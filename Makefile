@@ -1,5 +1,5 @@
 RC = rustc
-FLAGS = -L .
+FLAGS = -L ./bin
 
 all: libs bson test
 
