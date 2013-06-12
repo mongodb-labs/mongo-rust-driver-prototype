@@ -5,6 +5,7 @@ extern mod extra;
 //TODO: when linked_hashmap enters libextra, replace this
 extern mod ord_hashmap;
 
+use std::int::range;
 use std::to_bytes::*;
 use extra::json::*;
 use ord_hashmap::*;
@@ -45,6 +46,10 @@ pub trait BsonFormat {
 	fn bson_doc_fmt(&self) -> Document;
 }
 
+pub trait ByteStream {
+	fn sum(&self, count: int) -> u64;
+	fn advance(&mut self, count: int);
+}
 /**
 * The type of a complete BSON document. Contains an ordered map of fields and values and the size of the document as i32.
 */
@@ -214,23 +219,31 @@ impl Document {
 	}
 }
 
-priv fn sum_bytes(bytes: ~[u8]) -> u64 {
-	let mut i = 0;
-	let mut ret: u64 = 0;	
-	for bytes.each |&byte| {
-		let v = (byte as u64) << (8*i);
-		ret += v;
-		i += 1;
+impl ByteStream for ~[u8] {
+	fn sum(&self, count: int) -> u64 {
+		let mut ret: u64 = 0;	
+		for range(0,count) |i| {
+			ret += (self[i] as u64) << (8*i);
+		}
+		return ret;
 	}
-	return ret;
-} 
+	
+	fn advance(&mut self, count: int) {
+		for range(0,count) |_| {
+			self.shift();
+		}
+	}
+}
 
 /* Public encode and decode functions */
 
 //convert any object that can be validly represented in BSON into a BsonDocument
-//pub fn decode(bson: &mut [u8]) -> BsonDocument {
-	//let size: i32 = 				
-//}
+pub fn decode(bson: ~[u8]) -> BsonDocument {
+	let size: i32 = bson.sum(4) as i32;
+	let mut doc = BsonDocument::new();
+	doc.size = size;
+	doc
+}
 
 priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
 	let mut sz: i32 = 4; //since this map is going in an object, it has a 4-byte size variable
@@ -300,6 +313,12 @@ mod tests {
 	#[test]
 	fn test_object_bson_doc_fmt() {
 		//TODO	
+	}
+
+	#[test]
+	fn test_decode_size() {
+		let doc = decode(~[4,0,0,0,5,6,7,8]);
+		assert_eq!(doc.size, 4);
 	}
 
 	//testing encode
