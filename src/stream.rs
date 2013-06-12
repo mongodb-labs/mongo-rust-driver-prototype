@@ -6,7 +6,8 @@ use std::iterator::IteratorUtil;
 trait Stream<T:Eq> {
 	//Return if the stream has more values.	
 	fn has_next(&self) -> bool;
-	//Move the stream forward by count units.	
+	fn first<'a>(&'a self) -> &'a T;	
+	//Move the stream forward by count units.		
 	fn pass(&mut self, count: int);
 	//Apply a function to the first count units and return the results in a vector.
 	fn process<V: Copy>(&mut self, count: int, f: &fn(&T) -> V) -> ~[V];
@@ -18,6 +19,12 @@ trait Stream<T:Eq> {
 impl<T:Eq> Stream<T> for ~[T] {
 	fn has_next(&self) -> bool {
 		self.len() > 1	
+	}
+	fn first<'a>(&'a self) -> &'a T {
+		if self.is_empty() {
+			fail!("cannot get the first element of an empty stream!");
+		}
+		&'a self[0]
 	}
 	fn pass(&mut self, count: int) {
 		let mut c = 0;
@@ -61,7 +68,19 @@ mod tests {
 		assert_eq!((~[0]).has_next(), false);
 		assert_eq!((~[0,1,2]).has_next(), true);
 	}
+
+	#[test]
+	fn test_first() {
+		let full = ~[0];
+		assert_eq!(full.first(), &0);
+	}
 	
+	#[test]
+	#[should_fail]
+	fn test_first_fail() {
+		let empty: ~[~str] = ~[];
+		empty.first();
+	}	
 	#[test]
 	fn test_pass() {
 		let mut stream = ~[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];

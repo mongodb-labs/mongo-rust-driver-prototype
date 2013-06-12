@@ -24,6 +24,11 @@ bson: $(SRC)/bson.rs
 
 test: $(SRC)/bson.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(SRC)/bson.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/stream_test $(SRC)/stream.rs
+
+runtests: $(TEST)/bson_test $(TEST)/stream_test
+	$(TEST)/bson_test
+	$(TEST)/stream_test
 
 clean:
 	$(RM) ./bin/*.dylib
