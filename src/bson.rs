@@ -85,7 +85,7 @@ impl<'self> BsonDocument {
 	* Ex: let a = BsonDocument::inst().append(~"flag", Bool(true)).append(~"msg", UString(~"hello")).append(...);
 	* This may cause borrowing errors if used to make embedded objects.
 	*/
-	fn append(@mut self, key: ~str, val: Document) -> @ mut BsonDocument {
+	fn append(&'self mut self, key: ~str, val: Document) -> &'self mut BsonDocument {
 		self.fields.insert(key, val);
 		self.size = map_size(self.fields);
 		self
@@ -207,11 +207,22 @@ impl Document {
 	}
 }
 
+priv fn sum_bytes(bytes: ~[u8]) -> u64 {
+	let mut i = 0;
+	let mut ret: u64 = 0;	
+	for bytes.each |&byte| {
+		let v = (byte as u64) << (8*i);
+		ret += v;
+		i += 1;
+	}
+	return ret;
+} 
+
 /* Public encode and decode functions */
 
 //convert any object that can be validly represented in BSON into a BsonDocument
-//fn decode(bson: &mut [u8]) -> BsonDocument {
-		
+//pub fn decode(bson: &mut [u8]) -> BsonDocument {
+	//let size: i32 = 				
 //}
 
 priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
