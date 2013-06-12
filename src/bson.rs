@@ -162,24 +162,31 @@ impl ToBson for Document {
 	fn to_bson(&self, key: ~str) -> ~[u8] {
 		match *self {
 			//TODO float
-			UString(ref s) => ~[0x02] + key.to_bytes(l_end) + [0] + (1 + s.to_bytes(l_end).len() as i32).to_bytes(l_end) + s.to_bytes(l_end) + [0], 
-			Embedded(ref m) => ~[0x03] + key.to_bytes(l_end) + [0] + encode(*m),
-			Array(ref m) => ~[0x04] + key.to_bytes(l_end) + [0] + encode(*m),
-			Binary(st, ref bits) => ~[0x05] + key.to_bytes(l_end) + [0] + bits.len().to_bytes(l_end) + [st] + *bits, 	
-			ObjectId(ref id) => if id.len() != 12 { fail!("Invalid ObjectId: length must be 12 bytes") } else { ~[0x07] + key.to_bytes(l_end) + [0] + *id },
-			Bool(b) => ~[0x08] + key.to_bytes(l_end) + [0] + (if b {~[1]} else {~[0]}),
-			UTCDate(i) => ~[0x09] + key.to_bytes(l_end) + [0] + i.to_bytes(l_end),
-			Null => ~[0x0A] + key.to_bytes(l_end) + [0],
-			Regex(ref s1, ref s2) => ~[0x0B] + key.to_bytes(l_end) + [0] + s1.to_bytes(l_end) + [0] + s2.to_bytes(l_end) + [0], //TODO: scrub regexes
-			JScript(ref s) => ~[0x0D] + key.to_bytes(l_end) + [0] + (1 + s.to_bytes(l_end).len() as i32).to_bytes(l_end) + s.to_bytes(l_end) + [0],
-			JScriptWithScope(ref s, ref doc) => ~[0x0F] + key.to_bytes(l_end) + [0] + (5 + doc.size  + s.to_bytes(l_end).len() as i32).to_bytes(l_end) + s.to_bytes(l_end) + [0] + encode(*doc),	
-			Int32(i) => ~[0x10] + key.to_bytes(l_end) + [0] + i.to_bytes(l_end),
-			Timestamp(i) => ~[0x11] + key.to_bytes(l_end) + [0] + i.to_bytes(l_end),
-			Int64(i) => ~[0x12] + key.to_bytes(l_end) + [0] + i.to_bytes(l_end),
-			MinKey => ~[0xFF] + key.to_bytes(l_end) + [0],
-			MaxKey => ~[0x7F] + key.to_bytes(l_end) + [0],
+			//Double(f) => ~[0x01] + key.to_bson(~"") 	
+			UString(ref s) => ~[0x02] + key.to_bson(~"") + (s.to_bson(~"").len() as i32).to_bytes(l_end) + s.to_bson(~""), 
+			Embedded(ref m) => ~[0x03] + key.to_bson(~"") + encode(*m),
+			Array(ref m) => ~[0x04] + key.to_bson(~"") + encode(*m),
+			Binary(st, ref bits) => ~[0x05] + key.to_bson(~"") + bits.len().to_bytes(l_end) + [st] + *bits, 	
+			ObjectId(ref id) => if id.len() != 12 { fail!("Invalid ObjectId: length must be 12 bytes") } else { ~[0x07] + key.to_bson(~"") + *id },
+			Bool(b) => ~[0x08] + key.to_bson(~"") + (if b {~[1]} else {~[0]}),
+			UTCDate(i) => ~[0x09] + key.to_bson(~"") + i.to_bytes(l_end),
+			Null => ~[0x0A] + key.to_bson(~""),
+			Regex(ref s1, ref s2) => ~[0x0B] + key.to_bson(~"") + s1.to_bson(~"") + s2.to_bson(~""), //TODO: scrub regexes
+			JScript(ref s) => ~[0x0D] + key.to_bson(~"") + (s.to_bson(~"").len() as i32).to_bytes(l_end) + s.to_bson(~""),
+			JScriptWithScope(ref s, ref doc) => ~[0x0F] + key.to_bson(~"") + (4 + doc.size  + s.to_bson(~"").len() as i32).to_bytes(l_end) + s.to_bson(~"") + encode(*doc),	
+			Int32(i) => ~[0x10] + key.to_bson(~"") + i.to_bytes(l_end),
+			Timestamp(i) => ~[0x11] + key.to_bson(~"") + i.to_bytes(l_end),
+			Int64(i) => ~[0x12] + key.to_bson(~"") + i.to_bytes(l_end),
+			MinKey => ~[0xFF] + key.to_bson(~""),
+			MaxKey => ~[0x7F] + key.to_bson(~""),
 			_ => fail!() 
 		}
+	}
+}
+
+impl ToBson for ~str {
+	fn to_bson(&self, _: ~str) -> ~[u8] {
+		self.to_bytes(l_end) + [0]
 	}
 }
 
@@ -332,7 +339,6 @@ mod tests {
 	
 		let mut doc4 = BsonDocument::new();
 		doc4.put_all(~[(~"foo", JScriptWithScope(~"wat", ~ copy inside)), (~"baz", UString(~"qux"))]);	
-		println(fmt!(":::: %u", encode(&doc4).len()));	
 		assert_eq!(encode(&doc4), ~[53,0,0,0,15,102,111,111,0,30,0,0,0,119,97,116,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
 	
 

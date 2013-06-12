@@ -1,20 +1,32 @@
 RC = rustc
 FLAGS = -L ./bin
+RM = rm
+RMDIR = rmdir -p
+MKDIR = mkdir -p
 
-all: libs bson test
+SRC = ./src
+BIN = ./bin
+TEST = ./test
 
-libs:
-	$(RC) --lib -o ./bin/libord_hash.dylib ./src/ord_hash.rs
+.PHONY: test
 
-bson:
-	$(RC) $(FLAGS) -o ./bin/bson ./src/bson.rs
+all: bin libs test bson
 
-test:	
-	$(RC) $(FLAGS) --test -o ./test/bson_test bson.rs
+bin:
+	$(MKDIR) bin
+
+libs: $(SRC)/ord_hash.rs
+	$(RC) --lib --out-dir $(BIN) $(SRC)/ord_hash.rs
+
+bson: $(SRC)/bson.rs
+	$(RC) $(FLAGS) -o $(BIN)/bson $(SRC)/bson.rs
+
+test: $(SRC)/bson.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(SRC)/bson.rs
 
 clean:
-	rm -rf ./bin/*.o
-	rm ./bin/*.dylib
-	rm -rf ./bin/bson
-	rm -rf ./bin/bson_test
-	rm -rf ./bin/*.dSYM/*
+	$(RM) ./bin/*.dylib
+	$(RM) -f ./bin/bson
+	$(RM) -f ./test/bson_test
+	$(RM) -rf ./bin/*
+	$(RMDIR) bin
