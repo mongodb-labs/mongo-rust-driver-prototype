@@ -6,17 +6,20 @@ use std::iterator::IteratorUtil;
 trait Stream<T:Eq> {
 	//Return if the stream has more values.	
 	fn has_next(&self) -> bool;
+	//Return a pointer to the first element of the stream.
 	fn first<'a>(&'a self) -> &'a T;	
 	//Move the stream forward by count units.		
 	fn pass(&mut self, count: int);
 	//Apply a function to the first count units and return the results in a vector.
 	fn process<V: Copy>(&mut self, count: int, f: &fn(&T) -> V) -> ~[V];
+	//Collect the first count elements of a stream in a vector and return it.
+	fn aggregate(&mut self, count: int) -> ~[T];
 	//Look for the elements of search in the first element of the stream.
 	//If the first element of the stream matches any element, return the first match.	
 	fn expect(&self, search: ~[T]) -> Option<T>; 
 }
 
-impl<T:Eq> Stream<T> for ~[T] {
+impl<T:Eq + Copy> Stream<T> for ~[T] {
 	fn has_next(&self) -> bool {
 		self.len() > 1	
 	}
@@ -48,6 +51,9 @@ impl<T:Eq> Stream<T> for ~[T] {
 			c += 1;
 		}
 		ret
+	}
+	fn aggregate(&mut self, count: int) -> ~[T] {
+		self.process(count, |x| *x)
 	}	
 	fn expect(&self, search: ~[T]) -> Option<T> {
 		for search.iter().advance |&choice| {
