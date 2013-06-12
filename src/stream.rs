@@ -5,7 +5,7 @@ use std::iterator::IteratorUtil;
 
 trait Stream<T:Eq> {
 	//Return if the stream has more values.	
-	fn has_next(&self) -> bool;
+	fn has_next(& self) -> bool;
 	fn first<'a>(&'a self) -> &'a T;	
 	//Move the stream forward by count units.		
 	fn pass(&mut self, count: int);

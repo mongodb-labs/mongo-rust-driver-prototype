@@ -7,11 +7,31 @@ extern mod ord_hashmap;
 
 use std::util::id;
 use std::to_bytes::*;
+use std::str::from_bytes;
 use extra::json::*;
 use ord_hashmap::*;
 use stream::*;
 
 static l_end: bool = true;
+
+static DOUBLE: u8 = 0x01;
+static STRING: u8 = 0x02;
+static EMBED: u8 = 0x03;
+static ARRAY: u8 = 0x04;
+static BINARY: u8 = 0x05;
+static OBJID: u8 = 0x07;
+static BOOL: u8 = 0x08;
+static UTCDATE: u8 = 0x09;
+static NULL: u8 = 0x0A;
+static REGEX: u8 = 0x0B;
+static JSCRIPT: u8 = 0x0D;
+static JSCOPE: u8 = 0x0F;
+static INT32: u8 = 0x10;
+static TSTAMP: u8 = 0x11;
+static INT64: u8 = 0x12;
+static MINKEY: u8 = 0xFF;
+static MAXKEY: u8 = 0x7F;
+
 
 #[deriving(Eq)]
 pub enum Document {
@@ -57,17 +77,17 @@ pub struct BsonDocument {
 }
 
 impl<'self> BsonDocument {
-	fn contains_key(&self, key: ~str) -> bool {
+	pub fn contains_key(&self, key: ~str) -> bool {
 		self.fields.contains_key(&key)
 	}
 
-	fn find<'a>(&'a self, key: ~str) -> Option<&'a Document> {
+	pub fn find<'a>(&'a self, key: ~str) -> Option<&'a Document> {
 		self.fields.find(&key)
 	} 
 	/**
 	* Adds a key/value pair and updates size appropriately. Returns nothing.
 	*/
-	fn put(&mut self, key: ~str, val: Document) {
+	pub fn put(&mut self, key: ~str, val: Document) {
 		self.fields.insert(key, val);
 		self.size = map_size(self.fields);
 	}
@@ -75,7 +95,7 @@ impl<'self> BsonDocument {
 	/**
 	* Adds a list of key/value pairs and updates size. Returns nothing.
 	*/
-	fn put_all(&mut self, pairs: ~[(~str, Document)]) {
+	pub fn put_all(&mut self, pairs: ~[(~str, Document)]) {
 		//TODO: when is iter() going to be available?
 		for pairs.each |&(k,v)| {
 			self.fields.insert(k, v);
@@ -87,7 +107,7 @@ impl<'self> BsonDocument {
 	* Ex: let a = BsonDocument::inst().append(~"flag", Bool(true)).append(~"msg", UString(~"hello")).append(...);
 	* This may cause borrowing errors if used to make embedded objects.
 	*/
-	fn append(&'self mut self, key: ~str, val: Document) -> &'self mut BsonDocument {
+	pub fn append(&'self mut self, key: ~str, val: Document) -> &'self mut BsonDocument {
 		self.fields.insert(key, val);
 		self.size = map_size(self.fields);
 		self
@@ -96,7 +116,7 @@ impl<'self> BsonDocument {
 	/**
 	* Returns a new BsonDocument struct.
 	*/
-	fn new() -> BsonDocument {
+	pub fn new() -> BsonDocument {
 		BsonDocument { size: 0, fields: ~OrderedHashmap::new() }
 	}
 
@@ -107,21 +127,21 @@ impl<'self> BsonDocument {
 	* let c = BsonDocument::new();
 	* c.append(...).append(...).append(...); //compiles
 	*/
-	fn inst() -> @mut BsonDocument {
+	pub fn inst() -> @mut BsonDocument {
 		@mut BsonDocument::new()
 	}
 
 	/**
 	* Builds a BSON document from an OrderedHashmap.
 	*/
-	fn from_map(m: ~OrderedHashmap<~str, Document>) -> BsonDocument {	
+	pub fn from_map(m: ~OrderedHashmap<~str, Document>) -> BsonDocument {	
 		BsonDocument { size: map_size(m), fields: m }
 	}
 
 	/**
 	* Builds a BSON document from a JSON object. Note that some BSON fields, such as JavaScript, will not be generated.
 	*/
-	fn from_json(json: &Json) -> BsonDocument {
+	pub fn from_json(json: &Json) -> BsonDocument {
 		let mut m: ~OrderedHashmap<~str, Document> = ~OrderedHashmap::new();
 		match *json {
 			Object(ref jm) => { for jm.each_key |&k| {
@@ -219,31 +239,10 @@ impl Document {
 /* Public encode and decode functions */
 
 //convert any object that can be validly represented in BSON into a BsonDocument
-pub fn decode(b: ~[u8]) -> BsonDocument {
-	let mut bson = b;
-	let sizebits = bson.process(4, |x| *x);
-	let mut doc = BsonDocument::new();
-	doc.size = byte_sum(sizebits) as i32;
-	doc
+pub fn decode(mut b: ~[u8]) -> BsonDocument {
+	document(&mut b)
 }
 
-priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
-	let mut sz: i32 = 4; //since this map is going in an object, it has a 4-byte size variable
-	for m.each |&k, &v| {
-		sz += (k.to_bytes(l_end).len() as i32) + v.size() + 2; //1 byte format code, trailing 0 after each key
-	}
-	sz + 1 //trailing 0 byte
-}
-
-priv fn byte_sum(bytes: ~[u8]) -> u64 {
-	let mut i = 0;
-	let mut ret: u64 = 0;
-	for bytes.each |&byte| {
-		ret += (byte as u64) >> (8 * i);
-		i += 1;
-	}
-	ret
-}
 //convert a Rust object representing a BSON document into a bytestring
 pub fn encode(obj: &BsonDocument) -> ~[u8] {
 	let mut bson = obj.size.to_bytes(l_end);
@@ -254,6 +253,144 @@ pub fn encode(obj: &BsonDocument) -> ~[u8] {
 	return bson + [0];
 }
 
+/* Utility functions, mostly for decode */
+
+priv fn bytesum(bytes: ~[u8]) -> u64 {
+	let mut i = 0;
+	let mut ret: u64 = 0;
+	for bytes.each |&byte| {
+		ret += (byte as u64) >> (8 * i);
+		i += 1;
+	}
+	ret
+}
+
+priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
+	let mut sz: i32 = 4; //since this map is going in an object, it has a 4-byte size variable
+	for m.each |&k, &v| {
+		sz += (k.to_bytes(l_end).len() as i32) + v.size() + 2; //1 byte format code, trailing 0 after each key
+	}
+	sz + 1 //trailing 0 byte
+}
+
+priv fn document<T:Stream<u8>>(stream: &mut T) -> BsonDocument {
+	let size = bytesum(stream.aggregate(4)) as i32;
+	let elemcode = stream.expect(~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
+	let mut ret = BsonDocument::new();
+	while elemcode != Some(0x0) {
+		let key = cstring(stream);
+		let val: Document = match elemcode {
+			Some(DOUBLE) => _double(stream),
+			Some(STRING) => _string(stream),
+			Some(EMBED) => _embed(stream),
+			Some(ARRAY) => _array(stream),
+			Some(BINARY) => _binary(stream),
+			Some(OBJID) => _objid(stream),
+			Some(BOOL) => _bool(stream),
+			Some(UTCDATE) => _utcdate(stream),
+			Some(NULL) => _null(stream),
+			Some(REGEX) => _regex(stream),
+			Some(JSCRIPT) => _jscript(stream),
+			Some(JSCOPE) => _jscope(stream),
+			Some(INT32) => _int32(stream),
+			Some(TSTAMP) => _tstamp(stream),
+			Some(INT64) => _int64(stream),
+			Some(MINKEY) => _minkey(stream),
+			Some(MAXKEY) => _maxkey(stream),
+			_ => fail!("an invalid element code was found!")
+		};
+		ret.put(key, val);
+	}
+	ret.size = size;
+	ret
+}
+
+priv fn cstring<T:Stream<u8>>(stream: &mut T) -> ~str {
+	let s = from_bytes(stream.until(|&x| x == 0x0));
+	stream.pass(1);
+	s
+}
+
+priv fn _double<T:Stream<u8>>(stream: &mut T) -> Document {
+	//TODO: this might be pretty hard
+	Double(0 as f64)
+}
+
+priv fn _string<T:Stream<u8>>(stream: &mut T) -> Document {
+	stream.pass(4);
+	UString(cstring(stream))
+}
+
+priv fn _embed<T:Stream<u8>>(stream: &mut T) -> Document {
+	Embedded(~document(stream))	
+}
+
+priv fn _array<T:Stream<u8>>(stream: &mut T) -> Document {
+	Array(~document(stream))
+}
+
+priv fn _binary<T:Stream<u8>>(mut stream: &mut T) -> Document {
+	let bytes = stream.aggregate(4);
+	let count = bytesum(bytes);
+	let subtype = (&mut stream).first();
+	stream.pass(1);
+	let data = stream.aggregate(count as int);
+	Binary(*subtype, data)
+}
+
+priv fn _objid<T:Stream<u8>>(stream: &mut T) -> Document {
+	ObjectId(stream.aggregate(12))
+}
+
+priv fn _bool<T:Stream<u8>>(stream: &mut T) -> Document {
+	Bool((*stream.first()) as bool)
+}
+
+priv fn _utcdate<T:Stream<u8>>(stream: &mut T) -> Document {
+	UTCDate(bytesum(stream.aggregate(8)) as i64)
+}
+
+priv fn _null<T:Stream<u8>>(_: &mut T) -> Document {
+	Null
+}
+
+priv fn _regex<T:Stream<u8>>(stream: &mut T) -> Document {
+	let s1 = cstring(stream);
+	let s2 = cstring(stream);
+	Regex(s1, s2)
+}
+
+priv fn _jscript<T:Stream<u8>>(stream: &mut T) -> Document {
+	let s = _string(stream);
+	match s {
+		UString(s) => JScript(s),
+		_ => fail!("invalid string in javascript")
+	}
+}
+
+priv fn _jscope<T:Stream<u8>>(stream: &mut T) -> Document {
+	Null //TODO: i'm lazy
+}
+
+priv fn _int32<T:Stream<u8>>(stream: &mut T) -> Document {
+	Int32(bytesum(stream.aggregate(4)) as i32)
+}
+
+priv fn _tstamp<T:Stream<u8>>(stream: &mut T) -> Document {
+	Timestamp(bytesum(stream.aggregate(8)) as i64)
+}
+
+priv fn _int64<T:Stream<u8>>(stream: &mut T) -> Document {
+	Int64(bytesum(stream.aggregate(8)) as i64)
+}
+
+priv fn _minkey<T:Stream<u8>>(_: &mut T) -> Document {
+	MinKey
+}
+
+priv fn _maxkey<T:Stream<u8>>(_: &mut T) -> Document {
+	MaxKey
+} 
 #[cfg(test)]
 mod tests {
 	extern mod extra;
@@ -409,3 +546,4 @@ mod tests {
 		assert_eq!(enc, ~[33,0,0,0,8,102,111,111,0,1,2,98,97,114,0,4,0,0,0,98,97,122,0,16,113,117,120,0,148,1,0,0,0]);
 	}
 }
+

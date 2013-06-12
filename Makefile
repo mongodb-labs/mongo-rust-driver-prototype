@@ -15,14 +15,13 @@ all: bin libs test bson
 bin:
 	$(MKDIR) bin
 
-libs: $(SRC)/ord_hash.rs
+libs: $(SRC)/ord_hash.rs $(SRC)/stream.rs 
 	$(RC) --lib --out-dir $(BIN) $(SRC)/ord_hash.rs
 	$(RC) --lib --out-dir $(BIN) $(SRC)/stream.rs
-
 bson: $(SRC)/bson.rs
 	$(RC) $(FLAGS) -o $(BIN)/bson $(SRC)/bson.rs
 
-test: $(SRC)/bson.rs
+test: $(SRC)/bson.rs $(SRC)/stream.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(SRC)/bson.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/stream_test $(SRC)/stream.rs
 
