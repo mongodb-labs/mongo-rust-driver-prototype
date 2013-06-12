@@ -17,6 +17,7 @@ bin:
 
 libs: $(SRC)/ord_hash.rs
 	$(RC) --lib --out-dir $(BIN) $(SRC)/ord_hash.rs
+	$(RC) --lib --out-dir $(BIN) $(SRC)/stream.rs
 
 bson: $(SRC)/bson.rs
 	$(RC) $(FLAGS) -o $(BIN)/bson $(SRC)/bson.rs

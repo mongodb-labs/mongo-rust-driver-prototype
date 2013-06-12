@@ -1,14 +1,15 @@
 #[link(name="bson", vers="0.1", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
 #[crate_type="lib"];
 extern mod extra;
-
+extern mod stream;
 //TODO: when linked_hashmap enters libextra, replace this
 extern mod ord_hashmap;
 
-use std::int::range;
+use std::util::id;
 use std::to_bytes::*;
 use extra::json::*;
 use ord_hashmap::*;
+use stream::*;
 
 static l_end: bool = true;
 
@@ -46,10 +47,6 @@ pub trait BsonFormat {
 	fn bson_doc_fmt(&self) -> Document;
 }
 
-pub trait ByteStream {
-	fn sum(&self, count: int) -> u64;
-	fn advance(&mut self, count: int);
-}
 /**
 * The type of a complete BSON document. Contains an ordered map of fields and values and the size of the document as i32.
 */
@@ -219,29 +216,14 @@ impl Document {
 	}
 }
 
-impl ByteStream for ~[u8] {
-	fn sum(&self, count: int) -> u64 {
-		let mut ret: u64 = 0;	
-		for range(0,count) |i| {
-			ret += (self[i] as u64) << (8*i);
-		}
-		return ret;
-	}
-	
-	fn advance(&mut self, count: int) {
-		for range(0,count) |_| {
-			self.shift();
-		}
-	}
-}
-
 /* Public encode and decode functions */
 
 //convert any object that can be validly represented in BSON into a BsonDocument
-pub fn decode(bson: ~[u8]) -> BsonDocument {
-	let size: i32 = bson.sum(4) as i32;
+pub fn decode(b: ~[u8]) -> BsonDocument {
+	let mut bson = b;
+	let sizebits = bson.process(4, |x| *x);
 	let mut doc = BsonDocument::new();
-	doc.size = size;
+	doc.size = byte_sum(sizebits) as i32;
 	doc
 }
 
@@ -253,6 +235,15 @@ priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
 	sz + 1 //trailing 0 byte
 }
 
+priv fn byte_sum(bytes: ~[u8]) -> u64 {
+	let mut i = 0;
+	let mut ret: u64 = 0;
+	for bytes.each |&byte| {
+		ret += (byte as u64) >> (8 * i);
+		i += 1;
+	}
+	ret
+}
 //convert a Rust object representing a BSON document into a bytestring
 pub fn encode(obj: &BsonDocument) -> ~[u8] {
 	let mut bson = obj.size.to_bytes(l_end);
