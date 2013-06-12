@@ -14,6 +14,8 @@ trait Stream<T:Eq> {
 	//Collect the first count elements and return them in a vector.
 	//This is logically equivalent to self.process(count, id), modulo pointer types.
 	fn aggregate(&mut self, count: int) -> ~[T];
+	//Aggregate elements of the stream until the head of the stream meets the predicate.
+	fn until(&mut self, f: &fn(&T) -> bool) -> ~[T];
 	//Look for the elements of search in the first element of the stream.
 	//If the first element of the stream matches any element, return the first match.	
 	fn expect(&self, search: ~[T]) -> Option<T>; 
@@ -53,9 +55,21 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
 		}
 		ret
 	}
+
 	fn aggregate(&mut self, count: int) -> ~[T] {	
 		self.process(count, |x| *x)
 	}	
+	
+	fn until(&mut self, f: &fn(&T) -> bool) -> ~[T] {
+		let mut ret: ~[T] = ~[];
+		loop {
+			if f(self.first()) {
+				return ret;
+			}
+			ret += [self[0]];
+			self.pass(1);
+		}
+	}
 	fn expect(&self, search: ~[T]) -> Option<T> {
 		for search.iter().advance |&choice| {
 			if choice == self[0] { 
@@ -149,6 +163,20 @@ mod tests {
 		assert_eq!(stream.aggregate(3), ~[3,4,5]);
 	}
 
+	#[test]
+	fn test_until() {
+		let mut stream = ~[0,1,2,3,4,5,6,7,8,9];
+		let is_4: &fn(&int) -> bool = |&x| x == 4;
+		assert_eq!(stream.until(is_4), ~[0,1,2,3]);
+	}
+
+	#[test]
+	#[should_fail]
+	fn test_until_runover() {
+		let mut stream = ~[0,1,2,3,4,5,6,7,8,9];
+		let is_50: &fn(&int) -> bool = |&x| x == 50;
+		stream.until(is_50);
+	}
 	#[test]
 	fn test_expect() {
 		let stream = ~[0,1,2];
