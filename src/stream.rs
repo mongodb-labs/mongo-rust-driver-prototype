@@ -6,6 +6,7 @@ use std::iterator::IteratorUtil;
 trait Stream<T:Eq> {
 	//Return if the stream has more values.	
 	fn has_next(& self) -> bool;
+	//Get a borrowed pointer to the first element of the stream.
 	fn first<'a>(&'a self) -> &'a T;	
 	//Move the stream forward by count units.		
 	fn pass(&mut self, count: int);
@@ -168,6 +169,8 @@ mod tests {
 		let mut stream = ~[0,1,2,3,4,5,6,7,8,9];
 		let is_4: &fn(&int) -> bool = |&x| x == 4;
 		assert_eq!(stream.until(is_4), ~[0,1,2,3]);
+		let is_9: &fn(&int) -> bool = |&x| x == 9;
+		assert_eq!(stream.until(is_9), ~[4,5,6,7,8]);
 	}
 
 	#[test]

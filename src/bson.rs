@@ -273,12 +273,13 @@ priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
 	sz + 1 //trailing 0 byte
 }
 
-priv fn document<T:Stream<u8>>(stream: &mut T) -> BsonDocument {
+pub fn document<T:Stream<u8>>(stream: &mut T) -> BsonDocument {
 	let size = bytesum(stream.aggregate(4)) as i32;
-	let elemcode = stream.expect(~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
+	let mut elemcode = stream.expect(~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
 	let mut ret = BsonDocument::new();
-	while elemcode != Some(0x0) {
+	while elemcode != None {
 		let key = cstring(stream);
+		println(~"I found the key! It was " + key);
 		let val: Document = match elemcode {
 			Some(DOUBLE) => _double(stream),
 			Some(STRING) => _string(stream),
@@ -288,48 +289,50 @@ priv fn document<T:Stream<u8>>(stream: &mut T) -> BsonDocument {
 			Some(OBJID) => _objid(stream),
 			Some(BOOL) => _bool(stream),
 			Some(UTCDATE) => _utcdate(stream),
-			Some(NULL) => _null(stream),
+			Some(NULL) => Null,
 			Some(REGEX) => _regex(stream),
 			Some(JSCRIPT) => _jscript(stream),
 			Some(JSCOPE) => _jscope(stream),
 			Some(INT32) => _int32(stream),
 			Some(TSTAMP) => _tstamp(stream),
 			Some(INT64) => _int64(stream),
-			Some(MINKEY) => _minkey(stream),
-			Some(MAXKEY) => _maxkey(stream),
+			Some(MINKEY) => MinKey,
+			Some(MAXKEY) => MaxKey,
 			_ => fail!("an invalid element code was found!")
 		};
 		ret.put(key, val);
+		elemcode = stream.expect(~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
 	}
 	ret.size = size;
 	ret
 }
 
-priv fn cstring<T:Stream<u8>>(stream: &mut T) -> ~str {
-	let s = from_bytes(stream.until(|&x| x == 0x0));
+pub fn cstring<T:Stream<u8>>(stream: &mut T) -> ~str {
+	let is_0: &fn(&u8) -> bool = |&x| x == 0x00;
+	let s = from_bytes(stream.until(is_0));
 	stream.pass(1);
 	s
 }
 
-priv fn _double<T:Stream<u8>>(stream: &mut T) -> Document {
+pub fn _double<T:Stream<u8>>(stream: &mut T) -> Document {
 	//TODO: this might be pretty hard
 	Double(0 as f64)
 }
 
-priv fn _string<T:Stream<u8>>(stream: &mut T) -> Document {
+pub fn _string<T:Stream<u8>>(stream: &mut T) -> Document {
 	stream.pass(4);
 	UString(cstring(stream))
 }
 
-priv fn _embed<T:Stream<u8>>(stream: &mut T) -> Document {
+fn _embed<T:Stream<u8>>(stream: &mut T) -> Document {
 	Embedded(~document(stream))	
 }
 
-priv fn _array<T:Stream<u8>>(stream: &mut T) -> Document {
+fn _array<T:Stream<u8>>(stream: &mut T) -> Document {
 	Array(~document(stream))
 }
 
-priv fn _binary<T:Stream<u8>>(mut stream: &mut T) -> Document {
+fn _binary<T:Stream<u8>>(mut stream: &mut T) -> Document {
 	let bytes = stream.aggregate(4);
 	let count = bytesum(bytes);
 	let subtype = (&mut stream).first();
@@ -338,29 +341,29 @@ priv fn _binary<T:Stream<u8>>(mut stream: &mut T) -> Document {
 	Binary(*subtype, data)
 }
 
-priv fn _objid<T:Stream<u8>>(stream: &mut T) -> Document {
+fn _objid<T:Stream<u8>>(stream: &mut T) -> Document {
 	ObjectId(stream.aggregate(12))
 }
 
-priv fn _bool<T:Stream<u8>>(stream: &mut T) -> Document {
+fn _bool<T:Stream<u8>>(stream: &mut T) -> Document {
 	Bool((*stream.first()) as bool)
 }
 
-priv fn _utcdate<T:Stream<u8>>(stream: &mut T) -> Document {
+fn _utcdate<T:Stream<u8>>(stream: &mut T) -> Document {
 	UTCDate(bytesum(stream.aggregate(8)) as i64)
 }
 
-priv fn _null<T:Stream<u8>>(_: &mut T) -> Document {
+fn _null<T:Stream<u8>>(_: &mut T) -> Document {
 	Null
 }
 
-priv fn _regex<T:Stream<u8>>(stream: &mut T) -> Document {
+fn _regex<T:Stream<u8>>(stream: &mut T) -> Document {
 	let s1 = cstring(stream);
 	let s2 = cstring(stream);
 	Regex(s1, s2)
 }
 
-priv fn _jscript<T:Stream<u8>>(stream: &mut T) -> Document {
+fn _jscript<T:Stream<u8>>(stream: &mut T) -> Document {
 	let s = _string(stream);
 	match s {
 		UString(s) => JScript(s),
@@ -368,27 +371,27 @@ priv fn _jscript<T:Stream<u8>>(stream: &mut T) -> Document {
 	}
 }
 
-priv fn _jscope<T:Stream<u8>>(stream: &mut T) -> Document {
+fn _jscope<T:Stream<u8>>(stream: &mut T) -> Document {
 	Null //TODO: i'm lazy
 }
 
-priv fn _int32<T:Stream<u8>>(stream: &mut T) -> Document {
+fn _int32<T:Stream<u8>>(stream: &mut T) -> Document {
 	Int32(bytesum(stream.aggregate(4)) as i32)
 }
 
-priv fn _tstamp<T:Stream<u8>>(stream: &mut T) -> Document {
+fn _tstamp<T:Stream<u8>>(stream: &mut T) -> Document {
 	Timestamp(bytesum(stream.aggregate(8)) as i64)
 }
 
-priv fn _int64<T:Stream<u8>>(stream: &mut T) -> Document {
+fn _int64<T:Stream<u8>>(stream: &mut T) -> Document {
 	Int64(bytesum(stream.aggregate(8)) as i64)
 }
 
-priv fn _minkey<T:Stream<u8>>(_: &mut T) -> Document {
+fn _minkey<T:Stream<u8>>(_: &mut T) -> Document {
 	MinKey
 }
 
-priv fn _maxkey<T:Stream<u8>>(_: &mut T) -> Document {
+fn _maxkey<T:Stream<u8>>(_: &mut T) -> Document {
 	MaxKey
 } 
 #[cfg(test)]
@@ -441,12 +444,6 @@ mod tests {
 	#[test]
 	fn test_object_bson_doc_fmt() {
 		//TODO	
-	}
-
-	#[test]
-	fn test_decode_size() {
-		let doc = decode(~[4,0,0,0,5,6,7,8]);
-		assert_eq!(doc.size, 4);
 	}
 
 	//testing encode
@@ -544,6 +541,21 @@ mod tests {
 		let enc = encode(doc);
 	
 		assert_eq!(enc, ~[33,0,0,0,8,102,111,111,0,1,2,98,97,114,0,4,0,0,0,98,97,122,0,16,113,117,120,0,148,1,0,0,0]);
+	}
+
+	//test decode
+
+	#[test]
+	fn test_decode_size() {
+		let doc = decode(~[10,0,0,0,10,100,100,100,0,0]);
+		assert_eq!(doc.size, 10);
+	}
+
+
+	#[test]
+	fn test_cstring_decode() {
+		let mut stream: ~[u8] = ~[104,101,108,108,111,0,0];
+		assert_eq!(cstring(&mut stream), ~"hello");
 	}
 }
 
