@@ -183,8 +183,10 @@ impl BsonFormat for Json {
 impl ToBson for Document {
 	fn to_bson(&self, key: ~str) -> ~[u8] {
 		match *self {
-			//TODO float
-			//Double(f) => ~[0x01] + key.to_bson(~"") 	
+			Double(f) => {
+				let x: [u8,..8] = unsafe { std::cast::transmute(f as f64) };
+				~[0x01] + key.to_bson(~"") + x
+			}
 			UString(ref s) => ~[0x02] + key.to_bson(~"") + (s.to_bson(~"").len() as i32).to_bytes(l_end) + s.to_bson(~""), 
 			Embedded(ref m) => ~[0x03] + key.to_bson(~"") + encode(*m),
 			Array(ref m) => ~[0x04] + key.to_bson(~"") + encode(*m),
@@ -200,8 +202,7 @@ impl ToBson for Document {
 			Timestamp(i) => ~[0x11] + key.to_bson(~"") + i.to_bytes(l_end),
 			Int64(i) => ~[0x12] + key.to_bson(~"") + i.to_bytes(l_end),
 			MinKey => ~[0xFF] + key.to_bson(~""),
-			MaxKey => ~[0x7F] + key.to_bson(~""),
-			_ => fail!() 
+			MaxKey => ~[0x7F] + key.to_bson(~"")
 		}
 	}
 }
@@ -286,16 +287,16 @@ pub fn document<T:Stream<u8>>(stream: &mut T) -> BsonDocument {
 			Some(EMBED) => _embed(stream),
 			Some(ARRAY) => _array(stream),
 			Some(BINARY) => _binary(stream),
-			Some(OBJID) => _objid(stream),
+			Some(OBJID) => ObjectId(stream.aggregate(12)), 
 			Some(BOOL) => _bool(stream),
 			Some(UTCDATE) => UTCDate(bytesum(stream.aggregate(8)) as i64),
 			Some(NULL) => Null,
 			Some(REGEX) => _regex(stream),
 			Some(JSCRIPT) => _jscript(stream),
 			Some(JSCOPE) => _jscope(stream),
-			Some(INT32) => _int32(stream),
-			Some(TSTAMP) => _tstamp(stream),
-			Some(INT64) => _int64(stream),
+			Some(INT32) => Int32(bytesum(stream.aggregate(4)) as i32),
+			Some(TSTAMP) => Timestamp(bytesum(stream.aggregate(8)) as i64),
+			Some(INT64) => Int64(bytesum(stream.aggregate(8)) as i64),
 			Some(MINKEY) => MinKey,
 			Some(MAXKEY) => MaxKey,
 			_ => fail!("an invalid element code was found!")
@@ -316,9 +317,9 @@ pub fn cstring<T:Stream<u8>>(stream: &mut T) -> ~str {
 }
 
 pub fn _double<T:Stream<u8>>(stream: &mut T) -> Document {
-	//TODO: this might be pretty hard
-	stream.aggregate(8);
-	Double(0 as f64)
+	let bytes: ~[u8] = stream.aggregate(8);
+	let v: f64 = unsafe { std::cast::transmute(bytes) };
+	Double(v)
 }
 
 pub fn _string<T:Stream<u8>>(stream: &mut T) -> Document {
@@ -343,18 +344,10 @@ pub fn _binary<T:Stream<u8>>(mut stream: &mut T) -> Document {
 	Binary(*subtype, data)
 }
 
-pub fn _objid<T:Stream<u8>>(stream: &mut T) -> Document {
-	ObjectId(stream.aggregate(12))
-}
-
 pub fn _bool<T:Stream<u8>>(stream: &mut T) -> Document {
 	let ret = (*stream.first()) as bool;
 	stream.pass(1);
 	Bool(ret)
-}
-
-pub fn _utcdate<T:Stream<u8>>(stream: &mut T) -> Document {
-	UTCDate(bytesum(stream.aggregate(8)) as i64)
 }
 
 pub fn _regex<T:Stream<u8>>(stream: &mut T) -> Document {
@@ -365,6 +358,7 @@ pub fn _regex<T:Stream<u8>>(stream: &mut T) -> Document {
 
 pub fn _jscript<T:Stream<u8>>(stream: &mut T) -> Document {
 	let s = _string(stream);
+	//using this to avoid irrefutable pattern error
 	match s {
 		UString(s) => JScript(s),
 		_ => fail!("invalid string in javascript")
@@ -378,17 +372,6 @@ fn _jscope<T:Stream<u8>>(stream: &mut T) -> Document {
 	JScriptWithScope(s, ~doc)
 }
 
-fn _int32<T:Stream<u8>>(stream: &mut T) -> Document {
-	Int32(bytesum(stream.aggregate(4)) as i32)
-}
-
-fn _tstamp<T:Stream<u8>>(stream: &mut T) -> Document {
-	Timestamp(bytesum(stream.aggregate(8)) as i64)
-}
-
-fn _int64<T:Stream<u8>>(stream: &mut T) -> Document {
-	Int64(bytesum(stream.aggregate(8)) as i64)
-}
 #[cfg(test)]
 mod tests {
 	extern mod extra;
@@ -442,6 +425,12 @@ mod tests {
 	}
 
 	//testing encode
+
+	#[test]
+	fn test_double_encode() {
+		let doc = BsonDocument::inst().append(~"foo", Double(3.14159f64));
+		assert_eq!(encode(doc), ~[18,0,0,0,1,102,111,111,0,110,134,27,240,249,33,9,64,0]);
+	}
 	#[test]
 	fn test_string_encode() {
 		let doc = BsonDocument::inst().append(~"foo", UString(~"bar"));
@@ -553,13 +542,19 @@ mod tests {
 		let mut stream: ~[u8] = ~[104,101,108,108,111,0];
 		assert_eq!(cstring(&mut stream), ~"hello");
 	}
-
+	
 	#[test]
-	fn test_string_decode() {
-		let mut stream: ~[u8] =  ~[4,0,0,0,98,97,114,0];
-		assert_eq!(_string(&mut stream), UString(~"bar"));
+	fn test_double_decode() {
+		let mut stream: ~[u8] = ~[110,134,27,240,249,33,9,64];
+		let d = _double(&mut stream);
+		match d {
+			Double(d2) => {
+				println(fmt!(":::::::::d2 is %?", d2));
+				assert!(d2.approx_eq(&3.14159f64));
+			}
+			_ => fail!("failed in a test case; how did I get here?")
+		}
 	}
-
 	#[test]
 	fn test_document_decode() {
 		let mut stream1: ~[u8] = ~[11,0,0,0,8,102,111,111,0,1,0];
@@ -578,7 +573,7 @@ mod tests {
 	#[test]
 	fn test_binary_decode() {
 		let mut stream: ~[u8] = ~[6,0,0,0,0,1,2,3,4,5,6];
-		//assert_eq!(_binary(&mut stream), Binary(0, ~[1,2,3,4,5,6]));
+		assert_eq!(_binary(&mut stream), Binary(0, ~[1,2,3,4,5,6]));
 	}
 }
 
