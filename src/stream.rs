@@ -24,7 +24,7 @@ trait Stream<T:Eq> {
 
 impl<T:Eq + Copy> Stream<T> for ~[T] {
 	fn has_next(&self) -> bool {
-		self.len() > 1	
+		self.len() >= 1	
 	}
 	fn first<'a>(&'a self) -> &'a T {
 		if self.is_empty() {
@@ -33,20 +33,13 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
 		&'a self[0]
 	}
 	fn pass(&mut self, count: int) {
-		let mut c = 0;
-		if !self.has_next() || count >= self.len() as int {
-			fail!("cannot pass past end of stream!");
-		}	
-		while self.has_next() && c < count {
-			self.shift();
-			c += 1;
-		}
+		self.process(count, |x| *x);
 	}
 
 	fn process<V: Copy>(&mut self, count: int, f: &fn(&T) -> V) -> ~[V] {
 		let mut c = 0;
 		let mut ret: ~[V] = ~[];
-		if !self.has_next() || count >= self.len() as int {
+		if !self.has_next() || count > self.len() as int {
 			fail!("cannot process past end of stream!");
 		}
 		while self.has_next() && c < count {
@@ -64,7 +57,7 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
 	fn until(&mut self, f: &fn(&T) -> bool) -> ~[T] {
 		let mut ret: ~[T] = ~[];
 		loop {
-			if f(self.first()) {
+			if f(self.first()) || !self.has_next() {
 				return ret;
 			}
 			ret += [self[0]];
@@ -72,6 +65,7 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
 		}
 	}
 	fn expect(&self, search: ~[T]) -> Option<T> {
+		if !self.has_next() { return None; }
 		for search.iter().advance |&choice| {
 			if choice == self[0] { 
 				return Some(choice); 
@@ -87,7 +81,6 @@ mod tests {
 	fn test_has_next() {
 		let empty: ~[~str] = ~ [];
 		assert_eq!(empty.has_next(), false);	
-		assert_eq!((~[0]).has_next(), false);
 		assert_eq!((~[0,1,2]).has_next(), true);
 	}
 
@@ -122,8 +115,7 @@ mod tests {
 		let mut stream = ~[0,1];
 		stream.pass(1);
 		assert_eq!(stream[0], 1);
-		assert_eq!(stream.has_next(), false);
-		stream.pass(1);
+		stream.pass(2);
 	}
 
 	#[test]
@@ -147,7 +139,7 @@ mod tests {
 		let mut stream = ~[0,1];
 		let f: &fn(&int) -> int = |&val| 2 * val;
 		assert_eq!(stream.process(1, f), ~[0]);
-		stream.process(1, f);
+		stream.process(2, f);
 	}
 
 	#[test]
