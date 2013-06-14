@@ -14,6 +14,7 @@ all: bin libs test bson
 
 bin:
 	$(MKDIR) bin
+	$(MKDIR) test
 
 libs: $(SRC)/ord_hash.rs $(SRC)/stream.rs $(SRC)/json_parse.rs $(SRC)/bson_types.rs
 	$(RC) --lib --out-dir $(BIN) $(SRC)/ord_hash.rs
@@ -35,8 +36,10 @@ runtests: $(TEST)/bson_test $(TEST)/stream_test $(TEST)/json_test
 	$(TEST)/json_test
 
 clean:
-	$(RM) ./bin/*.dylib
-	$(RM) -f ./bin/bson
-	$(RM) -f ./test/bson_test
-	$(RM) -rf ./bin/*
+	$(RM) $(BIN)/*.dylib
+	$(RM) -f $(BIN)/bson
+	$(RM) -rf $(TEST)/*
+	$(RM) -f 
+	$(RM) -rf $(BIN)/*
 	$(RMDIR) bin
+	$(RMDIR) test
