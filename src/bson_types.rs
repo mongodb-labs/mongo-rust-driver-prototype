@@ -154,34 +154,6 @@ impl Document {
 		}
 	}
 }
-/*
-impl ToBson for Document {
-	fn to_bson(&self, key: ~str) -> ~[u8] {
-		match *self {
-			Double(f) => {
-				let x: [u8,..8] = unsafe { std::cast::transmute(f as f64) };
-				~[0x01] + key.to_bson(~"") + x
-			}
-			UString(ref s) => ~[0x02] + key.to_bson(~"") + (s.to_bson(~"").len() as i32).to_bytes(l_end) + s.to_bson(~""), 
-			Embedded(ref m) => ~[0x03] + key.to_bson(~"") + encode(*m),
-			Array(ref m) => ~[0x04] + key.to_bson(~"") + encode(*m),
-			Binary(st, ref bits) => ~[0x05] + key.to_bson(~"") + bits.len().to_bytes(l_end) + [st] + *bits, 	
-			ObjectId(ref id) => if id.len() != 12 { fail!("Invalid ObjectId: length must be 12 bytes") } else { ~[0x07] + key.to_bson(~"") + *id },
-			Bool(b) => ~[0x08] + key.to_bson(~"") + (if b {~[1]} else {~[0]}),
-			UTCDate(i) => ~[0x09] + key.to_bson(~"") + i.to_bytes(l_end),
-			Null => ~[0x0A] + key.to_bson(~""),
-			Regex(ref s1, ref s2) => ~[0x0B] + key.to_bson(~"") + s1.to_bson(~"") + s2.to_bson(~""), //TODO: scrub regexes
-			JScript(ref s) => ~[0x0D] + key.to_bson(~"") + (s.to_bson(~"").len() as i32).to_bytes(l_end) + s.to_bson(~""),
-			JScriptWithScope(ref s, ref doc) => ~[0x0F] + key.to_bson(~"") + (4 + doc.size  + s.to_bson(~"").len() as i32).to_bytes(l_end) + s.to_bson(~"") + encode(*doc),	
-			Int32(i) => ~[0x10] + key.to_bson(~"") + i.to_bytes(l_end),
-			Timestamp(i) => ~[0x11] + key.to_bson(~"") + i.to_bytes(l_end),
-			Int64(i) => ~[0x12] + key.to_bson(~"") + i.to_bytes(l_end),
-			MinKey => ~[0xFF] + key.to_bson(~""),
-			MaxKey => ~[0x7F] + key.to_bson(~"")
-		}
-	}
-}
-*/
 
 impl BsonFormattable for PureJson {
 	fn bson_doc_fmt(&self) -> Document{
@@ -190,7 +162,7 @@ impl BsonFormattable for PureJson {
 			PureJsonString(ref s) => UString(copy *s),
 			PureJsonBoolean(b) => Bool(b),
 			PureJsonNull => Null,
-			//PureJsonObjID(l) => ObjectId(l),
+			PureJsonObjID(ref l) => ObjectId(copy *l),
 			PureJsonList(ref l) => {
 				let nl = l.map(|&item| item.bson_doc_fmt()); 
 				let mut doc = BsonDocument::new();
@@ -208,7 +180,6 @@ impl BsonFormattable for PureJson {
 				}
 				Embedded(~doc)
 			}
-			_ => fail!("objid not implemented")
 		}
 	}
 }
