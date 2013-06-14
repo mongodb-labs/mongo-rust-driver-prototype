@@ -13,14 +13,58 @@ use stream::*;
 use ord_hashmap::*;
 use bson_types::*;
 
-pub fn from_string(s: &str) -> PureJson {
-	let mut stream = to_chars(s);
-	stream.pass_while(&~[' ', '\n', '\r', '\t']);
-	if !(stream.first() == &'{') {
-		fail!("invalid object given!"); 
-	}
-	_object(&mut stream)
+pub trait ObjNotation<T:Stream<char>> {
+	pub fn object(&mut T) -> Self;
+	pub fn from_string(s: &str) -> Self;
 }
+
+impl<T:Stream<char>> ObjNotation<T> for PureJson {
+	pub fn object(stream: &mut T) -> PureJson {
+		stream.pass(1); //pass over brace
+		let mut ret: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
+		while !(stream.first() == &'}') {
+			if stream.expect(&~['\"']).is_none() { fail!("keys must begin with quote marks") }
+			let key = match _string(stream) {
+				PureJsonString(s) => s,
+				_ => fail!("invalid key found")
+			};
+			stream.pass_while(&~[' ', '\n', '\r', '\t']);
+			if stream.expect(&~[':']).is_none() { fail!("keys and values should be separated by :") }
+			stream.pass(1); //pass over :
+			stream.pass_while(&~[' ', '\n', '\r', '\t']);
+			let c = stream.expect(&~['\"', 't', 'f', '[', '{']);
+			match c {
+				Some('\"') => { ret.insert(key, _string(stream)); }
+				Some('t') => { ret.insert(key, _bool(stream)); }
+				Some('v') => { ret.insert(key, _bool(stream)); }
+				Some('[') => { ret.insert(key, _list(stream)); }
+				Some('{') => {
+					let obj = ObjNotation::object::<T, PureJson>(stream);
+					let id = _objid(&obj);
+					if id.is_none() { ret.insert(key, id.unwrap()); }
+					else { ret.insert(key, obj); }
+				}
+				_ => if is_digit(*stream.first()) { ret.insert(key, _number(stream)); } else { fail!(fmt!("invalid value found: %?", stream.first())) }
+			}
+			stream.pass_while(&~[' ', '\n', '\r', '\t']);
+			let comma = stream.expect(&~[',', '}']);
+			if comma.is_none() { fail!("expected ',' after object element") } else {stream.pass(1); stream.pass_while(&~[' ', '\n', '\r', '\t']); }
+			if !stream.has_next() { break; }
+		}
+		stream.pass_while(&~[' ', '\n', '\r', '\t']);
+		PureJsonObject(ret)
+	}	
+
+	pub fn from_string(s: &str) -> PureJson {
+		let mut stream = to_chars(s);
+		stream.pass_while(&~[' ', '\n', '\r', '\t']);
+		if !(stream.first() == &'{') {
+			fail!("invalid object given!"); 
+		}
+		ObjNotation::object(&mut stream)
+	}
+}
+
 
 pub fn _string<T:Stream<char>>(stream: &mut T) -> PureJson {
 	stream.pass(1); //pass over begin quote
@@ -90,40 +134,25 @@ pub fn _list<T:Stream<char>>(stream: &mut T) -> PureJson {
 	PureJsonList(ret)
 }
 
-pub fn _object<T:Stream<char>>(stream: &mut T) -> PureJson {
-	stream.pass(1); //pass over brace
-	let mut ret: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
-	while !(stream.first() == &'}') {
-		if stream.expect(&~['\"']).is_none() { fail!("keys must begin with quote marks") }
-		let key = match _string(stream) {
-			PureJsonString(s) => s,
-			_ => fail!("invalid key found")
-		};
-		stream.pass_while(&~[' ', '\n', '\r', '\t']);
-		if stream.expect(&~[':']).is_none() { fail!("keys and values should be separated by :") }
-		stream.pass(1); //pass over :
-		stream.pass_while(&~[' ', '\n', '\r', '\t']);
-		let c = stream.expect(&~['\"', 't', 'f', '[']);
-		match c {
-			Some('\"') => { ret.insert(key, _string(stream)); }
-			Some('t') => { ret.insert(key, _bool(stream)); }
-			Some('v') => { ret.insert(key, _bool(stream)); }
-			Some('[') => { ret.insert(key, _list(stream)); }
-			_ => if is_digit(*stream.first()) { ret.insert(key, _number(stream)); } else { fail!(fmt!("invalid value found: %?", stream.first())) }
+pub fn _objid(json: &PureJson) -> Option<PureJson> {
+	match *json {
+		PureJsonObject(ref m) => {
+			if m.len() == 1 && m.contains_key(&~"$oid") {
+				match *(m.find(&~"$oid").unwrap()) {
+					PureJsonString(ref s) => return Some(PureJsonObjID(s.to_bytes())),
+					_ => fail!("invalid objid found!")
+				}
+			}
 		}
-		stream.pass_while(&~[' ', '\n', '\r', '\t']);
-		let comma = stream.expect(&~[',', '}']);
-		if comma.is_none() { fail!("expected ',' after object element") } else {stream.pass(1); stream.pass_while(&~[' ', '\n', '\r', '\t']); }
-		if !stream.has_next() { break; }
+		_ => fail!("invalid json string being objid checked")
 	}
-	stream.pass_while(&~[' ', '\n', '\r', '\t']);
-	PureJsonObject(ret)
+	None
 }
-
 #[cfg(test)]
 mod tests {
 	extern mod ord_hashmap;
-
+	extern mod bson_types;
+	
 	use super::*;
 	use bson_types::*;
 	use std::str::to_chars;
@@ -191,6 +220,6 @@ mod tests {
 		m.insert(~"bar", PureJsonNumber(2f));
 		m.insert(~"baz", PureJsonList(~[PureJsonString(~"qux")]));
 		
-		assert_eq!(PureJsonObject(m), _object(&mut stream));
+		assert_eq!(PureJsonObject(m), ObjNotation::object::<~[char], PureJson>(&mut stream));
 	}
 }
