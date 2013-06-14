@@ -276,7 +276,7 @@ priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
 
 pub fn document<T:Stream<u8>>(stream: &mut T) -> BsonDocument {
 	let size = bytesum(stream.aggregate(4)) as i32;
-	let mut elemcode = stream.expect(~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
+	let mut elemcode = stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
 	stream.pass(1);
 	let mut ret = BsonDocument::new();
 	while elemcode != None {
@@ -302,7 +302,7 @@ pub fn document<T:Stream<u8>>(stream: &mut T) -> BsonDocument {
 			_ => fail!("an invalid element code was found!")
 		};
 		ret.put(key, val);
-		elemcode = stream.expect(~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
+		elemcode = stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
 		if stream.has_next() { stream.pass(1); }
 	}
 	ret.size = size;
@@ -423,7 +423,10 @@ mod tests {
 
 	#[test]
 	fn test_object_bson_doc_fmt() {
-		//TODO	
+		let json = from_str("{\"foo\": true}").get();
+		let mut doc = BsonDocument::new();
+		doc.put(~"foo", Bool(true));
+		assert_eq!(json.bson_doc_fmt(), Embedded(~doc))	
 	}
 
 	//testing encode
@@ -576,6 +579,24 @@ mod tests {
 	fn test_binary_decode() {
 		let mut stream: ~[u8] = ~[6,0,0,0,0,1,2,3,4,5,6];
 		assert_eq!(_binary(&mut stream), Binary(0, ~[1,2,3,4,5,6]));
+	}
+
+	//full encode path testing
+	#[test]
+	fn test_string_whole_encode() {
+		let json = from_str("{\"foo\": \"bar\"}").get();
+		let doc = BsonDocument::from_json(&json);
+		assert_eq!(encode(&doc), ~[18,0,0,0,2,102,111,111,0,4,0,0,0,98,97,114,0,0]);
+	}
+
+	//TODO: json parsing :(
+	//#[test]
+	fn test_embed_whole_encode() {
+		let json = from_str("{\"foo\": [\"hello\", false], \"baz\": \"qux\"}").get();
+		println(fmt!(":::::::JSON::::::: %?", json));
+		let doc = BsonDocument::from_json(&json);
+		
+		assert_eq!(encode(&doc), ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
 	}
 }
 
