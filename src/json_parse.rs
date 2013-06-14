@@ -4,34 +4,22 @@
 extern mod ord_hashmap;
 extern mod stream;
 extern mod extra;
+extern mod bson_types;
 
 use std::char::is_digit;
 use std::str::{to_chars, from_chars};
 use std::float::from_str;
 use stream::*;
 use ord_hashmap::*;
+use bson_types::*;
 
-#[deriving(Eq)]
-pub enum PureJson {
-	PureJsonString(~str),
-	PureJsonNumber(float),
-	PureJsonBoolean(bool),
-	PureJsonList(~[PureJson]),
-	PureJsonObject(OrderedHashmap<~str, PureJson>),
-	PureJsonNull
-}
-
-pub trait BsonFormattable {
-	pub fn from_string(s: &str) -> Self;
-}
-
-impl BsonFormattable for PureJson {
-	pub fn from_string(s: &str) -> PureJson {
-		let stream = &mut to_chars(s);
-		stream.pass_while(&~[' ', '\n', '\r', '\t']);
-		if !(stream.first() == &'{') { fail!("invalid object given!") }
-		_object(stream)
+pub fn from_string(s: &str) -> PureJson {
+	let mut stream = to_chars(s);
+	stream.pass_while(&~[' ', '\n', '\r', '\t']);
+	if !(stream.first() == &'{') {
+		fail!("invalid object given!"); 
 	}
+	_object(&mut stream)
 }
 
 pub fn _string<T:Stream<char>>(stream: &mut T) -> PureJson {
@@ -137,6 +125,7 @@ mod tests {
 	extern mod ord_hashmap;
 
 	use super::*;
+	use bson_types::*;
 	use std::str::to_chars;
 	use ord_hashmap::*;
 

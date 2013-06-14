@@ -15,9 +15,10 @@ all: bin libs test bson
 bin:
 	$(MKDIR) bin
 
-libs: $(SRC)/ord_hash.rs $(SRC)/stream.rs $(SRC)/json_parse.rs
+libs: $(SRC)/ord_hash.rs $(SRC)/stream.rs $(SRC)/json_parse.rs $(SRC)/bson_types.rs
 	$(RC) --lib --out-dir $(BIN) $(SRC)/ord_hash.rs
 	$(RC) --lib --out-dir $(BIN) $(SRC)/stream.rs
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(SRC)/bson_types.rs
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(SRC)/json_parse.rs
 
 bson: $(SRC)/bson.rs
