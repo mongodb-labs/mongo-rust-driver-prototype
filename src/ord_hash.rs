@@ -35,6 +35,7 @@ impl<K:Hash + Eq,V: Eq> Eq for OrderedHashmap<K,V> {
 }
 
 impl<K: Hash + Eq + Copy,V: Copy> OrderedHashmap<K,V> {
+	pub fn len(&self) -> uint { self.map.len() }
 	pub fn contains_key(&self, k: &K) -> bool { self.map.contains_key(k) }
 	pub fn each(&self, blk: &fn(&K, & V) -> bool) -> bool {
 		for self.order.iter().advance |&(k, v)| {
