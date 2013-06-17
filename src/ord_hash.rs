@@ -62,8 +62,8 @@ impl<K: Hash + Eq + Copy,V: Copy> OrderedHashmap<K,V> {
 		self.map.find_mut(k)
 	}
 	pub fn insert(&mut self, k: K, v: V) -> bool {
-		let success = self.map.insert(k, v);
-		if success { self.order += [(@k, @v)] }
+		let success = self.map.insert(copy k, copy v);
+		if success { self.order.push((@k, @v)) }
 		success
 	}
 

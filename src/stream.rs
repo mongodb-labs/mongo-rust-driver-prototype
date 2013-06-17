@@ -35,7 +35,7 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
 		&'a self[0]
 	}
 	fn pass(&mut self, count: int) {
-		self.process(count, |x| *x);
+		self.process(count, |&x| x);
 	}
 
 	fn process<V: Copy>(&mut self, count: int, f: &fn(&T) -> V) -> ~[V] {
@@ -53,7 +53,7 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
 	}
 
 	fn aggregate(&mut self, count: int) -> ~[T] {	
-		self.process(count, |x| *x)
+		self.process(count, |&x| x)
 	}	
 	
 	fn until(&mut self, f: &fn(&T) -> bool) -> ~[T] {
@@ -62,7 +62,7 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
 			if !self.has_next() || f(self.first()) {
 				return ret;
 			}
-			ret += [self[0]];
+			ret.push(copy self[0]);
 			self.pass(1);
 		}
 	}

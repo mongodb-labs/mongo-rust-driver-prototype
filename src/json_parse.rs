@@ -7,7 +7,7 @@ extern mod extra;
 extern mod bson_types;
 
 use std::char::is_digit;
-use std::str::{to_chars, from_chars};
+use std::str::from_chars;
 use std::float::from_str;
 use stream::*;
 use ord_hashmap::*;
@@ -56,7 +56,7 @@ impl<T:Stream<char>> ObjNotation<T> for PureJson {
 	}	
 
 	pub fn from_string(s: &str) -> PureJson {
-		let mut stream = to_chars(s);
+		let mut stream = s.iter().collect::<~[char]>();
 		stream.pass_while(&~[' ', '\n', '\r', '\t']);
 		if !(stream.first() == &'{') {
 			fail!("invalid object given!"); 
@@ -139,7 +139,7 @@ pub fn _objid(json: &PureJson) -> Option<PureJson> {
 		PureJsonObject(ref m) => {
 			if m.len() == 1 && m.contains_key(&~"$oid") {
 				match *(m.find(&~"$oid").unwrap()) {
-					PureJsonString(ref s) => return Some(PureJsonObjID(s.to_bytes())),
+					PureJsonString(ref st) => return Some(PureJsonObjID(st.bytes_iter().collect::<~[u8]>())),
 					_ => fail!("invalid objid found!")
 				}
 			}
@@ -155,27 +155,26 @@ mod tests {
 	
 	use super::*;
 	use bson_types::*;
-	use std::str::to_chars;
 	use ord_hashmap::*;
 
 	#[test]
 	fn test_string_fmt() {
-		let mut stream = to_chars("\"hello\"");
+		let mut stream = "\"hello\"".iter().collect::<~[char]>();
 		let val = _string(&mut stream);
 		assert_eq!(PureJsonString(~"hello"), val);
 	}
 
 	#[test]
 	fn test_number_fmt() {
-		let mut stream = to_chars("2");
+		let mut stream = "2".iter().collect::<~[char]>();
 		let val = _number(&mut stream);
 		assert_eq!(PureJsonNumber(2f), val);
 	}
 
 	#[test]
 	fn test_bool_fmt() {
-		let mut stream_true = to_chars("true");
-		let mut stream_false = to_chars("false");
+		let mut stream_true = "true".iter().collect::<~[char]>();
+		let mut stream_false = "false".iter().collect::<~[char]>();
 		
 		let val_t = _bool(&mut stream_true);
 		let val_f = _bool(&mut stream_false);
@@ -187,26 +186,26 @@ mod tests {
 	#[test]
 	#[should_fail]
 	fn test_invalid_true_fmt() {
-		let mut stream = to_chars("tasdf");
+		let mut stream = "tasdf".iter().collect::<~[char]>();
 		_bool(&mut stream);
 	}
 
 	#[test]
 	#[should_fail]
 	fn test_invalid_false_fmt() {
-		let mut stream = to_chars("fasdf");
+		let mut stream = "fasdf".iter().collect::<~[char]>();
 		_bool(&mut stream);
 	}
 
 	#[test]
 	#[should_fail]
 	fn test_invalid_bool_fmt() {
-		let mut stream = to_chars("asdf");
+		let mut stream = "asdf".iter().collect::<~[char]>();
 		 _bool(&mut stream);
 	}
 	#[test]
 	fn test_list_fmt() {
-		let mut stream = to_chars("[5.01, true, \"hello\"]");
+		let mut stream = "[5.01, true, \"hello\"]".iter().collect::<~[char]>();
 		let val = _list(&mut stream);
 	
 		assert_eq!(PureJsonList(~[PureJsonNumber(5.01), PureJsonBoolean(true), PureJsonString(~"hello")]), val);
@@ -214,7 +213,7 @@ mod tests {
 
 	#[test]
 	fn test_object_fmt() {
-		let mut stream = to_chars("{\"foo\": true, \"bar\": 2, \"baz\": [\"qux\"]}");
+		let mut stream = "{\"foo\": true, \"bar\": 2, \"baz\": [\"qux\"]}".iter().collect::<~[char]>();
 		let mut m: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
 		m.insert(~"foo", PureJsonBoolean(true));
 		m.insert(~"bar", PureJsonNumber(2f));
