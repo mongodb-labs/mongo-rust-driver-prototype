@@ -260,10 +260,10 @@ mod tests {
 
 	#[test]
 	fn test_object_bson_doc_fmt() {
-		let json = ObjNotation::from_string::<~[char], PureJson>("{\"foo\": true}");
+		let jstring = "{\"foo\": true}";
 		let mut doc = BsonDocument::new();
 		doc.put(~"foo", Bool(true));
-		assert_eq!(json.bson_doc_fmt(), Embedded(~doc))	
+		assert_eq!(ObjParser::from_string::<~[char],PureJson,PureJsonParser<~[char]>>(jstring).bson_doc_fmt(), Embedded(~doc))	
 	}
 
 	//testing encode
@@ -421,15 +421,15 @@ mod tests {
 	//full encode path testing
 	#[test]
 	fn test_string_whole_encode() {
-		let json = ObjNotation::from_string::<~[char], PureJson>("{\"foo\": \"bar\"}");
-		let doc = BsonDocument::from_formattable(json);
+		let jstring = "{\"foo\": \"bar\"}";
+		let doc = BsonDocument::from_formattable(ObjParser::from_string::<~[char], PureJson, PureJsonParser<~[char]>>(jstring));
 		assert_eq!(encode(&doc), ~[18,0,0,0,2,102,111,111,0,4,0,0,0,98,97,114,0,0]);
 	}
 
 	//#[test]
 	fn test_embed_whole_encode() {
-		let json = ObjNotation::from_string::<~[char], PureJson>("{\"foo\": [\"hello\", false], \"baz\": \"qux\"}");
-		let doc = BsonDocument::from_formattable(json);
+		let jstring = "{\"foo\": [\"hello\", false], \"baz\": \"qux\"}";
+		let doc = BsonDocument::from_formattable(ObjParser::from_string::<~[char], PureJson, PureJsonParser<~[char]>>(jstring));
 		
 		assert_eq!(encode(&doc), ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
 	}
