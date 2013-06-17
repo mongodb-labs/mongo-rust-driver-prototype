@@ -154,6 +154,8 @@ pub fn _double<T:Stream<u8>>(stream: &mut T) -> Document {
 	let b: ~[u8] = stream.aggregate(8);
 	let bytes: [u8,..8] = unsafe { std::cast::transmute(b) };
 	let v: f64 = unsafe { std::cast::transmute(bytes) };
+	//let s = bytesum(b) as u64;
+	//Double(s as f64);
 	Double(v)
 }
 
