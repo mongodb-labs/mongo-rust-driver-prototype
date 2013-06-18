@@ -43,7 +43,6 @@ priv fn bytesum(bytes: ~[u8]) -> u64 {
 	ret
 }
 impl<T:Stream<u8>> BsonParser<T> {
-
 	pub fn document(&mut self) -> Result<BsonDocument,~str> {
 		let size = bytesum(self.stream.aggregate(4)) as i32;
 		let mut elemcode = self.stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
@@ -102,27 +101,23 @@ impl<T:Stream<u8>> BsonParser<T> {
 		ret.size = size;
 		Ok(ret)
 	}
-
 	pub fn cstring(&mut self) -> ~str {
 		let is_0: &fn(&u8) -> bool = |&x| x == 0x00;
 		let s = from_bytes(self.stream.until(is_0));
 		self.stream.pass(1);
 		s
 	}
-
 	pub fn _double(&mut self) -> Document {
 		//TODO: this doesn't work at all
 		let b = bytesum(self.stream.aggregate(8));
 		let v: f64 = unsafe { std::cast::transmute(b) };
 		Double(v)
 	}
-
 	pub fn _string(&mut self) -> Document {
 		self.stream.pass(4);
 		let v = self.cstring();
 		UString(v)
 	}
-
 	pub fn _embed(&mut self) -> Result<Document,~str> {
 		return self.document().chain(|s| Ok(Embedded(~s)));
 	}
@@ -130,7 +125,6 @@ impl<T:Stream<u8>> BsonParser<T> {
 	pub fn _array(&mut self) -> Result<Document,~str> {
 		return self.document().chain(|s| Ok(Array(~s)));
 	}
-
 	pub fn _binary(&mut self) -> Document {
 		let count = bytesum(self.stream.aggregate(4));
 		let subtype = *(self.stream.first());
@@ -138,19 +132,16 @@ impl<T:Stream<u8>> BsonParser<T> {
 		let data = self.stream.aggregate(count as int);
 		Binary(subtype, data)
 	}
-
 	pub fn _bool(&mut self) -> Document {
 		let ret = (*self.stream.first()) as bool;
 		self.stream.pass(1);
 		Bool(ret)
 	}
-
 	pub fn _regex(&mut self) -> Document {
 		let s1 = self.cstring();
 		let s2 = self.cstring();
 		Regex(s1, s2)
 	}
-
 	pub fn _jscript(&mut self) -> Result<Document, ~str> {
 		let s = self._string();
 		//using this to avoid irrefutable pattern error
@@ -159,14 +150,12 @@ impl<T:Stream<u8>> BsonParser<T> {
 			_ => Err(~"invalid string found in javascript")
 		}
 	}
-
 	pub fn _jscope(&mut self) -> Result<Document,~str> {
 		self.stream.pass(4);
 		let s = self.cstring();
 		let doc = self.document();
 		return doc.chain(|d| Ok(JScriptWithScope(copy s,~d)));
 	}
-	
 	pub fn new(stream: T) -> BsonParser<T> { BsonParser { stream: stream } }
 }
 /* Public encode and decode functions */
@@ -175,13 +164,10 @@ pub fn encode(doc: &BsonDocument) -> ~[u8] {
 	doc.to_bson()
 }
 
-//convert any object that can be validly represented in BSON into a BsonDocument
 pub fn decode(b: ~[u8]) -> Result<BsonDocument,~str> {
 	let mut parser = BsonParser::new(b);
 	parser.document()
 }
-
-/* Utility functions, mostly for decode */
 
 #[cfg(test)]
 mod tests {
@@ -239,7 +225,7 @@ mod tests {
 		let jstring = "{\"foo\": true}";
 		let mut doc = BsonDocument::new();
 		doc.put(~"foo", Bool(true));
-		assert_eq!(ObjParser::from_string::<~[char],PureJson,PureJsonParser<~[char]>>(jstring).bson_doc_fmt(), Embedded(~doc))	
+		assert_eq!((@mut PureJsonParser::new(~[' '])).from_string(jstring).bson_doc_fmt(), Embedded(~doc))	
 	}
 
 	//testing encode
@@ -402,14 +388,14 @@ mod tests {
 	#[test]
 	fn test_string_whole_encode() {
 		let jstring = "{\"foo\": \"bar\"}";
-		let doc = BsonDocument::from_formattable(ObjParser::from_string::<~[char], PureJson, PureJsonParser<~[char]>>(jstring));
+		let doc = BsonDocument::from_formattable((@mut PureJsonParser::new(~[' '])).from_string(jstring));
 		assert_eq!(encode(&doc), ~[18,0,0,0,2,102,111,111,0,4,0,0,0,98,97,114,0,0]);
 	}
 
 	//#[test]
 	fn test_embed_whole_encode() {
 		let jstring = "{\"foo\": [\"hello\", false], \"baz\": \"qux\"}";
-		let doc = BsonDocument::from_formattable(ObjParser::from_string::<~[char], PureJson, PureJsonParser<~[char]>>(jstring));
+		let doc = BsonDocument::from_formattable((@mut PureJsonParser::new(~[' '])).from_string(jstring));
 		
 		assert_eq!(encode(&doc), ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
 	}
