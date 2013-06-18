@@ -13,8 +13,9 @@ use stream::*;
 use ord_hashmap::*;
 use bson_types::*;
 
+//This trait is for parsing non-BSON object notations such as JSON, XML, etc.
 pub trait ObjParser<T:Stream<char>, V> {
-	pub fn from_string(s: &str) -> V;
+	pub fn from_string(&self, s: &str) -> V;
 }
 
 pub struct PureJsonParser<T> {
@@ -22,7 +23,7 @@ pub struct PureJsonParser<T> {
 }
 
 impl<T:Stream<char>> ObjParser<T, PureJson> for PureJsonParser<T> {
-	pub fn from_string(s: &str) -> PureJson {
+	pub fn from_string(&self, s: &str) -> PureJson {
 		let mut stream = s.iter().collect::<~[char]>();
 		stream.pass_while(&~[' ', '\n', '\r', '\t']);
 		if !(stream.first() == &'{') {
