@@ -6,7 +6,6 @@ extern mod ord_hashmap;
 extern mod json_parse;
 extern mod bson_types;
 
-use std::to_bytes::*;
 use std::str::from_bytes;
 use bson_types::*;
 use stream::*;
@@ -31,14 +30,9 @@ static INT64: u8 = 0x12;
 static MINKEY: u8 = 0xFF;
 static MAXKEY: u8 = 0x7F;
 
-/* Public encode and decode functions */
-//convert any object that can be validly represented in BSON into a BsonDocument
-pub fn decode(mut b: ~[u8]) -> Result<BsonDocument,~str> {
-	document(&mut b)
+pub struct BsonParser<T> {
+	stream: T
 }
-
-/* Utility functions, mostly for decode */
-
 priv fn bytesum(bytes: ~[u8]) -> u64 {
 	let mut i = 0;
 	let mut ret: u64 = 0;
@@ -48,129 +42,146 @@ priv fn bytesum(bytes: ~[u8]) -> u64 {
 	}
 	ret
 }
+impl<T:Stream<u8>> BsonParser<T> {
 
-pub fn document<T:Stream<u8>>(stream: &mut T) -> Result<BsonDocument,~str> {
-	let size = bytesum(stream.aggregate(4)) as i32;
-	let mut elemcode = stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
-	stream.pass(1);
-	let mut ret = BsonDocument::new();
-	while elemcode != None {
-		let key = cstring(stream);
-		let val: Document = match elemcode {
-			Some(DOUBLE) => _double(stream),
-			Some(STRING) => _string(stream),
-			Some(EMBED) => {
-				let doc = _embed(stream);
-				match doc {
-					Ok(d) => d,
-					Err(e) => return Err(e)
+	pub fn document(&mut self) -> Result<BsonDocument,~str> {
+		let size = bytesum(self.stream.aggregate(4)) as i32;
+		let mut elemcode = self.stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
+		self.stream.pass(1);
+		let mut ret = BsonDocument::new();
+		while elemcode != None {
+			let key = self.cstring();
+			let val: Document = match elemcode {
+				Some(DOUBLE) => self._double(),
+				Some(STRING) => self._string(),
+				Some(EMBED) => {
+					let doc = self._embed();
+					match doc {
+						Ok(d) => d,
+						Err(e) => return Err(e)
+					}
 				}
-			}
-			Some(ARRAY) => {
-				let doc = _array(stream);
-				match doc {
-					Ok(d) => d,
-					Err(e) => return Err(e)
+				Some(ARRAY) => {
+					let doc = self._array();
+					match doc {
+						Ok(d) => d,
+						Err(e) => return Err(e)
+					}
 				}
-			}
-			Some(BINARY) => _binary(stream),
-			Some(OBJID) => ObjectId(stream.aggregate(12)), 
-			Some(BOOL) => _bool(stream),
-			Some(UTCDATE) => UTCDate(bytesum(stream.aggregate(8)) as i64),
-			Some(NULL) => Null,
-			Some(REGEX) => _regex(stream),
-			Some(JSCRIPT) => {
-				let doc = _jscript(stream);
-				match doc {
-					Ok(d) => d,
-					Err(e) => return Err(e)
+				Some(BINARY) => self._binary(),
+				Some(OBJID) => ObjectId(self.stream.aggregate(12)), 
+				Some(BOOL) => self._bool(),
+				Some(UTCDATE) => UTCDate(bytesum(self.stream.aggregate(8)) as i64),
+				Some(NULL) => Null,
+				Some(REGEX) => self._regex(),
+				Some(JSCRIPT) => {
+					let doc = self._jscript();
+					match doc {
+						Ok(d) => d,
+						Err(e) => return Err(e)
+					}
 				}
-			}
-			Some(JSCOPE) => {
-				let doc = _jscope(stream);
-				match doc {
-					Ok(d) => d,
-					Err(e) => return Err(e)
+				Some(JSCOPE) => {
+					let doc = self._jscope();
+					match doc {
+						Ok(d) => d,
+						Err(e) => return Err(e)
+					}
 				}
-			}
-			Some(INT32) => Int32(bytesum(stream.aggregate(4)) as i32),
-			Some(TSTAMP) => Timestamp(bytesum(stream.aggregate(8)) as i64),
-			Some(INT64) => Int64(bytesum(stream.aggregate(8)) as i64),
-			Some(MINKEY) => MinKey,
-			Some(MAXKEY) => MaxKey,
-			_ => return Err(~"an invalid element code was found")
-		};
-		ret.put(key, val);
-		elemcode = stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
-		if stream.has_next() { stream.pass(1); }
+				Some(INT32) => Int32(bytesum(self.stream.aggregate(4)) as i32),
+				Some(TSTAMP) => Timestamp(bytesum(self.stream.aggregate(8)) as i64),
+				Some(INT64) => Int64(bytesum(self.stream.aggregate(8)) as i64),
+				Some(MINKEY) => MinKey,
+				Some(MAXKEY) => MaxKey,
+				_ => return Err(~"an invalid element code was found")
+			};
+			ret.put(key, val);
+			elemcode = self.stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
+			if self.stream.has_next() { self.stream.pass(1); }
+		}
+		ret.size = size;
+		Ok(ret)
 	}
-	ret.size = size;
-	Ok(ret)
-}
 
-pub fn cstring<T:Stream<u8>>(stream: &mut T) -> ~str {
-	let is_0: &fn(&u8) -> bool = |&x| x == 0x00;
-	let s = from_bytes(stream.until(is_0));
-	stream.pass(1);
-	s
-}
-
-pub fn _double<T:Stream<u8>>(stream: &mut T) -> Document {
-	//TODO: this doesn't work at all
-	let b = bytesum(stream.aggregate(8));
-	let v: f64 = unsafe { std::cast::transmute(b) };
-	Double(v)
-}
-
-pub fn _string<T:Stream<u8>>(stream: &mut T) -> Document {
-	stream.pass(4);
-	UString(cstring(stream))
-}
-
-pub fn _embed<T:Stream<u8>>(stream: &mut T) -> Result<Document,~str> {
-	return document(stream).chain(|s| Ok(Embedded(~s)));
-}
-
-pub fn _array<T:Stream<u8>>(stream: &mut T) -> Result<Document,~str> {
-	return document(stream).chain(|s| Ok(Array(~s)));
-}
-
-pub fn _binary<T:Stream<u8>>(mut stream: &mut T) -> Document {
-	let bytes = stream.aggregate(4);
-	let count = bytesum(bytes);
-	let subtype = (&mut stream).first();
-	stream.pass(1);
-	let data = stream.aggregate(count as int);
-	Binary(*subtype, data)
-}
-
-pub fn _bool<T:Stream<u8>>(stream: &mut T) -> Document {
-	let ret = (*stream.first()) as bool;
-	stream.pass(1);
-	Bool(ret)
-}
-
-pub fn _regex<T:Stream<u8>>(stream: &mut T) -> Document {
-	let s1 = cstring(stream);
-	let s2 = cstring(stream);
-	Regex(s1, s2)
-}
-
-pub fn _jscript<T:Stream<u8>>(stream: &mut T) -> Result<Document, ~str> {
-	let s = _string(stream);
-	//using this to avoid irrefutable pattern error
-	match s {
-		UString(s) => Ok(JScript(s)),
-		_ => Err(~"invalid string found in javascript")
+	pub fn cstring(&mut self) -> ~str {
+		let is_0: &fn(&u8) -> bool = |&x| x == 0x00;
+		let s = from_bytes(self.stream.until(is_0));
+		self.stream.pass(1);
+		s
 	}
+
+	pub fn _double(&mut self) -> Document {
+		//TODO: this doesn't work at all
+		let b = bytesum(self.stream.aggregate(8));
+		let v: f64 = unsafe { std::cast::transmute(b) };
+		Double(v)
+	}
+
+	pub fn _string(&mut self) -> Document {
+		self.stream.pass(4);
+		let v = self.cstring();
+		UString(v)
+	}
+
+	pub fn _embed(&mut self) -> Result<Document,~str> {
+		return self.document().chain(|s| Ok(Embedded(~s)));
+	}
+
+	pub fn _array(&mut self) -> Result<Document,~str> {
+		return self.document().chain(|s| Ok(Array(~s)));
+	}
+
+	pub fn _binary(&mut self) -> Document {
+		let count = bytesum(self.stream.aggregate(4));
+		let subtype = *(self.stream.first());
+		self.stream.pass(1);
+		let data = self.stream.aggregate(count as int);
+		Binary(subtype, data)
+	}
+
+	pub fn _bool(&mut self) -> Document {
+		let ret = (*self.stream.first()) as bool;
+		self.stream.pass(1);
+		Bool(ret)
+	}
+
+	pub fn _regex(&mut self) -> Document {
+		let s1 = self.cstring();
+		let s2 = self.cstring();
+		Regex(s1, s2)
+	}
+
+	pub fn _jscript(&mut self) -> Result<Document, ~str> {
+		let s = self._string();
+		//using this to avoid irrefutable pattern error
+		match s {
+			UString(s) => Ok(JScript(s)),
+			_ => Err(~"invalid string found in javascript")
+		}
+	}
+
+	pub fn _jscope(&mut self) -> Result<Document,~str> {
+		self.stream.pass(4);
+		let s = self.cstring();
+		let doc = self.document();
+		return doc.chain(|d| Ok(JScriptWithScope(copy s,~d)));
+	}
+	
+	pub fn new(stream: T) -> BsonParser<T> { BsonParser { stream: stream } }
+}
+/* Public encode and decode functions */
+
+pub fn encode(doc: &BsonDocument) -> ~[u8] {
+	doc.to_bson()
 }
 
-pub fn _jscope<T:Stream<u8>>(stream: &mut T) -> Result<Document,~str> {
-	stream.pass(4);
-	let s = cstring(stream);
-	let doc = document(stream);
-	return doc.chain(|d| Ok(JScriptWithScope(copy s,~d)));
+//convert any object that can be validly represented in BSON into a BsonDocument
+pub fn decode(b: ~[u8]) -> Result<BsonDocument,~str> {
+	let mut parser = BsonParser::new(b);
+	parser.document()
 }
+
+/* Utility functions, mostly for decode */
 
 #[cfg(test)]
 mod tests {
@@ -346,14 +357,16 @@ mod tests {
 	#[test]
 	fn test_cstring_decode() {
 		//the stream needs an extra 0 for this test since in practice, an object _cannot_ end with a cstring; this allows cstring to pass an extra time
-		let mut stream: ~[u8] = ~[104,101,108,108,111,0];
-		assert_eq!(cstring(&mut stream), ~"hello");
+		let stream: ~[u8] = ~[104,101,108,108,111,0];
+		let mut parser = BsonParser::new(stream);
+		assert_eq!(parser.cstring(), ~"hello");
 	}
 	
 	//#[test]
 	fn test_double_decode() {
-		let mut stream: ~[u8] = ~[110,134,27,240,249,33,9,64];
-		let d = _double(&mut stream);
+		let stream: ~[u8] = ~[110,134,27,240,249,33,9,64];
+		let mut parser = BsonParser::new(stream);
+		let d = parser._double();
 		match d {
 			Double(d2) => {
 				println(fmt!(":::::::::d2 is %?", d2));
@@ -364,10 +377,11 @@ mod tests {
 	}
 	#[test]
 	fn test_document_decode() {
-		let mut stream1: ~[u8] = ~[11,0,0,0,8,102,111,111,0,1,0];
+		let stream1: ~[u8] = ~[11,0,0,0,8,102,111,111,0,1,0];
+		let mut parser1 = BsonParser::new(stream1);
 		let mut doc1 = BsonDocument::new();
 		doc1.put(~"foo", Bool(true));
-		assert_eq!(document(&mut stream1).unwrap(), doc1); 
+		assert_eq!(parser1.document().unwrap(), doc1); 
 
 		let stream2: ~[u8] = ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0];
 		let mut inside = BsonDocument::new();
@@ -379,8 +393,9 @@ mod tests {
 
 	#[test]
 	fn test_binary_decode() {
-		let mut stream: ~[u8] = ~[6,0,0,0,0,1,2,3,4,5,6];
-		assert_eq!(_binary(&mut stream), Binary(0, ~[1,2,3,4,5,6]));
+		let stream: ~[u8] = ~[6,0,0,0,0,1,2,3,4,5,6];
+		let mut parser = BsonParser::new(stream);
+		assert_eq!(parser._binary(), Binary(0, ~[1,2,3,4,5,6]));
 	}
 
 	//full encode path testing
