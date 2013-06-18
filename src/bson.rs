@@ -2,16 +2,13 @@
 #[crate_type="lib"];
 extern mod extra;
 extern mod stream;
-//TODO: when linked_hashmap enters libextra, replace this
 extern mod ord_hashmap;
 extern mod json_parse;
 extern mod bson_types;
 
-use std::util::id;
 use std::to_bytes::*;
 use std::str::from_bytes;
 use bson_types::*;
-use ord_hashmap::*;
 use stream::*;
 
 static l_end: bool = true;
@@ -34,57 +31,10 @@ static INT64: u8 = 0x12;
 static MINKEY: u8 = 0xFF;
 static MAXKEY: u8 = 0x7F;
 
-pub trait ToBson {
-	fn to_bson(&self, key: ~str) -> ~[u8];
-}
-impl ToBson for Document {
-	fn to_bson(&self, key: ~str) -> ~[u8] {
-		match *self {
-			Double(f) => {
-				let x: [u8,..8] = unsafe { std::cast::transmute(f as f64) };
-				~[0x01] + key.to_bson(~"") + x
-			}
-			UString(ref s) => ~[0x02] + key.to_bson(~"") + (s.to_bson(~"").len() as i32).to_bytes(l_end) + s.to_bson(~""), 
-			Embedded(ref m) => ~[0x03] + key.to_bson(~"") + encode(*m),
-			Array(ref m) => ~[0x04] + key.to_bson(~"") + encode(*m),
-			Binary(st, ref bits) => ~[0x05] + key.to_bson(~"") + bits.len().to_bytes(l_end) + [st] + *bits, 	
-			ObjectId(ref id) => if id.len() != 12 { fail!("Invalid ObjectId: length must be 12 bytes") } else { ~[0x07] + key.to_bson(~"") + *id },
-			Bool(b) => ~[0x08] + key.to_bson(~"") + (if b {~[1]} else {~[0]}),
-			UTCDate(i) => ~[0x09] + key.to_bson(~"") + i.to_bytes(l_end),
-			Null => ~[0x0A] + key.to_bson(~""),
-			Regex(ref s1, ref s2) => ~[0x0B] + key.to_bson(~"") + s1.to_bson(~"") + s2.to_bson(~""), //TODO: scrub regexes
-			JScript(ref s) => ~[0x0D] + key.to_bson(~"") + (s.to_bson(~"").len() as i32).to_bytes(l_end) + s.to_bson(~""),
-			JScriptWithScope(ref s, ref doc) => ~[0x0F] + key.to_bson(~"") + (4 + doc.size  + s.to_bson(~"").len() as i32).to_bytes(l_end) + s.to_bson(~"") + encode(*doc),	
-			Int32(i) => ~[0x10] + key.to_bson(~"") + i.to_bytes(l_end),
-			Timestamp(i) => ~[0x11] + key.to_bson(~"") + i.to_bytes(l_end),
-			Int64(i) => ~[0x12] + key.to_bson(~"") + i.to_bytes(l_end),
-			MinKey => ~[0xFF] + key.to_bson(~""),
-			MaxKey => ~[0x7F] + key.to_bson(~"")
-		}
-	}
-}
-
-impl ToBson for ~str {
-	fn to_bson(&self, _: ~str) -> ~[u8] {
-		self.to_bytes(l_end) + [0]
-	}
-}
-
 /* Public encode and decode functions */
-
 //convert any object that can be validly represented in BSON into a BsonDocument
-pub fn decode(mut b: ~[u8]) -> BsonDocument {
+pub fn decode(mut b: ~[u8]) -> Result<BsonDocument,~str> {
 	document(&mut b)
-}
-
-//convert a Rust object representing a BSON document into a bytestring
-pub fn encode(obj: &BsonDocument) -> ~[u8] {
-	let mut bson = obj.size.to_bytes(l_end);
-	let dict = &obj.fields;
-	for obj.fields.each_key |&k| {
-		bson += dict.find(&k).unwrap().to_bson(k);
-	}
-	return bson + [0];
 }
 
 /* Utility functions, mostly for decode */
@@ -99,15 +49,7 @@ priv fn bytesum(bytes: ~[u8]) -> u64 {
 	ret
 }
 
-priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
-	let mut sz: i32 = 4; //since this map is going in an object, it has a 4-byte size variable
-	for m.each |&k, &v| {
-		sz += (k.to_bytes(l_end).len() as i32) + v.size() + 2; //1 byte format code, trailing 0 after each key
-	}
-	sz + 1 //trailing 0 byte
-}
-
-pub fn document<T:Stream<u8>>(stream: &mut T) -> BsonDocument {
+pub fn document<T:Stream<u8>>(stream: &mut T) -> Result<BsonDocument,~str> {
 	let size = bytesum(stream.aggregate(4)) as i32;
 	let mut elemcode = stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
 	stream.pass(1);
@@ -117,29 +59,53 @@ pub fn document<T:Stream<u8>>(stream: &mut T) -> BsonDocument {
 		let val: Document = match elemcode {
 			Some(DOUBLE) => _double(stream),
 			Some(STRING) => _string(stream),
-			Some(EMBED) => _embed(stream),
-			Some(ARRAY) => _array(stream),
+			Some(EMBED) => {
+				let doc = _embed(stream);
+				match doc {
+					Ok(d) => d,
+					Err(e) => return Err(e)
+				}
+			}
+			Some(ARRAY) => {
+				let doc = _array(stream);
+				match doc {
+					Ok(d) => d,
+					Err(e) => return Err(e)
+				}
+			}
 			Some(BINARY) => _binary(stream),
 			Some(OBJID) => ObjectId(stream.aggregate(12)), 
 			Some(BOOL) => _bool(stream),
 			Some(UTCDATE) => UTCDate(bytesum(stream.aggregate(8)) as i64),
 			Some(NULL) => Null,
 			Some(REGEX) => _regex(stream),
-			Some(JSCRIPT) => _jscript(stream),
-			Some(JSCOPE) => _jscope(stream),
+			Some(JSCRIPT) => {
+				let doc = _jscript(stream);
+				match doc {
+					Ok(d) => d,
+					Err(e) => return Err(e)
+				}
+			}
+			Some(JSCOPE) => {
+				let doc = _jscope(stream);
+				match doc {
+					Ok(d) => d,
+					Err(e) => return Err(e)
+				}
+			}
 			Some(INT32) => Int32(bytesum(stream.aggregate(4)) as i32),
 			Some(TSTAMP) => Timestamp(bytesum(stream.aggregate(8)) as i64),
 			Some(INT64) => Int64(bytesum(stream.aggregate(8)) as i64),
 			Some(MINKEY) => MinKey,
 			Some(MAXKEY) => MaxKey,
-			_ => fail!("an invalid element code was found!")
+			_ => return Err(~"an invalid element code was found")
 		};
 		ret.put(key, val);
 		elemcode = stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
 		if stream.has_next() { stream.pass(1); }
 	}
 	ret.size = size;
-	ret
+	Ok(ret)
 }
 
 pub fn cstring<T:Stream<u8>>(stream: &mut T) -> ~str {
@@ -151,11 +117,8 @@ pub fn cstring<T:Stream<u8>>(stream: &mut T) -> ~str {
 
 pub fn _double<T:Stream<u8>>(stream: &mut T) -> Document {
 	//TODO: this doesn't work at all
-	let b: ~[u8] = stream.aggregate(8);
-	let bytes: [u8,..8] = unsafe { std::cast::transmute(b) };
-	let v: f64 = unsafe { std::cast::transmute(bytes) };
-	//let s = bytesum(b) as u64;
-	//Double(s as f64);
+	let b = bytesum(stream.aggregate(8));
+	let v: f64 = unsafe { std::cast::transmute(b) };
 	Double(v)
 }
 
@@ -164,12 +127,12 @@ pub fn _string<T:Stream<u8>>(stream: &mut T) -> Document {
 	UString(cstring(stream))
 }
 
-pub fn _embed<T:Stream<u8>>(stream: &mut T) -> Document {
-	Embedded(~document(stream))	
+pub fn _embed<T:Stream<u8>>(stream: &mut T) -> Result<Document,~str> {
+	return document(stream).chain(|s| Ok(Embedded(~s)));
 }
 
-pub fn _array<T:Stream<u8>>(stream: &mut T) -> Document {
-	Array(~document(stream))
+pub fn _array<T:Stream<u8>>(stream: &mut T) -> Result<Document,~str> {
+	return document(stream).chain(|s| Ok(Array(~s)));
 }
 
 pub fn _binary<T:Stream<u8>>(mut stream: &mut T) -> Document {
@@ -193,20 +156,20 @@ pub fn _regex<T:Stream<u8>>(stream: &mut T) -> Document {
 	Regex(s1, s2)
 }
 
-pub fn _jscript<T:Stream<u8>>(stream: &mut T) -> Document {
+pub fn _jscript<T:Stream<u8>>(stream: &mut T) -> Result<Document, ~str> {
 	let s = _string(stream);
 	//using this to avoid irrefutable pattern error
 	match s {
-		UString(s) => JScript(s),
-		_ => fail!("invalid string in javascript")
+		UString(s) => Ok(JScript(s)),
+		_ => Err(~"invalid string found in javascript")
 	}
 }
 
-fn _jscope<T:Stream<u8>>(stream: &mut T) -> Document {
+pub fn _jscope<T:Stream<u8>>(stream: &mut T) -> Result<Document,~str> {
 	stream.pass(4);
 	let s = cstring(stream);
 	let doc = document(stream);
-	JScriptWithScope(s, ~doc)
+	return doc.chain(|d| Ok(JScriptWithScope(copy s,~d)));
 }
 
 #[cfg(test)]
@@ -273,24 +236,24 @@ mod tests {
 	#[test]
 	fn test_double_encode() {
 		let doc = BsonDocument::inst().append(~"foo", Double(3.14159f64));
-		assert_eq!(encode(doc), ~[18,0,0,0,1,102,111,111,0,110,134,27,240,249,33,9,64,0]);
+		assert_eq!(doc.to_bson(), ~[18,0,0,0,1,102,111,111,0,110,134,27,240,249,33,9,64,0]);
 	}
 	#[test]
 	fn test_string_encode() {
 		let doc = BsonDocument::inst().append(~"foo", UString(~"bar"));
-		assert_eq!(encode(doc), ~[18,0,0,0,2,102,111,111,0,4,0,0,0,98,97,114,0,0]);
+		assert_eq!(doc.to_bson(), ~[18,0,0,0,2,102,111,111,0,4,0,0,0,98,97,114,0,0]);
 	}
 
 	#[test]
 	fn test_bool_encode() {
 		let doc = BsonDocument::inst().append(~"foo", Bool(true));
-		assert_eq!(encode(doc), ~[11,0,0,0,8,102,111,111,0,1,0] );
+		assert_eq!(doc.to_bson(), ~[11,0,0,0,8,102,111,111,0,1,0] );
 	}
 
 	#[test]
 	fn test_32bit_encode() {
 		let doc = BsonDocument::inst().append(~"foo", Int32(56 as i32));
-		assert_eq!(encode(doc), ~[14,0,0,0,16,102,111,111,0,56,0,0,0,0]);
+		assert_eq!(doc.to_bson(), ~[14,0,0,0,16,102,111,111,0,56,0,0,0,0]);
 	}
 
 	#[test]
@@ -301,17 +264,17 @@ mod tests {
 		let mut doc2 = BsonDocument::new();
 		doc2.put_all(~[(~"foo", Array(~ copy inside)), (~"baz", UString(~"qux"))]);
 
-		assert_eq!(encode(&doc2), ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
+		assert_eq!(doc2.to_bson(), ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
 		
 		//embedded objects
 		let mut doc3 = BsonDocument::new();
 		doc3.put_all(~[(~"foo", Embedded(~ copy inside)), (~"baz", UString(~"qux"))]);	
 		
-		assert_eq!(encode(&doc3), ~[45,0,0,0,3,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
+		assert_eq!(doc3.to_bson(), ~[45,0,0,0,3,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
 	
 		let mut doc4 = BsonDocument::new();
 		doc4.put_all(~[(~"foo", JScriptWithScope(~"wat", ~ copy inside)), (~"baz", UString(~"qux"))]);	
-		assert_eq!(encode(&doc4), ~[53,0,0,0,15,102,111,111,0,30,0,0,0,119,97,116,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
+		assert_eq!(doc4.to_bson(), ~[53,0,0,0,15,102,111,111,0,30,0,0,0,119,97,116,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
 	
 
 	}
@@ -319,46 +282,46 @@ mod tests {
 	#[test]
 	fn test_64bit_encode() {
 		let doc1 = BsonDocument::inst().append(~"foo", UTCDate(4040404 as i64));
-		assert_eq!(encode(doc1), ~[18,0,0,0,9,102,111,111,0,212,166,61,0,0,0,0,0,0] );	
+		assert_eq!(doc1.to_bson(), ~[18,0,0,0,9,102,111,111,0,212,166,61,0,0,0,0,0,0] );	
 
 		let doc2 = BsonDocument::inst().append(~"foo", Int64(4040404 as i64));
-		assert_eq!(encode(doc2), ~[18,0,0,0,18,102,111,111,0,212,166,61,0,0,0,0,0,0] );	
+		assert_eq!(doc2.to_bson(), ~[18,0,0,0,18,102,111,111,0,212,166,61,0,0,0,0,0,0] );	
 
 		let doc3 = BsonDocument::inst().append(~"foo", Timestamp(4040404 as i64));
-		assert_eq!(encode(doc3), ~[18,0,0,0,17,102,111,111,0,212,166,61,0,0,0,0,0,0] );	
+		assert_eq!(doc3.to_bson(), ~[18,0,0,0,17,102,111,111,0,212,166,61,0,0,0,0,0,0] );	
 	}
 
 	#[test]
 	fn test_null_encode() {
 		let doc = BsonDocument::inst().append(~"foo", Null);
 
-		assert_eq!(encode(doc), ~[10,0,0,0,10,102,111,111,0,0]);
+		assert_eq!(doc.to_bson(), ~[10,0,0,0,10,102,111,111,0,0]);
 	}
 
 	#[test]
 	fn test_regex_encode() {
 		let doc = BsonDocument::inst().append(~"foo", Regex(~"bar", ~"baz"));
 
-		assert_eq!(encode(doc), ~[18,0,0,0,11,102,111,111,0,98,97,114,0,98,97,122,0,0]);	
+		assert_eq!(doc.to_bson(), ~[18,0,0,0,11,102,111,111,0,98,97,114,0,98,97,122,0,0]);	
 	}
 
 	#[test]
 	fn test_jscript_encode() {
 		let doc = BsonDocument::inst().append(~"foo", JScript(~"return 1;"));
-		assert_eq!(encode(doc), ~[24,0,0,0,13,102,111,111,0,10,0,0,0,114,101,116,117,114,110,32,49,59,0,0]);
+		assert_eq!(doc.to_bson(), ~[24,0,0,0,13,102,111,111,0,10,0,0,0,114,101,116,117,114,110,32,49,59,0,0]);
 	}
 	#[test]
 	fn test_valid_objid_encode() {
 		let doc = BsonDocument::inst().append(~"foo", ObjectId(~[0,1,2,3,4,5,6,7,8,9,10,11]));
 	
-		assert_eq!(encode(doc), ~[22,0,0,0,7,102,111,111,0,0,1,2,3,4,5,6,7,8,9,10,11,0]);
+		assert_eq!(doc.to_bson(), ~[22,0,0,0,7,102,111,111,0,0,1,2,3,4,5,6,7,8,9,10,11,0]);
 	}
 
 	#[test]
 	#[should_fail]
 	fn test_invalid_objid_encode() {
 		let doc = BsonDocument::inst().append(~"foo", ObjectId(~[1,2,3]));
-		encode(doc);
+		doc.to_bson();
 	}
 
 	#[test]
@@ -366,7 +329,7 @@ mod tests {
 
 		let doc = BsonDocument::inst().append(~"foo", Bool(true)).append(~"bar", UString(~"baz")).append(~"qux", Int32(404));
 
-		let enc = encode(doc);
+		let enc = doc.to_bson();
 	
 		assert_eq!(enc, ~[33,0,0,0,8,102,111,111,0,1,2,98,97,114,0,4,0,0,0,98,97,122,0,16,113,117,120,0,148,1,0,0,0]);
 	}
@@ -376,7 +339,7 @@ mod tests {
 	#[test]
 	fn test_decode_size() {
 		let doc = decode(~[10,0,0,0,10,100,100,100,0]);
-		assert_eq!(doc.size, 10);
+		assert_eq!(doc.unwrap().size, 10);
 	}
 
 
@@ -404,14 +367,14 @@ mod tests {
 		let mut stream1: ~[u8] = ~[11,0,0,0,8,102,111,111,0,1,0];
 		let mut doc1 = BsonDocument::new();
 		doc1.put(~"foo", Bool(true));
-		assert_eq!(document(&mut stream1), doc1); 
+		assert_eq!(document(&mut stream1).unwrap(), doc1); 
 
 		let stream2: ~[u8] = ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0];
 		let mut inside = BsonDocument::new();
 		inside.put_all(~[(~"0", UString(~"hello")), (~"1", Bool(false))]);
 		let mut doc2 = BsonDocument::new();
 		doc2.put_all(~[(~"foo", Array(~ copy inside)), (~"baz", UString(~"qux"))]);
-		assert_eq!(decode(stream2), doc2);
+		assert_eq!(decode(stream2).unwrap(), doc2);
 	}
 
 	#[test]
