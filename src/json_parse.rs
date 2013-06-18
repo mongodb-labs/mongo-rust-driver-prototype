@@ -15,7 +15,7 @@ use bson_types::*;
 
 //This trait is for parsing non-BSON object notations such as JSON, XML, etc.
 pub trait ObjParser<T:Stream<char>, V> {
-	pub fn from_string(&self, s: &str) -> V;
+	pub fn from_string(&self, s: &str) -> Result<V,~str>;
 }
 
 pub struct PureJsonParser<T> {
@@ -23,11 +23,11 @@ pub struct PureJsonParser<T> {
 }
 
 impl<T:Stream<char>> ObjParser<T, PureJson> for PureJsonParser<T> {
-	pub fn from_string(&self, s: &str) -> PureJson {
+	pub fn from_string(&self, s: &str) -> Result<PureJson,~str> {
 		let mut stream = s.iter().collect::<~[char]>();
 		stream.pass_while(&~[' ', '\n', '\r', '\t']);
 		if !(stream.first() == &'{') {
-			fail!("invalid object given!"); 
+			return Err(~"invalid json string found!");
 		}
 		let mut parser = PureJsonParser::new(stream);
 		parser.object()
@@ -35,40 +35,65 @@ impl<T:Stream<char>> ObjParser<T, PureJson> for PureJsonParser<T> {
 }
 
 impl<T:Stream<char>> PureJsonParser<T> {
-	pub fn object(&mut self) -> PureJson {
+	pub fn object(&mut self) -> Result<PureJson,~str> {
 		self.stream.pass(1); //pass over brace
 		let mut ret: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
 		while !(self.stream.first() == &'}') {
-			if self.stream.expect(&~['\"']).is_none() { fail!("keys must begin with quote marks") }
+			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
+			if self.stream.expect(&~['\"']).is_none() { println(fmt!("stream head is: %?\n", self.stream.first())); return Err(~"keys must begin with quote marks"); }
 			let key = match self._string() {
 				PureJsonString(s) => s,
-				_ => fail!("invalid key found")
+				_ => fail!("invalid key found")//TODO
 			};
 			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-			if self.stream.expect(&~[':']).is_none() { fail!("keys and values should be separated by :") }
+			if self.stream.expect(&~[':']).is_none() { return Err(~"keys and values should be separated by :"); }
 			self.stream.pass(1); //pass over :
 			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
 			let c = self.stream.expect(&~['\"', 't', 'f', '[', '{']);
 			match c {
 				Some('\"') => { ret.insert(key, self._string()); }
-				Some('t') => { ret.insert(key, self._bool()); }
-				Some('v') => { ret.insert(key, self._bool()); }
-				Some('[') => { ret.insert(key, self._list()); }
+				Some('t') => { 
+					let b = self._bool();
+					match b {
+						Ok(bl) => { ret.insert(key, bl); }
+						Err(e) => return Err(e)	
+					}
+				}
+				Some('f') => { 
+					let b = self._bool();
+					match b {
+						Ok(bl) => { ret.insert(key, bl); }
+						Err(e) => return Err(e)
+					}
+				}
+				Some('[') => {
+					let l = self._list();
+					match l {
+						Ok(ls) => { ret.insert(key, ls); }
+						Err(e) => return Err(e)
+					} 
+				}
 				Some('{') => {
-					let obj = self.object();
+					let o = self.object();
+					if o.is_err() { return o; }
+					let obj = o.unwrap();
 					let id = PureJsonParser::_objid::<T>(&obj);
-					if id.is_none() { ret.insert(key, id.unwrap()); }
+					if !id.is_none() { ret.insert(key, id.unwrap()); }
 					else { ret.insert(key, obj); }
 				}
-				_ => if is_digit(*self.stream.first()) { ret.insert(key, self._number()); } else { fail!(fmt!("invalid value found: %?", self.stream.first())) }
+				_ => if is_digit(*self.stream.first()) { ret.insert(key, self._number()); } else { return Err(fmt!("invalid value found: %?", self.stream.first())); }
 			}
 			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
 			let comma = self.stream.expect(&~[',', '}']);
-			if comma.is_none() { fail!("expected ',' after object element") } else {self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']); }
+			match comma { 
+				Some(',') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']) }
+				Some('}') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']); return Ok(PureJsonObject(ret)); }
+				_ => return Err(~"invalid end to object: expecting , or }")
+			}
 			if !self.stream.has_next() { break; }
 		}
 		self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-		PureJsonObject(ret)
+		Ok(PureJsonObject(ret))
 	}
 	pub fn _string(&mut self) -> PureJson {
 		self.stream.pass(1); //pass over begin quote
@@ -77,13 +102,11 @@ impl<T:Stream<char>> PureJsonParser<T> {
 		self.stream.pass_while(&~[' ', '\n', '\r', '\t']); //pass over trailing whitespace
 		PureJsonString(from_chars(ret))
 	}
-
 	pub fn _number(&mut self) -> PureJson {
 		let ret = self.stream.until(|c| (*c == ',') || std::vec::contains([' ', '\n', '\r', '\t'], c));
 		PureJsonNumber(from_str(from_chars(ret)).unwrap())
 	}
-
-	pub fn _bool(&mut self) -> PureJson {
+	pub fn _bool(&mut self) -> Result<PureJson,~str> {
 		let c1 = self.stream.expect(&~['t', 'f']);
 		match c1 {
 			Some('t') => { self.stream.pass(1); 	
@@ -91,51 +114,78 @@ impl<T:Stream<char>> PureJsonParser<T> {
 					let mut i = 0;
 					while i < 3 {
 						let c = self.stream.expect(&~[next[i]]);
-						if c.is_none() { fail!("invalid boolean value while expecting true!"); }
+						if c.is_none() { return Err(~"invalid boolean value while expecting true!"); }
 						i += 1;
 						self.stream.pass(1);
 					}
 					self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-					PureJsonBoolean(true)
+					Ok(PureJsonBoolean(true))
 				     }
 			Some('f') => { self.stream.pass(1);
 					let next = ~['a', 'l', 's', 'e'];
 					let mut i = 0;
 					while i < 4 {
 						let c = self.stream.expect(&~[next[i]]);
-						if c.is_none() { fail!("invalid boolean value while expecting false!"); }
+						if c.is_none() { return Err(~"invalid boolean value while expecting false!"); }
 						i += 1;
 						self.stream.pass(1);
 					}
 					self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-					PureJsonBoolean(false)
+					Ok(PureJsonBoolean(false))
 				     }
-			_ => fail!("invalid boolean value!")
+			_ => return Err(~"invalid boolean value!")
 		}	
 	}
 
-	pub fn _list(&mut self) -> PureJson {
+	pub fn _list(&mut self) -> Result<PureJson,~str> {
 		self.stream.pass(1); //pass over [
 		let mut ret: ~[PureJson] = ~[];
 		while !(self.stream.first() == &']') {
-			let c = self.stream.expect(&~['\"', 't', 'f']);
+			let c = self.stream.expect(&~['\"', 't', 'f', '[', '{']);
 			match c {
 				Some('\"') => ret.push(self._string()),
-				Some('t') => ret.push(self._bool()),
-				Some('v') => ret.push(self._bool()),
-				_ => if is_digit(*self.stream.first()) { ret.push(self._number()) } else { fail!(fmt!("invalid value found: %?", self.stream.first())) }
+				Some('t') => {
+					let b = self._bool();
+					match b {
+						Ok(bl) => ret.push(bl),
+						Err(e) => return Err(e)
+					}
+				}
+				Some('f') => {
+					let b = self._bool();
+					match b {
+						Ok(bl) => ret.push(bl),
+						Err(e) => return Err(e)
+					}
+				}
+				Some('[') => {
+					let l = self._list();
+					match l {
+						Ok(ls) => ret.push(ls),
+						Err(e) => return Err(e)
+					}
+				}
+				Some('{') => {
+					let o = self.object();
+					if o.is_err() { return o; }
+					let obj = o.unwrap();
+					let id = PureJsonParser::_objid::<T>(&obj);
+					if !id.is_none() { ret.push(id.unwrap()); }
+					else { ret.push(obj); }
+				}
+				_ => if is_digit(*self.stream.first()) { ret.push(self._number()) } else { return Err(fmt!("invalid value found: %?", self.stream.first())); }
 			}
 			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
 			let comma = self.stream.expect(&~[',', ']']);
 			match comma {
 				Some(',') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']); }
-				Some(']') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']); return PureJsonList(ret); }
-				_ => fail!(fmt!("invalid value found: %?", self.stream.first()))
+				Some(']') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']); return Ok(PureJsonList(ret)); }
+				_ => return Err(fmt!("invalid value found: %?", self.stream.first()))
 			}
 			if !self.stream.has_next() { break; } //this should only happen during tests
 		}
 		self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-		PureJsonList(ret)
+		Ok(PureJsonList(ret))
 	}
 
 	pub fn _objid(json: &PureJson) -> Option<PureJson> {
@@ -144,11 +194,11 @@ impl<T:Stream<char>> PureJsonParser<T> {
 				if m.len() == 1 && m.contains_key(&~"$oid") {
 					match *(m.find(&~"$oid").unwrap()) {
 						PureJsonString(ref st) => return Some(PureJsonObjID(st.bytes_iter().collect::<~[u8]>())),
-						_ => fail!("invalid objid found!")
+						_ => return None //fail more silently here
 					}
 				}
 			}
-			_ => fail!("invalid json string being objid checked")
+			_ => return None
 		}
 		None
 	}
@@ -187,8 +237,8 @@ mod tests {
 		let stream_false = "false".iter().collect::<~[char]>();
 		let mut parse_true = PureJsonParser::new(stream_true);
 		let mut parse_false = PureJsonParser::new(stream_false);	
-		let val_t = parse_true._bool();
-		let val_f = parse_false._bool();
+		let val_t = parse_true._bool().unwrap();
+		let val_f = parse_false._bool().unwrap();
 	
 		assert_eq!(PureJsonBoolean(true), val_t);
 		assert_eq!(PureJsonBoolean(false), val_f);
@@ -199,7 +249,7 @@ mod tests {
 	fn test_invalid_true_fmt() {
 		let stream = "tasdf".iter().collect::<~[char]>();
 		let mut parser = PureJsonParser::new(stream);
-		parser._bool();
+		if parser._bool().is_err() { fail!("invalid_true_fmt") }
 	}
 
 	#[test]
@@ -207,7 +257,7 @@ mod tests {
 	fn test_invalid_false_fmt() {
 		let stream = "fasdf".iter().collect::<~[char]>();
 		let mut parser = PureJsonParser::new(stream);
-		parser._bool();
+		if parser._bool().is_err() { fail!("invalid_false_fmt") }
 	}
 
 	#[test]
@@ -215,13 +265,13 @@ mod tests {
 	fn test_invalid_bool_fmt() {
 		let stream = "asdf".iter().collect::<~[char]>();
 		let mut parser = PureJsonParser::new(stream);
-		parser._bool();
+		if parser._bool().is_err() { fail!("invalid_bool_fmt") }
 	}
 	#[test]
 	fn test_list_fmt() {
 		let stream = "[5.01, true, \"hello\"]".iter().collect::<~[char]>();
 		let mut parser = PureJsonParser::new(stream);
-		let val = parser._list();
+		let val = parser._list().unwrap();
 	
 		assert_eq!(PureJsonList(~[PureJsonNumber(5.01), PureJsonBoolean(true), PureJsonString(~"hello")]), val);
 	}
@@ -235,7 +285,7 @@ mod tests {
 		m.insert(~"bar", PureJsonNumber(2f));
 		m.insert(~"baz", PureJsonList(~[PureJsonString(~"qux")]));
 		
-		assert_eq!(PureJsonObject(m), parser.object());
+		assert_eq!(PureJsonObject(m), parser.object().unwrap());
 	}
 
 	#[test]
@@ -243,8 +293,56 @@ mod tests {
 		let stream = "{\"$oid\": \"abcdefg\"}".iter().collect::<~[char]>();
 		let mut parser = PureJsonParser::new(stream);
 		let v = parser.object();
-		let val = PureJsonParser::_objid::<~[char]>(&v).unwrap();
+		let val = PureJsonParser::_objid::<~[char]>(&(v.unwrap())).unwrap();
 		
 		assert_eq!(PureJsonObjID("abcdefg".bytes_iter().collect::<~[u8]>()), val);
+	}
+
+	#[test]
+	fn test_nested_obj_fmt() {
+		let stream = "{\"qux\": {\"foo\": 5.0, \"bar\": \"baz\"}, \"fizzbuzz\": false}".iter().collect::<~[char]>();
+		let mut parser = PureJsonParser::new(stream);
+		let mut m1: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
+		m1.insert(~"foo", PureJsonNumber(5.0));
+		m1.insert(~"bar", PureJsonString(~"baz"));
+		
+		let mut m2: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
+		m2.insert(~"qux", PureJsonObject(m1));
+		m2.insert(~"fizzbuzz", PureJsonBoolean(false));
+	
+		let v = parser.object();
+		match v {
+			Ok(_) => { }
+			Err(e) => { fail!(fmt!("Object with internal object failed: %s", e)) }
+		}
+
+		assert_eq!(PureJsonObject(m2), v.unwrap());
+	}
+
+	#[test]
+	fn test_nested_list_fmt() {
+		//list with object inside
+		let stream1 = "[5.0, {\"foo\": true}, \"bar\"]".iter().collect::<~[char]>();
+		let mut parser1 = PureJsonParser::new(stream1);
+		let mut m = OrderedHashmap::new();
+		m.insert(~"foo", PureJsonBoolean(true));
+		let v1 = parser1._list();
+		match v1 {
+			Ok(_) => { }
+			Err(e) => { fail!(fmt!("List with internal object failed: %s", e)) }
+		}
+		
+		assert_eq!(PureJsonList(~[PureJsonNumber(5.0), PureJsonObject(m), PureJsonString(~"bar")]), v1.unwrap());
+	
+		//list with list inside
+		let stream2 = "[5.0, [true, false], \"foo\"]".iter().collect::<~[char]>();
+		let mut parser2 = PureJsonParser::new(stream2);	
+		let v2 = parser2._list();
+		match v2 {
+			Ok(_) => { }
+			Err(e) => { fail!(fmt!("List with internal list failed: %s", e)) }
+		}
+		
+		assert_eq!(PureJsonList(~[PureJsonNumber(5.0), PureJsonList(~[PureJsonBoolean(true), PureJsonBoolean(false)]), PureJsonString(~"foo")]), v2.unwrap());
 	}
 }
