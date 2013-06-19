@@ -1,5 +1,8 @@
 RC = rustc
+CC = gcc
+AR = ar rcs
 FLAGS = -L ./bin
+CFLAGS = -c -g -o
 RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
@@ -16,7 +19,9 @@ bin:
 	$(MKDIR) bin
 	$(MKDIR) test
 
-libs: $(SRC)/ord_hash.rs $(SRC)/stream.rs $(SRC)/json_parse.rs $(SRC)/bson_types.rs
+libs: $(SRC)/ord_hash.rs $(SRC)/stream.rs $(SRC)/json_parse.rs $(SRC)/bson_types.rs $(SRC)/cast.c
+	$(CC) $(CFLAGS) $(BIN)/typecast.o $(SRC)/cast.c
+	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
 	$(RC) --lib --out-dir $(BIN) $(SRC)/ord_hash.rs
 	$(RC) --lib --out-dir $(BIN) $(SRC)/stream.rs
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(SRC)/bson_types.rs
