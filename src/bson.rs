@@ -10,6 +10,11 @@ use std::str::from_bytes;
 use bson_types::*;
 use stream::*;
 
+#[link_args = "-ltypecast"]
+extern {
+	fn bytes_to_double(buf: *u8) -> f64;
+}
+
 static l_end: bool = true;
 
 static DOUBLE: u8 = 0x01;
@@ -108,9 +113,10 @@ impl<T:Stream<u8>> BsonParser<T> {
 		s
 	}
 	pub fn _double(&mut self) -> Document {
-		//TODO: this doesn't work at all
-		let b = bytesum(self.stream.aggregate(8));
-		let v: f64 = unsafe { std::cast::transmute(b) };
+		let b = self.stream.aggregate(8);
+		let v: f64 = unsafe { 
+			bytes_to_double(std::vec::raw::to_ptr(b))
+		};
 		Double(v)
 	}
 	pub fn _string(&mut self) -> Document {
@@ -348,14 +354,13 @@ mod tests {
 		assert_eq!(parser.cstring(), ~"hello");
 	}
 	
-	//#[test]
+	#[test]
 	fn test_double_decode() {
 		let stream: ~[u8] = ~[110,134,27,240,249,33,9,64];
 		let mut parser = BsonParser::new(stream);
 		let d = parser._double();
 		match d {
 			Double(d2) => {
-				println(fmt!(":::::::::d2 is %?", d2));
 				assert!(d2.approx_eq(&3.14159f64));
 			}
 			_ => fail!("failed in a test case; how did I get here?")
