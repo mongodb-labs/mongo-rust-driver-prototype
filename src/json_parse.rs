@@ -136,7 +136,24 @@ impl<T:Stream<char>> PureJsonParser<T> {
 			_ => return Err(~"invalid boolean value!")
 		}	
 	}
-
+	pub fn _null(&mut self) -> Result<PureJson,~str> {
+		let c1 = self.stream.expect(&~['n']);
+		match c1 {
+			Some('n') => { self.stream.pass(1);
+				let next = ~['u', 'l', 'l'];
+				let mut i = 0;
+				while i < 3 {
+					let c = self.stream.expect(&~[next[i]]);
+					if c.is_none() { return Err(~"invalid null value!"); }
+					i += 1;
+					self.stream.pass(1);
+				}
+				self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
+				Ok(PureJsonNull)
+			}
+			_ => return Err(~"invalid null value!")
+		}
+	}
 	pub fn _list(&mut self) -> Result<PureJson,~str> {
 		self.stream.pass(1); //pass over [
 		let mut ret: ~[PureJson] = ~[];
@@ -344,5 +361,21 @@ mod tests {
 		}
 		
 		assert_eq!(PureJsonList(~[PureJsonNumber(5.0), PureJsonList(~[PureJsonBoolean(true), PureJsonBoolean(false)]), PureJsonString(~"foo")]), v2.unwrap());
+	}
+
+	#[test]
+	fn test_null_fmt() {
+		let stream = "null".iter().collect::<~[char]>();
+		let mut parser = PureJsonParser::new(stream);
+		assert_eq!(PureJsonNull, parser._null().unwrap());
+		
+	}
+
+	#[test]
+	#[should_fail]
+	fn test_invalid_null_fmt() {
+		let stream = "nulf".iter().collect::<~[char]>();
+		let mut parser = PureJsonParser::new(stream);
+		if parser._null().is_err() { fail!("invalid null value") }
 	}
 }
