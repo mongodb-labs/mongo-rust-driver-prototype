@@ -1,4 +1,4 @@
-#[link(name="stream", vers="1", author="jed")];
+#[link(name="stream", vers="0.2", author="austin.estep@10gen.com")];
 #[crate_type="lib"];
 
 use std::iterator::IteratorUtil;

@@ -1,4 +1,4 @@
-#[link(name="ord_hashmap", vers="0.1", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
+#[link(name="ord_hashmap", vers="0.2", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
 #[crate_type="lib"];
 
 use std::hash::Hash;

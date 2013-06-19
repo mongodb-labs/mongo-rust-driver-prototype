@@ -1,4 +1,4 @@
-#[link(name="bson_types", vers="0.1", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
+#[link(name="bson_types", vers="0.2", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
 #[crate_type="lib"];
 //TODO: when linked_hashmap enters libextra, replace this
 extern mod ord_hashmap;
