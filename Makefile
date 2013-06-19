@@ -7,7 +7,7 @@ RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
 
-SRC = ./src
+BSONDIR = ./src/bson
 BIN = ./bin
 TEST = ./test
 
@@ -19,21 +19,21 @@ bin:
 	$(MKDIR) bin
 	$(MKDIR) test
 
-libs: $(SRC)/ord_hash.rs $(SRC)/stream.rs $(SRC)/json_parse.rs $(SRC)/bson_types.rs $(SRC)/cast.c
-	$(CC) $(CFLAGS) $(BIN)/typecast.o $(SRC)/cast.c
+libs: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/cast.c
+	$(CC) $(CFLAGS) $(BIN)/typecast.o $(BSONDIR)/cast.c
 	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
-	$(RC) --lib --out-dir $(BIN) $(SRC)/ord_hash.rs
-	$(RC) --lib --out-dir $(BIN) $(SRC)/stream.rs
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(SRC)/bson_types.rs
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(SRC)/json_parse.rs
+	$(RC) --lib --out-dir $(BIN) $(BSONDIR)/ord_hash.rs
+	$(RC) --lib --out-dir $(BIN) $(BSONDIR)/stream.rs
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson_types.rs
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/json_parse.rs
 
-bson: $(SRC)/bson.rs
-	$(RC) $(FLAGS) -o $(BIN)/bson $(SRC)/bson.rs
+bson: $(BSONDIR)/bson.rs
+	$(RC) $(FLAGS) -o $(BIN)/bson $(BSONDIR)/bson.rs
 
-test: $(SRC)/bson.rs $(SRC)/stream.rs $(SRC)/json_parse.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(SRC)/bson.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/stream_test $(SRC)/stream.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/json_test $(SRC)/json_parse.rs
+test: $(BSONDIR)/bson.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/stream_test $(BSONDIR)/stream.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/json_test $(BSONDIR)/json_parse.rs
 
 runtests: $(TEST)/bson_test $(TEST)/stream_test $(TEST)/json_test
 	$(TEST)/bson_test
