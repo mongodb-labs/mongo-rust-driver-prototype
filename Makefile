@@ -1,4 +1,5 @@
 RC = rustc
+RDOC = rustdoc --output-dir $(DOCS) --output-format markdown --output-style doc-per-mod
 CC = gcc
 AR = ar rcs
 FLAGS = -L ./bin
@@ -10,6 +11,7 @@ MKDIR = mkdir -p
 BSONDIR = ./src/bson
 BIN = ./bin
 TEST = ./test
+DOCS = ./docs
 
 .PHONY: test
 
@@ -18,6 +20,7 @@ all: bin libs test bson
 bin:
 	$(MKDIR) bin
 	$(MKDIR) test
+	$(MKDIR) docs
 
 libs: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/cast.c
 	$(CC) $(CFLAGS) $(BIN)/typecast.o $(BSONDIR)/cast.c
@@ -40,11 +43,15 @@ runtests: $(TEST)/bson_test $(TEST)/stream_test $(TEST)/json_test
 	$(TEST)/stream_test
 	$(TEST)/json_test
 
+doc: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/bson.rs
+	$(RDOC) $(BSONDIR)/ord_hash.rs
+	$(RDOC) $(BSONDIR)/stream.rs
+	$(RDOC) $(BSONDIR)/json_parse.rs
+	$(RDOC) $(BSONDIR)/bson_types.rs
+	$(RDOC) $(BSONDIR)/bson.rs
+
 clean:
 	$(RM) $(BIN)/*.dylib
-	$(RM) -f $(BIN)/bson
-	$(RM) -rf $(TEST)/*
-	$(RM) -f 
-	$(RM) -rf $(BIN)/*
-	$(RMDIR) bin
-	$(RMDIR) test
+	$(RM) -rf $(TEST)
+	$(RM) -rf $(BIN)
+	$(RM) -rf $(DOCS)
