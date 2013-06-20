@@ -15,22 +15,22 @@ use bson_types::*;
 
 ///This trait is for parsing non-BSON object notations such as JSON, XML, etc.
 pub trait ObjParser<T:Stream<char>, V> {
-	pub fn from_string(&self, s: &str) -> Result<V,~str>;
+	pub fn from_string(&mut self, s: &str) -> Result<V,~str>;
 }
 ///JSON parsing struct. T is a Stream<char>.
 pub struct PureJsonParser<T> {
 	stream: T
 }
 ///Publicly exposes from_string.
-impl<T:Stream<char>> ObjParser<T, PureJson> for PureJsonParser<T> {
-	pub fn from_string(&self, s: &str) -> Result<PureJson,~str> {
+impl ObjParser<~[char], PureJson> for PureJsonParser<~[char]> {
+	pub fn from_string(&mut self, s: &str) -> Result<PureJson,~str> {
 		let mut stream = s.iter().collect::<~[char]>();
 		stream.pass_while(&~[' ', '\n', '\r', '\t']);
 		if !(stream.first() == &'{') {
 			return Err(~"invalid json string found!");
 		}
-		let mut parser = PureJsonParser::new(stream);
-		parser.object()
+		self.stream = stream;
+		self.object()
 	}
 }
 
@@ -107,7 +107,7 @@ impl<T:Stream<char>> PureJsonParser<T> {
 	}
 	///Parse a number; converts it to float.
 	pub fn _number(&mut self) -> PureJson {
-		let ret = self.stream.until(|c| (*c == ',') || std::vec::contains([' ', '\n', '\r', '\t'], c));
+		let ret = self.stream.until(|c| (*c == ',') || std::vec::contains([' ', '\n', '\r', '\t', ']', '}'], c));
 		PureJsonNumber(from_str(from_chars(ret)).unwrap())
 	}
 	///Parse a boolean. Errors for values other than 'true' or 'false'.
@@ -216,8 +216,8 @@ impl<T:Stream<char>> PureJsonParser<T> {
 		match *json {
 			PureJsonObject(ref m) => {
 				if m.len() == 1 && m.contains_key(&~"$oid") {
-					match *(m.find(&~"$oid").unwrap()) {
-						PureJsonString(ref st) => return Some(PureJsonObjID(st.bytes_iter().collect::<~[u8]>())),
+					match (m.find(&~"$oid")) {
+						Some(&PureJsonString(ref st)) => return Some(PureJsonObjID(st.bytes_iter().collect::<~[u8]>())),
 						_ => return None //fail more silently here
 					}
 				}

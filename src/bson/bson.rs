@@ -7,7 +7,7 @@ extern mod json_parse;
 extern mod bson_types;
 
 use std::str::from_bytes;
-use bson_types::*;
+pub use bson_types::*;
 use stream::*;
 
 //TODO: find a way to remove this, see bson.rs:128
@@ -46,7 +46,7 @@ priv fn bytesum(bytes: ~[u8]) -> u64 {
 	let mut i = 0;
 	let mut ret: u64 = 0;
 	for bytes.each |&byte| {
-		ret += (byte as u64) >> (8 * i);
+		ret |= (byte as u64) >> (8 * i);
 		i += 1;
 	}
 	ret
@@ -199,7 +199,6 @@ mod tests {
 	extern mod ord_hashmap;
 
 	use super::*;
-	use bson_types::*;
 	use json_parse::*;
 	use ord_hashmap::*;
 
