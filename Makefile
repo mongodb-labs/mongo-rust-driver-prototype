@@ -49,12 +49,13 @@ runtests: $(TEST)/*
 	$(TEST)/json_test
 	$(TEST)/cursor_test
 
-doc: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/bson.rs
+doc: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/bson.rs $(MONGODIR)/*
 	$(RDOC) $(BSONDIR)/ord_hash.rs
 	$(RDOC) $(BSONDIR)/stream.rs
 	$(RDOC) $(BSONDIR)/json_parse.rs
 	$(RDOC) $(BSONDIR)/bson_types.rs
 	$(RDOC) $(BSONDIR)/bson.rs
+	$(RDOC) $(MONGODIR)/cursor.rs
 
 clean:
 	$(RM) $(BIN)/*.dylib
