@@ -14,6 +14,7 @@ use json_parse::*;
 //TODO temporary
 pub struct MongoCollection;
 
+///Structure representing a cursor
 pub struct Cursor {
 	id : i64,
 	collection : @MongoCollection,
@@ -25,11 +26,17 @@ pub struct Cursor {
 	data : Deque<BsonDocument>
 }
 
-pub enum QueryIndex {
-	IndexObj(BsonDocument),
-	IndexSpecifier(~str)
+/**
+* Enumeration allowing "overloading" of various property addition methods.
+* Functions like hint() and sort() take a QuerySpec, meaning users can pass
+* either a pre-constructed BsonDocument or a string in any BsonFormattable notation.
+*/
+pub enum QuerySpec {
+	SpecObj(BsonDocument),
+	SpecNotation(~str)
 }
 
+///Iterator implementation, opens access to powerful functions like collect, advance, map, etc.
 impl Iterator<BsonDocument> for Cursor {
 	pub fn next(&mut self) -> Option<BsonDocument> {
 		if !self.has_next() || !self.open {
@@ -40,9 +47,6 @@ impl Iterator<BsonDocument> for Cursor {
 }
 
 impl Cursor {
-    //fn explain(&self)/* -> Json */ { }
-
-    //fn sort(&self/*, order : Json*/) -> MongoCursor { cursor_tmp() }
 	pub fn new(collection: @MongoCollection, flags: i32) -> Cursor {
 		Cursor {
 			id: 0, //TODO
@@ -55,19 +59,24 @@ impl Cursor {
 			data: Deque::new::<BsonDocument>() 
 		}
 	}
-	pub fn hint(&mut self, index: QueryIndex) -> Result<~str,~str> {
+	fn explain(&mut self, explain: bool) {
+		let mut doc = BsonDocument::new();
+		doc.put(~"explain", Bool(explain));
+		self.add_query_spec(&doc);
+	}
+	pub fn hint(&mut self, index: QuerySpec) -> Result<~str,~str> {
 		match index {
-			IndexObj(doc) => {
-				for doc.fields.each |&k, &v| {
-					self.query_spec.put(k,v);
-				}
+			SpecObj(doc) => {
+				let mut hint = BsonDocument::new();
+				hint.put(~"$hint", Embedded(~doc));
+				self.add_query_spec(&hint);
 				Ok(~"added hint to query spec")
 			}
-			IndexSpecifier(ref s) => {
+			SpecNotation(ref s) => {
 				let mut parser = PureJsonParser::new(~[]);
 				let obj = parser.from_string(copy *s);
 				match obj {
-					Ok(o) => return self.hint(IndexObj(BsonDocument::from_formattable(o))),
+					Ok(o) => return self.hint(SpecObj(BsonDocument::from_formattable(o))),
 					Err(e) => return Err(e)
 				}
 			}
@@ -83,6 +92,7 @@ impl Cursor {
 		!self.data.is_empty()
 	}
 	pub fn close(&mut self) {
+		//self.collection.db.connection.close_cursor(self.id);
 		self.open = false
 	}
 	pub fn add_flag(&mut self, mask: i32) {
@@ -90,6 +100,11 @@ impl Cursor {
 	}
 	pub fn remove_flag(&mut self, mask: i32) {
 		self.flags &= !mask;
+	}
+	fn add_query_spec(&mut self, doc: &BsonDocument) {
+		for doc.fields.each |&k, &v| {
+			self.query_spec.put(k,v);
+		}
 	}
 	/*fn send_request(&mut self, Message) -> Result<~str, ~str>{
 		if self.open {
@@ -125,18 +140,30 @@ mod tests {
 	use bson_types::*;
 
 	#[test]
-	fn test_add_index() {
+	fn test_add_index_obj() {
 		let mut doc = BsonDocument::new();
 		doc.put(~"foo", Double(1f64));
-		let hint = ~"{\"bar\": 1}"; 
-		let mut cursor = Cursor::new(@MongoCollection, 10 as i32);
-		cursor.hint(IndexObj(doc));
-		cursor.hint(IndexSpecifier(hint));
-		
-		let mut spec = BsonDocument::new();
-		spec.put(~"foo", Double(1f64));
-		spec.put(~"bar", Double(1f64));
+		let mut cursor = Cursor::new(@MongoCollection, 10i32);
+		cursor.hint(SpecObj(doc));
+	
+		let mut spec = BsonDocument::new();	
+		let mut speci = BsonDocument::new();
+		speci.put(~"foo", Double(1f64));
+		spec.put(~"$hint", Embedded(~speci));
 
+		assert_eq!(cursor.query_spec, spec);
+	}
+	#[test]
+	fn test_add_index_str() {
+		let hint = ~"{\"foo\": 1}";
+		let mut cursor = Cursor::new(@MongoCollection, 10i32);
+		cursor.hint(SpecNotation(hint));
+
+		let mut spec = BsonDocument::new();
+		let mut speci = BsonDocument::new();
+		speci.put(~"foo", Double(1f64));
+		spec.put(~"$hint", Embedded(~speci));
+		
 		assert_eq!(cursor.query_spec, spec);
 	}	
 }
