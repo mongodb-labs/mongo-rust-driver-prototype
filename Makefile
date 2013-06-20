@@ -9,13 +9,14 @@ RMDIR = rmdir -p
 MKDIR = mkdir -p
 
 BSONDIR = ./src/bson
+MONGODIR = ./src/libmongo
 BIN = ./bin
 TEST = ./test
 DOCS = ./docs
 
 .PHONY: test
 
-all: bin libs test bson
+all: bin libs bson mongo test
 
 bin:
 	$(MKDIR) bin
@@ -33,15 +34,20 @@ libs: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSO
 bson: $(BSONDIR)/bson.rs
 	$(RC) $(FLAGS) -o $(BIN)/bson $(BSONDIR)/bson.rs
 
-test: $(BSONDIR)/bson.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs
+mongo: $(MONGODIR)/*
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/cursor.rs
+
+test: $(BSONDIR)/bson.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(MONGODIR)/cursor.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/stream_test $(BSONDIR)/stream.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/json_test $(BSONDIR)/json_parse.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/cursor_test $(MONGODIR)/cursor.rs
 
-runtests: $(TEST)/bson_test $(TEST)/stream_test $(TEST)/json_test
+runtests: $(TEST)/*
 	$(TEST)/bson_test
 	$(TEST)/stream_test
 	$(TEST)/json_test
+	$(TEST)/cursor_test
 
 doc: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/bson.rs
 	$(RDOC) $(BSONDIR)/ord_hash.rs
