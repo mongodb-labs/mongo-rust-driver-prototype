@@ -13,15 +13,15 @@ use stream::*;
 use ord_hashmap::*;
 use bson_types::*;
 
-//This trait is for parsing non-BSON object notations such as JSON, XML, etc.
+///This trait is for parsing non-BSON object notations such as JSON, XML, etc.
 pub trait ObjParser<T:Stream<char>, V> {
 	pub fn from_string(&self, s: &str) -> Result<V,~str>;
 }
-
+///JSON parsing struct. T is a Stream<char>.
 pub struct PureJsonParser<T> {
 	stream: T
 }
-
+///Publicly exposes from_string.
 impl<T:Stream<char>> ObjParser<T, PureJson> for PureJsonParser<T> {
 	pub fn from_string(&self, s: &str) -> Result<PureJson,~str> {
 		let mut stream = s.iter().collect::<~[char]>();
@@ -34,7 +34,9 @@ impl<T:Stream<char>> ObjParser<T, PureJson> for PureJsonParser<T> {
 	}
 }
 
+///Main parser implementation for JSON
 impl<T:Stream<char>> PureJsonParser<T> {
+	///Parse an object. Returns an error string on parse failure
 	pub fn object(&mut self) -> Result<PureJson,~str> {
 		self.stream.pass(1); //pass over brace
 		let mut ret: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
@@ -95,6 +97,7 @@ impl<T:Stream<char>> PureJsonParser<T> {
 		self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
 		Ok(PureJsonObject(ret))
 	}
+	///Parse a string.
 	pub fn _string(&mut self) -> PureJson {
 		self.stream.pass(1); //pass over begin quote
 		let ret: ~[char] = self.stream.until(|c| *c == '\"'); 
@@ -102,10 +105,12 @@ impl<T:Stream<char>> PureJsonParser<T> {
 		self.stream.pass_while(&~[' ', '\n', '\r', '\t']); //pass over trailing whitespace
 		PureJsonString(from_chars(ret))
 	}
+	///Parse a number; converts it to float.
 	pub fn _number(&mut self) -> PureJson {
 		let ret = self.stream.until(|c| (*c == ',') || std::vec::contains([' ', '\n', '\r', '\t'], c));
 		PureJsonNumber(from_str(from_chars(ret)).unwrap())
 	}
+	///Parse a boolean. Errors for values other than 'true' or 'false'.
 	pub fn _bool(&mut self) -> Result<PureJson,~str> {
 		let c1 = self.stream.expect(&~['t', 'f']);
 		match c1 {
@@ -136,6 +141,7 @@ impl<T:Stream<char>> PureJsonParser<T> {
 			_ => return Err(~"invalid boolean value!")
 		}	
 	}
+	///Parse null. Errors for values other than 'null'.
 	pub fn _null(&mut self) -> Result<PureJson,~str> {
 		let c1 = self.stream.expect(&~['n']);
 		match c1 {
@@ -154,6 +160,7 @@ impl<T:Stream<char>> PureJsonParser<T> {
 			_ => return Err(~"invalid null value!")
 		}
 	}
+	///Parse a list.
 	pub fn _list(&mut self) -> Result<PureJson,~str> {
 		self.stream.pass(1); //pass over [
 		let mut ret: ~[PureJson] = ~[];
@@ -204,7 +211,7 @@ impl<T:Stream<char>> PureJsonParser<T> {
 		self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
 		Ok(PureJsonList(ret))
 	}
-
+	///If this object was an $oid, return an ObjID.
 	pub fn _objid(json: &PureJson) -> Option<PureJson> {
 		match *json {
 			PureJsonObject(ref m) => {
@@ -220,6 +227,7 @@ impl<T:Stream<char>> PureJsonParser<T> {
 		None
 	}
 
+	///Return a new JSON parser with a given stream.
 	pub fn new(stream: T) -> PureJsonParser<T> { PureJsonParser {stream: stream} }
 }
 

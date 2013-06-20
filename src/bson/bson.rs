@@ -10,6 +10,7 @@ use std::str::from_bytes;
 use bson_types::*;
 use stream::*;
 
+//TODO: find a way to remove this, see bson.rs:128
 #[link_args = "-ltypecast"]
 extern {
 	fn bytes_to_double(buf: *u8) -> f64;
@@ -35,9 +36,12 @@ static INT64: u8 = 0x12;
 static MINKEY: u8 = 0xFF;
 static MAXKEY: u8 = 0x7F;
 
+///parser object for BSON. T is constrained to Stream<u8>.
 pub struct BsonParser<T> {
 	stream: T
 }
+
+///Collects up to 8 bytes in order as a u64.
 priv fn bytesum(bytes: ~[u8]) -> u64 {
 	let mut i = 0;
 	let mut ret: u64 = 0;
@@ -47,7 +51,9 @@ priv fn bytesum(bytes: ~[u8]) -> u64 {
 	}
 	ret
 }
+
 impl<T:Stream<u8>> BsonParser<T> {
+	///Parse a document. Returns an error string on parse failure. 
 	pub fn document(&mut self) -> Result<BsonDocument,~str> {
 		let size = bytesum(self.stream.aggregate(4)) as i32;
 		let mut elemcode = self.stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
@@ -106,31 +112,37 @@ impl<T:Stream<u8>> BsonParser<T> {
 		ret.size = size;
 		Ok(ret)
 	}
+	///Parse a string without denoting its length. Mainly for keys.
 	pub fn cstring(&mut self) -> ~str {
 		let is_0: &fn(&u8) -> bool = |&x| x == 0x00;
 		let s = from_bytes(self.stream.until(is_0));
 		self.stream.pass(1);
 		s
 	}
+	///Parse a double.
 	pub fn _double(&mut self) -> Document {
 		let b = self.stream.aggregate(8);
+		//TODO this is bad
 		let v: f64 = unsafe { 
 			bytes_to_double(std::vec::raw::to_ptr(b))
 		};
 		Double(v)
 	}
+	///Parse a string with length.
 	pub fn _string(&mut self) -> Document {
-		self.stream.pass(4);
+		self.stream.pass(4); //skip length
 		let v = self.cstring();
 		UString(v)
 	}
+	///Parse an embedded object. May fail.
 	pub fn _embed(&mut self) -> Result<Document,~str> {
 		return self.document().chain(|s| Ok(Embedded(~s)));
 	}
-
+	///Parse an embedded array. May fail.
 	pub fn _array(&mut self) -> Result<Document,~str> {
 		return self.document().chain(|s| Ok(Array(~s)));
 	}
+	///Parse generic binary data.
 	pub fn _binary(&mut self) -> Document {
 		let count = bytesum(self.stream.aggregate(4));
 		let subtype = *(self.stream.first());
@@ -138,16 +150,19 @@ impl<T:Stream<u8>> BsonParser<T> {
 		let data = self.stream.aggregate(count as int);
 		Binary(subtype, data)
 	}
+	///Parse a boolean.
 	pub fn _bool(&mut self) -> Document {
 		let ret = (*self.stream.first()) as bool;
 		self.stream.pass(1);
 		Bool(ret)
 	}
+	///Parse a regex.
 	pub fn _regex(&mut self) -> Document {
 		let s1 = self.cstring();
 		let s2 = self.cstring();
 		Regex(s1, s2)
 	}
+	///Parse a javascript object.
 	pub fn _jscript(&mut self) -> Result<Document, ~str> {
 		let s = self._string();
 		//using this to avoid irrefutable pattern error
@@ -156,20 +171,22 @@ impl<T:Stream<u8>> BsonParser<T> {
 			_ => Err(~"invalid string found in javascript")
 		}
 	}
+	///Parse a scoped javascript object.
 	pub fn _jscope(&mut self) -> Result<Document,~str> {
 		self.stream.pass(4);
 		let s = self.cstring();
 		let doc = self.document();
 		return doc.chain(|d| Ok(JScriptWithScope(copy s,~d)));
 	}
+	///Create a new parser with a given stream.
 	pub fn new(stream: T) -> BsonParser<T> { BsonParser { stream: stream } }
 }
-/* Public encode and decode functions */
 
+///Standalone encode binding.
 pub fn encode(doc: &BsonDocument) -> ~[u8] {
 	doc.to_bson()
 }
-
+///Standalone decode binding.
 pub fn decode(b: ~[u8]) -> Result<BsonDocument,~str> {
 	let mut parser = BsonParser::new(b);
 	parser.document()

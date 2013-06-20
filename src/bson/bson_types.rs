@@ -9,16 +9,16 @@ use extra::serialize::*;
 use ord_hashmap::*;
 
 static l_end: bool = true;
-
+///Trait for document notations which can be represented as BSON.
 pub trait BsonFormattable {
 	fn bson_doc_fmt(&self) -> Document;
 }
-
+///serialize::Encoder object for Bson.
 pub struct BsonDocEncoder {
 	priv buf: ~[u8],
 	priv curr_key: ~str
 }
-
+///Enumeration of individual BSON types.
 #[deriving(Eq)]
 pub enum Document {
 	Double(f64),					//x01
@@ -43,7 +43,7 @@ pub enum Document {
 	MaxKey						//x7F
 	
 }
-
+///Implementation of JSON which maintains ordering.
 #[deriving(Eq)]
 pub enum PureJson {
 	PureJsonString(~str),
@@ -55,15 +55,16 @@ pub enum PureJson {
 	PureJsonObjID(~[u8])
 }
 
-/**
-* The type of a complete BSON document. Contains an ordered map of fields and values and the size of the document as i32.
+/*The type of a complete BSON document.
+*Contains an ordered map of fields and values and the size of the document as i32.
 */
 #[deriving(ToStr,Eq)]
 pub struct BsonDocument {
 	size: i32,
 	fields: ~OrderedHashmap<~str, Document>
 }
-
+//TODO: most functions are in standalone impl. Clean this up?
+///serialize::Encoder implementation.
 impl Encoder for BsonDocEncoder {
 	fn emit_nil(&mut self) { let key = self.key(); self.buf.push_all(key); }
 	fn emit_uint(&mut self, _: uint) { fail!("uint not implemented") }
@@ -113,7 +114,9 @@ impl Encoder for BsonDocEncoder {
 	fn emit_map_elt_val(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { fail!("not implemented")}
 
 }
-
+/**Standalone implementation of BsonDocEncoder.
+*Ideally this would largely go away, though with_key and key probably need to remain.
+*/
 impl BsonDocEncoder {
 	fn with_key<'a>(&'a mut self,key: ~str) -> &'a mut BsonDocEncoder{
 		self.curr_key = key;
@@ -163,7 +166,10 @@ impl BsonDocEncoder {
 	fn new() -> BsonDocEncoder { BsonDocEncoder { buf: ~[], curr_key: ~"" } }
 }
 
+///Encodable implementation for BsonDocument.
 impl Encodable<BsonDocEncoder> for BsonDocument {
+	///After encode is run, the field 'buf' in the Encoder object will contain the encoded value.
+	///See bson_types.rs:203
 	fn encode(&self, encoder: &mut BsonDocEncoder) {
 		encoder.emit_size(self.size);
 		for self.fields.each |&k,&v| {
@@ -198,8 +204,9 @@ impl<'self> BsonDocument {
 	pub fn to_bson(&self) -> ~[u8] {
 		let mut encoder = BsonDocEncoder::new();
 		self.encode(&mut encoder);
-		encoder.buf
+		encoder.buf //the encoded value is contained here
 	}
+	//Exposing underlying OrderedHashmap methods
 	pub fn contains_key(&self, key: ~str) -> bool {
 		self.fields.contains_key(&key)
 	}
@@ -207,9 +214,7 @@ impl<'self> BsonDocument {
 	pub fn find<'a>(&'a self, key: ~str) -> Option<&'a Document> {
 		self.fields.find(&key)
 	} 
-	/**
-	* Adds a key/value pair and updates size appropriately. Returns nothing.
-	*/
+	///Adds a key/value pair and updates size appropriately. Returns nothing.
 	pub fn put(&mut self, key: ~str, val: Document) {
 		self.fields.insert(key, val);
 		self.size = map_size(self.fields);
@@ -236,9 +241,7 @@ impl<'self> BsonDocument {
 		self
 	}
 
-	/**
-	* Returns a new BsonDocument struct.
-	*/
+	///Returns a new BsonDocument struct.
 	pub fn new() -> BsonDocument {
 		BsonDocument { size: 0, fields: ~OrderedHashmap::new() }
 	}
@@ -254,16 +257,12 @@ impl<'self> BsonDocument {
 		@mut BsonDocument::new()
 	}
 
-	/**
-	* Builds a BSON document from an OrderedHashmap.
-	*/
+	///Builds a BSON document from an OrderedHashmap.
 	pub fn from_map(m: ~OrderedHashmap<~str, Document>) -> BsonDocument {	
 		BsonDocument { size: map_size(m), fields: m }
 	}
 
-	/**
-	* Builds a BSON document from a JSON object. Note that some BSON fields, such as JavaScript, will not be generated.
-	*/
+	///Builds a BSON document from a JSON object. Note that some BSON fields, such as JavaScript, will not be generated.
 	pub fn from_formattable<T:BsonFormattable>(json: T) -> BsonDocument {
 		let m = json.bson_doc_fmt();
 		match m {
@@ -273,6 +272,7 @@ impl<'self> BsonDocument {
 	}
 }
 
+///Allows Documents to report their own size in bytes.
 impl Document {
 	fn size(&self) -> i32 {
 		match *self {
@@ -297,6 +297,7 @@ impl Document {
 	}
 }
 
+///Transforms from JSON enum to BSON enum.
 impl BsonFormattable for PureJson {
 	fn bson_doc_fmt(&self) -> Document{
 		match *self {
@@ -326,6 +327,7 @@ impl BsonFormattable for PureJson {
 	}
 }
 
+///Calculate the size of a BSON object based on its fields.
 priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
 	let mut sz: i32 = 4; //since this map is going in an object, it has a 4-byte size variable
 	for m.each |&k, &v| {
