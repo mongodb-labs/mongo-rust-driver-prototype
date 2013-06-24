@@ -36,6 +36,7 @@ bson: $(BSONDIR)/bson.rs
 
 mongo: $(MONGODIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/cursor.rs
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rc
 
 test: $(BSONDIR)/bson.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(MONGODIR)/cursor.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs

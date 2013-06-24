@@ -7,6 +7,9 @@
 
 extern mod std;
 extern mod extra;
+extern mod bson;
+extern mod bson_types;
+extern mod json_parse;
 
 // Misc: utility module
 pub mod util;
@@ -14,12 +17,12 @@ pub mod util;
 // Client-side components
 //pub mod client;     // primary point-of-entry for driver system
 //pub mod db;         // database-related functionality
-//pub mod coll;       // collection-related functionality
+pub mod coll;       // collection-related functionality
 
 // Connection components
 pub mod conn;       // medium for connecting to [a] server(s); general
 //pub mod conn_node;    // ...; node
-//mod msg;        // message header and related; hidden
+mod msg;        // message header and related; hidden
 //pub mod conn_replica; // ...; replica set
 //pub mod conn_shard;   // ...; sharded cluster
 
