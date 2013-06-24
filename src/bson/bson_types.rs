@@ -58,7 +58,7 @@ pub enum PureJson {
 /*The type of a complete BSON document.
 *Contains an ordered map of fields and values and the size of the document as i32.
 */
-#[deriving(ToStr,Eq)]
+#[deriving(Eq)]
 pub struct BsonDocument {
 	size: i32,
 	fields: ~OrderedHashmap<~str, Document>
@@ -225,7 +225,7 @@ impl<'self> BsonDocument {
 	*/
 	pub fn put_all(&mut self, pairs: ~[(~str, Document)]) {
 		//TODO: when is iter() going to be available?
-		for pairs.each |&(k,v)| {
+		for pairs.iter().advance |&(k,v)| {
 			self.fields.insert(k, v);
 		}
 		self.size = map_size(self.fields);
@@ -310,7 +310,7 @@ impl BsonFormattable for PureJson {
 				let nl = l.map(|&item| item.bson_doc_fmt()); 
 				let mut doc = BsonDocument::new();
 				let mut i: int = 0;
-				for nl.each |&item| {
+				for nl.iter().advance |&item| {
 					doc.put(i.to_str(), item);
 					i += 1;
 				}

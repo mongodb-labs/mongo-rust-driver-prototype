@@ -8,7 +8,6 @@ use std::option::Option;
 use std::iterator::IteratorUtil;
 
 ///A hashmap which maintains iteration order using a list.
-#[deriving(ToStr)]
 pub struct OrderedHashmap<K,V> {
 	priv map: HashMap<K,V>,
 	priv order: ~[(@K,@V)]

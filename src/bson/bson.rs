@@ -45,7 +45,7 @@ pub struct BsonParser<T> {
 priv fn bytesum(bytes: ~[u8]) -> u64 {
 	let mut i = 0;
 	let mut ret: u64 = 0;
-	for bytes.each |&byte| {
+	for bytes.iter().advance |&byte| {
 		ret |= (byte as u64) >> (8 * i);
 		i += 1;
 	}
