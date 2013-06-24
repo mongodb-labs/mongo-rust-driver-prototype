@@ -110,7 +110,7 @@ impl Connection for NodeConnection {
      */
     fn send(&self, data : ~[u8]) -> Result<(), MongoErr> {
         match *(self.sock) {
-            None => return Err(MongoErr::new(~"connection", ~"unknown send err", ~"null socket")),
+            None => return Err(MongoErr::new(~"connection", ~"unknown send err", ~"cannot send on null socket")),
             Some(sock) => {
                 match sock.write_future(data).get() {
                     Err(e) => return Err(MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
@@ -125,9 +125,8 @@ impl Connection for NodeConnection {
      */
     fn recv(&self) -> Result<~[u8], MongoErr> {
          // sanity check and unwrap: should not send on an unconnected connection
-        if !(self.port.is_some()) { return Err(MongoErr::new(~"connection", ~"closed port", ~"cannot receive from a closed port")); }
         match *(self.port) {
-            None => return Err(MongoErr::new(~"connection", ~"unknown send err", ~"this code path should never be reached (null port)")),
+            None => return Err(MongoErr::new(~"connection", ~"unknown recv err", ~"cannot receive from null port")),
             Some(port) => {
                 match port.recv() {
                     Err(e) => Err(MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
@@ -223,5 +222,56 @@ mod tests {
 		let s: @Socket = @MockSocket {flag: true} as @Socket;
 		conn.sock = @mut Some(s);
 		assert!(conn.send(~[0u8]).is_ok());
+	}
+
+	#[test]
+	fn test_recv_null_port() {
+		let conn = Connection::new::<NodeConnection>(~"foo", 42);
+		assert!(conn.recv().is_err());
+	}
+
+	//TODO recv tests need a mock port presumably
+	//#[test]
+	fn test_recv_read_err() {
+		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+		let s: @Socket = @MockSocket {flag: false} as @Socket;
+		conn.sock = @mut Some(s);
+		assert!(conn.recv().is_err());
+	}
+
+	//#[test]
+	fn test_recv_read() {
+		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+		let s: @Socket = @MockSocket {flag: true} as @Socket;
+		conn.sock = @mut Some(s);
+		assert!(conn.recv().is_ok());
+	}
+
+	#[test]
+	fn test_disconnect_no_socket() {
+		let conn = Connection::new::<NodeConnection>(~"foo", 42);
+		let e = conn.disconnect();
+		assert!(conn.sock.is_none());
+		assert!(e.is_ok());
+	}
+	
+	#[test]
+	fn test_disconnect_read_stop_err() {
+		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+		let s: @Socket = @MockSocket {flag: false} as @Socket;
+		conn.sock = @mut Some(s);
+		let e = conn.disconnect();
+		assert!(!(conn.sock.is_none()));
+		assert!(e.is_err());
+	}
+
+	#[test]
+	fn test_disconnect_read_stop() {
+		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+		let s: @Socket = @MockSocket {flag: true} as @Socket;
+		conn.sock = @mut Some(s);
+		let e = conn.disconnect();
+		assert!(conn.sock.is_none());
+		assert!(e.is_ok());
 	}
 }
