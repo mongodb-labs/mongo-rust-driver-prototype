@@ -109,13 +109,11 @@ impl Connection for NodeConnection {
      * "Fire and forget" asynchronous write to server of given data.
      */
     fn send(&self, data : ~[u8]) -> Result<(), MongoErr> {
-        // sanity check and unwrap: should not send on an unconnected connection
-        assert!(self.sock.is_some());
         match *(self.sock) {
-            None => return Err(util::MongoErr::new(~"connection", ~"unknown send err", ~"this code path should never be reached (null socket)")),
+            None => return Err(MongoErr::new(~"connection", ~"unknown send err", ~"null socket")),
             Some(sock) => {
                 match sock.write_future(data).get() {
-                    Err(e) => return Err(util::MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
+                    Err(e) => return Err(MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
                     Ok(_) => Ok(()),
                 }
             }
@@ -183,21 +181,47 @@ mod tests {
 			return Err(TcpErrData { err_name: ~"mock error", err_msg: ~"mocksocket" });
 		}
 		fn write_future(&self, _: ~[u8]) -> Future<Result<(), TcpErrData>> {
-			do spawn {
-				Ok(())
+			if self.flag {
+				do spawn { Ok(()) }
+			}
+			else {
+				do spawn { Err(TcpErrData { err_name: ~"mock error", err_msg: ~"mocksocket" }) }
 			}
 		}
 	}	
 	#[test]
-	#[should_fail]
 	fn test_connect_preexisting_socket() {
 		let s: @Socket = @MockSocket {flag: true} as @Socket;
 		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
 		conn.sock = @mut Some(s);
-		match conn.connect() {
-			Err(_) => fail!("test_connect_preexisting_socket"),
-			Ok(_) => ()
-		}
+		assert!(conn.connect().is_err());
+	}
+
+	#[test]
+	fn test_connect_ip_parse_fail() {
+		let conn = Connection::new::<NodeConnection>(~"invalid.ip.str", 42);
+		assert!(conn.connect().is_err());
+	}
+
+	#[test]
+	fn test_send_null_sock() {
+		let conn = Connection::new::<NodeConnection>(~"foo", 42);
+		assert!(conn.send(~[0u8]).is_err());
+	}
+
+	#[test]
+	fn test_send_write_future_err() {
+		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+		let s: @Socket = @MockSocket {flag: false} as @Socket;
+		conn.sock = @mut Some(s);
+		assert!(conn.send(~[0u8]).is_err());
+	}
+
+	#[test]
+	fn test_send_write_future() {
+		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+		let s: @Socket = @MockSocket {flag: true} as @Socket;
+		conn.sock = @mut Some(s);
+		assert!(conn.send(~[0u8]).is_ok());
 	}
 }
-
