@@ -1,34 +1,59 @@
-use ip = extra::net::ip;
-use tcp = extra::net::tcp;
-use extra::uv;
+#[link(name="connection", vers="0.2", author="jaoke.chinlee@10gen.com, austin.estep@10gen.com")];
+#[crate_type="lib"];
+extern mod extra;
+extern mod util;
 
-use result = std::result;
+use extra::net::ip::*;
+use extra::net::tcp::*;
+use extra::uv::*;
+use extra::future::*;
 
-use util;
+use util::*;
 
+
+/**
+ *
+ */
+pub trait Socket {
+	fn read_start(&self) -> Result<@Port<Result<~[u8], TcpErrData>>, TcpErrData>;
+	fn read_stop(&self) -> Result<(), TcpErrData>;
+	fn write_future(&self, raw_write_data: ~[u8]) -> Future<Result<(), TcpErrData>>;
+}
+
+impl Socket for TcpSocket {
+	fn read_start(&self) -> Result<@Port<Result<~[u8], TcpErrData>>, TcpErrData> {
+		self.read_start()	
+	}
+	fn read_stop(&self) -> Result<(), TcpErrData> {
+		self.read_stop()
+	}
+	fn write_future(&self, raw_write_data: ~[u8]) -> Future<Result<(), TcpErrData>> {
+		self.write_future(raw_write_data)
+	}
+}
 /**
  * Connection interface all connectors use (ReplicaSetConnection,
  * ShardedClusterConnection, NodeConnection).
  */
 pub trait Connection {
     fn new(server_ip_str : ~str, server_port : uint) -> Self;
-    fn connect(&self) -> result::Result<(), util::MongoErr>;
-    fn send(&self, data : ~[u8]) -> result::Result<(), util::MongoErr>;
-    fn recv(&self) -> result::Result<~[u8], util::MongoErr>;
-    fn disconnect(&self) -> result::Result<(), util::MongoErr>;
+    fn connect(&self) -> Result<(), MongoErr>;
+    fn send(&self, data : ~[u8]) -> Result<(), MongoErr>;
+    fn recv(&self) -> Result<~[u8], MongoErr>;
+    fn disconnect(&self) -> Result<(), MongoErr>;
 }
 
 /**
  * Connection between Client and Server. Routes user requests to
  * server and hands back wrapped result for Client to parse.
  */
-pub struct NodeConnection<'self> {
+pub struct NodeConnection {
     priv server_ip_str : ~str,
     priv server_port : uint,
-    priv server_ip : @mut Option<ip::IpAddr>,
-    priv iotask : uv::iotask::IoTask,
-    priv sock : @mut Option<@tcp::TcpSocket>,
-    priv port : @mut Option<@Port<result::Result<~[u8], tcp::TcpErrData>>>,
+    priv server_ip : @mut Option<IpAddr>,
+    priv iotask : iotask::IoTask,
+    priv sock : @mut Option<@Socket>,
+    priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>
 }
 
 impl Connection for NodeConnection {
@@ -37,7 +62,7 @@ impl Connection for NodeConnection {
             server_ip_str : server_ip_str,
             server_port : server_port,
             server_ip : @mut None,
-            iotask : uv::global_loop::get(),
+            iotask : global_loop::get(),
             sock : @mut None,
             port : @mut None,
         }
@@ -48,48 +73,50 @@ impl Connection for NodeConnection {
      * # Returns
      * Ok(()), or a MongoConnectionErr
      */
-    fn connect(&self) -> result::Result<(), util::MongoErr> {
+    fn connect(&self) -> Result<(), MongoErr> {
         // sanity check: should not connect if already connected (?)
-        assert!(self.sock.is_none() && self.port.is_none());
+        if !(self.sock.is_none() && self.port.is_none()) {
+		return Err(MongoErr::new(~"connection", ~"Pre-existing socket", ~"Cannot override existing socket"));
+	}
 
         // parse IP addr
-        let tmp_ip = match ip::v4::try_parse_addr(self.server_ip_str) {
-            result::Err(e) => return result::Err(util::MongoErr::new(~"connection", ~"IP Parse Err", e.err_msg.clone())),
-            result::Ok(addr) => addr,
+        let tmp_ip = match v4::try_parse_addr(self.server_ip_str) {
+            Err(e) => return Err(MongoErr::new(~"connection", ~"IP Parse Err", e.err_msg.clone())),
+            Ok(addr) => addr,
         };
 
         // set up the socket --- for now, just v4
-        let tmp_sock = match tcp::connect(tmp_ip, self.server_port, &self.iotask) {
-            result::Err(tcp::GenericConnectErr(ename, emsg)) => return result::Err(util::MongoErr::new(~"connection", ename, emsg)),
-            result::Err(tcp::ConnectionRefused) => return result::Err(util::MongoErr::new(~"connection", ~"EHOSTNOTFOUND", ~"Invalid IP or port")),
-            result::Ok(sock) => sock,
+        let tmp_sock = match connect(tmp_ip, self.server_port, &self.iotask) {
+            Err(GenericConnectErr(ename, emsg)) => return Err(MongoErr::new(~"connection", ename, emsg)),
+            Err(ConnectionRefused) => return Err(MongoErr::new(~"connection", ~"EHOSTNOTFOUND", ~"Invalid IP or port")),
+            Ok(sock) => @sock as @Socket
         };
 
         // start the read port
         *(self.port) = match tmp_sock.read_start() {
-            result::Err(e) => return result::Err(util::MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
-            result::Ok(port) => Some(port),
+            Err(e) => return Err(MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
+            Ok(port) => Some(port),
         };
 
         // hand initialized fields to self
-        *(self.sock) = Some(@tmp_sock);
+        *(self.sock) = Some(tmp_sock);
         *(self.server_ip) = Some(tmp_ip);
 
-        result::Ok(())
+        Ok(())
     }
 
     /**
      * "Fire and forget" asynchronous write to server of given data.
      */
-    fn send(&self, data : ~[u8]) -> result::Result<(), util::MongoErr> {
+    fn send(&self, data : ~[u8]) -> Result<(), MongoErr> {
         // sanity check and unwrap: should not send on an unconnected connection
         assert!(self.sock.is_some());
         match *(self.sock) {
-            None => return result::Err(util::MongoErr::new(~"connection", ~"unknown send err", ~"this code path should never be reached (null socket)")),
+            None => return Err(util::MongoErr::new(~"connection", ~"unknown send err", ~"this code path should never be reached (null socket)")),
             Some(sock) => {
                 match sock.write_future(data).get() {
-                    result::Err(e) => return result::Err(util::MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
-                    result::Ok(_) => result::Ok(()),
+                    Err(e) => return Err(util::MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
+                    Ok(_) => Ok(()),
                 }
             }
         }
@@ -98,15 +125,15 @@ impl Connection for NodeConnection {
     /**
      * Pick up a response from the server.
      */
-    fn recv(&self) -> result::Result<~[u8], util::MongoErr> {
+    fn recv(&self) -> Result<~[u8], MongoErr> {
          // sanity check and unwrap: should not send on an unconnected connection
-        assert!(self.port.is_some());
+        if !(self.port.is_some()) { return Err(MongoErr::new(~"connection", ~"closed port", ~"cannot receive from a closed port")); }
         match *(self.port) {
-            None => return result::Err(util::MongoErr::new(~"connection", ~"unknown send err", ~"this code path should never be reached (null port)")),
+            None => return Err(MongoErr::new(~"connection", ~"unknown send err", ~"this code path should never be reached (null port)")),
             Some(port) => {
                 match port.recv() {
-                    result::Err(e) => result::Err(util::MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
-                    result::Ok(msg) => result::Ok(msg),
+                    Err(e) => Err(MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
+                    Ok(msg) => Ok(msg),
                 }
             }
         }
@@ -115,7 +142,7 @@ impl Connection for NodeConnection {
     /**
      * Disconnect from the server.
      */
-    fn disconnect(&self) -> result::Result<(), util::MongoErr> {
+    fn disconnect(&self) -> Result<(), MongoErr> {
         // NO sanity check: don't really care if disconnect unconnected connection
 
         // nuke port first (we can keep the ip)
@@ -125,13 +152,52 @@ impl Connection for NodeConnection {
             None => (),
             Some(sock) => {
                 match sock.read_stop() {
-                    result::Err(e) => return result::Err(util::MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
-                    result::Ok(_) => (),
+                    Err(e) => return Err(MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
+                    Ok(_) => (),
                 }
             }
         }
         *(self.sock) = None;
 
-        result::Ok(())
+        Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use extra::net::tcp::*;
+	use extra::future::*;
+
+	struct MockSocket {
+		flag: bool
+	}
+
+	impl Socket for MockSocket {
+		fn read_start(&self) -> Result<@Port<Result<~[u8], TcpErrData>>, TcpErrData> {
+			let ret: Result<@Port<Result<~[u8], TcpErrData>>, TcpErrData> = Err(TcpErrData { err_name: ~"mock error", err_msg: ~"mocksocket" });
+			ret
+		}
+		fn read_stop(&self) -> Result<(), TcpErrData> {
+			if self.flag { return Ok(()); }
+			return Err(TcpErrData { err_name: ~"mock error", err_msg: ~"mocksocket" });
+		}
+		fn write_future(&self, _: ~[u8]) -> Future<Result<(), TcpErrData>> {
+			do spawn {
+				Ok(())
+			}
+		}
+	}	
+	#[test]
+	#[should_fail]
+	fn test_connect_preexisting_socket() {
+		let s: @Socket = @MockSocket {flag: true} as @Socket;
+		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+		conn.sock = @mut Some(s);
+		match conn.connect() {
+			Err(_) => fail!("test_connect_preexisting_socket"),
+			Ok(_) => ()
+		}
+	}
+}
+
