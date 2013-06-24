@@ -32,6 +32,9 @@ impl MongoErr {
 
 /**
  * CRUD option flags.
+ * If options ever change, modify:
+ *      util.rs: appropriate enums (_FLAGs or _OPTIONs)
+ *      coll.rs: appropriate flag and option helper parser functions
  */
 pub enum UPDATE_FLAG {
     UPSERT = 1 << 0,
@@ -65,8 +68,8 @@ pub enum QUERY_FLAG {
 pub enum QUERY_OPTION {
     // update as query operation takes more options;
     //      intended for non-mask-type options
-    SKIP(int),
-    RET(int),
+    NSKIP(int),
+    NRET(int),
 }
 
 pub enum DELETE_FLAG {
