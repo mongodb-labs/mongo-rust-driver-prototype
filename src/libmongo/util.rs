@@ -28,6 +28,9 @@ impl MongoErr {
 
 /**
  * CRUD option flags.
+ * If options ever change, modify:
+ *      util.rs: appropriate enums (_FLAGs or _OPTIONs)
+ *      coll.rs: appropriate flag and option helper parser functions
  */
 pub enum UPDATE_FLAG {
     UPSERT = 1 << 0,
