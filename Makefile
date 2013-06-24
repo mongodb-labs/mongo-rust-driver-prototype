@@ -23,37 +23,23 @@ bin:
 	$(MKDIR) test
 	$(MKDIR) docs
 
-libs: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/cast.c
+libs: $(BSONDIR)/cast.c
 	$(CC) $(CFLAGS) $(BIN)/typecast.o $(BSONDIR)/cast.c
 	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
-	$(RC) --lib --out-dir $(BIN) $(BSONDIR)/ord_hash.rs
-	$(RC) --lib --out-dir $(BIN) $(BSONDIR)/stream.rs
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson_types.rs
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/json_parse.rs
 
-bson: $(BSONDIR)/bson.rs
-	$(RC) $(FLAGS) -o $(BIN)/bson $(BSONDIR)/bson.rs
+bson: $(BSONDIR)/*
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson.rc
 
 mongo: $(MONGODIR)/*
-	#$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/util.rs
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/cursor.rs
-	#$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/conn.rs
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rc
 
-
-test: $(BSONDIR)/bson.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(MONGODIR)/cursor.rs $(MONGODIR)/conn.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/stream_test $(BSONDIR)/stream.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/json_test $(BSONDIR)/json_parse.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/cursor_test $(MONGODIR)/cursor.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/connection_test $(MONGODIR)/conn.rs
+test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
+	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
+	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
 
 runtests: $(TEST)/*
 	$(TEST)/bson_test
-	$(TEST)/stream_test
-	$(TEST)/json_test
-	$(TEST)/cursor_test
-	$(TEST)/connection_test
+	$(TEST)/mongo_test
 
 doc: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/bson.rs $(MONGODIR)/*
 	$(RDOC) $(BSONDIR)/ord_hash.rs

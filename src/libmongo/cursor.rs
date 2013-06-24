@@ -1,16 +1,9 @@
-#[link(name="cursor", vers="0.2", author="jaoke.chinlee@10gen.com, austin.estep@10gen.com")];
-#[crate_type="lib"]
-
-extern mod extra;
 extern mod bson;
-extern mod bson_types;
-extern mod json_parse;
-extern mod util;
 
 use extra::deque::Deque; 
-use bson::*;
-use bson_types::*;
-use json_parse::*;
+use bson::bson::*;
+use bson::bson_types::*;
+use bson::json_parse::*;
 use util::*;
 
 //TODO temporary
@@ -127,11 +120,10 @@ impl Cursor {
 mod tests {
 	extern mod bson;
 	extern mod extra;
-	extern mod util;
 
 	use super::*; 
-	use bson::*;
-	use bson_types::*;
+	use bson::bson::*;
+	use bson::bson_types::*;
 	use util::*;
 
 	#[test]

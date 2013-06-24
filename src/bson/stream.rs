@@ -1,9 +1,6 @@
-#[link(name="stream", vers="0.2", author="austin.estep@10gen.com")];
-#[crate_type="lib"];
-
 use std::iterator::IteratorUtil;
 
-trait Stream<T:Eq> {
+pub trait Stream<T:Eq> {
 	///Return if the stream has more values.	
 	fn has_next(& self) -> bool;
 	///Get a borrowed pointer to the first element of the stream.

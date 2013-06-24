@@ -1,0 +1,12 @@
+#[link(name="bson", vers="0.1", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
+#[crate_type="lib"];
+#[license="Apache 2.0"];
+
+extern mod std;
+extern mod extra;
+
+pub mod ord_hash;
+pub mod stream;
+pub mod json_parse;
+pub mod bson_types;
+pub mod bson;

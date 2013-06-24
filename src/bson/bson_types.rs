@@ -1,12 +1,9 @@
-#[link(name="bson_types", vers="0.2", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
-#[crate_type="lib"];
 //TODO: when linked_hashmap enters libextra, replace this
-extern mod ord_hashmap;
-extern mod extra;
 
 use std::to_bytes::*;
+use std::cast::transmute;
 use extra::serialize::*;
-use ord_hashmap::*;
+use ord_hash::*;
 
 static l_end: bool = true;
 ///Trait for document notations which can be represented as BSON.
@@ -79,7 +76,7 @@ impl Encoder for BsonDocEncoder {
 	fn emit_i8(&mut self, _: i8) { fail!("i8 not implemented") }
 	fn emit_bool(&mut self, v: bool) { let key = self.key(); self.buf.push_all(key + (if v {~[1]} else {~[0]})) }
 	fn emit_f64(&mut self, v: f64) {
-		let x: [u8,..8] = unsafe { std::cast::transmute(v) };
+		let x: [u8,..8] = unsafe { transmute(v) };
 		let key = self.key();
 		self.buf.push_all(key + x);
 	} 

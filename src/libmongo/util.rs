@@ -1,6 +1,5 @@
-extern mod bson_types;
-
-use bson_types::*;
+extern mod bson;
+use bson::bson_types::*;
 
 pub struct MongoErr {
     //err_code : int,

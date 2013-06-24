@@ -1,14 +1,7 @@
-#[link(name="bson", vers="0.2", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
-#[crate_type="lib"];
-extern mod extra;
-extern mod stream;
-extern mod ord_hashmap;
-extern mod json_parse;
-extern mod bson_types;
-
 use std::str::from_bytes;
-pub use bson_types::*;
+use bson_types::*;
 use stream::*;
+use std::vec::raw::to_ptr;
 
 //TODO: find a way to remove this, see bson.rs:128
 #[link_args = "-ltypecast"]
@@ -124,7 +117,7 @@ impl<T:Stream<u8>> BsonParser<T> {
 		let b = self.stream.aggregate(8);
 		//TODO this is bad
 		let v: f64 = unsafe { 
-			bytes_to_double(std::vec::raw::to_ptr(b))
+			bytes_to_double(to_ptr(b))
 		};
 		Double(v)
 	}
@@ -194,13 +187,10 @@ pub fn decode(b: ~[u8]) -> Result<BsonDocument,~str> {
 
 #[cfg(test)]
 mod tests {
-	extern mod bson_types;
-	extern mod json_parse;
-	extern mod ord_hashmap;
-
 	use super::*;
 	use json_parse::*;
-	use ord_hashmap::*;
+	use ord_hash::*;
+	use bson_types::*;
 
 	static l: bool = true;
 	

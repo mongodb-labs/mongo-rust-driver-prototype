@@ -1,17 +1,10 @@
-#[link(name="json_parse", vers="0.2", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
-#[crate_type="lib"];
-
-extern mod ord_hashmap;
-extern mod stream;
-extern mod extra;
-extern mod bson_types;
-
 use std::char::is_digit;
 use std::str::from_chars;
 use std::float::from_str;
 use stream::*;
-use ord_hashmap::*;
+use ord_hash::*;
 use bson_types::*;
+use std::vec::contains;
 
 ///This trait is for parsing non-BSON object notations such as JSON, XML, etc.
 pub trait ObjParser<T:Stream<char>, V> {
@@ -107,7 +100,7 @@ impl<T:Stream<char>> PureJsonParser<T> {
 	}
 	///Parse a number; converts it to float.
 	pub fn _number(&mut self) -> PureJson {
-		let ret = self.stream.until(|c| (*c == ',') || std::vec::contains([' ', '\n', '\r', '\t', ']', '}'], c));
+		let ret = self.stream.until(|c| (*c == ',') || contains([' ', '\n', '\r', '\t', ']', '}'], c));
 		PureJsonNumber(from_str(from_chars(ret)).unwrap())
 	}
 	///Parse a boolean. Errors for values other than 'true' or 'false'.
@@ -233,12 +226,10 @@ impl<T:Stream<char>> PureJsonParser<T> {
 
 #[cfg(test)]
 mod tests {
-	extern mod ord_hashmap;
-	extern mod bson_types;
-	
+
 	use super::*;
 	use bson_types::*;
-	use ord_hashmap::*;
+	use ord_hash::*;
 
 	#[test]
 	fn test_string_fmt() {

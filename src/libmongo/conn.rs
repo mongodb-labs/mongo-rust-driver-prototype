@@ -1,8 +1,3 @@
-#[link(name="connection", vers="0.2", author="jaoke.chinlee@10gen.com, austin.estep@10gen.com")];
-#[crate_type="lib"];
-extern mod extra;
-extern mod util;
-
 use extra::net::ip::*;
 use extra::net::tcp::*;
 use extra::uv::*;
