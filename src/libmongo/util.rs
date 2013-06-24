@@ -1,3 +1,7 @@
+extern mod bson_types;
+
+use bson_types::*;
+
 pub struct MongoErr {
     //err_code : int,
     err_type : ~str,
@@ -97,4 +101,8 @@ pub enum WRITE_CONCERN {
     WTIMEOUT(int),      // timeout after how long?
 }
 
+pub enum QuerySpec {
+	SpecObj(BsonDocument),
+	SpecNotation(~str)
+}
 // TODO read preference
