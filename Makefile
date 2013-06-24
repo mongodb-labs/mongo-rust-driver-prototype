@@ -35,13 +35,10 @@ bson: $(BSONDIR)/bson.rs
 	$(RC) $(FLAGS) -o $(BIN)/bson $(BSONDIR)/bson.rs
 
 mongo: $(MONGODIR)/*
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/cursor.rs
-<<<<<<< HEAD
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/util.rs
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/cursor.rs
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/conn.rs
-=======
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rc
->>>>>>> dffb5ef0381c1cb3532f18a12abfc472341c658e
 
 
 test: $(BSONDIR)/bson.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(MONGODIR)/cursor.rs $(MONGODIR)/conn.rs
