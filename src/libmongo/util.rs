@@ -1,5 +1,3 @@
-use std::to_bytes::*;
-
 pub struct MongoErr {
     //err_code : int,
     err_type : ~str,
@@ -92,47 +90,11 @@ pub enum REPLY_FLAG {
 pub static LITTLE_ENDIAN_TRUE : bool = true;
 
 // TODO write concern
+pub enum WRITE_CONCERN {
+    JOURNAL(bool),      // wait for next journal commit?
+    W(~str),            // replicate to how many?
+    FSYNC(bool),        // wait for write to disk?
+    WTIMEOUT(int),      // timeout after how long?
+}
+
 // TODO read preference
-
-// XXX Bson, Json placeholders
-pub struct Bson {
-    data : ~[u8],
-    size : uint,
-}
-impl Bson {
-    pub fn tmp() -> Bson {
-        let j = Json::tmp();
-        let dat = j.to_bytes(true);
-        Bson { data : copy dat, size : dat.len() as uint }
-    }
-    pub fn tmp2(x : int, y : int) -> Bson {
-        let j = Json::tmp2(x, y);
-        let dat = j.to_bytes(true);
-        Bson { data : copy dat, size : dat.len() as uint }
-    }
-    pub fn to_json(&self) -> Json {
-        // hrm...
-        Json { key : 0, val : 0 }
-    }
-    pub fn to_bytes(&self, lsb0 : bool) -> ~[u8] {
-        let mut bytes = copy self.data;
-        bytes += self.size.to_bytes(true);
-        bytes
-    }
-}
-
-pub struct Json {
-    key : int,
-    val : int,
-}
-impl Json {
-    pub fn tmp() -> Json { Json { key : 0, val : 0 } }
-    pub fn tmp2(x : int, y : int) -> Json { Json { key : x, val : y } }
-    pub fn to_bson(&self) -> Bson { Bson { data : ~[], size : 0 } }
-    pub fn to_bytes(&self, lsb0 : bool) -> ~[u8] {
-        let mut bytes : ~[u8] = ~[];
-        bytes += self.key.to_bytes(lsb0);
-        bytes += self.val.to_bytes(lsb0);
-        bytes
-    }
-}
