@@ -45,7 +45,7 @@ impl Iterator<BsonDocument> for Cursor {
 		Some(self.data.pop_front())
 	}
 }
-
+///Cursor API.
 impl Cursor {
 	pub fn new(collection: @MongoCollection, flags: i32) -> Cursor {
 		Cursor {
@@ -115,9 +115,11 @@ impl Cursor {
 		//}
 		self.open = false
 	}
+	///Add a flag with a bitmask.
 	pub fn add_flag(&mut self, mask: i32) {
 		self.flags |= mask;
 	}
+	///Remove a flag with a bitmask.
 	pub fn remove_flag(&mut self, mask: i32) {
 		self.flags &= !mask;
 	}
