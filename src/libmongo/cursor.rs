@@ -81,6 +81,24 @@ impl Cursor {
 				}
 			}
 		}
+	}
+	pub fn sort(&mut self, ordering: QuerySpec) -> Result<~str,~str> {
+		match ordering {
+			SpecObj(doc) => {
+				let mut ord = BsonDocument::new();
+				ord.put(~"$orderby", Embedded(~doc));
+				self.add_query_spec(&ord);
+				Ok(~"added ordering to query spec")
+			}
+			SpecNotation(ref s) => {
+				let mut parser = PureJsonParser::new(~[]);
+				let obj = parser.from_string(copy *s);
+				match obj {
+					Ok(o) => return self.sort(SpecObj(BsonDocument::from_formattable(o))),
+					Err(e) => return Err(e)
+				}
+			}
+		}
 	} 
 	pub fn limit<'a>(&'a mut self, n : int) -> &'a mut Cursor { 
 		self.limit = n as i32; self
@@ -92,7 +110,9 @@ impl Cursor {
 		!self.data.is_empty()
 	}
 	pub fn close(&mut self) {
+		//if self.id != 0 {
 		//self.collection.db.connection.close_cursor(self.id);
+		//}
 		self.open = false
 	}
 	pub fn add_flag(&mut self, mask: i32) {
