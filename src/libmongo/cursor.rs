@@ -5,11 +5,13 @@ extern mod extra;
 extern mod bson;
 extern mod bson_types;
 extern mod json_parse;
+extern mod util;
 
 use extra::deque::Deque; 
 use bson::*;
 use bson_types::*;
 use json_parse::*;
+use util::*;
 
 //TODO temporary
 pub struct MongoCollection;
@@ -26,16 +28,6 @@ pub struct Cursor {
 	data : Deque<BsonDocument>
 }
 
-/**
-* Enumeration allowing "overloading" of various property addition methods.
-* Functions like hint() and sort() take a QuerySpec, meaning users can pass
-* either a pre-constructed BsonDocument or a string in any BsonFormattable notation.
-*/
-pub enum QuerySpec {
-	SpecObj(BsonDocument),
-	SpecNotation(~str)
-}
-
 ///Iterator implementation, opens access to powerful functions like collect, advance, map, etc.
 impl Iterator<BsonDocument> for Cursor {
 	pub fn next(&mut self) -> Option<BsonDocument> {
@@ -45,7 +37,7 @@ impl Iterator<BsonDocument> for Cursor {
 		Some(self.data.pop_front())
 	}
 }
-
+///Cursor API
 impl Cursor {
 	pub fn new(collection: @MongoCollection, flags: i32) -> Cursor {
 		Cursor {
@@ -95,9 +87,11 @@ impl Cursor {
 		//self.collection.db.connection.close_cursor(self.id);
 		self.open = false
 	}
+	///Add a flag with a bitmask
 	pub fn add_flag(&mut self, mask: i32) {
 		self.flags |= mask;
 	}
+	///Remove a flag with a bitmask
 	pub fn remove_flag(&mut self, mask: i32) {
 		self.flags &= !mask;
 	}
@@ -132,12 +126,13 @@ impl Cursor {
 #[cfg(test)]
 mod tests {
 	extern mod bson;
-	extern mod bson_types;
 	extern mod extra;
+	extern mod util;
 
 	use super::*; 
 	use bson::*;
 	use bson_types::*;
+	use util::*;
 
 	#[test]
 	fn test_add_index_obj() {
