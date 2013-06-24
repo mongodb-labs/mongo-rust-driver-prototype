@@ -36,18 +36,23 @@ bson: $(BSONDIR)/bson.rs
 
 mongo: $(MONGODIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/cursor.rs
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/util.rs
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/conn.rs
 
-test: $(BSONDIR)/bson.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(MONGODIR)/cursor.rs
+
+test: $(BSONDIR)/bson.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(MONGODIR)/cursor.rs $(MONGODIR)/conn.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/stream_test $(BSONDIR)/stream.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/json_test $(BSONDIR)/json_parse.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/cursor_test $(MONGODIR)/cursor.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/connection_test $(MONGODIR)/conn.rs
 
 runtests: $(TEST)/*
 	$(TEST)/bson_test
 	$(TEST)/stream_test
 	$(TEST)/json_test
 	$(TEST)/cursor_test
+	$(TEST)/connection_test
 
 doc: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/bson.rs $(MONGODIR)/*
 	$(RDOC) $(BSONDIR)/ord_hash.rs
