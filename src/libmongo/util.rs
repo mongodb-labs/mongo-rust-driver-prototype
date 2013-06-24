@@ -68,8 +68,8 @@ pub enum QUERY_FLAG {
 pub enum QUERY_OPTION {
     // update as query operation takes more options;
     //      intended for non-mask-type options
-    SKIP(int),
-    RET(int),
+    NSKIP(int),
+    NRET(int),
 }
 
 pub enum DELETE_FLAG {
