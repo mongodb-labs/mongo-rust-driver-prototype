@@ -1,10 +1,10 @@
+use std::*;
 use extra::net::ip::*;
 use extra::net::tcp::*;
 use extra::uv::*;
 use extra::future::*;
 
 use util::*;
-
 
 /**
  *
@@ -36,6 +36,9 @@ pub trait Connection {
     fn send(&self, data : ~[u8]) -> Result<(), MongoErr>;
     fn recv(&self) -> Result<~[u8], MongoErr>;
     fn disconnect(&self) -> Result<(), MongoErr>;
+
+    fn get_requestId(&self) -> i32;
+    fn inc_requestId(&self) -> i32;
 }
 
 /**
@@ -48,7 +51,8 @@ pub struct NodeConnection {
     priv server_ip : @mut Option<IpAddr>,
     priv iotask : iotask::IoTask,
     priv sock : @mut Option<@Socket>,
-    priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>
+    priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
+    priv cur_requestId : ~cell::Cell<i32>,  // actually should be in Client but here for now
 }
 
 impl Connection for NodeConnection {
@@ -60,6 +64,7 @@ impl Connection for NodeConnection {
             iotask : global_loop::get(),
             sock : @mut None,
             port : @mut None,
+            cur_requestId : ~cell::Cell::new(0),
         }
     }
 
@@ -152,6 +157,16 @@ impl Connection for NodeConnection {
         *(self.sock) = None;
 
         Ok(())
+    }
+
+    /**
+     * Should actually be in Client but circular dependencies don't work
+     */
+    fn get_requestId(&self) -> i32 { self.cur_requestId.take() }
+    fn inc_requestId(&self) -> i32 {
+        let tmp = self.cur_requestId.take();
+        self.cur_requestId.put_back(tmp+1);
+        tmp
     }
 }
 
