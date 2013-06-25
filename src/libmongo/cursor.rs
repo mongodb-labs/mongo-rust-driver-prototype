@@ -3,14 +3,16 @@ use bson::bson_types::*;
 use bson::json_parse::*;
 
 use util::*;
+use coll::Collection;
 
 //TODO temporary
-pub struct Collection;
+//pub struct Collection;
 
 ///Structure representing a cursor
 pub struct Cursor {
 	id : i64,
-	collection : @Collection,
+	//collection : @Collection,
+	collection : Option<@Collection>,   // TODO temporory so tests pass
 	flags : i32, // tailable, slave_ok, oplog_replay, no_timeout, await_data, exhaust, partial, can set during find() too
 	skip : i32,
 	limit : i32,
@@ -31,17 +33,22 @@ impl Iterator<BsonDocument> for Cursor {
 }
 ///Cursor API
 impl Cursor {
-	pub fn new(collection: @Collection, flags: i32) -> Cursor {
+	pub fn new(collection : Option<@Collection>, id : i64, n : i32, flags : i32, vec : ~[BsonDocument]) -> Cursor {
+        let mut docs = Deque::new::<BsonDocument>();
+        for vec.iter().advance |&doc| {
+            docs.add_back(doc);
+        }
+
 		Cursor {
-			id: 0, //TODO
+			id: id,
 			collection: collection,
 			flags: flags,
 			skip: 0,
 			limit: 0,
 			open: true,
-			retrieved: 0,
+			retrieved: n,
 			query_spec: BsonDocument::new(),
-			data: Deque::new::<BsonDocument>() 
+			data: docs,
 		}
 	}
 	pub fn explain(&mut self, explain: bool) {
@@ -134,12 +141,14 @@ mod tests {
 	use super::*; 
 	use bson::bson_types::*;
 	use util::*;
+    //use coll::*;
 
 	#[test]
 	fn test_add_index_obj() {
 		let mut doc = BsonDocument::new();
 		doc.put(~"foo", Double(1f64));
-		let mut cursor = Cursor::new(@Collection, 10i32);
+		//let mut cursor = Cursor::new(@Collection, 10i32);
+		let mut cursor = Cursor::new(None, 0i64, 0i32, 10i32, ~[]);
 		cursor.hint(SpecObj(doc));
 	
 		let mut spec = BsonDocument::new();	
@@ -152,7 +161,8 @@ mod tests {
 	#[test]
 	fn test_add_index_str() {
 		let hint = ~"{\"foo\": 1}";
-		let mut cursor = Cursor::new(@Collection, 10i32);
+		//let mut cursor = Cursor::new(@Collection, 10i32);
+		let mut cursor = Cursor::new(None, 0i64, 0i32, 10i32, ~[]);
 		cursor.hint(SpecNotation(hint));
 
 		let mut spec = BsonDocument::new();
