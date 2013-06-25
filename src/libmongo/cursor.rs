@@ -1,8 +1,7 @@
-extern mod bson;
-
 use extra::deque::Deque; 
 use bson::bson_types::*;
 use bson::json_parse::*;
+
 use util::*;
 
 //TODO temporary
