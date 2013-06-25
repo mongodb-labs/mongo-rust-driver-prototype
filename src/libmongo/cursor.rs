@@ -44,7 +44,7 @@ impl Cursor {
 			data: Deque::new::<BsonDocument>() 
 		}
 	}
-	fn explain(&mut self, explain: bool) {
+	pub fn explain(&mut self, explain: bool) {
 		let mut doc = BsonDocument::new();
 		doc.put(~"explain", Bool(explain));
 		self.add_query_spec(&doc);
@@ -58,21 +58,31 @@ impl Cursor {
 				Ok(~"added hint to query spec")
 			}
 			SpecNotation(ref s) => {
-				let mut parser = PureJsonParser::new(~[]);
-				let obj = parser.from_string(copy *s);
+				let obj = ObjParser::from_string::<PureJson, PureJsonParser<~[char]>>(copy *s);
 				match obj {
 					Ok(o) => return self.hint(SpecObj(BsonDocument::from_formattable(o))),
 					Err(e) => return Err(e)
 				}
 			}
 		}
+	}
+	pub fn sort(&mut self, orderby: QuerySpec) -> Result<~str,~str> {
+		match orderby {
+			SpecObj(doc) => {
+				let mut ord = BsonDocument::new();
+				ord.put(~"$orderby", Embedded(~doc));
+				self.add_query_spec(&ord);
+				Ok(~"added hint to query spec")
+			}
+			SpecNotation(ref s) => {
+				let obj = ObjParser::from_string::<PureJson, PureJsonParser<~[char]>>(copy *s);
+				match obj {
+					Ok(o) => return self.sort(SpecObj(BsonDocument::from_formattable(o))),
+					Err(e) => return Err(e)
+				}
+			}
+		}
 	} 
-	pub fn limit<'a>(&'a mut self, n : int) -> &'a mut Cursor { 
-		self.limit = n as i32; self
-	}
-	pub fn skip<'a>(&'a mut self, n : int) -> &'a mut Cursor { 
-		self.skip = n as i32; self
-	}
 	pub fn has_next(&self) -> bool {
 		!self.data.is_empty()
 	}
@@ -96,7 +106,7 @@ impl Cursor {
 	/*fn send_request(&mut self, Message) -> Result<~str, ~str>{
 		if self.open {
 			if self.has_next() {
-				getmore = self.collection.get_more(self.limit);
+				getmore = self.collection.get_more(min(self.limit-self.retrieved, self.batch_size));
 				dbresult = self.collection.db.send_msg(getmore); //ideally the db class would parse the OP_REPLY and give back a result
 				match dbresult {
 					Ok(docs) => {
