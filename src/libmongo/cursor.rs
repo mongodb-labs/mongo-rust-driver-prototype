@@ -1,7 +1,7 @@
 use extra::deque::Deque; 
 use bson::bson_types::*;
 use bson::json_parse::*;
-//use std::cmp::min;
+use std::cmp::min;
 use util::*;
 
 //TODO temporary
@@ -105,22 +105,31 @@ impl Cursor {
 			self.query_spec.put(k,v);
 		}
 	}
-	/*fn send_request(&mut self, Message) -> Result<~str, ~str>{
-		if self.open {
-			if self.has_next() {
-				let batch_amt = if self.batch_size != 0 { min(self.limit-self.retrieved, self.batch_size) } else { self.limit-selfretrieved }
-				dbresult = self.collection.db.send_msg(getmore); //ideally the db class would parse the OP_REPLY and give back a result
-				match dbresult {
-					Ok(docs) => {
-						for docs.iter().advance |&doc| {
-							self.data.add_back(doc);
-						}
-					}
-					Err(e) => return Err(e)
-				}
-				Ok(~"success")
+	fn refresh(&mut self) -> Result<i32, ~str> {
+		if self.has_next() || !self.open {
+			return Ok(self.data.len() as i32);
+		}
+		
+		if self.id == 0 { //cursor is empty; query again
+			let mut query_amt = self.batch_size;
+			if self.limit != 0 {
+				query_amt = if self.batch_size != 0 { min(self.limit, self.batch_size) } else { self.limit };
 			}
-			
+			//self.send_request(asdfasdf);
+			Ok(1i32)
+		}
+
+		else { //cursor is not empty; get_more
+			let limit = if self.limit != 0 { if self.batch_size != 0 { min(self.limit - self.retrieved, self.batch_size) } else { self.limit - self.retrieved } } else { self.batch_size };
+			//self.send_request(asdfasdf);
+			Ok(2i32)
+		}
+	}
+	/*fn send_request(&mut self, msg: Message) -> Result<~str, ~str>{
+		if self.open {
+			match self.collection.db.connection.send_request_and_retrieve_result(msg) {
+
+			}
 		}
 		else {
 			Err(~"cannot send a request through a closed cursor")
