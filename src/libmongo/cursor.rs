@@ -3,10 +3,10 @@ use bson::bson_types::*;
 use bson::json_parse::*;
 //use std::cmp::min;
 use util::*;
-use coll::Collection;
+//use coll::Collection;
 
 //TODO temporary
-//pub struct Collection;
+pub struct Collection;
 
 ///Structure representing a cursor
 pub struct Cursor {
