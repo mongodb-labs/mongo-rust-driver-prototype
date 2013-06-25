@@ -1,3 +1,5 @@
+use std::comm::GenericPort;
+
 use extra::net::ip::*;
 use extra::net::tcp::*;
 use extra::uv::*;
@@ -5,8 +7,10 @@ use extra::future::*;
 
 use util::*;
 
+pub type PortResult = Result<~[u8], TcpErrData>;
+
 /**
- *
+ * Trait for sockets used by Connection. Used as a traitobject.
  */
 pub trait Socket {
 	fn read_start(&self) -> Result<@Port<Result<~[u8], TcpErrData>>, TcpErrData>;
@@ -47,7 +51,8 @@ pub struct NodeConnection {
     priv server_ip : @mut Option<IpAddr>,
     priv iotask : iotask::IoTask,
     priv sock : @mut Option<@Socket>,
-    priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
+    //priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
+    priv port : @mut Option<@GenericPort<PortResult>>
 }
 
 impl Connection for NodeConnection {
@@ -89,7 +94,7 @@ impl Connection for NodeConnection {
         // start the read port
         *(self.port) = match tmp_sock.read_start() {
             Err(e) => return Err(MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
-            Ok(port) => Some(port),
+            Ok(port) => Some(port as @GenericPort<PortResult>),
         };
 
         // hand initialized fields to self
@@ -157,11 +162,27 @@ impl Connection for NodeConnection {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use std::comm::GenericPort;
 	use extra::net::tcp::*;
 	use extra::future::*;
 
 	struct MockSocket {
 		flag: bool
+	}
+
+	struct MockPort {
+		flag: bool
+	}
+
+	impl GenericPort<PortResult> for MockPort {
+		fn recv(&self) -> PortResult {
+			if self.flag { return Ok(~[0u8]); }
+			else { return Err(TcpErrData { err_name: ~"mock error", err_msg: ~"mockport" } ); }
+		}
+		fn try_recv(&self) -> Option<PortResult> {
+			if self.flag { return Some(Ok(~[0u8])); }
+			else { return Some(Err(TcpErrData { err_name: ~"mock error", err_msg: ~"mockport" } )); }
+		}
 	}
 
 	impl Socket for MockSocket {
@@ -224,20 +245,19 @@ mod tests {
 		assert!(conn.recv().is_err());
 	}
 
-	//TODO recv tests need a mock port presumably
-	//#[test]
+	#[test]
 	fn test_recv_read_err() {
 		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
-		let s: @Socket = @MockSocket {flag: false} as @Socket;
-		conn.sock = @mut Some(s);
+		let p: @GenericPort<PortResult> = @MockPort {flag: false} as @GenericPort<PortResult>;
+		conn.port = @mut Some(p);
 		assert!(conn.recv().is_err());
 	}
 
-	//#[test]
+	#[test]
 	fn test_recv_read() {
 		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
-		let s: @Socket = @MockSocket {flag: true} as @Socket;
-		conn.sock = @mut Some(s);
+		let p: @GenericPort<PortResult> = @MockPort {flag: true} as @GenericPort<PortResult>;
+		conn.port = @mut Some(p);
 		assert!(conn.recv().is_ok());
 	}
 
