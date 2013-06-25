@@ -1,22 +1,22 @@
 extern mod bson;
 
 use extra::deque::Deque; 
-use bson::bson::*;
 use bson::bson_types::*;
 use bson::json_parse::*;
 use util::*;
 
 //TODO temporary
-pub struct MongoCollection;
+pub struct Collection;
 
 ///Structure representing a cursor
 pub struct Cursor {
 	id : i64,
-	collection : @MongoCollection,
+	collection : @Collection,
 	flags : i32, // tailable, slave_ok, oplog_replay, no_timeout, await_data, exhaust, partial, can set during find() too
 	skip : i32,
 	limit : i32,
 	open : bool,
+	retrieved: i32,
 	query_spec : BsonDocument,
 	data : Deque<BsonDocument>
 }
@@ -32,7 +32,7 @@ impl Iterator<BsonDocument> for Cursor {
 }
 ///Cursor API
 impl Cursor {
-	pub fn new(collection: @MongoCollection, flags: i32) -> Cursor {
+	pub fn new(collection: @Collection, flags: i32) -> Cursor {
 		Cursor {
 			id: 0, //TODO
 			collection: collection,
@@ -40,6 +40,7 @@ impl Cursor {
 			skip: 0,
 			limit: 0,
 			open: true,
+			retrieved: 0,
 			query_spec: BsonDocument::new(),
 			data: Deque::new::<BsonDocument>() 
 		}
@@ -122,7 +123,6 @@ mod tests {
 	extern mod extra;
 
 	use super::*; 
-	use bson::bson::*;
 	use bson::bson_types::*;
 	use util::*;
 
@@ -130,7 +130,7 @@ mod tests {
 	fn test_add_index_obj() {
 		let mut doc = BsonDocument::new();
 		doc.put(~"foo", Double(1f64));
-		let mut cursor = Cursor::new(@MongoCollection, 10i32);
+		let mut cursor = Cursor::new(@Collection, 10i32);
 		cursor.hint(SpecObj(doc));
 	
 		let mut spec = BsonDocument::new();	
@@ -143,7 +143,7 @@ mod tests {
 	#[test]
 	fn test_add_index_str() {
 		let hint = ~"{\"foo\": 1}";
-		let mut cursor = Cursor::new(@MongoCollection, 10i32);
+		let mut cursor = Cursor::new(@Collection, 10i32);
 		cursor.hint(SpecNotation(hint));
 
 		let mut spec = BsonDocument::new();
