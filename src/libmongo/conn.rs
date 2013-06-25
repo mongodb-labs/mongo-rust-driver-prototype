@@ -7,7 +7,6 @@ use extra::future::*;
 
 use util::*;
 
-
 pub type PortResult = Result<~[u8], TcpErrData>;
 
 /**
@@ -52,6 +51,7 @@ pub struct NodeConnection {
     priv server_ip : @mut Option<IpAddr>,
     priv iotask : iotask::IoTask,
     priv sock : @mut Option<@Socket>,
+    //priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
     priv port : @mut Option<@GenericPort<PortResult>>
 }
 
