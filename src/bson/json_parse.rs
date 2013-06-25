@@ -7,23 +7,23 @@ use bson_types::*;
 use std::vec::contains;
 
 ///This trait is for parsing non-BSON object notations such as JSON, XML, etc.
-pub trait ObjParser<T:Stream<char>, V> {
-	pub fn from_string(&mut self, s: &str) -> Result<V,~str>;
+pub trait ObjParser<V> {
+	pub fn from_string(s: &str) -> Result<V,~str>;
 }
 ///JSON parsing struct. T is a Stream<char>.
 pub struct PureJsonParser<T> {
 	stream: T
 }
 ///Publicly exposes from_string.
-impl ObjParser<~[char], PureJson> for PureJsonParser<~[char]> {
-	pub fn from_string(&mut self, s: &str) -> Result<PureJson,~str> {
+impl ObjParser<PureJson> for PureJsonParser<~[char]> {
+	pub fn from_string(s: &str) -> Result<PureJson,~str> {
 		let mut stream = s.iter().collect::<~[char]>();
 		stream.pass_while(&[' ', '\n', '\r', '\t']);
 		if !(stream.first() == &'{') {
 			return Err(~"invalid json string found!");
 		}
-		self.stream = stream;
-		self.object()
+		let mut parser = PureJsonParser::new(stream);
+		parser.object()
 	}
 }
 
@@ -35,7 +35,7 @@ impl<T:Stream<char>> PureJsonParser<T> {
 		let mut ret: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
 		while !(self.stream.first() == &'}') {
 			self.stream.pass_while(&[' ', '\n', '\r', '\t']);
-			if self.stream.expect(&['\"']).is_none() { println(fmt!("stream head is: %?\n", self.stream.first())); return Err(~"keys must begin with quote marks"); }
+			if self.stream.expect(&['\"']).is_none() { return Err(~"keys must begin with quote marks"); }
 			let key = match self._string() {
 				PureJsonString(s) => s,
 				_ => fail!("invalid key found")//TODO
