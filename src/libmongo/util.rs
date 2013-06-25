@@ -1,4 +1,3 @@
-extern mod bson;
 use bson::bson_types::*;
 
 pub struct MongoErr {
