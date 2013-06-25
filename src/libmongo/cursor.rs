@@ -1,7 +1,7 @@
 use extra::deque::Deque; 
 use bson::bson_types::*;
 use bson::json_parse::*;
-
+//use std::cmp::min;
 use util::*;
 
 //TODO temporary
@@ -16,6 +16,7 @@ pub struct Cursor {
 	limit : i32,
 	open : bool,
 	retrieved: i32,
+	batch_size: i32,
 	query_spec : BsonDocument,
 	data : Deque<BsonDocument>
 }
@@ -40,6 +41,7 @@ impl Cursor {
 			limit: 0,
 			open: true,
 			retrieved: 0,
+			batch_size: 0,
 			query_spec: BsonDocument::new(),
 			data: Deque::new::<BsonDocument>() 
 		}
@@ -106,7 +108,7 @@ impl Cursor {
 	/*fn send_request(&mut self, Message) -> Result<~str, ~str>{
 		if self.open {
 			if self.has_next() {
-				getmore = self.collection.get_more(min(self.limit-self.retrieved, self.batch_size));
+				let batch_amt = if self.batch_size != 0 { min(self.limit-self.retrieved, self.batch_size) } else { self.limit-selfretrieved }
 				dbresult = self.collection.db.send_msg(getmore); //ideally the db class would parse the OP_REPLY and give back a result
 				match dbresult {
 					Ok(docs) => {
