@@ -18,7 +18,7 @@ pub struct PureJsonParser<T> {
 impl ObjParser<~[char], PureJson> for PureJsonParser<~[char]> {
 	pub fn from_string(&mut self, s: &str) -> Result<PureJson,~str> {
 		let mut stream = s.iter().collect::<~[char]>();
-		stream.pass_while(&~[' ', '\n', '\r', '\t']);
+		stream.pass_while(&[' ', '\n', '\r', '\t']);
 		if !(stream.first() == &'{') {
 			return Err(~"invalid json string found!");
 		}
@@ -34,17 +34,17 @@ impl<T:Stream<char>> PureJsonParser<T> {
 		self.stream.pass(1); //pass over brace
 		let mut ret: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
 		while !(self.stream.first() == &'}') {
-			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-			if self.stream.expect(&~['\"']).is_none() { println(fmt!("stream head is: %?\n", self.stream.first())); return Err(~"keys must begin with quote marks"); }
+			self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+			if self.stream.expect(&['\"']).is_none() { println(fmt!("stream head is: %?\n", self.stream.first())); return Err(~"keys must begin with quote marks"); }
 			let key = match self._string() {
 				PureJsonString(s) => s,
 				_ => fail!("invalid key found")//TODO
 			};
-			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-			if self.stream.expect(&~[':']).is_none() { return Err(~"keys and values should be separated by :"); }
+			self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+			if self.stream.expect(&[':']).is_none() { return Err(~"keys and values should be separated by :"); }
 			self.stream.pass(1); //pass over :
-			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-			let c = self.stream.expect(&~['\"', 't', 'f', '[', '{']);
+			self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+			let c = self.stream.expect(&['\"', 't', 'f', '[', '{']);
 			match c {
 				Some('\"') => { ret.insert(key, self._string()); }
 				Some('t') => { 
@@ -78,16 +78,16 @@ impl<T:Stream<char>> PureJsonParser<T> {
 				}
 				_ => if is_digit(*self.stream.first()) { ret.insert(key, self._number()); } else { return Err(fmt!("invalid value found: %?", self.stream.first())); }
 			}
-			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-			let comma = self.stream.expect(&~[',', '}']);
+			self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+			let comma = self.stream.expect(&[',', '}']);
 			match comma { 
-				Some(',') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']) }
-				Some('}') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']); return Ok(PureJsonObject(ret)); }
+				Some(',') => { self.stream.pass(1); self.stream.pass_while(&[' ', '\n', '\r', '\t']) }
+				Some('}') => { self.stream.pass(1); self.stream.pass_while(&[' ', '\n', '\r', '\t']); return Ok(PureJsonObject(ret)); }
 				_ => return Err(~"invalid end to object: expecting , or }")
 			}
 			if !self.stream.has_next() { break; }
 		}
-		self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
+		self.stream.pass_while(&[' ', '\n', '\r', '\t']);
 		Ok(PureJsonObject(ret))
 	}
 	///Parse a string.
@@ -95,7 +95,7 @@ impl<T:Stream<char>> PureJsonParser<T> {
 		self.stream.pass(1); //pass over begin quote
 		let ret: ~[char] = self.stream.until(|c| *c == '\"'); 
 		self.stream.pass(1); //pass over end quote
-		self.stream.pass_while(&~[' ', '\n', '\r', '\t']); //pass over trailing whitespace
+		self.stream.pass_while(&[' ', '\n', '\r', '\t']); //pass over trailing whitespace
 		PureJsonString(from_chars(ret))
 	}
 	///Parse a number; converts it to float.
@@ -105,30 +105,30 @@ impl<T:Stream<char>> PureJsonParser<T> {
 	}
 	///Parse a boolean. Errors for values other than 'true' or 'false'.
 	pub fn _bool(&mut self) -> Result<PureJson,~str> {
-		let c1 = self.stream.expect(&~['t', 'f']);
+		let c1 = self.stream.expect(&['t', 'f']);
 		match c1 {
 			Some('t') => { self.stream.pass(1); 	
 					let next = ~['r', 'u', 'e'];
 					let mut i = 0;
 					while i < 3 {
-						let c = self.stream.expect(&~[next[i]]);
+						let c = self.stream.expect(&[next[i]]);
 						if c.is_none() { return Err(~"invalid boolean value while expecting true!"); }
 						i += 1;
 						self.stream.pass(1);
 					}
-					self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
+					self.stream.pass_while(&[' ', '\n', '\r', '\t']);
 					Ok(PureJsonBoolean(true))
 				     }
 			Some('f') => { self.stream.pass(1);
 					let next = ~['a', 'l', 's', 'e'];
 					let mut i = 0;
 					while i < 4 {
-						let c = self.stream.expect(&~[next[i]]);
+						let c = self.stream.expect(&[next[i]]);
 						if c.is_none() { return Err(~"invalid boolean value while expecting false!"); }
 						i += 1;
 						self.stream.pass(1);
 					}
-					self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
+					self.stream.pass_while(&[' ', '\n', '\r', '\t']);
 					Ok(PureJsonBoolean(false))
 				     }
 			_ => return Err(~"invalid boolean value!")
@@ -136,18 +136,18 @@ impl<T:Stream<char>> PureJsonParser<T> {
 	}
 	///Parse null. Errors for values other than 'null'.
 	pub fn _null(&mut self) -> Result<PureJson,~str> {
-		let c1 = self.stream.expect(&~['n']);
+		let c1 = self.stream.expect(&['n']);
 		match c1 {
 			Some('n') => { self.stream.pass(1);
 				let next = ~['u', 'l', 'l'];
 				let mut i = 0;
 				while i < 3 {
-					let c = self.stream.expect(&~[next[i]]);
+					let c = self.stream.expect(&[next[i]]);
 					if c.is_none() { return Err(~"invalid null value!"); }
 					i += 1;
 					self.stream.pass(1);
 				}
-				self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
+				self.stream.pass_while(&[' ', '\n', '\r', '\t']);
 				Ok(PureJsonNull)
 			}
 			_ => return Err(~"invalid null value!")
@@ -158,7 +158,7 @@ impl<T:Stream<char>> PureJsonParser<T> {
 		self.stream.pass(1); //pass over [
 		let mut ret: ~[PureJson] = ~[];
 		while !(self.stream.first() == &']') {
-			let c = self.stream.expect(&~['\"', 't', 'f', '[', '{']);
+			let c = self.stream.expect(&['\"', 't', 'f', '[', '{']);
 			match c {
 				Some('\"') => ret.push(self._string()),
 				Some('t') => {
@@ -192,16 +192,16 @@ impl<T:Stream<char>> PureJsonParser<T> {
 				}
 				_ => if is_digit(*self.stream.first()) { ret.push(self._number()) } else { return Err(fmt!("invalid value found: %?", self.stream.first())); }
 			}
-			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-			let comma = self.stream.expect(&~[',', ']']);
+			self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+			let comma = self.stream.expect(&[',', ']']);
 			match comma {
-				Some(',') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']); }
-				Some(']') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']); return Ok(PureJsonList(ret)); }
+				Some(',') => { self.stream.pass(1); self.stream.pass_while(&[' ', '\n', '\r', '\t']); }
+				Some(']') => { self.stream.pass(1); self.stream.pass_while(&[' ', '\n', '\r', '\t']); return Ok(PureJsonList(ret)); }
 				_ => return Err(fmt!("invalid value found: %?", self.stream.first()))
 			}
 			if !self.stream.has_next() { break; } //this should only happen during tests
 		}
-		self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
+		self.stream.pass_while(&[' ', '\n', '\r', '\t']);
 		Ok(PureJsonList(ret))
 	}
 	///If this object was an $oid, return an ObjID.

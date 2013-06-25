@@ -18,9 +18,9 @@ pub trait Stream<T:Eq> {
 	/**Look for the elements of search in the first element of the stream.
 	*If the first element of the stream matches any element, return the first match.	
 	*/
-	fn expect(&self, search: &~[T]) -> Option<T>; 
+	fn expect(&self, search: &[T]) -> Option<T>; 
 	///Skip values which match the listed values until a different one is found.
-	fn pass_while(&mut self, to_skip: &~[T]);
+	fn pass_while(&mut self, to_skip: &[T]);
 }
 
 impl<T:Eq + Copy> Stream<T> for ~[T] {
@@ -65,7 +65,7 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
 			self.pass(1);
 		}
 	}
-	fn expect(&self, search: &~[T]) -> Option<T> {
+	fn expect(&self, search: &[T]) -> Option<T> {
 		if !self.has_next() { return None; }
 		for search.iter().advance |&choice| {
 			if choice == self[0] { 
@@ -74,7 +74,7 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
 		}
 		None
 	}
-	fn pass_while(&mut self, to_skip: &~[T]) {
+	fn pass_while(&mut self, to_skip: &[T]) {
 		while self.has_next() {
 			let v = self.expect(to_skip);
 			if v == None { return; }
@@ -182,9 +182,9 @@ mod tests {
 	#[test]
 	fn test_expect() {
 		let stream = ~[0,1,2];
-		assert_eq!(stream.expect(&~[0,1]), Some(0));
-		assert_eq!(stream.expect(&~[1,0]), Some(0));
-		assert_eq!(stream.expect(&~[3,4]), None);
+		assert_eq!(stream.expect(&[0,1]), Some(0));
+		assert_eq!(stream.expect(&[1,0]), Some(0));
+		assert_eq!(stream.expect(&[3,4]), None);
 	}
 
 	#[test]
@@ -192,7 +192,7 @@ mod tests {
 		let mut stream = ~[0,1,2,3,2,3,4,3,4,5];
 		let to_skip = ~[1,2,3];
 		stream.pass(1);
-		stream.pass_while(&to_skip);
+		stream.pass_while(to_skip);
 		assert_eq!(stream[0], 4);
 		stream.pass(1);
 		assert_eq!(stream[0], 3);	

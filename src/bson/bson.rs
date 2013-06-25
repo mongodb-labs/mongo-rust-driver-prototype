@@ -35,7 +35,7 @@ pub struct BsonParser<T> {
 }
 
 ///Collects up to 8 bytes in order as a u64.
-priv fn bytesum(bytes: ~[u8]) -> u64 {
+priv fn bytesum(bytes: &[u8]) -> u64 {
 	let mut i = 0;
 	let mut ret: u64 = 0;
 	for bytes.iter().advance |&byte| {
@@ -49,7 +49,7 @@ impl<T:Stream<u8>> BsonParser<T> {
 	///Parse a document. Returns an error string on parse failure. 
 	pub fn document(&mut self) -> Result<BsonDocument,~str> {
 		let size = bytesum(self.stream.aggregate(4)) as i32;
-		let mut elemcode = self.stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
+		let mut elemcode = self.stream.expect(&[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
 		self.stream.pass(1);
 		let mut ret = BsonDocument::new();
 		while elemcode != None {
@@ -99,7 +99,7 @@ impl<T:Stream<u8>> BsonParser<T> {
 				_ => return Err(~"an invalid element code was found")
 			};
 			ret.put(key, val);
-			elemcode = self.stream.expect(&~[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
+			elemcode = self.stream.expect(&[DOUBLE,STRING,EMBED,ARRAY,BINARY,OBJID,BOOL,UTCDATE,NULL,REGEX,JSCRIPT,JSCOPE,INT32,TSTAMP,INT64,MINKEY,MAXKEY]);
 			if self.stream.has_next() { self.stream.pass(1); }
 		}
 		ret.size = size;
