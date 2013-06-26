@@ -55,3 +55,6 @@ clean:
 	$(RM) -rf $(TEST)
 	$(RM) -rf $(BIN)
 	$(RM) -rf $(DOCS)
+
+tidy:
+	sed -e 's/\s\+$$//g' ./src/*
