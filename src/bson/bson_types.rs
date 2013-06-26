@@ -40,17 +40,6 @@ pub enum Document {
     MaxKey                        //x7F
     
 }
-///Implementation of JSON which maintains ordering.
-#[deriving(Eq)]
-pub enum PureJson {
-    PureJsonString(~str),
-    PureJsonNumber(float),
-    PureJsonBoolean(bool),
-    PureJsonList(~[PureJson]),
-    PureJsonObject(OrderedHashmap<~str, PureJson>),
-    PureJsonNull,
-    PureJsonObjID(~[u8])
-}
 
 /*The type of a complete BSON document.
 *Contains an ordered map of fields and values and the size of the document as i32.
@@ -290,36 +279,6 @@ impl Document {
             Int64(_) => 8,
             MinKey => 0,
             MaxKey => 0
-        }
-    }
-}
-
-///Transforms from JSON enum to BSON enum.
-impl BsonFormattable for PureJson {
-    fn bson_doc_fmt(&self) -> Document{
-        match *self {
-            PureJsonNumber(f) => Double(f as f64),
-            PureJsonString(ref s) => UString(copy *s),
-            PureJsonBoolean(b) => Bool(b),
-            PureJsonNull => Null,
-            PureJsonObjID(ref l) => ObjectId(copy *l),
-            PureJsonList(ref l) => {
-                let nl = l.map(|&item| item.bson_doc_fmt()); 
-                let mut doc = BsonDocument::new();
-                let mut i: int = 0;
-                for nl.iter().advance |&item| {
-                    doc.put(i.to_str(), item);
-                    i += 1;
-                }
-                Array(~doc)
-            }
-            PureJsonObject(ref m) => {
-                let mut doc = BsonDocument::new();
-                for m.each_key |&k| {
-                    doc.put(copy k, m.find(&k).unwrap().bson_doc_fmt());
-                }
-                Embedded(~doc)
-            }
         }
     }
 }

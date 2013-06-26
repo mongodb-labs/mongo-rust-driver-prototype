@@ -215,29 +215,12 @@ mod tests {
         assert_eq!(doc2.size, 58);
     }
 
-    //testing conversions for PureBson implementation
-    //MINOR: move these to different testing module
-    #[test]
-    fn test_string_bson_doc_fmt() {
-        assert_eq!(PureJsonString(~"hello").bson_doc_fmt(), UString(~"hello"));
-    }
-
-    #[test]
-    fn test_list_bson_doc_fmt() {
-        let lst = PureJsonList(~[PureJsonBoolean(true), PureJsonString(~"hello")]);
-        match lst.bson_doc_fmt() {
-            Array(~l1) => { assert_eq!(l1.find(~"0").unwrap(), &Bool(true));
-                           assert_eq!(l1.find(~"1").unwrap(), &UString(~"hello")); }
-            _ => fail!()
-        }
-    }
-
     #[test]
     fn test_object_bson_doc_fmt() {
         let jstring = "{\"foo\": true}";
         let mut doc = BsonDocument::new();
         doc.put(~"foo", Bool(true));
-        assert_eq!(ObjParser::from_string::<PureJson, PureJsonParser<~[char]>>(jstring).unwrap().bson_doc_fmt(), Embedded(~doc));    
+        assert_eq!(ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(jstring).unwrap(), Embedded(~doc));    
     }
 
     //testing encode
@@ -398,15 +381,19 @@ mod tests {
     //full encode path testing
     #[test]
     fn test_string_whole_encode() {
-        let jstring = "{\"foo\": \"bar\"}";
-        let doc = BsonDocument::from_formattable(ObjParser::from_string::<PureJson, PureJsonParser<~[char]>>(jstring).unwrap());
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", UString(~"bar"));
+
         assert_eq!(encode(&doc), ~[18,0,0,0,2,102,111,111,0,4,0,0,0,98,97,114,0,0]);
     }
 
     //#[test]
     fn test_embed_whole_encode() {
         let jstring = "{\"foo\": [\"hello\", false], \"baz\": \"qux\"}";
-        let doc = BsonDocument::from_formattable(ObjParser::from_string::<PureJson, PureJsonParser<~[char]>>(jstring).unwrap());
+        let doc = match ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(jstring).unwrap() {
+            Embedded(ref map) => BsonDocument::from_map(copy map.fields),
+            _ => fail!("test_embed_whole_encode parse failure")
+        };
         
         assert_eq!(encode(&doc), ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
     }
