@@ -1,9 +1,10 @@
 RC = rustc
-RDOC = rustdoc --output-dir $(DOCS) --output-format markdown --output-style doc-per-mod
+RDOC = rustdoc 
+RDOCFLAGS = --output-dir $(DOCS) --output-format markdown --output-style doc-per-mod
 CC = gcc
 AR = ar rcs
 FLAGS = -L ./bin
-CFLAGS = -c -g -o
+CFLAGS = -c -g -Wall -Werror 
 RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
@@ -24,7 +25,7 @@ bin:
 	$(MKDIR) docs
 
 libs: $(BSONDIR)/cast.c
-	$(CC) $(CFLAGS) $(BIN)/typecast.o $(BSONDIR)/cast.c
+	$(CC) $(CFLAGS) -o $(BIN)/typecast.o $(BSONDIR)/cast.c
 	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
 
 bson: $(BSONDIR)/*
@@ -42,12 +43,12 @@ runtests: $(TEST)/*
 	$(TEST)/mongo_test
 
 doc: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/bson.rs $(MONGODIR)/*
-	$(RDOC) $(BSONDIR)/ord_hash.rs
-	$(RDOC) $(BSONDIR)/stream.rs
-	$(RDOC) $(BSONDIR)/json_parse.rs
-	$(RDOC) $(BSONDIR)/bson_types.rs
-	$(RDOC) $(BSONDIR)/bson.rs
-	$(RDOC) $(MONGODIR)/cursor.rs
+	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/ord_hash.rs
+	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/stream.rs
+	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/json_parse.rs
+	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/bson_types.rs
+	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/bson.rs
+	$(RDOC) $(RDOCFLAGS) $(MONGODIR)/cursor.rs
 
 clean:
 	$(RM) $(BIN)/*.dylib
