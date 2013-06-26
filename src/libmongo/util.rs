@@ -89,17 +89,14 @@ pub enum REPLY_FLAG {
     AWAIT_CAPABLE = 1 << 3,
 }
 
-/**
- * Misc
- */
-pub static LITTLE_ENDIAN_TRUE : bool = true;
-
 // TODO write concern
 pub enum WRITE_CONCERN {
     JOURNAL(bool),      // wait for next journal commit?
-    W(~str),            // replicate to how many?
+    W_N(int),           // replicate to how many? (number)
+    W_STR(~str),        // replicate to how many? (string, e.g. "majority")
+    //W_TAGSET(~str),     // replicate to what tagset? (string to parse)
+    WTIMEOUT(int),      // timeout after how many ms?
     FSYNC(bool),        // wait for write to disk?
-    WTIMEOUT(int),      // timeout after how long?
 }
 
 pub enum QuerySpec {
@@ -107,3 +104,21 @@ pub enum QuerySpec {
 	SpecNotation(~str)
 }
 // TODO read preference
+
+/**
+ * Collections for admin purposes.
+ */
+/*
+pub static SYSTEM_NAMESPACE : &'static str = &'static "system.namespaces";
+pub static SYSTEM_INDEX : &'static str = &'static "system.indexes";
+pub static SYSTEM_PROFILE : &'static str = &'static "system.profile";
+pub static SYSTEM_USER : &'static str = &'static "system.users";
+pub static SYSTEM_COMMAND : &'static str = &'static "$cmd";
+pub static SYSTEM_JS : &'static str = &'static "system.js";
+*/
+
+/**
+ * Misc
+ */
+pub static LITTLE_ENDIAN_TRUE : bool = true;
+
