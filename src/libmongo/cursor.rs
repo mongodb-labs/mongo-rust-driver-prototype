@@ -32,6 +32,28 @@ impl Iterator<BsonDocument> for Cursor {
         Some(self.data.pop_front())
     }
 }
+macro_rules! query_add (
+   ($obj:ident, $field:expr, $cb:ident) => {
+        match $obj {
+            SpecObj(doc) => {
+                let mut t = BsonDocument::new();
+                t.put($field, Embedded(~doc));
+                self.add_query_spec(&t);
+                Ok(~"added to query spec")
+            }
+            SpecNotation(ref s) => {
+                let obj = ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(copy *s);
+                if obj.is_ok() {
+                    match obj.unwrap() {
+                        Embedded(ref map) => return self.$cb(SpecObj(BsonDocument::from_map(copy map.fields))),
+                        _ => fail!()
+                    }
+                }
+                else { return Err(~"could not parse json object"); }
+            }
+        }
+   }
+)
 ///Cursor API
 impl Cursor {
     pub fn new(query: BsonDocument, collection : Option<@Collection>, id : i64, n : i32, flags : i32, vec : ~[BsonDocument]) -> Cursor {
@@ -59,38 +81,10 @@ impl Cursor {
         self.add_query_spec(&doc);
     }
     pub fn hint(&mut self, index: QuerySpec) -> Result<~str,~str> {
-        match index {
-            SpecObj(doc) => {
-                let mut hint = BsonDocument::new();
-                hint.put(~"$hint", Embedded(~doc));
-                self.add_query_spec(&hint);
-                Ok(~"added hint to query spec")
-            }
-            SpecNotation(ref s) => {
-                let obj = ObjParser::from_string::<PureJson, PureJsonParser<~[char]>>(copy *s);
-                match obj {
-                    Ok(o) => return self.hint(SpecObj(BsonDocument::from_formattable(o))),
-                    Err(e) => return Err(e)
-                }
-            }
-        }
+       query_add!(index, ~"$hint", hint) 
     }
     pub fn sort(&mut self, orderby: QuerySpec) -> Result<~str,~str> {
-        match orderby {
-            SpecObj(doc) => {
-                let mut ord = BsonDocument::new();
-                ord.put(~"$orderby", Embedded(~doc));
-                self.add_query_spec(&ord);
-                Ok(~"added hint to query spec")
-            }
-            SpecNotation(ref s) => {
-                let obj = ObjParser::from_string::<PureJson, PureJsonParser<~[char]>>(copy *s);
-                match obj {
-                    Ok(o) => return self.sort(SpecObj(BsonDocument::from_formattable(o))),
-                    Err(e) => return Err(e)
-                }
-            }
-        }
+       query_add!(orderby, ~"$orderby", sort) 
     } 
     pub fn has_next(&self) -> bool {
         !self.data.is_empty()
