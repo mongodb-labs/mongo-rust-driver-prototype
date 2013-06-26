@@ -1,11 +1,11 @@
 use std::iterator::IteratorUtil;
 
 pub trait Stream<T:Eq> {
-    ///Return if the stream has more values.    
+    ///Return if the stream has more values.
     fn has_next(& self) -> bool;
     ///Get a borrowed pointer to the first element of the stream.
-    fn first<'a>(&'a self) -> &'a T;    
-    ///Move the stream forward by count units.        
+    fn first<'a>(&'a self) -> &'a T;
+    ///Move the stream forward by count units.
     fn pass(&mut self, count: int);
     ///Apply a function to the first count units and return the results in a vector.
     fn process<V: Copy>(&mut self, count: int, f: &fn(&T) -> V) -> ~[V];
@@ -16,16 +16,16 @@ pub trait Stream<T:Eq> {
     ///Aggregate elements of the stream until the head of the stream meets the predicate.
     fn until(&mut self, f: &fn(&T) -> bool) -> ~[T];
     /**Look for the elements of search in the first element of the stream.
-    *If the first element of the stream matches any element, return the first match.    
+    *If the first element of the stream matches any element, return the first match.
     */
-    fn expect(&self, search: &[T]) -> Option<T>; 
+    fn expect(&self, search: &[T]) -> Option<T>;
     ///Skip values which match the listed values until a different one is found.
     fn pass_while(&mut self, to_skip: &[T]);
 }
 
 impl<T:Eq + Copy> Stream<T> for ~[T] {
     fn has_next(&self) -> bool {
-        self.len() >= 1    
+        self.len() >= 1
     }
     fn first<'a>(&'a self) -> &'a T {
         if self.is_empty() {
@@ -51,10 +51,10 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
         ret
     }
 
-    fn aggregate(&mut self, count: int) -> ~[T] {    
+    fn aggregate(&mut self, count: int) -> ~[T] {
         self.process(count, |&x| x)
-    }    
-    
+    }
+
     fn until(&mut self, f: &fn(&T) -> bool) -> ~[T] {
         let mut ret: ~[T] = ~[];
         loop {
@@ -68,8 +68,8 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
     fn expect(&self, search: &[T]) -> Option<T> {
         if !self.has_next() { return None; }
         for search.iter().advance |&choice| {
-            if choice == self[0] { 
-                return Some(choice); 
+            if choice == self[0] {
+                return Some(choice);
             }
         }
         None
@@ -80,7 +80,7 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
             if v == None { return; }
             self.pass(1);
         }
-    }    
+    }
 }
 
 #[cfg(test)]
@@ -88,7 +88,7 @@ mod tests {
     #[test]
     fn test_has_next() {
         let empty: ~[~str] = ~ [];
-        assert_eq!(empty.has_next(), false);    
+        assert_eq!(empty.has_next(), false);
         assert_eq!((~[0,1,2]).has_next(), true);
     }
 
@@ -97,13 +97,13 @@ mod tests {
         let full = ~[0];
         assert_eq!(full.first(), &0);
     }
-    
+
     #[test]
     #[should_fail]
     fn test_first_fail() {
         let empty: ~[~str] = ~[];
         empty.first();
-    }    
+    }
     #[test]
     fn test_pass() {
         let mut stream = ~[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
@@ -195,7 +195,7 @@ mod tests {
         stream.pass_while(to_skip);
         assert_eq!(stream[0], 4);
         stream.pass(1);
-        assert_eq!(stream[0], 3);    
+        assert_eq!(stream[0], 3);
     }
 
 }

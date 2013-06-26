@@ -16,7 +16,7 @@ impl<K: Hash + Eq,V> Container for OrderedHashmap<K,V> {
 }
 
 impl<K: Hash + Eq,V> Mutable for OrderedHashmap<K,V> {
-    pub fn clear(&mut self) { 
+    pub fn clear(&mut self) {
         self.map = HashMap::new();
         self.order = ~[];
     }

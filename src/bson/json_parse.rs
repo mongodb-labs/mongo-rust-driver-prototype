@@ -2,7 +2,6 @@ use std::char::is_digit;
 use std::str::from_chars;
 use std::float::from_str;
 use stream::*;
-use ord_hash::*;
 use bson_types::*;
 use std::vec::contains;
 
@@ -30,13 +29,20 @@ impl ObjParser<Document> for ExtendedJsonParser<~[char]> {
         parser.object()
     }
 }
-
+macro_rules! match_insert {
+    ($cb:ident, $key:expr) => {
+        match self.$cb() {
+            Ok(bl) => { ret.put($key, bl); }
+            Err(e) => return Err(e)
+        }
+    }
+}
 ///Main parser implementation for JSON
 impl<T:Stream<char>> ExtendedJsonParser<T> {
     ///Parse an object. Returns an error string on parse failure
     pub fn object(&mut self) -> DocResult {
         self.stream.pass(1); //pass over brace
-        let mut ret: OrderedHashmap<~str, Document> = OrderedHashmap::new();
+        let mut ret = BsonDocument::new();
         while !(self.stream.first() == &'}') {
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
             if self.stream.expect(&['\"']).is_none() { return Err(~"keys must begin with quote marks"); }
@@ -45,64 +51,52 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                 _ => fail!("invalid key found")//TODO
             };
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
-            if self.stream.expect(&[':']).is_none() { 
-                return Err(~"keys and values should be separated by :"); 
+            if self.stream.expect(&[':']).is_none() {
+                return Err(~"keys and values should be separated by :");
             }
             self.stream.pass(1); //pass over :
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
             let c = self.stream.expect(&['\"', 't', 'f', '[', '{']);
             match c {
-                Some('\"') => { ret.insert(key, self._string()); }
+                Some('\"') => { ret.put(key, self._string()); }
                 Some('t') => {
-                    let b = self._bool();
-                    match b {
-                        Ok(bl) => { ret.insert(key, bl); }
-                        Err(e) => return Err(e)
-                    }
+                    match_insert!(_bool,key);
                 }
                 Some('f') => {
-                    let b = self._bool();
-                    match b {
-                        Ok(bl) => { ret.insert(key, bl); }
-                        Err(e) => return Err(e)
-                    }
+                    match_insert!(_bool,key);
                 }
                 Some('[') => {
-                    let l = self._list();
-                    match l {
-                        Ok(ls) => { ret.insert(key, ls); }
-                        Err(e) => return Err(e)
-                    }
+                    match_insert!(_list,key)
                 }
                 Some('{') => {
                     let o = self.object();
                     if o.is_err() { return o; }
                     let obj = o.unwrap();
                     let id = ExtendedJsonParser::_keyobj::<T>(&obj);
-                    if !id.is_none() { ret.insert(key, id.unwrap()); }
-                    else { ret.insert(key, obj); }
+                    if !id.is_none() { ret.put(key, id.unwrap()); }
+                    else { ret.put(key, obj); }
                 }
-                _ => if is_digit(*self.stream.first()) { ret.insert(key, self._number()); } 
+                _ => if is_digit(*self.stream.first()) { ret.put(key, self._number()); }
                      else { return Err(fmt!("invalid value found: %?", self.stream.first())); }
             }
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
             let comma = self.stream.expect(&[',', '}']);
             match comma {
-                Some(',') => { 
-                    self.stream.pass(1); 
-                    self.stream.pass_while(&[' ', '\n', '\r', '\t']) 
+                Some(',') => {
+                    self.stream.pass(1);
+                    self.stream.pass_while(&[' ', '\n', '\r', '\t'])
                 }
-                Some('}') => { 
-                    self.stream.pass(1); 
-                    self.stream.pass_while(&[' ', '\n', '\r', '\t']); 
-                    return Ok(Embedded(~BsonDocument::from_map(~ret)));
+                Some('}') => {
+                    self.stream.pass(1);
+                    self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+                    return Ok(Embedded(~ret));
                 }
                 _ => return Err(~"invalid end to object: expecting , or }")
             }
             if !self.stream.has_next() { break; }
         }
         self.stream.pass_while(&[' ', '\n', '\r', '\t']);
-        Ok(Embedded(~BsonDocument::from_map(~ret)))
+        Ok(Embedded(~ret))
     }
     ///Parse a string.
     pub fn _string(&mut self) -> Document {
@@ -114,7 +108,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
     }
     ///Parse a number; converts it to float.
     pub fn _number(&mut self) -> Document {
-        let ret = self.stream.until(|c| (*c == ',') || 
+        let ret = self.stream.until(|c| (*c == ',') ||
             contains([' ', '\n', '\r', '\t', ']', '}'], c));
         Double(from_str(from_chars(ret)).unwrap() as f64)
     }
@@ -127,7 +121,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                     let mut i = 0;
                     while i < 3 {
                         let c = self.stream.expect(&[next[i]]);
-                        if c.is_none() { 
+                        if c.is_none() {
                             return Err(~"invalid boolean value while expecting true!");
                         }
                         i += 1;
@@ -182,25 +176,13 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
             match c {
                 Some('\"') => ret.put(i.to_str(), self._string()),
                 Some('t') => {
-                    let b = self._bool();
-                    match b {
-                        Ok(bl) => ret.put(i.to_str(), bl),
-                        Err(e) => return Err(e)
-                    }
+                    match_insert!(_bool,i.to_str());
                 }
                 Some('f') => {
-                    let b = self._bool();
-                    match b {
-                        Ok(bl) => ret.put(i.to_str(), bl),
-                        Err(e) => return Err(e)
-                    }
+                    match_insert!(_bool,i.to_str());
                 }
                 Some('[') => {
-                    let l = self._list();
-                    match l {
-                        Ok(ls) => ret.put(i.to_str(), ls),
-                        Err(e) => return Err(e)
-                    }
+                    match_insert!(_list,i.to_str());
                 }
                 Some('{') => {
                     let o = self.object();
@@ -211,8 +193,8 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                     else { ret.put(i.to_str(), obj); }
                 }
                 _ => if is_digit(*self.stream.first()) {
-                        ret.put(i.to_str(), self._number()) 
-                     } 
+                        ret.put(i.to_str(), self._number())
+                     }
                      else {
                          return Err(fmt!("invalid value found: %?", self.stream.first()));
                      }
@@ -271,8 +253,8 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                     && m.contains_key(~"$binary")
                     && m.contains_key(~"$type") {
                     match (m.find(~"$binary"), m.find(~"$type")) {
-                        (Some(&UString(ref s1)), Some(&UString(ref s2))) => 
-                            return Some(Binary(s2.bytes_iter().collect::<~[u8]>()[0], 
+                        (Some(&UString(ref s1)), Some(&UString(ref s2))) =>
+                            return Some(Binary(s2.bytes_iter().collect::<~[u8]>()[0],
                                 s1.bytes_iter().collect::<~[u8]>())),
                         _ => return None
                     }
@@ -281,7 +263,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                     && m.contains_key(~"$regex")
                     && m.contains_key(~"$options") {
                     match (m.find(~"$regex"), m.find(~"$options")) {
-                        (Some(&UString(ref s1)), Some(&UString(ref s2))) => 
+                        (Some(&UString(ref s1)), Some(&UString(ref s2))) =>
                             return Some(Regex(copy *s1, copy *s2)),
                         _ => return None
                     }
