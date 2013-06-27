@@ -43,7 +43,7 @@ check: $(TEST)/*
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 
-doc: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/bson.rs $(MONGODIR)/*
+doc: $(BSONDIR)/*.rs $(MONGODIR)/*
 	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/ord_hash.rs
 	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/stream.rs
 	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/json_parse.rs
