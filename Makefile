@@ -38,7 +38,7 @@ test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
 
-runtests: $(TEST)/*
+check: $(TEST)/*
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 
@@ -55,3 +55,6 @@ clean:
 	$(RM) -rf $(TEST)
 	$(RM) -rf $(BIN)
 	$(RM) -rf $(DOCS)
+
+tidy:
+	sed -e 's/\s\+$$//g' ./src/*

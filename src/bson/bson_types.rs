@@ -30,7 +30,7 @@ pub enum Document {
     Null,                        //x0A
     Regex(~str, ~str),                //x0B
     //deprecated: x0C dbpointer
-    JScript(~str),                    //x0D    
+    JScript(~str),                    //x0D
     JScriptWithScope(~str, ~BsonDocument),        //x0F
     //deprecated: x0E symbol
     Int32(i32),                    //x10
@@ -38,18 +38,7 @@ pub enum Document {
     Int64(i64),                    //x12
     MinKey,                        //xFF
     MaxKey                        //x7F
-    
-}
-///Implementation of JSON which maintains ordering.
-#[deriving(Eq)]
-pub enum PureJson {
-    PureJsonString(~str),
-    PureJsonNumber(float),
-    PureJsonBoolean(bool),
-    PureJsonList(~[PureJson]),
-    PureJsonObject(OrderedHashmap<~str, PureJson>),
-    PureJsonNull,
-    PureJsonObjID(~[u8])
+
 }
 
 /*The type of a complete BSON document.
@@ -79,16 +68,16 @@ impl Encoder for BsonDocEncoder {
         let x: [u8,..8] = unsafe { transmute(v) };
         let key = self.key();
         self.buf.push_all(key + x);
-    } 
+    }
     fn emit_f32(&mut self, v: f32) { self.emit_f64(v as f64); }
     fn emit_float(&mut self, v: float) { self.emit_f64(v as f64); }
     fn emit_str(&mut self, v: &str) { let key = self.key(); self.buf.push_all(key + ((v.to_bytes(l_end) + [0]).len() as i32).to_bytes(l_end) + v.to_bytes(l_end) + [0]); }
-    
+
     //embedded
     fn emit_struct(&mut self, _: &str, _: uint, _: &fn(&mut BsonDocEncoder)) {
         fail!("not implemented");
     }
-    
+
     //unimplemented junk
     fn emit_char(&mut self, _: char) { fail!("not implemented") }
     fn emit_enum(&mut self, _: &str, _: &fn(&mut BsonDocEncoder)) { fail!("not implemented") }
@@ -104,7 +93,7 @@ impl Encoder for BsonDocEncoder {
     fn emit_option(&mut self, _:&fn(&mut BsonDocEncoder)) { fail!("not implemented")}
     fn emit_option_none(&mut self) { fail!("not implemented")}
     fn emit_option_some(&mut self, _: &fn(&mut BsonDocEncoder)) { fail!("not implemented")}
-    fn emit_seq(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { fail!("not implemented")}    
+    fn emit_seq(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { fail!("not implemented")}
     fn emit_seq_elt(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { fail!("not implemented")}
     fn emit_map(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { fail!("not implemented")}
     fn emit_map_elt_key(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { fail!("not implemented")}
@@ -181,10 +170,10 @@ impl Encodable<BsonDocEncoder> for BsonDocument {
                 Null => { encoder.emit_u8(0x0A); encoder.with_key(k).emit_nil(); }
                 Regex(ref s1, ref s2) => { encoder.emit_u8(0x0B); encoder.with_key(k).emit_regex(*s1, *s2); }
                 JScript(ref s) => { encoder.emit_u8(0x0D); encoder.with_key(k).emit_str(*s); }
-                JScriptWithScope(ref s, ref doc) => { 
-                    encoder.emit_u8(0x0F); 
+                JScriptWithScope(ref s, ref doc) => {
+                    encoder.emit_u8(0x0F);
                     encoder.with_key(k).emit_i32(5 + doc.size + (s.to_bytes(l_end).len() as i32));
-                    encoder.emit_cstr(*s); 
+                    encoder.emit_cstr(*s);
                     doc.encode(encoder);
                 }
                 Int32(i) => { encoder.emit_u8(0x10); encoder.with_key(k).emit_i32(i); }
@@ -210,13 +199,13 @@ impl<'self> BsonDocument {
 
     pub fn find<'a>(&'a self, key: ~str) -> Option<&'a Document> {
         self.fields.find(&key)
-    } 
+    }
     ///Adds a key/value pair and updates size appropriately. Returns nothing.
     pub fn put(&mut self, key: ~str, val: Document) {
         self.fields.insert(key, val);
         self.size = map_size(self.fields);
     }
-    
+
     /**
     * Adds a list of key/value pairs and updates size. Returns nothing.
     */
@@ -255,7 +244,7 @@ impl<'self> BsonDocument {
     }
 
     ///Builds a BSON document from an OrderedHashmap.
-    pub fn from_map(m: ~OrderedHashmap<~str, Document>) -> BsonDocument {    
+    pub fn from_map(m: ~OrderedHashmap<~str, Document>) -> BsonDocument {
         BsonDocument { size: map_size(m), fields: m }
     }
 
@@ -277,49 +266,19 @@ impl Document {
             UString(ref s) => 5 + (*s).to_bytes(l_end).len() as i32,
             Embedded(ref doc) => doc.size,
             Array(ref doc) => doc.size,
-            Binary(_, ref dat) => 5 + dat.len() as i32, 
+            Binary(_, ref dat) => 5 + dat.len() as i32,
             ObjectId(_) => 12,
             Bool(_) => 1,
             UTCDate(_) => 8,
             Null => 0,
             Regex(ref s1, ref s2) => 2 + (s1.to_bytes(l_end).len() + s2.to_bytes(l_end).len()) as i32,
             JScript(ref s) => 5 + (*s).to_bytes(l_end).len() as i32,
-            JScriptWithScope(ref s, ref doc) => 5 + (*s).to_bytes(l_end).len() as i32 + doc.size,    
+            JScriptWithScope(ref s, ref doc) => 5 + (*s).to_bytes(l_end).len() as i32 + doc.size,
             Int32(_) => 4,
             Timestamp(_) => 8,
             Int64(_) => 8,
             MinKey => 0,
             MaxKey => 0
-        }
-    }
-}
-
-///Transforms from JSON enum to BSON enum.
-impl BsonFormattable for PureJson {
-    fn bson_doc_fmt(&self) -> Document{
-        match *self {
-            PureJsonNumber(f) => Double(f as f64),
-            PureJsonString(ref s) => UString(copy *s),
-            PureJsonBoolean(b) => Bool(b),
-            PureJsonNull => Null,
-            PureJsonObjID(ref l) => ObjectId(copy *l),
-            PureJsonList(ref l) => {
-                let nl = l.map(|&item| item.bson_doc_fmt()); 
-                let mut doc = BsonDocument::new();
-                let mut i: int = 0;
-                for nl.iter().advance |&item| {
-                    doc.put(i.to_str(), item);
-                    i += 1;
-                }
-                Array(~doc)
-            }
-            PureJsonObject(ref m) => {
-                let mut doc = BsonDocument::new();
-                for m.each_key |&k| {
-                    doc.put(copy k, m.find(&k).unwrap().bson_doc_fmt());
-                }
-                Embedded(~doc)
-            }
         }
     }
 }
