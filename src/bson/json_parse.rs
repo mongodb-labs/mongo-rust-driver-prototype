@@ -30,6 +30,16 @@ impl ObjParser<Document> for ExtendedJsonParser<~[char]> {
     }
 }
 
+///Convenience BsonFormattable implementation for ~str; fail!s if cannot format.
+impl BsonFormattable for ~str {
+    fn bson_doc_fmt(&self) -> Document {
+        match ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(*self) {
+            Ok(doc) => doc,
+            Err(e) => fail!("invalid string for parsing: %s", e),
+        }
+    }
+}
+
 macro_rules! match_insert {
     ($cb:ident, $key:expr) => {
         match self.$cb() {
