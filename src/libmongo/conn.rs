@@ -56,7 +56,7 @@ pub struct NodeConnection {
 }
 
 impl Connection for NodeConnection {
-    fn new(server_ip_str : ~str, server_port : uint) -> NodeConnection {
+    pub fn new(server_ip_str : ~str, server_port : uint) -> NodeConnection {
         NodeConnection {
             server_ip_str : server_ip_str,
             server_port : server_port,
@@ -72,28 +72,37 @@ impl Connection for NodeConnection {
      * # Returns
      * Ok(()), or a MongoConnectionErr
      */
-    fn connect(&self) -> Result<(), MongoErr> {
+    pub fn connect(&self) -> Result<(), MongoErr> {
         // sanity check: should not connect if already connected (?)
         if !(self.sock.is_none() && self.port.is_none()) {
-		return Err(MongoErr::new(~"connection", ~"Pre-existing socket", ~"Cannot override existing socket"));
+		return Err(MongoErr::new(
+                        ~"conn::connect",
+                        ~"pre-existing socket",
+                        ~"cannot override existing socket"));
 	}
 
         // parse IP addr
         let tmp_ip = match v4::try_parse_addr(self.server_ip_str) {
-            Err(e) => return Err(MongoErr::new(~"connection", ~"IP Parse Err", e.err_msg.clone())),
+            Err(e) => return Err(MongoErr::new(
+                                    ~"conn::connect",
+                                    ~"IP parse err",
+                                    e.err_msg.clone())),
             Ok(addr) => addr,
         };
 
         // set up the socket --- for now, just v4
         let tmp_sock = match connect(tmp_ip, self.server_port, &self.iotask) {
-            Err(GenericConnectErr(ename, emsg)) => return Err(MongoErr::new(~"connection", ename, emsg)),
-            Err(ConnectionRefused) => return Err(MongoErr::new(~"connection", ~"EHOSTNOTFOUND", ~"Invalid IP or port")),
+            Err(GenericConnectErr(ename, emsg)) => return Err(MongoErr::new(~"conn::connect", ename, emsg)),
+            Err(ConnectionRefused) => return Err(MongoErr::new(~"conn::connect", ~"EHOSTNOTFOUND", ~"Invalid IP or port")),
             Ok(sock) => @sock as @Socket
         };
 
         // start the read port
         *(self.port) = match tmp_sock.read_start() {
-            Err(e) => return Err(MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
+            Err(e) => return Err(MongoErr::new(
+                                    ~"conn::connect",
+                                    e.err_name.clone(),
+                                    e.err_msg.clone())),
             Ok(port) => Some(port as @GenericPort<PortResult>),
         };
 
@@ -107,12 +116,15 @@ impl Connection for NodeConnection {
     /**
      * "Fire and forget" asynchronous write to server of given data.
      */
-    fn send(&self, data : ~[u8]) -> Result<(), MongoErr> {
+    pub fn send(&self, data : ~[u8]) -> Result<(), MongoErr> {
         match *(self.sock) {
             None => return Err(MongoErr::new(~"connection", ~"unknown send err", ~"cannot send on null socket")),
             Some(sock) => {
                 match sock.write_future(data).get() {
-                    Err(e) => return Err(MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
+                    Err(e) => return Err(MongoErr::new(
+                                            ~"conn::send",
+                                            e.err_name.clone(),
+                                            e.err_msg.clone())),
                     Ok(_) => Ok(()),
                 }
             }
@@ -122,13 +134,19 @@ impl Connection for NodeConnection {
     /**
      * Pick up a response from the server.
      */
-    fn recv(&self) -> Result<~[u8], MongoErr> {
+    pub fn recv(&self) -> Result<~[u8], MongoErr> {
          // sanity check and unwrap: should not send on an unconnected connection
         match *(self.port) {
-            None => return Err(MongoErr::new(~"connection", ~"unknown recv err", ~"cannot receive from null port")),
+            None => return Err(MongoErr::new(
+                                    ~"conn::recv",
+                                    ~"unknown recv err",
+                                    ~"cannot receive from null port")),
             Some(port) => {
                 match port.recv() {
-                    Err(e) => Err(MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
+                    Err(e) => Err(MongoErr::new(
+                                    ~"conn::recv",
+                                    e.err_name.clone(),
+                                    e.err_msg.clone())),
                     Ok(msg) => Ok(msg),
                 }
             }
@@ -138,7 +156,7 @@ impl Connection for NodeConnection {
     /**
      * Disconnect from the server.
      */
-    fn disconnect(&self) -> Result<(), MongoErr> {
+    pub fn disconnect(&self) -> Result<(), MongoErr> {
         // NO sanity check: don't really care if disconnect unconnected connection
 
         // nuke port first (we can keep the ip)
@@ -148,7 +166,10 @@ impl Connection for NodeConnection {
             None => (),
             Some(sock) => {
                 match sock.read_stop() {
-                    Err(e) => return Err(MongoErr::new(~"connection", e.err_name.clone(), e.err_msg.clone())),
+                    Err(e) => return Err(MongoErr::new(
+                                            ~"conn::disconnect",
+                                            e.err_name.clone(),
+                                            e.err_msg.clone())),
                     Ok(_) => (),
                 }
             }
