@@ -2,13 +2,14 @@ use std::char::is_digit;
 use std::str::from_chars;
 use std::float::from_str;
 use stream::*;
-use bson_types::*;
+use encode::*;
 use std::vec::contains;
 
 ///This trait is for parsing non-BSON object notations such as JSON, XML, etc.
 pub trait ObjParser<V> {
     pub fn from_string(s: &str) -> Result<V,~str>;
 }
+
 ///JSON parsing struct. T is a Stream<char>.
 pub struct ExtendedJsonParser<T> {
     stream: T
@@ -27,16 +28,6 @@ impl ObjParser<Document> for ExtendedJsonParser<~[char]> {
         }
         let mut parser = ExtendedJsonParser::new(stream);
         parser.object()
-    }
-}
-
-///Convenience BsonFormattable implementation for ~str; fail!s if cannot format.
-impl BsonFormattable for ~str {
-    fn bson_doc_fmt(&self) -> Document {
-        match ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(*self) {
-            Ok(doc) => doc,
-            Err(e) => fail!("invalid string for parsing: %s", e),
-        }
     }
 }
 
@@ -294,7 +285,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
 mod tests {
 
     use super::*;
-    use bson_types::*;
+    use encode::*;
     use ord_hash::*;
 
     #[test]
