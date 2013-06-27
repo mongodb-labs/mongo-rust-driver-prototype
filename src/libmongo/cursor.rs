@@ -1,5 +1,5 @@
 use extra::deque::Deque; 
-use bson::bson_types::*;
+use bson::encode::*;
 use bson::json_parse::*;
 use std::cmp::min;
 use util::*;
@@ -144,7 +144,7 @@ mod tests {
     extern mod extra;
 
     use super::*; 
-    use bson::bson_types::*;
+    use bson::encode::*;
     use util::*;
     //use coll::*;
 
