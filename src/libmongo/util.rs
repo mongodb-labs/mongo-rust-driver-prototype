@@ -1,4 +1,5 @@
 use bson::bson_types::*;
+use bson::json_parse::*;
 
 pub struct MongoErr {
     //err_code : int,
@@ -122,3 +123,21 @@ pub static SYSTEM_JS : &'static str = &'static "system.js";
  */
 pub static LITTLE_ENDIAN_TRUE : bool = true;
 
+/*
+ * Helper: convert string to BsonDocument if possible.
+ */
+pub fn _str_to_bson(s : ~str) -> Result<~BsonDocument, MongoErr> {
+    match ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(s) {
+        Ok(doc) => match doc {
+            Embedded(bson) => Ok(bson),
+            _ => Err(MongoErr::new(
+                        ~"coll::_str_to_bson",
+                        ~"converting string to bson",
+                        ~"non-bson string")),
+        },
+        Err(e) => Err(MongoErr::new(
+                        ~"coll::_str_to_bson",
+                        ~"converting string to bson",
+                        fmt!("-->\n%s", e))),
+    }
+}
