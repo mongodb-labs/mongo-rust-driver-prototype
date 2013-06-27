@@ -10,11 +10,7 @@ static l_end: bool = true;
 pub trait BsonFormattable {
     fn bson_doc_fmt(&self) -> Document;
 }
-///serialize::Encoder object for Bson.
-pub struct BsonDocEncoder {
-    priv buf: ~[u8],
-    priv curr_key: ~str
-}
+
 ///Enumeration of individual BSON types.
 #[deriving(Eq)]
 pub enum Document {
@@ -48,6 +44,11 @@ pub enum Document {
 pub struct BsonDocument {
     size: i32,
     fields: ~OrderedHashmap<~str, Document>
+}
+
+///serialize::Encoder object for Bson.
+pub struct BsonDocEncoder {
+    priv buf: ~[u8]
 }
 
 macro_rules! cstr(
@@ -92,11 +93,18 @@ impl Encoder for BsonDocEncoder {
             + v.to_bytes(l_end) + [0]);
         }
 
-    //embedded
-    fn emit_struct(&mut self, _: &str, _: uint, _: &fn(&mut BsonDocEncoder)) { }
-
-    //unimplemented junk
+    fn emit_map_elt_key(&mut self, l: uint, f: &fn(&mut BsonDocEncoder)) {
+        if l == 0 { return; } //if the key is empty, return
+        f(self);
+        self.emit_u8(0u8);
+    }
+    fn emit_map_elt_val(&mut self, _: uint, f: &fn(&mut BsonDocEncoder)) {
+        f(self);
+    }
     fn emit_char(&mut self, c: char) { self.buf.push(c as u8); }
+    
+    //unimplemented junk
+    fn emit_struct(&mut self, _: &str, _: uint, _: &fn(&mut BsonDocEncoder)) { }
     fn emit_enum(&mut self, _: &str, _: &fn(&mut BsonDocEncoder)) { }
     fn emit_enum_variant(&mut self, _: &str, _: uint, _:uint, _:&fn(&mut BsonDocEncoder)) { }
     fn emit_enum_variant_arg(&mut self, _:uint, _:&fn(&mut BsonDocEncoder)) { }
@@ -113,23 +121,16 @@ impl Encoder for BsonDocEncoder {
     fn emit_seq(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { }
     fn emit_seq_elt(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { }
     fn emit_map(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { }
-    fn emit_map_elt_key(&mut self, l: uint, f: &fn(&mut BsonDocEncoder)) {
-        if l == 0 { return; } //if the key is empty, return
-        f(self);
-        self.emit_u8(0u8);
-    }
-    fn emit_map_elt_val(&mut self, _: uint, f: &fn(&mut BsonDocEncoder)) { 
-        f(self);     
-    }
+    
 
 }
 
 ///Encoder for BsonDocuments
 impl BsonDocEncoder {
-    fn new() -> BsonDocEncoder { BsonDocEncoder { buf: ~[], curr_key: ~"" } }
+    fn new() -> BsonDocEncoder { BsonDocEncoder { buf: ~[] } }
 }
 
-///Light wrapper around a typical Map implementation. 
+///Light wrapper around a typical Map implementation.
 impl<E:Encoder> Encodable<E> for BsonDocument {
     fn encode(&self, encoder: &mut E) {
         encoder.emit_i32(self.size);
@@ -151,7 +152,7 @@ impl<E:Encoder> Encodable<E> for BsonDocument {
                Timestamp(_) => 0x11,
                Int64(_) => 0x12,
                MinKey => 0xFF,
-               MaxKey => 0x7F 
+               MaxKey => 0x7F
             };
 
             encoder.emit_u8(b);
@@ -169,41 +170,41 @@ impl<E:Encoder> Encodable<E> for Document {
     ///See bson_types.rs:203
     fn encode(&self, encoder: &mut E) {
         match *self {
-            Double(f) => { 
+            Double(f) => {
                 encoder.emit_f64(f as f64);
             }
-            UString(ref s) => { 
+            UString(ref s) => {
                 encoder.emit_str(*s);
             }
-            Embedded(ref doc) => { 
+            Embedded(ref doc) => {
                 doc.encode(encoder);
             }
             Array(ref doc) => {
                 doc.encode(encoder);
             }
             ObjectId(ref id) => {
-                if !(id.len() == 12) { 
+                if !(id.len() == 12) {
                     fail!(fmt!("invalid object id found: %?", id));
                 }
                 for id.iter().advance |&elt| {
                     encoder.emit_u8(elt);
                 }
             }
-            Bool(b) => { 
-                encoder.emit_bool(b); 
+            Bool(b) => {
+                encoder.emit_bool(b);
             }
-            UTCDate(i) => { 
-                encoder.emit_i64(i); 
+            UTCDate(i) => {
+                encoder.emit_i64(i);
             }
             Null => { }
-            Regex(ref s1, ref s2) => { 
+            Regex(ref s1, ref s2) => {
                 encoder.emit_map_elt_val(0, cstr!(s1));
                 encoder.emit_u8(0u8);
                 encoder.emit_map_elt_val(0, cstr!(s2));
                 encoder.emit_u8(0u8);
             }
-            JScript(ref s) => { 
-                encoder.emit_str(*s); 
+            JScript(ref s) => {
+                encoder.emit_str(*s);
             }
             JScriptWithScope(ref s, ref doc) => {
                 encoder.emit_i32(5 + doc.size + (s.to_bytes(l_end).len() as i32));
@@ -211,13 +212,13 @@ impl<E:Encoder> Encodable<E> for Document {
                 encoder.emit_u8(0u8);
                 doc.encode(encoder);
             }
-            Int32(i) => { 
-                encoder.emit_i32(i); 
+            Int32(i) => {
+                encoder.emit_i32(i);
             }
-            Timestamp(i) => { 
-                encoder.emit_i64(i); 
+            Timestamp(i) => {
+                encoder.emit_i64(i);
             }
-            Int64(i) => { 
+            Int64(i) => {
                 encoder.emit_i64(i); }
             MinKey => { }
             MaxKey => { }
@@ -225,6 +226,7 @@ impl<E:Encoder> Encodable<E> for Document {
         }
     }
 }
+
 
 impl<'self> BsonDocument {
     pub fn to_bson(&self) -> ~[u8] {
@@ -269,7 +271,7 @@ impl<'self> BsonDocument {
 
     ///Returns a new BsonDocument struct.
     pub fn new() -> BsonDocument {
-        BsonDocument { size: 0, fields: ~OrderedHashmap::new() }
+        BsonDocument { size: 5, fields: ~OrderedHashmap::new() }
     }
 
     /**
