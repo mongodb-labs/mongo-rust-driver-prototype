@@ -102,7 +102,7 @@ impl Cursor {
         self.flags &= !mask;
     }
     fn add_query_spec(&mut self, doc: &BsonDocument) {
-        for doc.fields.each |&k, &v| {
+        for doc.fields.iter().advance |&(@k, @v)| {
             self.query_spec.put(k,v);
         }
     }

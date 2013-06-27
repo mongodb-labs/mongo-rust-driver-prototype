@@ -2,7 +2,7 @@ use std::hash::Hash;
 use std::hashmap::*;
 use std::container::Container;
 use std::option::Option;
-use std::iterator::IteratorUtil;
+use std::vec::*;
 
 ///A hashmap which maintains iteration order using a list.
 pub struct OrderedHashmap<K,V> {
@@ -33,26 +33,14 @@ impl<K:Hash + Eq,V: Eq> Eq for OrderedHashmap<K,V> {
 /**Expose most of the Hashmap implementation.
 * TODO: Still exposes old iterator syntax.
 */
-impl<K: Hash + Eq + Copy,V: Copy> OrderedHashmap<K,V> {
+impl<'self, K: Hash + Eq + Copy,V: Copy> OrderedHashmap<K,V> {
     pub fn len(&self) -> uint { self.map.len() }
     pub fn contains_key(&self, k: &K) -> bool { self.map.contains_key(k) }
-    pub fn each(&self, blk: &fn(&K, & V) -> bool) -> bool {
-        for self.order.iter().advance |&(k, v)| {
-            if !blk(k, v) { return false; }
-        }
-        true
+    pub fn iter(&'self self) -> VecIterator<'self, (@K, @V)> {
+        self.order.iter()    
     }
-    pub fn each_key(&self, blk: &fn(&K) -> bool) -> bool {
-        for self.order.iter().advance |&(k, _)| {
-            if !blk(k) { return false; }
-        }
-        true
-    }
-    pub fn each_value(& self, blk: &fn(&V) -> bool) -> bool {
-        for self.order.iter().advance |&(_, v)| {
-            if !blk(v) { return false; }
-        }
-        true
+    pub fn rev_iter(&'self self) -> VecRevIterator<'self, (@K, @V)> {
+        self.order.rev_iter()
     }
     pub fn find<'a>(&'a self, k: &K) -> Option<&'a V> {
         self.map.find(k)

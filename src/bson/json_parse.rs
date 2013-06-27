@@ -29,6 +29,7 @@ impl ObjParser<Document> for ExtendedJsonParser<~[char]> {
         parser.object()
     }
 }
+
 macro_rules! match_insert {
     ($cb:ident, $key:expr) => {
         match self.$cb() {
@@ -37,6 +38,7 @@ macro_rules! match_insert {
         }
     }
 }
+
 ///Main parser implementation for JSON
 impl<T:Stream<char>> ExtendedJsonParser<T> {
     ///Parse an object. Returns an error string on parse failure
