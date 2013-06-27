@@ -1,4 +1,4 @@
-use bson::bson_types::*;
+use bson::encode::*;
 use bson::json_parse::*;
 
 pub struct MongoErr {
