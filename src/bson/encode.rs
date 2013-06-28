@@ -57,15 +57,16 @@ macro_rules! cstr(
         )
     }
 )
+
 //TODO: most functions are in standalone impl. Clean this up?
 ///serialize::Encoder implementation.
 impl Encoder for BsonDocEncoder {
     fn emit_nil(&mut self) { }
-    fn emit_uint(&mut self, _: uint) { }
+    fn emit_uint(&mut self, v: uint) { self.emit_i32(v as i32); }
     fn emit_u8(&mut self, v: u8) { self.buf.push(v) }
-    fn emit_u16(&mut self, _: u16) { }
-    fn emit_u32(&mut self, _: u32) { }
-    fn emit_u64(&mut self, _: u64) { }
+    fn emit_u16(&mut self, v: u16) { self.emit_i32(v as i32); }
+    fn emit_u32(&mut self, v: u32) { self.emit_i32(v as i32); }
+    fn emit_u64(&mut self, v: u64) { self.emit_i64(v as i64); }
     //TODO target architectures with cfg
     fn emit_int(&mut self, v: int) { self.emit_i32(v as i32); }
     fn emit_i64(&mut self, v: i64) {
@@ -179,6 +180,13 @@ impl<E:Encoder> Encodable<E> for Document {
             Array(ref doc) => {
                 doc.encode(encoder);
             }
+            Binary(st, ref dat) => {
+                encoder.emit_i32(dat.len() as i32);
+                encoder.emit_u8(st);
+                for dat.iter().advance |&elt| {
+                    encoder.emit_u8(elt);
+                }
+            }
             ObjectId(ref id) => {
                 if !(id.len() == 12) {
                     fail!(fmt!("invalid object id found: %?", id));
@@ -219,7 +227,6 @@ impl<E:Encoder> Encodable<E> for Document {
                 encoder.emit_i64(i); }
             MinKey => { }
             MaxKey => { }
-            _ => fail!("binary pls")
         }
     }
 }
@@ -333,6 +340,23 @@ mod tests {
     use super::*;
     use json_parse::*;
 
+    //testing size computation
+    #[test]
+    fn test_obj_size() {
+        let mut doc1 = BsonDocument::new();
+        doc1.put(~"0", UString(~"hello"));
+        doc1.put(~"1", Bool(false));
+
+        assert_eq!(doc1.size, 22);
+
+        let mut doc2 = BsonDocument::new();
+        doc2.put(~"foo", UString(~"bar"));
+        doc2.put(~"baz", UString(~"qux"));
+        doc2.put(~"doc", Embedded(~doc1));
+
+        assert_eq!(doc2.size, 58);
+    }
+
     #[test]
     fn test_double_encode() {
         let doc = BsonDocument::inst().append(~"foo", Double(3.14159f64));
@@ -379,6 +403,11 @@ mod tests {
 
     }
 
+    #[test]
+    fn test_binary_encode() {
+        let doc = BsonDocument::inst().append(~"foo", Binary(2u8, ~[0u8,1,2,3]));
+        assert_eq!(doc.to_bson(), ~[19,0,0,0,5,102,111,111,0,4,0,0,0,2,0,1,2,3,0]);
+    }
     #[test]
     fn test_64bit_encode() {
         let doc1 = BsonDocument::inst().append(~"foo", UTCDate(4040404 as i64));

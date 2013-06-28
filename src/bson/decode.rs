@@ -111,14 +111,14 @@ impl<T:Stream<u8>> BsonParser<T> {
         Ok(ret)
     }
     ///Parse a string without denoting its length. Mainly for keys.
-    pub fn cstring(&mut self) -> ~str {
+    fn cstring(&mut self) -> ~str {
         let is_0: &fn(&u8) -> bool = |&x| x == 0x00;
         let s = from_bytes(self.stream.until(is_0));
         self.stream.pass(1);
         s
     }
     ///Parse a double.
-    pub fn _double(&mut self) -> Document {
+    fn _double(&mut self) -> Document {
         let b = self.stream.aggregate(8);
         //TODO this is bad
         let v: f64 = unsafe {
@@ -127,21 +127,21 @@ impl<T:Stream<u8>> BsonParser<T> {
         Double(v)
     }
     ///Parse a string with length.
-    pub fn _string(&mut self) -> Document {
+    fn _string(&mut self) -> Document {
         self.stream.pass(4); //skip length
         let v = self.cstring();
         UString(v)
     }
     ///Parse an embedded object. May fail.
-    pub fn _embed(&mut self) -> Result<Document,~str> {
+    fn _embed(&mut self) -> Result<Document,~str> {
         return self.document().chain(|s| Ok(Embedded(~s)));
     }
     ///Parse an embedded array. May fail.
-    pub fn _array(&mut self) -> Result<Document,~str> {
+    fn _array(&mut self) -> Result<Document,~str> {
         return self.document().chain(|s| Ok(Array(~s)));
     }
     ///Parse generic binary data.
-    pub fn _binary(&mut self) -> Document {
+    fn _binary(&mut self) -> Document {
         let count = bytesum(self.stream.aggregate(4));
         let subtype = *(self.stream.first());
         self.stream.pass(1);
@@ -149,19 +149,19 @@ impl<T:Stream<u8>> BsonParser<T> {
         Binary(subtype, data)
     }
     ///Parse a boolean.
-    pub fn _bool(&mut self) -> Document {
+    fn _bool(&mut self) -> Document {
         let ret = (*self.stream.first()) as bool;
         self.stream.pass(1);
         Bool(ret)
     }
     ///Parse a regex.
-    pub fn _regex(&mut self) -> Document {
+    fn _regex(&mut self) -> Document {
         let s1 = self.cstring();
         let s2 = self.cstring();
         Regex(s1, s2)
     }
     ///Parse a javascript object.
-    pub fn _jscript(&mut self) -> Result<Document, ~str> {
+    fn _jscript(&mut self) -> Result<Document, ~str> {
         let s = self._string();
         //using this to avoid irrefutable pattern error
         match s {
@@ -170,7 +170,7 @@ impl<T:Stream<u8>> BsonParser<T> {
         }
     }
     ///Parse a scoped javascript object.
-    pub fn _jscope(&mut self) -> Result<Document,~str> {
+    fn _jscope(&mut self) -> Result<Document,~str> {
         self.stream.pass(4);
         let s = self.cstring();
         let doc = self.document();
@@ -189,31 +189,9 @@ pub fn decode(b: ~[u8]) -> Result<BsonDocument,~str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ord_hash::*;
     use encode::*;
 
     static l: bool = true;
-
-
-    //testing size computation
-    #[test]
-    fn test_obj_size() {
-        let mut m: OrderedHashmap<~str, Document> = OrderedHashmap::new();
-        m.insert(~"0", UString(~"hello"));
-        m.insert(~"1", Bool(false));
-
-        let doc = BsonDocument::from_map(~m);
-
-        assert_eq!(doc.size, 22);
-
-        let mut n = OrderedHashmap::new();
-        n.insert(~"foo", UString(~"bar"));
-        n.insert(~"baz", UString(~"qux"));
-        n.insert(~"doc", Embedded(~doc));
-
-        let doc2 = BsonDocument::from_map(~n);
-        assert_eq!(doc2.size, 58);
-    }
 
     #[test]
     fn test_decode_size() {

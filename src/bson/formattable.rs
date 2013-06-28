@@ -84,6 +84,7 @@ i32_fmt!{impl u8}
 i32_fmt!{impl u16}
 i32_fmt!{impl u32}
 i32_fmt!{impl uint}
+i32_fmt!{impl char}
 list_fmt!{impl ~[T] (T): ~[]}
 list_fmt!{impl @[T] (T): @[]}
 
