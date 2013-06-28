@@ -44,12 +44,8 @@ check: test
 	$(TEST)/mongo_test
 
 doc: $(BSONDIR)/*.rs $(MONGODIR)/*
-	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/ord_hash.rs
-	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/stream.rs
-	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/json_parse.rs
-	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/bson_types.rs
-	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/bson.rs
-	$(RDOC) $(RDOCFLAGS) $(MONGODIR)/cursor.rs
+	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/bson.rc
+	$(RDOC) $(RDOCFLAGS) $(MONGODIR)/mongo.rc
 
 clean:
 	$(RM) $(BIN)/*.dylib
