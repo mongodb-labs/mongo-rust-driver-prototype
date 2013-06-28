@@ -18,7 +18,7 @@ DOCS = ./docs
 
 .PHONY: test
 
-all: bin libs bson mongo test
+all: bin libs bson mongo
 
 bin:
 	$(MKDIR) bin
@@ -39,7 +39,7 @@ test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
 
-check: $(TEST)/*
+check: test 
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 
