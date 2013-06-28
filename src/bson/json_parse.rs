@@ -81,6 +81,13 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                     else { ret.put(key, obj); }
                 }
                 _ => if is_digit(*self.stream.first()) { ret.put(key, self._number()); }
+                     else if (*self.stream.first()) == '-' {
+                        self.stream.pass(1);
+                        match self._number() {
+                           Double(f) => ret.put(key, Double(-1f64 * f)),
+                           _ => return Err(~"error while expecting a negative value")  
+                        }
+                     }
                      else { return Err(fmt!("invalid value found: %?", self.stream.first())); }
             }
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
@@ -375,11 +382,11 @@ mod tests {
 
     #[test]
     fn test_object_fmt() {
-        let stream = "{\"foo\": true, \"bar\": 2, \"baz\": [\"qux\"]}".iter().collect::<~[char]>();
+        let stream = "{\"foo\": true, \"bar\": 2, \"baz\": [\"qux-dux\"]}".iter().collect::<~[char]>();
         let mut parser = ExtendedJsonParser::new(stream);
         let mut m: OrderedHashmap<~str, Document> = OrderedHashmap::new();
         let mut doc = BsonDocument::new();
-        doc.put(~"0", UString(~"qux"));
+        doc.put(~"0", UString(~"qux-dux"));
         m.insert(~"foo", Bool(true));
         m.insert(~"bar", Double(2f64));
         m.insert(~"baz", Array(~doc));
