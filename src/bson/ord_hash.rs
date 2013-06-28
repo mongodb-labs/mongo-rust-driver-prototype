@@ -30,9 +30,8 @@ impl<K:Hash + Eq,V: Eq> Eq for OrderedHashmap<K,V> {
         self.map != other.map || self.order != other.order
     }
 }
-/**Expose most of the Hashmap implementation.
-* TODO: Still exposes old iterator syntax.
-*/
+
+///Expose most of the Hashmap implementation.
 impl<'self, K: Hash + Eq + Copy,V: Copy> OrderedHashmap<K,V> {
     pub fn len(&self) -> uint { self.map.len() }
     pub fn contains_key(&self, k: &K) -> bool { self.map.contains_key(k) }

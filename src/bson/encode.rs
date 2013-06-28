@@ -231,7 +231,6 @@ impl<E:Encoder> Encodable<E> for Document {
     }
 }
 
-
 impl<'self> BsonDocument {
     pub fn to_bson(&self) -> ~[u8] {
         let mut encoder = BsonDocEncoder::new();

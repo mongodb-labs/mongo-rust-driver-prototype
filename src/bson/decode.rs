@@ -11,6 +11,7 @@ extern {
 
 static l_end: bool = true;
 
+//Format codes
 static DOUBLE: u8 = 0x01;
 static STRING: u8 = 0x02;
 static EMBED: u8 = 0x03;
@@ -29,7 +30,7 @@ static INT64: u8 = 0x12;
 static MINKEY: u8 = 0xFF;
 static MAXKEY: u8 = 0x7F;
 
-///parser object for BSON. T is constrained to Stream<u8>.
+///Parser object for BSON. T is constrained to Stream<u8>.
 pub struct BsonParser<T> {
     stream: T
 }
@@ -46,7 +47,8 @@ priv fn bytesum(bytes: &[u8]) -> u64 {
 }
 
 impl<T:Stream<u8>> BsonParser<T> {
-    ///Parse a document. Returns an error string on parse failure.
+
+    ///Parse a byte stream into a BsonDocument. Returns an error string on parse failure.
     pub fn document(&mut self) -> Result<BsonDocument,~str> {
         let size = bytesum(self.stream.aggregate(4)) as i32;
         let mut elemcode = self.stream.expect(&[
@@ -110,6 +112,7 @@ impl<T:Stream<u8>> BsonParser<T> {
         ret.size = size;
         Ok(ret)
     }
+    
     ///Parse a string without denoting its length. Mainly for keys.
     fn cstring(&mut self) -> ~str {
         let is_0: &fn(&u8) -> bool = |&x| x == 0x00;
@@ -117,6 +120,7 @@ impl<T:Stream<u8>> BsonParser<T> {
         self.stream.pass(1);
         s
     }
+
     ///Parse a double.
     fn _double(&mut self) -> Document {
         let b = self.stream.aggregate(8);
@@ -126,6 +130,7 @@ impl<T:Stream<u8>> BsonParser<T> {
         };
         Double(v)
     }
+
     ///Parse a string with length.
     fn _string(&mut self) -> Document {
         self.stream.pass(4); //skip length
@@ -160,6 +165,7 @@ impl<T:Stream<u8>> BsonParser<T> {
         let s2 = self.cstring();
         Regex(s1, s2)
     }
+
     ///Parse a javascript object.
     fn _jscript(&mut self) -> Result<Document, ~str> {
         let s = self._string();
@@ -169,6 +175,7 @@ impl<T:Stream<u8>> BsonParser<T> {
             _ => Err(~"invalid string found in javascript")
         }
     }
+
     ///Parse a scoped javascript object.
     fn _jscope(&mut self) -> Result<Document,~str> {
         self.stream.pass(4);
@@ -176,6 +183,7 @@ impl<T:Stream<u8>> BsonParser<T> {
         let doc = self.document();
         return doc.chain(|d| Ok(JScriptWithScope(copy s,~d)));
     }
+
     ///Create a new parser with a given stream.
     pub fn new(stream: T) -> BsonParser<T> { BsonParser { stream: stream } }
 }
