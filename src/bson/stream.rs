@@ -1,5 +1,3 @@
-use std::iterator::IteratorUtil;
-
 pub trait Stream<T:Eq> {
     ///Return if the stream has more values.
     fn has_next(& self) -> bool;
