@@ -2,13 +2,14 @@ use std::char::is_digit;
 use std::str::from_chars;
 use std::float::from_str;
 use stream::*;
-use bson_types::*;
+use encode::*;
 use std::vec::contains;
 
 ///This trait is for parsing non-BSON object notations such as JSON, XML, etc.
 pub trait ObjParser<V> {
     pub fn from_string(s: &str) -> Result<V,~str>;
 }
+
 ///JSON parsing struct. T is a Stream<char>.
 pub struct ExtendedJsonParser<T> {
     stream: T
@@ -30,16 +31,6 @@ impl ObjParser<Document> for ExtendedJsonParser<~[char]> {
     }
 }
 
-///Convenience BsonFormattable implementation for ~str; fail!s if cannot format.
-impl BsonFormattable for ~str {
-    fn bson_doc_fmt(&self) -> Document {
-        match ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(*self) {
-            Ok(doc) => doc,
-            Err(e) => fail!("invalid string for parsing: %s", e),
-        }
-    }
-}
-
 macro_rules! match_insert {
     ($cb:ident, $key:expr) => {
         match self.$cb() {
@@ -51,6 +42,7 @@ macro_rules! match_insert {
 
 ///Main parser implementation for JSON
 impl<T:Stream<char>> ExtendedJsonParser<T> {
+
     ///Parse an object. Returns an error string on parse failure
     pub fn object(&mut self) -> DocResult {
         self.stream.pass(1); //pass over brace
@@ -89,6 +81,13 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                     else { ret.put(key, obj); }
                 }
                 _ => if is_digit(*self.stream.first()) { ret.put(key, self._number()); }
+                     else if (*self.stream.first()) == '-' {
+                        self.stream.pass(1);
+                        match self._number() {
+                           Double(f) => ret.put(key, Double(-1f64 * f)),
+                           _ => return Err(~"error while expecting a negative value")  
+                        }
+                     }
                      else { return Err(fmt!("invalid value found: %?", self.stream.first())); }
             }
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
@@ -110,22 +109,25 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
         self.stream.pass_while(&[' ', '\n', '\r', '\t']);
         Ok(Embedded(~ret))
     }
+
     ///Parse a string.
-    pub fn _string(&mut self) -> Document {
+    fn _string(&mut self) -> Document {
         self.stream.pass(1); //pass over begin quote
         let ret: ~[char] = self.stream.until(|c| *c == '\"');
         self.stream.pass(1); //pass over end quote
         self.stream.pass_while(&[' ', '\n', '\r', '\t']); //pass over trailing whitespace
         UString(from_chars(ret))
     }
+
     ///Parse a number; converts it to float.
-    pub fn _number(&mut self) -> Document {
+    fn _number(&mut self) -> Document {
         let ret = self.stream.until(|c| (*c == ',') ||
             contains([' ', '\n', '\r', '\t', ']', '}'], c));
         Double(from_str(from_chars(ret)).unwrap() as f64)
     }
+
     ///Parse a boolean. Errors for values other than 'true' or 'false'.
-    pub fn _bool(&mut self) -> DocResult {
+    fn _bool(&mut self) -> DocResult {
         let c1 = self.stream.expect(&['t', 'f']);
         match c1 {
             Some('t') => { self.stream.pass(1);
@@ -159,8 +161,9 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
             _ => return Err(~"invalid boolean value!")
         }
     }
+
     ///Parse null. Errors for values other than 'null'.
-    pub fn _null(&mut self) -> DocResult {
+    fn _null(&mut self) -> DocResult {
         let c1 = self.stream.expect(&['n']);
         match c1 {
             Some('n') => { self.stream.pass(1);
@@ -178,8 +181,9 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
             _ => return Err(~"invalid null value!")
         }
     }
+
     ///Parse a list.
-    pub fn _list(&mut self) -> DocResult {
+    fn _list(&mut self) -> DocResult {
         self.stream.pass(1); //pass over [
         let mut ret = BsonDocument::new();
         let mut i: uint = 0;
@@ -231,8 +235,9 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
         self.stream.pass_while(&[' ', '\n', '\r', '\t']);
         Ok(Array(~ret))
     }
+
     ///If this object was an $oid, return an ObjID.
-    pub fn _keyobj(json: &Document) -> Option<Document> {
+    fn _keyobj(json: &Document) -> Option<Document> {
         match *json {
             Embedded(ref m) => {
                 if m.fields.len() == 1 && m.contains_key(~"$oid") { //objectid
@@ -249,19 +254,33 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                         _ => return None
                     }
                 }
-                else if m.fields.len() == 1 && m.contains_key(~"$minKey") {
+                else if m.fields.len() == 1 && m.contains_key(~"$minKey") { //minkey
                     match (m.find(~"$minKey")) {
                         Some(&Double(1f64)) => return Some(MinKey),
                         _ => return None
                     }
                 }
-                else if m.fields.len() == 1 && m.contains_key(~"$maxKey") {
+                else if m.fields.len() == 1 && m.contains_key(~"$maxKey") { //maxkey
                     match (m.find(~"$maxKey")) {
                         Some(&Double(1f64)) => return Some(MaxKey),
                         _ => return None
                     }
                 }
-                else if m.fields.len() == 2
+                else if m.fields.len() == 1 && m.contains_key(~"$timestamp") { //timestamp
+                    match (m.find(~"$timestamp")) {
+                        Some(&Embedded(ref doc)) => if doc.fields.len() == 2
+                            && doc.contains_key(~"t")
+                            && doc.contains_key(~"i") {
+                                match (m.find(~"t"), m.find(~"i")) {
+                                    (Some(&Double(a)), Some(&Double(b))) => 
+                                        return Some(Timestamp((a+b) as i64)), //TODO    
+                                    _ => return None
+                                }
+                            },
+                        _ => return None
+                    }
+                }
+                else if m.fields.len() == 2 //binary data
                     && m.contains_key(~"$binary")
                     && m.contains_key(~"$type") {
                     match (m.find(~"$binary"), m.find(~"$type")) {
@@ -271,7 +290,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                         _ => return None
                     }
                 }
-                else if m.fields.len() == 2
+                else if m.fields.len() == 2 //regex
                     && m.contains_key(~"$regex")
                     && m.contains_key(~"$options") {
                     match (m.find(~"$regex"), m.find(~"$options")) {
@@ -294,7 +313,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
 mod tests {
 
     use super::*;
-    use bson_types::*;
+    use encode::*;
     use ord_hash::*;
 
     #[test]
@@ -363,36 +382,16 @@ mod tests {
 
     #[test]
     fn test_object_fmt() {
-        let stream = "{\"foo\": true, \"bar\": 2, \"baz\": [\"qux\"]}".iter().collect::<~[char]>();
+        let stream = "{\"foo\": true, \"bar\": 2, \"baz\": [\"qux-dux\"]}".iter().collect::<~[char]>();
         let mut parser = ExtendedJsonParser::new(stream);
         let mut m: OrderedHashmap<~str, Document> = OrderedHashmap::new();
         let mut doc = BsonDocument::new();
-        doc.put(~"0", UString(~"qux"));
+        doc.put(~"0", UString(~"qux-dux"));
         m.insert(~"foo", Bool(true));
         m.insert(~"bar", Double(2f64));
         m.insert(~"baz", Array(~doc));
 
         assert_eq!(Embedded(~BsonDocument::from_map(~m)), parser.object().unwrap());
-    }
-
-    #[test]
-    fn test_objid_fmt() {
-        let stream = "{\"$oid\": \"abcdefg\"}".iter().collect::<~[char]>();
-        let mut parser = ExtendedJsonParser::new(stream);
-        let v = parser.object();
-        let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
-
-        assert_eq!(ObjectId("abcdefg".bytes_iter().collect::<~[u8]>()), val);
-    }
-
-    #[test]
-    fn test_date_fmt() {
-        let stream = "{\"$date\": 12345}".iter().collect::<~[char]>();
-        let mut parser = ExtendedJsonParser::new(stream);
-        let v = parser.object();
-        let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
-
-        assert_eq!(UTCDate(12345i64), val);
     }
 
     #[test]
@@ -468,5 +467,54 @@ mod tests {
         let stream = "nulf".iter().collect::<~[char]>();
         let mut parser = ExtendedJsonParser::new(stream);
         if parser._null().is_err() { fail!("invalid null value") }
+    }
+
+    #[test]
+    fn test_objid_fmt() {
+        let stream = "{\"$oid\": \"abcdefg\"}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let v = parser.object();
+        let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
+
+        assert_eq!(ObjectId("abcdefg".bytes_iter().collect::<~[u8]>()), val);
+    }
+
+    #[test]
+    fn test_date_fmt() {
+        let stream = "{\"$date\": 12345}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let v = parser.object();
+        let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
+
+        assert_eq!(UTCDate(12345i64), val);
+    }
+
+    #[test]
+    fn test_minkey_1_fmt() {
+        let stream = "{\"$minKey\": 1}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let v = parser.object();
+        let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
+
+        assert_eq!(MinKey, val);
+    }
+
+    #[test]
+    #[should_fail]
+    fn test_minkey_otherkey_fmt() {
+        let stream = "{\"$minKey\": 3}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let v = parser.object();
+        ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
+    }
+
+    #[test]
+    fn test_regex_fmt() {
+        let stream = "{\"$regex\": \"foo\", \"$options\": \"bar\"}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let v = parser.object();
+        let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
+
+        assert_eq!(Regex(~"foo",~"bar"), val);
     }
 }

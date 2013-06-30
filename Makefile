@@ -18,7 +18,7 @@ DOCS = ./docs
 
 .PHONY: test
 
-all: bin libs bson mongo test
+all: bin libs bson mongo
 
 bin:
 	$(MKDIR) bin
@@ -39,17 +39,13 @@ test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
 
-check: $(TEST)/*
+check: test 
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 
-doc: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/bson.rs $(MONGODIR)/*
-	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/ord_hash.rs
-	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/stream.rs
-	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/json_parse.rs
-	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/bson_types.rs
-	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/bson.rs
-	$(RDOC) $(RDOCFLAGS) $(MONGODIR)/cursor.rs
+doc: $(BSONDIR)/*.rs $(MONGODIR)/*
+	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/bson.rc
+	$(RDOC) $(RDOCFLAGS) $(MONGODIR)/mongo.rc
 
 clean:
 	$(RM) $(BIN)/*.dylib

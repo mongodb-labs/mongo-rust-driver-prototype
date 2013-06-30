@@ -6,10 +6,6 @@ use extra::serialize::*;
 use ord_hash::*;
 
 static l_end: bool = true;
-///Trait for document notations which can be represented as BSON.
-pub trait BsonFormattable {
-    fn bson_doc_fmt(&self) -> Document;
-}
 
 ///Enumeration of individual BSON types.
 #[deriving(Eq)]
@@ -37,8 +33,9 @@ pub enum Document {
 
 }
 
-/*The type of a complete BSON document.
-*Contains an ordered map of fields and values and the size of the document as i32.
+/**
+* The type of a complete BSON document.
+* Contains an ordered map of fields and values and the size of the document as i32.
 */
 #[deriving(Eq)]
 pub struct BsonDocument {
@@ -60,15 +57,16 @@ macro_rules! cstr(
         )
     }
 )
+
 //TODO: most functions are in standalone impl. Clean this up?
 ///serialize::Encoder implementation.
 impl Encoder for BsonDocEncoder {
     fn emit_nil(&mut self) { }
-    fn emit_uint(&mut self, _: uint) { }
+    fn emit_uint(&mut self, v: uint) { self.emit_i32(v as i32); }
     fn emit_u8(&mut self, v: u8) { self.buf.push(v) }
-    fn emit_u16(&mut self, _: u16) { }
-    fn emit_u32(&mut self, _: u32) { }
-    fn emit_u64(&mut self, _: u64) { }
+    fn emit_u16(&mut self, v: u16) { self.emit_i32(v as i32); }
+    fn emit_u32(&mut self, v: u32) { self.emit_i32(v as i32); }
+    fn emit_u64(&mut self, v: u64) { self.emit_i64(v as i64); }
     //TODO target architectures with cfg
     fn emit_int(&mut self, v: int) { self.emit_i32(v as i32); }
     fn emit_i64(&mut self, v: i64) {
@@ -182,6 +180,13 @@ impl<E:Encoder> Encodable<E> for Document {
             Array(ref doc) => {
                 doc.encode(encoder);
             }
+            Binary(st, ref dat) => {
+                encoder.emit_i32(dat.len() as i32);
+                encoder.emit_u8(st);
+                for dat.iter().advance |&elt| {
+                    encoder.emit_u8(elt);
+                }
+            }
             ObjectId(ref id) => {
                 if !(id.len() == 12) {
                     fail!(fmt!("invalid object id found: %?", id));
@@ -222,11 +227,9 @@ impl<E:Encoder> Encodable<E> for Document {
                 encoder.emit_i64(i); }
             MinKey => { }
             MaxKey => { }
-            _ => fail!("binary pls")
         }
     }
 }
-
 
 impl<'self> BsonDocument {
     pub fn to_bson(&self) -> ~[u8] {
@@ -290,14 +293,6 @@ impl<'self> BsonDocument {
         BsonDocument { size: map_size(m), fields: m }
     }
 
-    ///Builds a BSON document from a JSON object. Note that some BSON fields, such as JavaScript, will not be generated.
-    pub fn from_formattable<T:BsonFormattable>(json: T) -> BsonDocument {
-        let m = json.bson_doc_fmt();
-        match m {
-            Embedded(ref m) => copy **m,
-            _ => fail!("could not correctly format BsonFormattable object")
-        }
-    }
 }
 
 ///Allows Documents to report their own size in bytes.
@@ -325,6 +320,11 @@ impl Document {
     }
 }
 
+///Standalone encode binding.
+pub fn encode(doc: &BsonDocument) -> ~[u8] {
+    doc.to_bson()
+}
+
 ///Calculate the size of a BSON object based on its fields.
 priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
     let mut sz: i32 = 4; //since this map is going in an object, it has a 4-byte size variable
@@ -332,4 +332,157 @@ priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
         sz += (k.to_bytes(l_end).len() as i32) + v.size() + 2; //1 byte format code, trailing 0 after each key
     }
     sz + 1 //trailing 0 byte
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use json_parse::*;
+
+    //testing size computation
+    #[test]
+    fn test_obj_size() {
+        let mut doc1 = BsonDocument::new();
+        doc1.put(~"0", UString(~"hello"));
+        doc1.put(~"1", Bool(false));
+
+        assert_eq!(doc1.size, 22);
+
+        let mut doc2 = BsonDocument::new();
+        doc2.put(~"foo", UString(~"bar"));
+        doc2.put(~"baz", UString(~"qux"));
+        doc2.put(~"doc", Embedded(~doc1));
+
+        assert_eq!(doc2.size, 58);
+    }
+
+    #[test]
+    fn test_double_encode() {
+        let doc = BsonDocument::inst().append(~"foo", Double(3.14159f64));
+        assert_eq!(doc.to_bson(), ~[18,0,0,0,1,102,111,111,0,110,134,27,240,249,33,9,64,0]);
+    }
+    #[test]
+    fn test_string_encode() {
+        let doc = BsonDocument::inst().append(~"foo", UString(~"bar"));
+        assert_eq!(doc.to_bson(), ~[18,0,0,0,2,102,111,111,0,4,0,0,0,98,97,114,0,0]);
+    }
+
+    #[test]
+    fn test_bool_encode() {
+        let doc = BsonDocument::inst().append(~"foo", Bool(true));
+        assert_eq!(doc.to_bson(), ~[11,0,0,0,8,102,111,111,0,1,0] );
+    }
+
+    #[test]
+    fn test_32bit_encode() {
+        let doc = BsonDocument::inst().append(~"foo", Int32(56 as i32));
+        assert_eq!(doc.to_bson(), ~[14,0,0,0,16,102,111,111,0,56,0,0,0,0]);
+    }
+
+    #[test]
+    fn test_embed_encode() {
+        //lists
+        let mut inside = BsonDocument::new();
+        inside.put_all(~[(~"0", UString(~"hello")), (~"1", Bool(false))]);
+        let mut doc2 = BsonDocument::new();
+        doc2.put_all(~[(~"foo", Array(~ copy inside)), (~"baz", UString(~"qux"))]);
+
+        assert_eq!(doc2.to_bson(), ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
+
+        //embedded objects
+        let mut doc3 = BsonDocument::new();
+        doc3.put_all(~[(~"foo", Embedded(~ copy inside)), (~"baz", UString(~"qux"))]);
+
+        assert_eq!(doc3.to_bson(), ~[45,0,0,0,3,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
+
+        let mut doc4 = BsonDocument::new();
+        doc4.put_all(~[(~"foo", JScriptWithScope(~"wat", ~ copy inside)), (~"baz", UString(~"qux"))]);
+        assert_eq!(doc4.to_bson(), ~[53,0,0,0,15,102,111,111,0,30,0,0,0,119,97,116,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
+
+
+    }
+
+    #[test]
+    fn test_binary_encode() {
+        let doc = BsonDocument::inst().append(~"foo", Binary(2u8, ~[0u8,1,2,3]));
+        assert_eq!(doc.to_bson(), ~[19,0,0,0,5,102,111,111,0,4,0,0,0,2,0,1,2,3,0]);
+    }
+    #[test]
+    fn test_64bit_encode() {
+        let doc1 = BsonDocument::inst().append(~"foo", UTCDate(4040404 as i64));
+        assert_eq!(doc1.to_bson(), ~[18,0,0,0,9,102,111,111,0,212,166,61,0,0,0,0,0,0] );
+
+        let doc2 = BsonDocument::inst().append(~"foo", Int64(4040404 as i64));
+        assert_eq!(doc2.to_bson(), ~[18,0,0,0,18,102,111,111,0,212,166,61,0,0,0,0,0,0] );
+
+        let doc3 = BsonDocument::inst().append(~"foo", Timestamp(4040404 as i64));
+        assert_eq!(doc3.to_bson(), ~[18,0,0,0,17,102,111,111,0,212,166,61,0,0,0,0,0,0] );
+    }
+
+    #[test]
+    fn test_null_encode() {
+        let doc = BsonDocument::inst().append(~"foo", Null);
+
+        assert_eq!(doc.to_bson(), ~[10,0,0,0,10,102,111,111,0,0]);
+    }
+
+    #[test]
+    fn test_regex_encode() {
+        let doc = BsonDocument::inst().append(~"foo", Regex(~"bar", ~"baz"));
+
+        assert_eq!(doc.to_bson(), ~[18,0,0,0,11,102,111,111,0,98,97,114,0,98,97,122,0,0]);
+    }
+
+    #[test]
+    fn test_jscript_encode() {
+        let doc = BsonDocument::inst().append(~"foo", JScript(~"return 1;"));
+        assert_eq!(doc.to_bson(), ~[24,0,0,0,13,102,111,111,0,10,0,0,0,114,101,116,117,114,110,32,49,59,0,0]);
+    }
+    #[test]
+    fn test_valid_objid_encode() {
+        let doc = BsonDocument::inst().append(~"foo", ObjectId(~[0,1,2,3,4,5,6,7,8,9,10,11]));
+
+        assert_eq!(doc.to_bson(), ~[22,0,0,0,7,102,111,111,0,0,1,2,3,4,5,6,7,8,9,10,11,0]);
+    }
+
+    #[test]
+    #[should_fail]
+    fn test_invalid_objid_encode() {
+        let doc = BsonDocument::inst().append(~"foo", ObjectId(~[1,2,3]));
+        doc.to_bson();
+    }
+
+    #[test]
+    fn test_multi_encode() {
+
+        let doc = BsonDocument::inst()
+            .append(~"foo", Bool(true))
+            .append(~"bar", UString(~"baz"))
+            .append(~"qux", Int32(404));
+
+        let enc = doc.to_bson();
+
+        assert_eq!(enc, ~[33,0,0,0,8,102,111,111,0,1,2,98,97,114,0,4,0,0,0,98,97,122,0,16,113,117,120,0,148,1,0,0,0]);
+    }
+
+    //full encode path testing
+    #[test]
+    fn test_string_whole_encode() {
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", UString(~"bar"));
+
+        assert_eq!(encode(&doc), ~[18,0,0,0,2,102,111,111,0,4,0,0,0,98,97,114,0,0]);
+    }
+
+    #[test]
+    fn test_embed_whole_encode() {
+        let jstring = "{\"foo\": [\"hello\", false], \"baz\": \"qux\"}";
+        let doc = match ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(jstring).unwrap() {
+            Embedded(ref map) => BsonDocument::from_map(copy map.fields),
+            _ => fail!("test_embed_whole_encode parse failure")
+        };
+
+        assert_eq!(encode(&doc), ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
+    }
+
 }
