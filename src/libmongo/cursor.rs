@@ -14,7 +14,7 @@
  */
 
 use std::cmp::min;
-use extra::deque::Deque; 
+use extra::deque::Deque;
 
 use bson::decode::*;
 use bson::encode::*;
