@@ -153,8 +153,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                         if c.is_none() {
                             return Err(~"invalid boolean value while expecting true!");
                         }
-                        //i += 1;
-                        i = i+ 1;
+                        i += 1;
                         self.stream.pass(1);
                     }
                     self.stream.pass_while(&[' ', '\n', '\r', '\t']);
@@ -168,8 +167,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                         if c.is_none() {
                             return Err(~"invalid boolean value while expecting false!");
                         }
-                        //i += 1;
-                        i = i + 1;
+                        i += 1;
                         self.stream.pass(1);
                     }
                     self.stream.pass_while(&[' ', '\n', '\r', '\t']);
@@ -189,8 +187,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                 while i < 3 {
                     let c = self.stream.expect(&[next[i]]);
                     if c.is_none() { return Err(~"invalid null value!"); }
-                    //i += 1;
-                    i = i + 1;
+                    i += 1;
                     self.stream.pass(1);
                 }
                 self.stream.pass_while(&[' ', '\n', '\r', '\t']);
@@ -233,8 +230,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                          return Err(fmt!("invalid value found: %?", self.stream.first()));
                      }
             }
-            //i += 1;
-            i = i + 1;
+            i += 1;
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
             let comma = self.stream.expect(&[',', ']']);
             match comma {

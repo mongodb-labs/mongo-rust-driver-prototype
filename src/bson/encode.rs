@@ -44,7 +44,8 @@ pub enum Document {
     Timestamp(i64),                    //x11
     Int64(i64),                    //x12
     MinKey,                        //xFF
-    MaxKey,                       //x7F
+    MaxKey                        //x7F
+
 }
 
 /**
@@ -348,8 +349,7 @@ pub fn encode(doc: &BsonDocument) -> ~[u8] {
 priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
     let mut sz: i32 = 4; //since this map is going in an object, it has a 4-byte size variable
     for m.iter().advance |&(k, v)| {
-        //sz += (k.to_bytes(l_end).len() as i32) + v.size() + 2; //1 byte format code, trailing 0 after each key
-        sz = sz + (k.to_bytes(l_end).len() as i32) + v.size() + 2; //1 byte format code, trailing 0 after each key
+        sz += (k.to_bytes(l_end).len() as i32) + v.size() + 2; //1 byte format code, trailing 0 after each key
     }
     sz + 1 //trailing 0 byte
 }

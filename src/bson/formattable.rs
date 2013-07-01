@@ -92,8 +92,7 @@ macro_rules! list_fmt {
                         let mut ret = $empty;
                         for d.fields.iter().advance |&(_,@v)| {
                              match BsonFormattable::from_bson_t::<$inner>(v) {
-                                //Ok(elt) => ret += [elt],
-                                Ok(elt) => ret = ret + [elt],
+                                Ok(elt) => ret += [elt],
                                 Err(e) => return Err(e)
                              }
                         }
