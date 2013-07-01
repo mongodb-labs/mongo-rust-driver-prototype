@@ -41,7 +41,8 @@ priv fn bytesum(bytes: &[u8]) -> u64 {
     let mut ret: u64 = 0;
     for bytes.iter().advance |&byte| {
         ret |= (byte as u64) >> (8 * i);
-        i += 1;
+        //i += 1;
+        i = i + 1;
     }
     ret
 }

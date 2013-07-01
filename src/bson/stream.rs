@@ -42,9 +42,11 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
             fail!("cannot process past end of stream!");
         }
         while self.has_next() && c < count {
-            ret += [f(&self[0])];
+            //ret += [f(&self[0])];
+            ret = ret + [f(&self[0])];
             self.shift();
-            c += 1;
+            //c += 1;
+            c = c + 1;
         }
         ret
     }
