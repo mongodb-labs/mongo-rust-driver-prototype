@@ -115,7 +115,7 @@ impl Encoder for BsonDocEncoder {
         f(self);
     }
     fn emit_char(&mut self, c: char) { self.buf.push(c as u8); }
-    
+
     //unimplemented junk
     fn emit_struct(&mut self, _: &str, _: uint, _: &fn(&mut BsonDocEncoder)) { }
     fn emit_enum(&mut self, _: &str, _: &fn(&mut BsonDocEncoder)) { }
@@ -134,7 +134,7 @@ impl Encoder for BsonDocEncoder {
     fn emit_seq(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { }
     fn emit_seq_elt(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { }
     fn emit_map(&mut self, _: uint, _: &fn(&mut BsonDocEncoder)) { }
-    
+
 
 }
 

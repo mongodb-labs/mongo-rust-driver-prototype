@@ -112,11 +112,11 @@ println(fmt!("\nndocs in this cursor: %?", vec.len()));
         self.add_query_spec(&doc);
     }
     pub fn hint(&mut self, index: QuerySpec) -> Result<~str,~str> {
-       query_add!(index, ~"$hint", hint) 
+       query_add!(index, ~"$hint", hint)
     }
     pub fn sort(&mut self, orderby: QuerySpec) -> Result<~str,~str> {
-       query_add!(orderby, ~"$orderby", sort) 
-    } 
+       query_add!(orderby, ~"$orderby", sort)
+    }
     pub fn has_next(&self) -> bool {
         //!self.data.is_empty()
         self.i < self.data.len() as i32
@@ -203,7 +203,7 @@ println(fmt!("\nndocs in this cursor: %?", vec.len()));
         if self.has_next() || !self.open {
             return Ok(self.data.len() as i32);
         }
-        
+
         if self.id == 0 { //cursor is empty; query again
             let mut query_amt = self.batch_size;
             if self.limit != 0 {
@@ -236,7 +236,7 @@ mod tests {
     extern mod bson;
     extern mod extra;
 
-    use super::*; 
+    use super::*;
     use bson::encode::*;
     use util::*;
     //use coll::*;
@@ -247,8 +247,8 @@ mod tests {
         doc.put(~"foo", Double(1f64));
         let mut cursor = Cursor::new(BsonDocument::new(), None, 0i64, 0i32, 10i32, ~[]);
         cursor.hint(SpecObj(doc));
-    
-        let mut spec = BsonDocument::new();    
+
+        let mut spec = BsonDocument::new();
         let mut speci = BsonDocument::new();
         speci.put(~"foo", Double(1f64));
         spec.put(~"$hint", Embedded(~speci));
@@ -265,7 +265,7 @@ mod tests {
         let mut speci = BsonDocument::new();
         speci.put(~"foo", Double(1f64));
         spec.put(~"$hint", Embedded(~speci));
-        
+
         assert_eq!(cursor.query_spec, spec);
     }    */
 }

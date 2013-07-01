@@ -13,13 +13,13 @@
 # limitations under the License.
 
 RC = rustc
-RDOC = rustdoc 
+RDOC = rustdoc
 RDOCFLAGS = --output-dir $(DOCS) --output-format markdown --output-style doc-per-mod
 CC = gcc
 AR = ar rcs
 FLAGS = -L ./bin $(USERFLAGS)
-CFLAGS = -c -g -Wall -Werror 
-USERFLAGS = 
+CFLAGS = -c -g -Wall -Werror
+USERFLAGS =
 RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
@@ -59,7 +59,7 @@ test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 #	$(RC) $(FLAGS) --test -o $(TEST)/mox_test $(MOXDIR)/moxidize.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
 
-check: test 
+check: test
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 

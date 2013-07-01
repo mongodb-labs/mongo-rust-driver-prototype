@@ -238,7 +238,7 @@ mod tests {
                 do spawn { Err(TcpErrData { err_name: ~"mock error", err_msg: ~"mocksocket" }) }
             }
         }
-    }    
+    }
     #[test]
     fn test_connect_preexisting_socket() {
         let s: @Socket = @MockSocket {flag: true} as @Socket;
@@ -304,7 +304,7 @@ mod tests {
         assert!(conn.sock.is_none());
         assert!(e.is_ok());
     }
-    
+
     #[test]
     fn test_disconnect_read_stop_err() {
         let mut conn = Connection::new::<NodeConnection>(~"foo", 42);

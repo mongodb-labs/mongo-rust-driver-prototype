@@ -127,7 +127,7 @@ impl<T:Stream<u8>> BsonParser<T> {
         ret.size = size;
         Ok(ret)
     }
-    
+
     ///Parse a string without denoting its length. Mainly for keys.
     fn cstring(&mut self) -> ~str {
         let is_0: &fn(&u8) -> bool = |&x| x == 0x00;
@@ -266,4 +266,3 @@ mod tests {
     }
 
 }
-

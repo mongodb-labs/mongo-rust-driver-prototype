@@ -51,7 +51,7 @@ impl<'self, K: Hash + Eq + Copy,V: Copy> OrderedHashmap<K,V> {
     pub fn len(&self) -> uint { self.map.len() }
     pub fn contains_key(&self, k: &K) -> bool { self.map.contains_key(k) }
     pub fn iter(&'self self) -> VecIterator<'self, (@K, @V)> {
-        self.order.iter()    
+        self.order.iter()
     }
     pub fn rev_iter(&'self self) -> VecRevIterator<'self, (@K, @V)> {
         self.order.rev_iter()
