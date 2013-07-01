@@ -92,7 +92,7 @@ macro_rules! list_fmt {
                         let mut ret = $empty;
                         for d.fields.iter().advance |&(_,@v)| {
                              match BsonFormattable::from_bson_t::<$inner>(v) {
-                                Ok(elt) => ret += [elt],
+                                Ok(elt) => ret.push(elt), //FIXME @[T] should be able to utilize this
                                 Err(e) => return Err(e)
                              }
                         }
@@ -116,7 +116,7 @@ i32_fmt!{impl u32}
 i32_fmt!{impl uint}
 i32_fmt!{impl char}
 list_fmt!{impl ~[T] (T): ~[]}
-list_fmt!{impl @[T] (T): @[]}
+//list_fmt!{impl @[T] (T): @[]}
 
 impl BsonFormattable for f64 {
     fn to_bson_t(&self) -> Document { Double(*self) }

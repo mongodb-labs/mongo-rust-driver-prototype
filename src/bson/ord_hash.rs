@@ -26,8 +26,8 @@ pub struct OrderedHashmap<K,V> {
 }
 
 impl<K: Hash + Eq,V> Container for OrderedHashmap<K,V> {
-    pub fn len(&const self) -> uint { self.map.len() }
-    pub fn is_empty(&const self) -> bool { self.map.is_empty() }
+    pub fn len(&self) -> uint { self.map.len() }
+    pub fn is_empty(&self) -> bool { self.map.is_empty() }
 }
 
 impl<K: Hash + Eq,V> Mutable for OrderedHashmap<K,V> {
