@@ -10,7 +10,10 @@ extern mod extra;
 extern mod bson;
 
 // Misc: utility module
-pub mod util;
+mod util;
+#[macro_escape]
+mod mock;
+mod mockable;
 
 // Client-side components
 //pub mod client;     // primary point-of-entry for driver system
@@ -20,7 +23,7 @@ pub mod util;
 // Connection components
 pub mod conn;       // medium for connecting to [a] server(s); general
 //pub mod conn_node;    // ...; node
-mod msg;        // message header and related; hidden
+//mod msg;        // message header and related; hidden
 //pub mod conn_replica; // ...; replica set
 //pub mod conn_shard;   // ...; sharded cluster
 
