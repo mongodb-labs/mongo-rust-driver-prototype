@@ -63,7 +63,7 @@ impl<T:Mockable,U:Mockable> Mockable for Result<T,U> {
     }
 }
 
-impl<T:Mockable + Owned> Mockable for future::Future<T> {
+impl<T:Mockable + Send> Mockable for future::Future<T> {
     fn mock(state: int) -> future::Future<T> {
         do future::spawn { Mockable::mock::<T>(state) }
     }
