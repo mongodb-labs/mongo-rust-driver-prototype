@@ -1,7 +1,7 @@
 use std::cmp::min;
 use extra::deque::Deque; 
 
-use bson::bson_types::*;
+use bson::decode::*;
 use bson::encode::*;
 use bson::json_parse::*;
 
@@ -17,7 +17,7 @@ pub struct Cursor {
     id : i64,   // id on server (hence 0 if closed)
     collection : @Collection,
     //collection : Option<@Collection>,   // TODO temporory so tests pass
-    flags : i32, // tailable, slave_ok, oplog_replay, no_timeout, await_data, exhaust, partial, can set during find() too
+    flags : i32, // QUERY_FLAGs
     skip : i32,
     limit : i32,
     open : bool,
@@ -39,7 +39,8 @@ impl Iterator<BsonDocument> for Cursor {
             return None;
         }
         //Some(self.data.pop_front())
-        self.i += 1;
+        //self.i += 1;
+        self.i = self.i + 1;
         Some(copy self.data[self.i-1])
     }
 }
@@ -83,7 +84,7 @@ println(fmt!("\nndocs in this cursor: %?", vec.len()));
             limit: 0,
             open: true,
             retrieved: n,
-            batch_size: 0,
+            batch_size: n,
             query_spec: query,
             data: vec,
             i: 0,
@@ -122,17 +123,17 @@ println(fmt!("\nndocs in this cursor: %?", vec.len()));
             self.query_spec.put(k,v);
         }
     }
-    //fn refresh(&mut self) -> Result<i32, ~str> {
     fn refresh(&mut self) -> i32 {
         // clear out error
         self.err = None;
 
+        // check if cursor has exhausted everything on server
         if self.id == 0 {
-println(fmt!("\ni:%?, len:%?", self.i, self.data.len()));
-            // cursor is already closed on server
             if self.has_next() || self.i == self.data.len() as i32 {
+                // cursor still holds more even if server doesn't; return
                 return (self.data.len() as i32)-self.i;
             } else {
+                // cursor holds no more and should not be refreshed
                 self.err = Some(MongoErr::new(
                                 ~"cursor::refresh",
                                 ~"cursor closed and empty",
@@ -141,6 +142,7 @@ println(fmt!("\ni:%?, len:%?", self.i, self.data.len()));
             }
         }
 
+        // otherwise, create a get_more message
         let msg = msg::mk_get_more(self.collection.client.inc_requestId(), copy self.collection.db, copy self.collection.name, self.limit, self.id);
         match self.collection._send_msg(msg::msg_to_bytes(msg), None, true) {
             Ok(reply) => match reply {

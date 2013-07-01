@@ -1,3 +1,4 @@
+use bson::decode::*;
 use bson::encode::*;
 use bson::json_parse::*;
 
