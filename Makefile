@@ -19,7 +19,7 @@ DOCS = ./docs
 
 .PHONY: test
 
-all: bin libs bson moxidize mongo
+all: bin libs bson mongo
 
 bin:
 	$(MKDIR) bin
@@ -33,15 +33,15 @@ libs: $(BSONDIR)/cast.c
 bson: $(BSONDIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson.rc
 
-moxidize: $(MOXDIR)/*
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MOXDIR)/moxidize.rc
+#moxidize: $(MOXDIR)/*
+#	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MOXDIR)/moxidize.rc
 
 mongo: $(MONGODIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rc
 
 test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
-	$(RC) $(FLAGS) --test -o $(TEST)/mox_test $(MOXDIR)/moxidize.rc
+#	$(RC) $(FLAGS) --test -o $(TEST)/mox_test $(MOXDIR)/moxidize.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
 
 check: test 
