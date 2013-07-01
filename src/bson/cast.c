@@ -15,7 +15,7 @@
 
 #include <string.h>
 double bytes_to_double(void* buf) {
-	double val;
-	memcpy(&val, buf, sizeof(double));
-	return val;
+    double val;
+    memcpy(&val, buf, sizeof(double));
+    return val;
 }
