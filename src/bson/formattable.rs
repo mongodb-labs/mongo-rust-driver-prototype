@@ -3,10 +3,25 @@ use json_parse::*;
 use extra::json;
 use std::hashmap::HashMap;
 
-///Trait for document notations which can be represented as BSON.
-///This trait allows any type to be easily serialized and deserialized as BSON.
+/**
+ * Trait for document notations which can be represented as BSON.
+ * This trait allows any type to be easily serialized and deserialized as BSON.
+ * After implementing this trait on a type Foo, Foo can be converted to
+ * a BSON formatted byte representation by calling (Foo::new()).to_bson_t().encode(BsonDocEncoder::new());
+ */
 pub trait BsonFormattable {
+    /**
+     * Converts an object into a Document.
+     * Typically for a struct, an implementation of to_bson_t would convert the struct
+     * into a HashMap-based variant of Document (usually Embedded) that would
+     * map field names to values.
+     */
     fn to_bson_t(&self) -> Document;
+    /**
+     * Converts a Document into an object of the given type.
+     * Logically this method is the inverse of to_bson_t
+     * and usually the two functions should roundtrip.
+     */
     fn from_bson_t(doc: Document) -> Result<Self,~str>;
 }
 
