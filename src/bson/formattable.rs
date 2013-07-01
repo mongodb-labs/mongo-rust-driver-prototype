@@ -1,5 +1,5 @@
 /* Copyright 2013 10gen Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -63,7 +63,7 @@ macro_rules! i32_fmt {
             fn to_bson_t(&self) -> Document {
                 (*self as i32).to_bson_t()
             }
-            
+
             fn from_bson_t(doc: Document) -> Result<$t, ~str> {
                 match BsonFormattable::from_bson_t::<i32>(doc) {
                     Ok(i) => Ok(i as $t),
@@ -125,7 +125,7 @@ impl BsonFormattable for f64 {
         match doc {
             Double(f) => Ok(f),
             _ => Err(~"can only cast Double to f64")
-        }   
+        }
     }
 }
 
@@ -277,17 +277,17 @@ mod tests {
 
     #[test]
     fn test_list_to_bson() {
-       let l = ~[1,2,3]; 
+       let l = ~[1,2,3];
        let mut doc = BsonDocument::new();
        doc.put(~"0", Int32(1i32));
        doc.put(~"1", Int32(2i32));
        doc.put(~"2", Int32(3i32));
        assert_eq!(l.to_bson_t(), Array(~doc));
     }
-    
+
     #[test]
     fn test_bson_to_list() {
-       let l = ~[1i32,2,3]; 
+       let l = ~[1i32,2,3];
        let mut doc = BsonDocument::new();
        doc.put(~"0", Int32(1i32));
        doc.put(~"1", Int32(2i32));

@@ -1,3 +1,19 @@
+/* Copyright 2013 10gen Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+use bson::decode::*;
 use bson::encode::*;
 use bson::json_parse::*;
 
@@ -84,7 +100,7 @@ pub enum DELETE_OPTION {
  * Reply flags, but user shouldn't deal with them directly.
  */
 pub enum REPLY_FLAG {
-    CUR_NOT_FOUND = 1,
+    CUR_NOT_FOUND = 1 << 0,
     QUERY_FAIL = 1 << 1,
     SHARD_CONFIG_STALE = 1 << 2,    // driver should ignore
     AWAIT_CAPABLE = 1 << 3,
@@ -107,16 +123,50 @@ pub enum QuerySpec {
 // TODO read preference
 
 /**
+ * Indexing.
+ */
+pub enum INDEX_ORDER {
+    ASC = 1,
+    DESC = -1,
+}
+
+pub enum INDEX_FLAG{
+    BACKGROUND = 1 << 0,
+    UNIQUE = 1 << 1,
+    DROP_DUPS = 1 << 2,
+    SPARSE = 1 << 3,
+}
+
+pub enum INDEX_OPTION {
+    INDEX_NAME(~str),
+    EXPIRE_AFTER_SEC(int),
+    //VERS(int),
+    //WEIGHTS(BsonDocument),
+    //DEFAULT_LANG(~str),
+    //OVERRIDE_LANG(~str),
+}
+
+pub enum INDEX_GEOTYPE {
+    SPHERICAL,                          // "2dsphere"
+    FLAT,                               // "2d"
+}
+
+pub enum INDEX_FIELD {
+    NORMAL(~[(~str, INDEX_ORDER)]),
+    HASHED(~str),
+    GEOSPATIAL(~str, INDEX_GEOTYPE),
+    //GEOHAYSTACK(
+}
+
+/**
  * Collections for admin purposes.
  */
-/*
 pub static SYSTEM_NAMESPACE : &'static str = &'static "system.namespaces";
 pub static SYSTEM_INDEX : &'static str = &'static "system.indexes";
 pub static SYSTEM_PROFILE : &'static str = &'static "system.profile";
 pub static SYSTEM_USER : &'static str = &'static "system.users";
 pub static SYSTEM_COMMAND : &'static str = &'static "$cmd";
 pub static SYSTEM_JS : &'static str = &'static "system.js";
-*/
 
 /**
  * Misc

@@ -1,5 +1,4 @@
 /* Copyright 2013 10gen Inc.
- * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -28,6 +27,7 @@ pub type PortResult = Result<~[u8], TcpErrData>;
  * Trait for sockets used by Connection. Used as a traitobject.
  */
 pub trait Socket {
+<<<<<<< HEAD
 	fn read_start(&self) -> Result<@Port<PortResult>, TcpErrData>;
 	fn read_stop(&self) -> Result<(), TcpErrData>;
 	fn write_future(&self, raw_write_data: ~[u8]) -> Future<Result<(), TcpErrData>>;
@@ -90,11 +90,11 @@ impl Connection for NodeConnection {
     pub fn connect(&self) -> Result<(), MongoErr> {
         // sanity check: should not connect if already connected (?)
         if !(self.sock.is_none() && self.port.is_none()) {
-		return Err(MongoErr::new(
+        return Err(MongoErr::new(
                         ~"conn::connect",
                         ~"pre-existing socket",
                         ~"cannot override existing socket"));
-	}
+    }
 
         // parse IP addr
         let tmp_ip = match v4::try_parse_addr(self.server_ip_str) {
@@ -197,6 +197,7 @@ impl Connection for NodeConnection {
 
 #[cfg(test)]
 mod tests {
+<<<<<<< HEAD
 	use super::*;
 	use std::comm::GenericPort;
 	use extra::net::tcp::*;

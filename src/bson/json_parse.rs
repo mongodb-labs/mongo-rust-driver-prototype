@@ -1,5 +1,5 @@
 /* Copyright 2013 10gen Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -100,7 +100,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                         self.stream.pass(1);
                         match self._number() {
                            Double(f) => ret.put(key, Double(-1f64 * f)),
-                           _ => return Err(~"error while expecting a negative value")  
+                           _ => return Err(~"error while expecting a negative value")
                         }
                      }
                      else { return Err(fmt!("invalid value found: %?", self.stream.first())); }
@@ -287,8 +287,8 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                             && doc.contains_key(~"t")
                             && doc.contains_key(~"i") {
                                 match (m.find(~"t"), m.find(~"i")) {
-                                    (Some(&Double(a)), Some(&Double(b))) => 
-                                        return Some(Timestamp((a+b) as i64)), //TODO    
+                                    (Some(&Double(a)), Some(&Double(b))) =>
+                                        return Some(Timestamp((a+b) as i64)), //TODO
                                     _ => return None
                                 }
                             },

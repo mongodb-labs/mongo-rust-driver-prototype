@@ -1,5 +1,5 @@
 /* Copyright 2013 10gen Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -127,7 +127,7 @@ impl<T:Stream<u8>> BsonParser<T> {
         ret.size = size;
         Ok(ret)
     }
-    
+
     ///Parse a string without denoting its length. Mainly for keys.
     fn cstring(&mut self) -> ~str {
         let is_0: &fn(&u8) -> bool = |&x| x == 0x00;
@@ -266,4 +266,3 @@ mod tests {
     }
 
 }
-

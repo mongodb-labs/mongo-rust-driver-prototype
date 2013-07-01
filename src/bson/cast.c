@@ -1,5 +1,5 @@
 /* Copyright 2013 10gen Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 
 #include <string.h>
 double bytes_to_double(void* buf) {
-	double val;
-	memcpy(&val, buf, sizeof(double));
-	return val;
+    double val;
+    memcpy(&val, buf, sizeof(double));
+    return val;
 }
