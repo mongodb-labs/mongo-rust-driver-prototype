@@ -27,7 +27,6 @@ pub type PortResult = Result<~[u8], TcpErrData>;
  * Trait for sockets used by Connection. Used as a traitobject.
  */
 pub trait Socket {
-<<<<<<< HEAD
 	fn read_start(&self) -> Result<@Port<PortResult>, TcpErrData>;
 	fn read_stop(&self) -> Result<(), TcpErrData>;
 	fn write_future(&self, raw_write_data: ~[u8]) -> Future<Result<(), TcpErrData>>;
@@ -197,7 +196,6 @@ impl Connection for NodeConnection {
 
 #[cfg(test)]
 mod tests {
-<<<<<<< HEAD
 	use super::*;
 	use std::comm::GenericPort;
 	use extra::net::tcp::*;
