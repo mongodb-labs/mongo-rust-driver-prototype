@@ -297,6 +297,11 @@ impl<'self> BsonDocument {
 
 ///Allows Documents to report their own size in bytes.
 impl Document {
+    fn to_bson(&self) -> {
+        let mut encoder = BsonDocEncoder::new();
+        self.encode(&mut encoder);
+        encoder.buf
+    }
     fn size(&self) -> i32 {
         match *self {
             Double(_) => 8,
