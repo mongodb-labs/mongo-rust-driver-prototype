@@ -57,7 +57,7 @@ impl<T:Eq + Copy> Stream<T> for ~[T] {
             fail!("cannot process past end of stream!");
         }
         while self.has_next() && c < count {
-            ret += [f(&self[0])];
+            ret.push(f(&self[0]));
             self.shift();
             c += 1;
         }
@@ -149,18 +149,16 @@ mod tests {
     #[test]
     fn test_process() {
         let mut stream = ~[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
-        let f: &fn(&int) -> int = |&val| 2 * val;
-        assert_eq!(stream.process(3, f), ~[0,2,4]);
-        assert_eq!(stream.process(3, f), ~[6,8,10]);
+        assert_eq!(stream.process(3, |&val| 2 * val), ~[0,2,4]);
+        assert_eq!(stream.process(3, |&val| 2 * val), ~[6,8,10]);
     }
 
     #[test]
     #[should_fail]
     fn test_process_fail() {
         let mut stream = ~[0,1];
-        let f: &fn(&int) -> int = |&val| 2 * val;
-        assert_eq!(stream.process(1, f), ~[0]);
-        stream.process(2, f);
+        assert_eq!(stream.process(1, |&val| 2 * val), ~[0]);
+        stream.process(2, |&val| 2 * val);
     }
 
     #[test]

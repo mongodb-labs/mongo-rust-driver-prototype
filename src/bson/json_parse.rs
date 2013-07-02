@@ -18,7 +18,6 @@ use std::str::from_chars;
 use std::float::from_str;
 use stream::*;
 use encode::*;
-use std::vec::contains;
 
 ///This trait is for parsing non-BSON object notations such as JSON, XML, etc.
 pub trait ObjParser<V> {
@@ -137,7 +136,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
     ///Parse a number; converts it to float.
     fn _number(&mut self) -> Document {
         let ret = self.stream.until(|c| (*c == ',') ||
-            contains([' ', '\n', '\r', '\t', ']', '}'], c));
+            [' ', '\n', '\r', '\t', ']', '}'].contains(c));
         Double(from_str(from_chars(ret)).unwrap() as f64)
     }
 
