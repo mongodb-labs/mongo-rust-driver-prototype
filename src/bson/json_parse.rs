@@ -328,7 +328,6 @@ mod tests {
 
     use super::*;
     use encode::*;
-    use ord_hash::*;
 
     #[test]
     fn test_string_fmt() {
@@ -398,14 +397,14 @@ mod tests {
     fn test_object_fmt() {
         let stream = "{\"foo\": true, \"bar\": 2, \"baz\": [\"qux-dux\"]}".iter().collect::<~[char]>();
         let mut parser = ExtendedJsonParser::new(stream);
-        let mut m: OrderedHashmap<~str, Document> = OrderedHashmap::new();
+        let mut d = BsonDocument::new();
         let mut doc = BsonDocument::new();
         doc.put(~"0", UString(~"qux-dux"));
-        m.insert(~"foo", Bool(true));
-        m.insert(~"bar", Double(2f64));
-        m.insert(~"baz", Array(~doc));
+        d.put(~"foo", Bool(true));
+        d.put(~"bar", Double(2f64));
+        d.put(~"baz", Array(~doc));
 
-        assert_eq!(Embedded(~BsonDocument::from_map(~m)), parser.object().unwrap());
+        assert_eq!(Embedded(~d), parser.object().unwrap());
     }
 
     #[test]
