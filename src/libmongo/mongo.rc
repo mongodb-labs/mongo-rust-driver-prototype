@@ -18,6 +18,8 @@
 #[license="Apache 2.0"];
 #[crate_type="lib"];
 
+// TODO fix visibility issues
+
 //#[no_core]
 
 extern mod std;
@@ -25,21 +27,21 @@ extern mod extra;
 extern mod bson;
 
 // Misc: utility module
-mod util;
+pub mod util;
 #[macro_escape]
 mod mock;
 mod mockable;
 
 // Client-side components
-//pub mod client;     // primary point-of-entry for driver system
-//pub mod db;         // database-related functionality
-//pub mod coll;       // collection-related functionality
+pub mod client;     // primary point-of-entry for driver system
+pub mod db;         // database-related functionality
+pub mod coll;       // collection-related functionality
 
 // Connection components
-pub mod conn;       // medium for connecting to [a] server(s); general
+mod conn;       // medium for connecting to [a] server(s); general, should be hidden from user
 //pub mod conn_node;    // ...; node
 //mod msg;        // message header and related; hidden
-//pub mod msg;        // message header and related; will be hidden later
+mod msg;        // message header and related; should be hidden from user
 //pub mod conn_replica; // ...; replica set
 //pub mod conn_shard;   // ...; sharded cluster
 

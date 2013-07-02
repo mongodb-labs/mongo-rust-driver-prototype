@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 
-use bson::decode::*;
 use bson::encode::*;
 use bson::json_parse::*;
 
@@ -117,8 +116,8 @@ pub enum WRITE_CONCERN {
 }
 
 pub enum QuerySpec {
-	SpecObj(BsonDocument),
-	SpecNotation(~str)
+    SpecObj(BsonDocument),
+    SpecNotation(~str)
 }
 // TODO read preference
 
@@ -159,14 +158,17 @@ pub enum INDEX_FIELD {
 }
 
 /**
- * Collections for admin purposes.
+ * Special collections for database operations, but should not be
+ * accessible to users.
  */
-pub static SYSTEM_NAMESPACE : &'static str = &'static "system.namespaces";
-pub static SYSTEM_INDEX : &'static str = &'static "system.indexes";
-pub static SYSTEM_PROFILE : &'static str = &'static "system.profile";
-pub static SYSTEM_USER : &'static str = &'static "system.users";
-pub static SYSTEM_COMMAND : &'static str = &'static "$cmd";
-pub static SYSTEM_JS : &'static str = &'static "system.js";
+priv mod special {
+    pub static SYSTEM_NAMESPACE : &'static str = &'static "system.namespaces";
+    pub static SYSTEM_INDEX : &'static str = &'static "system.indexes";
+    pub static SYSTEM_PROFILE : &'static str = &'static "system.profile";
+    pub static SYSTEM_USER : &'static str = &'static "system.users";
+    pub static SYSTEM_COMMAND : &'static str = &'static "$cmd";
+    pub static SYSTEM_JS : &'static str = &'static "system.js";
+}
 
 /**
  * Misc

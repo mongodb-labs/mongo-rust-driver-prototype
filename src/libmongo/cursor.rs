@@ -12,24 +12,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+//01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567
 
-use std::cmp::min;
-use extra::deque::Deque;
-
-use bson::decode::*;
 use bson::encode::*;
 use bson::json_parse::*;
 
 use util::*;
+use msg::*;
 use coll::Collection;
-use msg;
-
-//TODO temporary
-//pub struct Collection;
 
 ///Structure representing a cursor
 pub struct Cursor {
-    priv id : Option<i64>,                  // id on server (None if cursor not yet queried, 0 if closed)
+    priv id : Option<i64>,                  // id on server (None->not yet queried, 0->closed)
     priv collection : @Collection,          // collection associated with cursor
     flags : i32,                            // QUERY_FLAGs
     batch_size : i32,                       // size of batch in cursor fetch, may be modified
@@ -38,24 +32,20 @@ pub struct Cursor {
     iter_err : Option<MongoErr>,            // last error from iteration (stored in cursor)
     priv retrieved : i32,                   // number retrieved by cursor already
     priv proj_spec : Option<BsonDocument>,  // projection, does not appear to be resettable
-    priv skip : i32,                        // number for cursor to skip, must be specified before first "next"
-    priv limit : i32,                       // max number for cursor to return, must be specified before first "next"
-    priv data : ~[BsonDocument],            // docs stored in cursor
-    priv i : i32,                           // maybe i64 just in case? index within data currently held
+    priv skip : i32,                        // number to skip, specify before first "next"
+    priv limit : i32,                       // max to return, specify before first "next"
+    priv data : ~[~BsonDocument],           // docs stored in cursor
+    priv i : i32,                           // i64? index within data currently held
 }
 
 ///Iterator implementation, opens access to powerful functions like collect, advance, map, etc.
-impl Iterator<BsonDocument> for Cursor {
-    pub fn next(&mut self) -> Option<BsonDocument> {
-        //if self.refresh().unwrap() == 0 || !self.open {
-        //if self.collection.refresh(@self) == 0 || !self.open {
+impl Iterator<~BsonDocument> for Cursor {
+    pub fn next(&mut self) -> Option<~BsonDocument> {
         if self.refresh() == 0 {
             return None;
         }
-        //Some(self.data.pop_front())
-        //self.i += 1;
         self.i = self.i + 1;
-        Some(copy self.data[self.i-1])  // TODO move out of vector rather than copy out of vector
+        Some(copy self.data[self.i-1])
     }
 }
 macro_rules! query_add (
@@ -71,7 +61,8 @@ macro_rules! query_add (
                 let obj = ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(copy *s);
                 if obj.is_ok() {
                     match obj.unwrap() {
-                        Embedded(ref map) => return self.$cb(SpecObj(BsonDocument::from_map(copy map.fields))),
+                        Embedded(ref map) =>
+                            return self.$cb(SpecObj(BsonDocument::from_map(copy map.fields))),
                         _ => fail!()
                     }
                 } else {
@@ -92,7 +83,10 @@ impl Cursor {
      * but don't query yet (i.e. constructed cursors are empty).
      */
     //pub fn new(query : BsonDocument, proj : BsonDocument, collection : @Collection, flags : i32, nskip : i32, nlimit : i32) -> Cursor {
-    pub fn new(query : BsonDocument, proj : Option<BsonDocument>, collection : @Collection, flags : i32) -> Cursor {
+    pub fn new(     query : BsonDocument,
+                    proj : Option<BsonDocument>,
+                    collection : @Collection,
+                    flags : i32) -> Cursor {
         Cursor {
             id: None,
             collection: collection,
@@ -119,7 +113,7 @@ impl Cursor {
 
         // if cursor's never been queried, query and fill data up
         if self.id.is_none() {
-            let msg = msg::mk_query(
+            let msg = mk_query(
                             self.collection.client.inc_requestId(),
                             copy self.collection.db,
                             copy self.collection.name,
@@ -128,13 +122,11 @@ impl Cursor {
                             self.batch_size,
                             copy self.query_spec,
                             copy self.proj_spec);
-println(fmt!("\nquery:%?", msg));
-            match self.collection._send_msg(msg::msg_to_bytes(msg), None, true) {
+            match self.collection._send_msg(msg_to_bytes(msg), None, true) {
                 Ok(reply) => match reply {
                     Some(r) => match r {
                         // XXX check if need start
-                        msg::OpReply { header:_, flags:_, cursor_id:id, start:_, nret:n, docs:d } => {
-println(fmt!("\n%?", copy d));
+                        OpReply { header:_, flags:_, cursor_id:id, start:_, nret:n, docs:d } => {
                             self.id = Some(id);
                             self.retrieved = n;
                             self.data = d;
@@ -190,29 +182,30 @@ println(fmt!("\n%?", copy d));
         }
 
         // otherwise, get_more
-        let msg = msg::mk_get_more(
+        let msg = mk_get_more(
                             self.collection.client.inc_requestId(),
                             copy self.collection.db,
                             copy self.collection.name,
                             self.batch_size,
                             cur_id);
-        match self.collection._send_msg(msg::msg_to_bytes(msg), None, true) {
+        match self.collection._send_msg(msg_to_bytes(msg), None, true) {
             Ok(reply) => match reply {
                 Some(r) => match r {
-                    // TODO check how start used
-                    msg::OpReply { header:_, flags:_, cursor_id:id, start:_, nret:n, docs:d } => {
+                    // TODO check re: start
+                    OpReply { header:_, flags:_, cursor_id:id, start:_, nret:n, docs:d } => {
                         // send a kill cursors if needed---TODO batch
                         if id == 0 {
-                            let kill_msg = msg::mk_kill_cursor(
+                            let kill_msg = mk_kill_cursor(
                                                 self.collection.client.inc_requestId(),
                                                 1i32,
                                                 ~[cur_id]);
-                            match self.collection._send_msg(msg::msg_to_bytes(kill_msg), None, false) {
+                            match self.collection._send_msg(msg_to_bytes(kill_msg), None, false) {
                                 Ok(reply) => match reply {
                                     Some(r) => self.iter_err = Some(MongoErr::new(
                                                 ~"cursor::refresh",
                                                 ~"unknown error",
-                                                fmt!("received unexpected response %? from server", r))),
+                                                fmt!("received unexpected response %? from server",
+                                                    r))),
                                     None => (),
                                 },
                                 Err(e) => self.iter_err = Some(e),
@@ -261,7 +254,9 @@ println(fmt!("\n%?", copy d));
         }
 
         self.limit = limit;
-        self.batch_size = limit;
+        if self.batch_size == 0 || self.batch_size > limit {
+            self.batch_size = limit;
+        }
         Ok(())
     }
 
@@ -307,7 +302,7 @@ println(fmt!("\n%?", copy d));
     /// OTHER USEFUL FUNCTIONS
     pub fn has_next(&self) -> bool {
         //!self.data.is_empty()
-        // return true even if right at end, due to how i works
+        // return true even if right at end (normal exhaustion of cursor)
         self.i <= self.data.len() as i32
     }
     pub fn close(&mut self) {

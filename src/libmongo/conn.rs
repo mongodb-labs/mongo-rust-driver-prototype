@@ -1,4 +1,5 @@
 /* Copyright 2013 10gen Inc.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -89,11 +90,11 @@ impl Connection for NodeConnection {
     pub fn connect(&self) -> Result<(), MongoErr> {
         // sanity check: should not connect if already connected (?)
         if !(self.sock.is_none() && self.port.is_none()) {
-        return Err(MongoErr::new(
-                        ~"conn::connect",
-                        ~"pre-existing socket",
-                        ~"cannot override existing socket"));
-    }
+            return Err(MongoErr::new(
+                            ~"conn::connect",
+                            ~"pre-existing socket",
+                            ~"cannot override existing socket"));
+        }
 
         // parse IP addr
         let tmp_ip = match v4::try_parse_addr(self.server_ip_str) {
