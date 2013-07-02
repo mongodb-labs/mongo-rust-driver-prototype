@@ -4,6 +4,9 @@ pub trait Mockable {
     fn mock(state: int) -> Self;
 }
 
+impl Mockable for () {
+    fn mock(_: int) -> () { () }
+}
 impl Mockable for char {
     fn mock(_: int) -> char { 0 as char }
 }
@@ -30,6 +33,18 @@ impl Mockable for float {
 
 impl Mockable for ~str {
     fn mock(_: int) -> ~str { ~"" }
+}
+
+impl<T:Mockable> Mockable for ~T {
+    fn mock(state: int) -> ~T {
+        ~Mockable::mock::<T>(state)
+    }
+}
+
+impl<T:Mockable> Mockable for @T {
+    fn mock(state: int) -> @T {
+        @Mockable::mock::<T>(state)
+    }
 }
 
 impl<T:Mockable> Mockable for ~[T] {
