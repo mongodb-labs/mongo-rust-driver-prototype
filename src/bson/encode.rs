@@ -20,9 +20,14 @@ use std::cast::transmute;
 use extra::serialize::*;
 use ord_hash::*;
 
-static l_end: bool = true;
+static L_END: bool = true;
 
-///Enumeration of individual BSON types.
+/**
+ * Algebraic data type representing the BSON AST. 
+ * BsonDocument maps string keys to this type.
+ * This can be converted back and forth from BsonDocument
+ * by using the Embedded variant.
+ */
 #[deriving(Eq)]
 pub enum Document {
     Double(f64),                    //x01
@@ -58,8 +63,13 @@ pub struct BsonDocument {
     fields: ~OrderedHashmap<~str, Document>
 }
 
-///serialize::Encoder object for Bson.
+/**
+ * serialize::Encoder object for Bson.
+ * After encoding has been done with an Encoder instance,
+ * encoder.buf will contain the resulting ~[u8].
+ */
 pub struct BsonDocEncoder {
+    //TODO: is it possible this could be an IOWriter, like the extra::json encoder?
     priv buf: ~[u8]
 }
 
@@ -73,7 +83,6 @@ macro_rules! cstr(
     }
 )
 
-//TODO: most functions are in standalone impl. Clean this up?
 ///serialize::Encoder implementation.
 impl Encoder for BsonDocEncoder {
     fn emit_nil(&mut self) { }
@@ -85,10 +94,10 @@ impl Encoder for BsonDocEncoder {
     //TODO target architectures with cfg
     fn emit_int(&mut self, v: int) { self.emit_i32(v as i32); }
     fn emit_i64(&mut self, v: i64) {
-        self.buf.push_all(v.to_bytes(l_end))
+        self.buf.push_all(v.to_bytes(L_END))
     }
     fn emit_i32(&mut self, v: i32) {
-        self.buf.push_all(v.to_bytes(l_end))
+        self.buf.push_all(v.to_bytes(L_END))
     }
     fn emit_i16(&mut self, v: i16) { self.emit_i32(v as i32); }
     fn emit_i8(&mut self, v: i8) { self.emit_i32(v as i32); }
@@ -102,8 +111,8 @@ impl Encoder for BsonDocEncoder {
     fn emit_f32(&mut self, v: f32) { self.emit_f64(v as f64); }
     fn emit_float(&mut self, v: float) { self.emit_f64(v as f64); }
     fn emit_str(&mut self, v: &str) {
-        self.buf.push_all(((v.to_bytes(l_end) + [0]).len() as i32).to_bytes(l_end)
-            + v.to_bytes(l_end) + [0]);
+        self.buf.push_all(((v.to_bytes(L_END) + [0]).len() as i32).to_bytes(L_END)
+            + v.to_bytes(L_END) + [0]);
         }
 
     fn emit_map_elt_key(&mut self, l: uint, f: &fn(&mut BsonDocEncoder)) {
@@ -227,7 +236,7 @@ impl<E:Encoder> Encodable<E> for Document {
                 encoder.emit_str(*s);
             }
             JScriptWithScope(ref s, ref doc) => {
-                encoder.emit_i32(5 + doc.size + (s.to_bytes(l_end).len() as i32));
+                encoder.emit_i32(5 + doc.size + (s.to_bytes(L_END).len() as i32));
                 encoder.emit_map_elt_val(0, cstr!(s));
                 encoder.emit_u8(0u8);
                 doc.encode(encoder);
@@ -260,15 +269,14 @@ impl<'self> BsonDocument {
     pub fn find<'a>(&'a self, key: ~str) -> Option<&'a Document> {
         self.fields.find(&key)
     }
+
     ///Adds a key/value pair and updates size appropriately. Returns nothing.
     pub fn put(&mut self, key: ~str, val: Document) {
         self.fields.insert(key, val);
         self.size = map_size(self.fields);
     }
 
-    /**
-    * Adds a list of key/value pairs and updates size. Returns nothing.
-    */
+    ///Adds a list of key/value pairs and updates size. Returns nothing.
     pub fn put_all(&mut self, pairs: ~[(~str, Document)]) {
         //TODO: when is iter() going to be available?
         for pairs.iter().advance |&(k,v)| {
@@ -276,6 +284,7 @@ impl<'self> BsonDocument {
         }
         self.size = map_size(self.fields);
     }
+
     /**
     * Adds a key/value pair and updates size appropriately. Returns a mutable self reference with a fixed lifetime, allowing calls to be chained.
     * Ex: let a = BsonDocument::inst().append(~"flag", Bool(true)).append(~"msg", UString(~"hello")).append(...);
@@ -288,6 +297,7 @@ impl<'self> BsonDocument {
     }
 
     ///Returns a new BsonDocument struct.
+    ///The default size is 5: 4 for the size integer and 1 for the terminating 0x0.
     pub fn new() -> BsonDocument {
         BsonDocument { size: 5, fields: ~OrderedHashmap::new() }
     }
@@ -303,24 +313,27 @@ impl<'self> BsonDocument {
         @mut BsonDocument::new()
     }
 
-    ///Builds a BSON document from an OrderedHashmap.
-    pub fn from_map(m: ~OrderedHashmap<~str, Document>) -> BsonDocument {
+    fn from_map(m: ~OrderedHashmap<~str, Document>) -> BsonDocument {
         BsonDocument { size: map_size(m), fields: m }
     }
 
 }
 
-///Allows Documents to report their own size in bytes.
+///Methods on documents.
 impl Document {
+
+    ///Allows any document to be converted to its BSON-serialized representation.
     fn to_bson(&self) -> ~[u8] {
         let mut encoder = BsonDocEncoder::new();
         self.encode(&mut encoder);
         encoder.buf
     }
+
+    ///Reports the size of a document's BSON representation.
     fn size(&self) -> i32 {
         match *self {
             Double(_) => 8,
-            UString(ref s) => 5 + (*s).to_bytes(l_end).len() as i32,
+            UString(ref s) => 5 + (*s).to_bytes(L_END).len() as i32,
             Embedded(ref doc) => doc.size,
             Array(ref doc) => doc.size,
             Binary(_, ref dat) => 5 + dat.len() as i32,
@@ -328,9 +341,9 @@ impl Document {
             Bool(_) => 1,
             UTCDate(_) => 8,
             Null => 0,
-            Regex(ref s1, ref s2) => 2 + (s1.to_bytes(l_end).len() + s2.to_bytes(l_end).len()) as i32,
-            JScript(ref s) => 5 + (*s).to_bytes(l_end).len() as i32,
-            JScriptWithScope(ref s, ref doc) => 5 + (*s).to_bytes(l_end).len() as i32 + doc.size,
+            Regex(ref s1, ref s2) => 2 + (s1.to_bytes(L_END).len() + s2.to_bytes(L_END).len()) as i32,
+            JScript(ref s) => 5 + (*s).to_bytes(L_END).len() as i32,
+            JScriptWithScope(ref s, ref doc) => 5 + (*s).to_bytes(L_END).len() as i32 + doc.size,
             Int32(_) => 4,
             Timestamp(_) => 8,
             Int64(_) => 8,
@@ -340,16 +353,11 @@ impl Document {
     }
 }
 
-///Standalone encode binding.
-pub fn encode(doc: &BsonDocument) -> ~[u8] {
-    doc.to_bson()
-}
-
-///Calculate the size of a BSON object based on its fields.
+//Calculate the size of a BSON object based on its fields.
 priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
     let mut sz: i32 = 4; //since this map is going in an object, it has a 4-byte size variable
     for m.iter().advance |&(k, v)| {
-        sz += (k.to_bytes(l_end).len() as i32) + v.size() + 2; //1 byte format code, trailing 0 after each key
+        sz += (k.to_bytes(L_END).len() as i32) + v.size() + 2; //1 byte format code, trailing 0 after each key
     }
     sz + 1 //trailing 0 byte
 }

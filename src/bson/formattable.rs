@@ -22,7 +22,7 @@ use std::hashmap::HashMap;
  * Trait for document notations which can be represented as BSON.
  * This trait allows any type to be easily serialized and deserialized as BSON.
  * After implementing this trait on a type Foo, Foo can be converted to
- * a BSON formatted byte representation by calling (Foo::new()).to_bson_t().encode(BsonDocEncoder::new());
+ * a BSON formatted byte representation by calling (Foo::new()).to_bson_t().to_bson();
  */
 pub trait BsonFormattable {
     /**
@@ -74,37 +74,6 @@ macro_rules! i32_fmt {
     }
 }
 
-macro_rules! list_fmt {
-    (impl $list:ty ($inner:ty): $empty:expr) => {
-        impl<'self, T:BsonFormattable + Copy> BsonFormattable for $list {
-            fn to_bson_t(&self) -> Document {
-                let mut doc = BsonDocument::new();
-                let s = self.map(|elt| elt.to_bson_t());
-                for s.iter().enumerate().advance |(i, &elt)| {
-                    doc.put(i.to_str(), elt);
-                }
-                return Array(~doc);
-            }
-
-            fn from_bson_t(doc: Document) -> Result<$list, ~str> {
-                match doc {
-                    Array(d) => {
-                        let mut ret = $empty;
-                        for d.fields.iter().advance |&(_,@v)| {
-                             match BsonFormattable::from_bson_t::<$inner>(v) {
-                                Ok(elt) => ret.push(elt), //FIXME @[T] should be able to utilize this
-                                Err(e) => return Err(e)
-                             }
-                        }
-                        return Ok(ret);
-                    }
-                    _ => Err(~"only Arrays can be converted to lists")
-                }
-            }
-        }
-    }
-}
-
 float_fmt!{impl f32}
 float_fmt!{impl float}
 i32_fmt!{impl i8}
@@ -115,8 +84,6 @@ i32_fmt!{impl u16}
 i32_fmt!{impl u32}
 i32_fmt!{impl uint}
 i32_fmt!{impl char}
-list_fmt!{impl ~[T] (T): ~[]}
-//list_fmt!{impl @[T] (T): @[]}
 
 impl BsonFormattable for f64 {
     fn to_bson_t(&self) -> Document { Double(*self) }
@@ -200,6 +167,33 @@ impl BsonFormattable for json::Json {
             Int64(i) => Ok(json::Number(i as float)),
             MinKey => Err(~"minkey cannot be translated to Json"),
             MaxKey => Err(~"maxkey cannot be translated to Json")
+        }
+    }
+}
+
+impl<'self, T:BsonFormattable + Copy> BsonFormattable for ~[T] {
+    fn to_bson_t(&self) -> Document {
+        let mut doc = BsonDocument::new();
+        let s = self.map(|elt| elt.to_bson_t());
+        for s.iter().enumerate().advance |(i, &elt)| {
+            doc.put(i.to_str(), elt);
+        }
+        return Array(~doc);
+    }
+
+    fn from_bson_t(doc: Document) -> Result<~[T], ~str> {
+        match doc {
+            Array(d) => {
+                let mut ret = ~[];
+                for d.fields.iter().advance |&(_,@v)| {
+                     match BsonFormattable::from_bson_t::<T>(v) {
+                        Ok(elt) => ret.push(elt),
+                        Err(e) => return Err(e)
+                     }
+                }
+                return Ok(ret);
+            }
+            _ => Err(~"only Arrays can be converted to lists")
         }
     }
 }
