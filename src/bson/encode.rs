@@ -28,7 +28,7 @@ static L_END: bool = true;
  * This can be converted back and forth from BsonDocument
  * by using the Embedded variant.
  */
-#[deriving(Eq)]
+#[deriving(Eq,ToStr)]
 pub enum Document {
     Double(f64),                    //x01
     UString(~str),                    //x02
@@ -57,7 +57,7 @@ pub enum Document {
 * The type of a complete BSON document.
 * Contains an ordered map of fields and values and the size of the document as i32.
 */
-#[deriving(Eq)]
+#[deriving(Eq,ToStr)]
 pub struct BsonDocument {
     size: i32,
     fields: ~OrderedHashmap<~str, Document>
