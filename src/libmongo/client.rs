@@ -12,27 +12,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-//01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567
 
 use std::*;
 
 use util::*;
 use conn::*;
 use db::DB;
-//use coll::Collection;
 
 /**
  * User interfaces with Client, which processes user requests
  * and sends them through the connection.
+ *
+ * All communication to server goes through Client, i.e. database,
+ * collection, etc. all store their associated Client
  */
 pub struct Client {
     conn : ~cell::Cell<NodeConnection>,
-    //inds : [Index],
     db : ~cell::Cell<~str>,
     priv cur_requestId : ~cell::Cell<i32>,      // first unused requestId
+    // XXX index cache?
 }
 
 impl Client {
+    /**
+     * Create a new Mongo Client.
+     *
+     * Currently can connect to single unreplicated, unsharded
+     * server via `connect`.
+     *
+     * # Returns
+     * empty Client
+     */
     pub fn new() -> Client {
         Client {
             conn : ~cell::Cell::new_empty(),
@@ -41,11 +51,11 @@ impl Client {
         }
     }
 
-    /*pub fn get_dbs(&self) -> &'self ~[DB] {
-        let db = @DB::new(~"admin", self);
-        db.run_command(SpecNotation(~"{ \"\":1 }"));
-    }*/
+    pub fn get_admin(@self) -> DB {
+        DB::new(~"admin", self)
+    }
 
+    // probably not actually needed
     pub fn use_db(&self, db : ~str) {
         if !self.db.is_empty() {
             self.db.take();
@@ -53,6 +63,18 @@ impl Client {
         self.db.put_back(db);
     }
 
+    /**
+     * Drops the given database.
+     *
+     * # Arguments
+     * * `db` - name of database to drop
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * anything propagated from run_command
+     */
     pub fn drop_db(@self, db : ~str) -> Result<(), MongoErr> {
         let db = @DB::new(db, self);
         db.run_command(SpecNotation(~"{ \"dropDatabase\":1 }"))
@@ -60,6 +82,17 @@ impl Client {
 
     /**
      * Connect to a single server.
+     *
+     * # Arguments
+     * * `server_ip_str` - string containing IP address of server
+     * * `server_port` - port to which to connect
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * already connected
+     * * network
      */
     pub fn connect(&self, server_ip_str : ~str, server_port : uint)
                 -> Result<(), MongoErr> {
@@ -73,9 +106,7 @@ impl Client {
         let tmp = Connection::new::<NodeConnection>(server_ip_str, server_port);
         match tmp.connect() {
             Ok(_) => {
-                debug!("[ONE] %?", tmp);
                 self.conn.put_back(tmp);
-                debug!("[TWO] %?", self);
                 Ok(())
             }
             Err(e) => return Err(MongoErr::new(
@@ -86,15 +117,33 @@ impl Client {
     }
 
     /**
-     * Disconnect from server. Simultaneously empties connection cell.
+     * Disconnect from server.
+     * Simultaneously empties connection cell.
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * network
      */
     pub fn disconnect(&self) -> Result<(), MongoErr> {
         if !self.conn.is_empty() { self.conn.take().disconnect() }
+        // XXX currently succeeds even if not previously connected.
         else { Ok(()) }
     }
 
     /**
      * Send on connection affiliated with this client.
+     *
+     * # Arguments
+     * * `bytes` - bytes to send
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * not connected
+     * * network
      */
     pub fn send(&self, bytes : ~[u8]) -> Result<(), MongoErr> {
         if self.conn.is_empty() {
@@ -112,6 +161,13 @@ impl Client {
 
     /**
      * Receive on connection affiliated with this client.
+     *
+     * # Returns
+     * bytes received over connection on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * not connected
+     * * network
      */
     pub fn recv(&self) -> Result<~[u8], MongoErr> {
         if self.conn.is_empty() {
@@ -140,5 +196,4 @@ impl Client {
         self.cur_requestId.put_back(tmp+1);
         tmp
     }
-
 }

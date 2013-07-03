@@ -22,6 +22,7 @@ use bson::decode::*;
 
 use util::*;
 
+// XXX ideally, this could be used in all the len computations
 //static header_sz : uint = 4*sys::size_of::<i32>();
 
 enum OpCode {
@@ -303,12 +304,10 @@ pub fn parse_reply(bytes : ~[u8]) -> Result<ServerMsg, MongoErr> {
         let mut docs : ~[~BsonDocument] = ~[];
         let mut addr = nret_addr + sys::size_of::<i32>();
         let head = (addr - len_addr);
-        debug!("skipping head %?", head);
 
         let mut i = 0;
         for (*(nret_addr as *i32) as uint).times {
             let size = *(addr as *i32);
-            debug!("this doc's size: %?", size);
 
             // TODO: make unstupid
             let mut doc_bytes : ~[u8] = ~[];

@@ -13,39 +13,83 @@
  * limitations under the License.
  */
 
-use std::*;
-
-use bson::decode::*;
 use bson::encode::*;
 
 use util::*;
-use util::special::*;
 use client::Client;
 use coll::Collection;
 
 pub struct DB {
     name : ~str,
     priv client : @Client,
-    cur_coll : ~cell::Cell<~str>,
 }
 
-/**
- */
 impl DB {
-
+    /**
+     * Create a new Mongo DB with given name and associated Client.
+     *
+     * # Arguments
+     * * `name` - name of DB
+     * * `client` - Client with which this DB is associated
+     *
+     * # Returns
+     * DB (handle to database)
+     */
     pub fn new(name : ~str, client : @Client) -> DB {
         DB {
             name : name,
-            cur_coll : ~cell::Cell::new_empty(),
             client : client
         }
     }
 
-    /*pub fn get_collection_names(&self) -> Collection {
+    /**
+     * Get names of all collections in this db, returning error
+     * if any fail. Names do not include db name.
+     *
+     * # Returns
+     * vector of collection names on success, MongoErr on failure
+     */
+    pub fn get_collection_names(&self) -> Result<~[~str], MongoErr> {
+        let mut names : ~[~str] = ~[];
 
+        // query on namespace collection
+        let coll = @Collection::new(copy self.name, fmt!("%s", SYSTEM_NAMESPACE), self.client);
+        let mut cur = match coll.find(None, None, None) {
+            Ok(cursor) => cursor,
+            Err(e) => return Err(e),
+        };
+
+        // pull out all the names, returning error if any fail
+        for cur.advance |doc| {
+            match doc.find(~"name") {
+                Some(val) => {
+                    let tmp = copy *val;
+                    match tmp {
+                        UString(s) => {
+                            // ignore special collections (with "$")
+                            if !s.contains_char('$') {
+                                let name = s.slice_from(self.name.len()+1).to_owned();
+                                names = names + [name];
+                            }
+                        },
+                        _ => return Err(MongoErr::new(
+                                    ~"db::get_collection_names",
+                                    fmt!("db %s", copy self.name),
+                                    ~"got non-string collection name")),
+                    }
+                },
+                None => return Err(MongoErr::new(
+                                ~"db::get_collection_names",
+                                fmt!("db %s", copy self.name),
+                                ~"got no name for collection")),
+
+            }
+        }
+
+        Ok(names)
     }
 
-    pub fn get_collection(&self, coll : ~str) -> Collection {
+    /*pub fn get_collection(&self, coll : ~str) -> Collection {
         Collection::new(copy self.name, coll, self.client);
     }
 
@@ -61,7 +105,9 @@ impl DB {
         DB::new(~"admin", self.client)
     }*/
 
-    // TODO make take options?
+    // TODO make take options? (not strictly necessary but may be good?)
+    // TODO allow other query options, e.g. SLAVE_OK, with helper function
+    // TODO return non-unit for things like listDatabases
     pub fn run_command(&self, cmd : QuerySpec) -> Result<(), MongoErr> {
         let coll = @Collection::new(copy self.name, fmt!("%s", SYSTEM_COMMAND), self.client);
 

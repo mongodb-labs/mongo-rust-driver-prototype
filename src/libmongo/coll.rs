@@ -12,16 +12,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-//01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567
 
 use bson::encode::*;
 use bson::formattable::*;
 
 use util::*;
-use util::special::*;
 use msg::*;
 use client::Client;
 use cursor::Cursor;
+use db::DB;
 
 // macro for compressing options array into single i32 flag
 // may need to remove if each CRUD op responsible for own options parsing
@@ -37,6 +36,94 @@ macro_rules! process_flags(
         }
     );
 )
+
+pub enum MongoIndex {
+    MongoIndexName(~str),
+    MongoIndexFields(~[INDEX_FIELD]),
+}
+
+impl MongoIndex {
+    // XXX
+    fn process_index_opts(flags : i32, options : Option<~[INDEX_OPTION]>) -> (Option<~str>, ~[~str]) {
+        let mut opts_str = ~[];
+
+        // flags
+        /*if (flags & BACKGROUND as i32) != 0i32 { opts_str += [~"\"background\":true"]; }
+        if (flags & UNIQUE as i32) != 0i32 { opts_str += [~"\"unique\":true"]; }
+        if (flags & DROP_DUPS as i32) != 0i32 { opts_str += [~"\"dropDups\":true"]; }
+        if (flags & SPARSE as i32) != 0i32 { opts_str += [~"\"spare\":true"]; } */
+        if (flags & BACKGROUND as i32) != 0i32 { opts_str = opts_str + [~"\"background\":true"]; }
+        if (flags & UNIQUE as i32) != 0i32 { opts_str = opts_str + [~"\"unique\":true"]; }
+        if (flags & DROP_DUPS as i32) != 0i32 { opts_str = opts_str + [~"\"dropDups\":true"]; }
+        if (flags & SPARSE as i32) != 0i32 { opts_str = opts_str + [~"\"spare\":true"]; }
+
+        // options
+        let mut name = None;
+        match options {
+            None => (),
+            Some(opt_arr) => {
+                for opt_arr.iter().advance |&opt| {
+                    //opts_str += match opt {
+                    opts_str = opts_str + match opt {
+                        INDEX_NAME(n) => {
+                            name = Some(copy n);
+                            [fmt!("\"name\":\"%s\"", n)]
+                        }
+                        EXPIRE_AFTER_SEC(exp) => [fmt!("\"expireAfterSeconds\":%d", exp).to_owned()],
+                        //VERS(int),
+                        //WEIGHTS(BsonDocument),
+                        //DEFAULT_LANG(~str),
+                        //OVERRIDE_LANG(~str),
+                    };
+                }
+            }
+        };
+
+        (name, opts_str)
+    }
+    fn process_index_fields(index_arr : ~[INDEX_FIELD], get_name : bool) -> (~str, ~[~str]) {
+        let mut name = ~"";
+        let mut index_str = ~[];
+        for index_arr.iter().advance |&field| {
+            match field {
+                NORMAL(arr) => {
+                    for arr.iter().advance |&(key, order)| {
+                        /*index_str += [fmt!("\"%s\":%d", copy key, order as int)];
+                        if get_name { name += fmt!("%s_%d", copy key, order as int); } */
+                        index_str = index_str + [fmt!("\"%s\":%d", copy key, order as int)];
+                        if get_name { name = name + fmt!("%s_%d", copy key, order as int); }
+                    }
+                }
+                //HASHED(key) => index_str += [fmt!("\"%s\":\"hashed\"", copy key)],
+                HASHED(key) => index_str = index_str + [fmt!("\"%s\":\"hashed\"", copy key)],
+                GEOSPATIAL(key, geotype) => {
+                    let typ = match geotype {
+                        SPHERICAL => ~"2dsphere",
+                        FLAT => ~"2d",
+                    };
+                    //index_str += [fmt!("\"%s\":\"%s\"", copy key, typ)];
+                    index_str = index_str + [fmt!("\"%s\":\"%s\"", copy key, typ)];
+                }
+            }
+        }
+
+        (name, index_str)
+    }
+
+    /**
+     * From either `~str` or full specification of index, get name.
+     */
+    pub fn get_name(&self) -> ~str {
+        let tmp = copy *self;
+        match tmp {
+            MongoIndexName(s) => s,
+            MongoIndexFields(arr) => {
+                let (name, _) = MongoIndex::process_index_fields(arr, true);
+                name
+            }
+        }
+    }
+}
 
 pub struct Collection {
     db : ~str,          // XXX should be private? if yes, refactor cursor
@@ -58,10 +145,18 @@ impl Collection {
      * Sends message on connection; if write, checks write concern,
      * and if query, picks up OP_REPLY.
      *
-     * Returns OP_REPLY on successful query, None on no last error,
-     * MongoErr otherwise.
+     * # Arguments
+     * * `msg` - bytes to send
+     * * `wc` - write concern (if applicable)
+     * * `auto_get_reply` - whether Client should expect an `OP_REPLY`
+     *                      from the server
+     *
+     * # Returns
+     * if read operation, `OP_REPLY` on success, MongoErr on failure;
+     * if write operation, None on no last error, MongoErr on last error
+     *      or network error
      */
-    // XXX right now, public---try to move refresh in here so that can be private?
+    // XXX right now, public---try to move things around so doesn't need to be?
     // TODO check_primary for replication purposes?
     pub fn _send_msg(&self, msg : ~[u8], wc : Option<~[WRITE_CONCERN]>, auto_get_reply : bool)
                 -> Result<Option<ServerMsg>, MongoErr> {
@@ -149,6 +244,16 @@ impl Collection {
 
     /**
      * Parses write concern into bytes and sends to server.
+     *
+     * # Arguments
+     * * `wc` - write concern, i.e. getLastError specifications
+     *
+     * # Returns
+     * () on success, MongoErr on failuer
+     *
+     * # Failure Types
+     * * invalid write concern specification (should never happen)
+     * * network
      */
     fn _send_wc(&self, wc : ~str) -> Result<(), MongoErr>{
         let concern_json = match _str_to_bson(wc) {
@@ -179,6 +284,14 @@ impl Collection {
 
     /**
      * Picks up server response.
+     *
+     * # Returns
+     * ServerMsg on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * invalid bytestring/message returned (should never happen)
+     * * server returned message with error flags
+     * * network
      */
     fn _recv_msg(&self) -> Result<ServerMsg, MongoErr> {
         let m = match self.client.recv() {
@@ -217,14 +330,29 @@ impl Collection {
 
     /// INSERT OPS
     // TODO possibly combine anyway?
+    /**
+     * Insert given document with given writeconcern into Collection.
+     *
+     * # Arguments
+     * * `doc`- BsonFormattable to input
+     * * `wc` - write concern with which to insert (None for default of 1,
+     *          Some for finer specification)
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * invalid document to insert
+     * * network
+     */
     pub fn insert<U : BsonFormattable>(&self, doc : U, wc : Option<~[WRITE_CONCERN]>)
                 -> Result<(), MongoErr> {
         let bson_doc = ~[match doc.to_bson_t() {
                 Embedded(bson) => *bson,
                 _ => return Err(MongoErr::new(
                                     ~"coll::insert",
-                                    ~"some BsonDocument/Document error",
-                                    ~"no idea")),
+                                    ~"unknown BsonDocument/Document error",
+                                    ~"BsonFormattable not actually BSON formattable")),
             }];
         let msg = mk_insert(
                         self.client.inc_requestId(),
@@ -241,6 +369,25 @@ impl Collection {
                                     fmt!("-->\n%s", MongoErr::to_str(e)))),
         }
     }
+    /**
+     * Insert given batch of documents with given writeconcern
+     * into Collection.
+     *
+     * # Arguments
+     * * `docs`- array of BsonFormattable to input
+     * * `flag_array` - `CONT_ON_ERR`
+     * * `option_array` - [none yet]
+     * * `wc` - write concern with which to insert (None for default of 1,
+     *          Some for finer specification)
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * invalid document to insert (e.g. not proper format or
+     *      duplicate `_id`)
+     * * network
+     */
     pub fn insert_batch<U : BsonFormattable>(&self, docs : ~[U],
                                                     flag_array : Option<~[INSERT_FLAG]>,
                                                     option_array : Option<~[INSERT_OPTION]>,
@@ -274,11 +421,50 @@ impl Collection {
                                     fmt!("-->\n%s", MongoErr::to_str(e)))),
         }
     }
-    /*pub fn save<U : BsonFormattable>(&self, doc : U, wc : Option<~[WRITE_CONCERN]>)
+    // TODO check
+    pub fn save<U : BsonFormattable>(&self, doc : U, wc : Option<~[WRITE_CONCERN]>)
                 -> Result<(), MongoErr> {
-    }*/
+        let bson_doc = match doc.to_bson_t() {
+            Embedded(bson) => *bson,
+            _ => return Err(MongoErr::new(
+                                ~"coll::save",
+                                ~"unknown BsonDocument/Document error",
+                                ~"BsonFormattable not actually BSON formattable")),
+        };
+        let maybe_id = copy bson_doc.find(~"id");
+        match maybe_id {
+            None => self.insert(doc, wc),
+            Some(id) => {
+                let new_id = copy *id;
+                let mut query = BsonDocument::new();
+                query.append(~"_id", new_id);
+                self.update(SpecObj(query), SpecObj(copy bson_doc), Some(~[UPSERT]), None, wc)
+            },
+        }
+    }
 
     /// UPDATE OPS
+    /**
+     * Update documents satisfying given query with given update
+     * specification and write concern.
+     *
+     * # Arguments
+     * * `query` - `SpecNotation(~str)` or `SpecObj(BsonDocument)`
+     *              specifying documents to update
+     * * `update_spec` - `SpecNotation(~str)` or `SpecObj(BsonDocument)`
+     *              specifying update to documents
+     * * `flag_array` - `UPSERT`, `MULTI`
+     * * `option_array` - [nothing yet]
+     * * `wc` - write concern with which to update documents
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * invalid query or update specification
+     * * getLastError
+     * * network
+     */
     pub fn update(&self,    query : QuerySpec,
                             update_spec : QuerySpec,
                             flag_array : Option<~[UPDATE_FLAG]>,
@@ -342,6 +528,21 @@ impl Collection {
         }
         (nskip, nret)
     }
+    /**
+     * Returns Cursor over given projection from queried documents.
+     *
+     * # Arguments
+     * * `query` - optional `SpecNotation(~str)` or `SpecObj(BsonDocument)`
+     *              specifying documents to query
+     * * `proj` -  optioal `SpecNotation(~str)` or `SpecObj(BsonDocument)`
+     *              specifying projection from queried documents
+     * * `flag_array` - optional, `CUR_TAILABLE`, `SLAVE_OK`, `OPLOG_REPLAY`,
+     *                  `NO_CUR_TIMEOUT`, `AWAIT_DATA`, `EXHAUST`,
+     *                  `PARTIAL`
+     *
+     * # Returns
+     * initialized (unqueried) Cursor on success, MongoErr on failure
+     */
     pub fn find(@self,  query : Option<QuerySpec>,
                         proj : Option<QuerySpec>,
                         flag_array : Option<~[QUERY_FLAG]>/*,
@@ -385,6 +586,21 @@ impl Collection {
 //        Ok(Cursor::new(q, p, @self, flags, nskip, nret))
         Ok(Cursor::new(q, p, self, flags))
     }
+    /**
+     * Returns pointer to first Bson from queried documents.
+     *
+     * # Arguments
+     * * `query` - optional `SpecNotation(~str)` or `SpecObj(BsonDocument)`
+     *              specifying documents to query
+     * * `proj` -  optional `SpecNotation(~str)` or `SpecObj(BsonDocument)`
+     *              specifying projection from queried documents
+     * * `flag_array` - optional, `CUR_TAILABLE`, `SLAVE_OK`, `OPLOG_REPLAY`,
+     *                  `NO_CUR_TIMEOUT`, `AWAIT_DATA`, `EXHAUST`,
+     *                  `PARTIAL`
+     *
+     * # Returns
+     * ~BsonDocument of first result on success, MongoErr on failure
+     */
     //pub fn find_one(@self, query : Option<QuerySpec>, proj : Option<QuerySpec>, flag_array : Option<~[QUERY_FLAG]>, option_array : Option<~[QUERY_OPTION]>)
     pub fn find_one(@self, query : Option<QuerySpec>, proj : Option<QuerySpec>, flag_array : Option<~[QUERY_FLAG]>)
                 -> Result<~BsonDocument, MongoErr> {
@@ -397,7 +613,7 @@ impl Collection {
         let mut cur = self.find(query, proj, flag_array);
         match cur {
             Ok(ref mut cursor) => {
-                cursor.limit(1);
+                cursor.limit(-1);
                 match cursor.next() {
                     Some(doc) => Ok(doc),
                     None => Err(MongoErr::new(
@@ -418,16 +634,32 @@ impl Collection {
         let _ = options;
         0i32
     }
-    pub fn remove<U : BsonFormattable>(&self, query : Option<U>, flag_array : Option<~[DELETE_FLAG]>, option_array : Option<~[DELETE_OPTION]>, wc : Option<~[WRITE_CONCERN]>)
+    /**
+     * Remove specified documents from collection.
+     *
+     * # Arguments
+     * * `query` - optional `SpecNotation(~str)` or `SpecObj(BsonDocument)`
+     *              specifying documents to query
+     * * `flag_array` - optional, `CUR_TAILABLE`, `SLAVE_OK`, `OPLOG_REPLAY`,
+     *                  `NO_CUR_TIMEOUT`, `AWAIT_DATA`, `EXHAUST`,
+     *                  `PARTIAL`
+     * * `option_array` - [nothing yet]
+     * * `wc` - write concern with which to perform remove
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
+    pub fn remove(&self, query : Option<QuerySpec>, flag_array : Option<~[DELETE_FLAG]>, option_array : Option<~[DELETE_OPTION]>, wc : Option<~[WRITE_CONCERN]>)
                 -> Result<(), MongoErr> {
         let q = match query {
             None => BsonDocument::new(),
-            Some(doc) => match doc.to_bson_t() {
-                Embedded(bson) => *bson,
-                _ => return Err(MongoErr::new(
-                                    ~"coll::remove",
-                                    ~"some BsonDocument/Document error",
-                                    ~"no idea")),
+            Some(SpecObj(bson_doc)) => bson_doc,
+            Some(SpecNotation(s)) => match _str_to_bson(s) {
+                Ok(b) => *b,
+                Err(e) => return Err(MongoErr::new(
+                                        ~"coll::remove",
+                                        ~"query specification",
+                                        fmt!("-->\n%s", MongoErr::to_str(e)))),
             },
         };
         let flags = process_flags!(flag_array);
@@ -444,92 +676,77 @@ impl Collection {
     }
 
     /// INDICES (or "Indexes")
-    // XXX
-    priv fn process_index_opts(&self, flags : i32, options : Option<~[INDEX_OPTION]>) -> (bool, ~[~str]) {
-        let mut opts_str = ~[];
-
-        // flags
-        /*if (flags & BACKGROUND as i32) != 0i32 { opts_str += [~"\"background\":true"]; }
-        if (flags & UNIQUE as i32) != 0i32 { opts_str += [~"\"unique\":true"]; }
-        if (flags & DROP_DUPS as i32) != 0i32 { opts_str += [~"\"dropDups\":true"]; }
-        if (flags & SPARSE as i32) != 0i32 { opts_str += [~"\"spare\":true"]; } */
-        if (flags & BACKGROUND as i32) != 0i32 { opts_str = opts_str + [~"\"background\":true"]; }
-        if (flags & UNIQUE as i32) != 0i32 { opts_str = opts_str + [~"\"unique\":true"]; }
-        if (flags & DROP_DUPS as i32) != 0i32 { opts_str = opts_str + [~"\"dropDups\":true"]; }
-        if (flags & SPARSE as i32) != 0i32 { opts_str = opts_str + [~"\"spare\":true"]; }
-
-        // options
-        let mut has_name = false;
-        match options {
-            None => (),
-            Some(opt_arr) => {
-                for opt_arr.iter().advance |&opt| {
-                    //opts_str += match opt {
-                    opts_str = opts_str + match opt {
-                        INDEX_NAME(n) => {
-                            has_name = true;
-                            [fmt!("\"name\":%s", n)]
-                        }
-                        EXPIRE_AFTER_SEC(exp) => [fmt!("\"expireAfterSeconds\":%d", exp).to_owned()],
-                        //VERS(int),
-                        //WEIGHTS(BsonDocument),
-                        //DEFAULT_LANG(~str),
-                        //OVERRIDE_LANG(~str),
-                    };
-                }
-            }
-        };
-
-        (has_name, opts_str)
-    }
-    priv fn process_index_fields(&self, index_arr : ~[INDEX_FIELD], get_name : bool) -> (~str, ~[~str]) {
-        let mut name = ~"";
-        let mut index_str = ~[];
-        for index_arr.iter().advance |&field| {
-            match field {
-                NORMAL(arr) => {
-                    for arr.iter().advance |&(key, order)| {
-                        /*index_str += [fmt!("\"%s\":%d", copy key, order as int)];
-                        if get_name { name += fmt!("%s_%d", copy key, order as int); } */
-                        index_str = index_str + [fmt!("\"%s\":%d", copy key, order as int)];
-                        if get_name { name = name + fmt!("%s_%d", copy key, order as int); }
-                    }
-                }
-                //HASHED(key) => index_str += [fmt!("\"%s\":\"hashed\"", copy key)],
-                HASHED(key) => index_str = index_str + [fmt!("\"%s\":\"hashed\"", copy key)],
-                GEOSPATIAL(key, geotype) => {
-                    let typ = match geotype {
-                        SPHERICAL => ~"2dsphere",
-                        FLAT => ~"2d",
-                    };
-                    //index_str += [fmt!("\"%s\":\"%s\"", copy key, typ)];
-                    index_str = index_str + [fmt!("\"%s\":\"%s\"", copy key, typ)];
-                }
-            }
-        }
-
-        (name, index_str)
-    }
-    pub fn create_index(&self, index_arr : ~[INDEX_FIELD], flag_array : Option<~[INDEX_FLAG]>, option_array : Option<~[INDEX_OPTION]>) -> Result<(), MongoErr> {
+    /**
+     * Create index by specifying a vector of the different elements
+     * that can form an index (e.g. (field,order) pairs, geographical
+     * options, etc.)
+     *
+     * # Arguments
+     * * `index_arr` - vector of index elements
+     *                  (NORMAL(vector of (field, order) pairs),
+     *                  HASHED(field),
+     *                  GEOSPATIAL(field, type))
+     * * `flag_array` - optional vector of index-creating flags:
+     *                  BACKGROUND,
+     *                  UNIQUE,
+     *                  DROP_DUPS,
+     *                  SPARSE
+     * * `option_array` - optional vector of index-creating options:
+     *                  INDEX_NAME(name),
+     *                  EXPIRE_AFTER_SEC(nsecs)
+     *
+     * # Returns
+     * name of index as MongoIndexName (in enum MongoIndex) on success,
+     * MongoErr on failure
+     */
+    pub fn create_index(&self,  index_arr : ~[INDEX_FIELD],
+                                flag_array : Option<~[INDEX_FLAG]>,
+                                option_array : Option<~[INDEX_OPTION]>)
+                -> Result<MongoIndex, MongoErr> {
         let coll = @Collection::new(copy self.db, fmt!("%s", SYSTEM_INDEX), self.client);
 
         let flags = process_flags!(flag_array);
-        let (x, y) = self.process_index_opts(flags, option_array);
-        let has_name = x; let mut opts = y;
-        let (default_name, index) = self.process_index_fields(index_arr, !has_name);
-        if !has_name { opts = opts + [fmt!("\"name\":\"%s\"", default_name)]; }
+        let (x, y) = MongoIndex::process_index_opts(flags, option_array);
+        let mut maybe_name = x; let mut opts = y;
+        let (default_name, index) = MongoIndex::process_index_fields(index_arr, maybe_name.is_none());
+        if maybe_name.is_none() {
+            opts = opts + [fmt!("\"name\":\"%s\"", default_name)];
+            maybe_name = Some(default_name);
+        }
 
         let index_str = fmt!("{ \"key\":{ %s }, \"ns\":\"%s.%s\", %s }",
                             index.connect(", "),
                             copy self.db,
                             copy self.name,
                             opts.connect(", "));
-        coll.insert(index_str, None)
+        match coll.insert(index_str, None) {
+            Ok(_) => Ok(MongoIndexName(maybe_name.unwrap())),
+            Err(e) => Err(e),
+        }
     }
-
-    // TODO index cache
-    pub fn ensure_index(&self, index_arr : ~[INDEX_FIELD], flag_array : Option<~[INDEX_FLAG]>, option_array : Option<~[INDEX_OPTION]>) -> Result<(), MongoErr> {
+    // TODO index cache? XXX presently just does a create_index...
+    pub fn ensure_index(&self,  index_arr : ~[INDEX_FIELD],
+                                flag_array : Option<~[INDEX_FLAG]>,
+                                option_array : Option<~[INDEX_OPTION]>)
+                -> Result<MongoIndex, MongoErr> {
         self.create_index(index_arr, flag_array, option_array)
+    }
+    /**
+     * Drops specified index.
+     *
+     * # Arguments
+     * * `index` - MongoIndex to drop specified either by explicit name
+     *              or fields
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
+    pub fn drop_index(&self, index : MongoIndex) -> Result<(), MongoErr> {
+        let db = DB::new(copy self.db, self.client);
+        db.run_command(SpecNotation(
+            fmt!("{ \"deleteIndexes\":\"%s\", \"index\":\"%s\" }",
+                copy self.name,
+                index.get_name())))
     }
 }
 

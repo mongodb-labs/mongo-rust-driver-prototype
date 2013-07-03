@@ -16,6 +16,11 @@
 use bson::encode::*;
 use bson::json_parse::*;
 
+/*****
+ * Utility module for use internal and external to crate.
+ * Users must access functionality for proper use of options, etc.
+ ****/
+
 pub struct MongoErr {
     //err_code : int,
     err_type : ~str,
@@ -105,7 +110,6 @@ pub enum REPLY_FLAG {
     AWAIT_CAPABLE = 1 << 3,
 }
 
-// TODO write concern
 pub enum WRITE_CONCERN {
     JOURNAL(bool),      // wait for next journal commit?
     W_N(int),           // replicate to how many? (number)
@@ -129,7 +133,7 @@ pub enum INDEX_ORDER {
     DESC = -1,
 }
 
-pub enum INDEX_FLAG{
+pub enum INDEX_FLAG {
     BACKGROUND = 1 << 0,
     UNIQUE = 1 << 1,
     DROP_DUPS = 1 << 2,
@@ -154,20 +158,7 @@ pub enum INDEX_FIELD {
     NORMAL(~[(~str, INDEX_ORDER)]),
     HASHED(~str),
     GEOSPATIAL(~str, INDEX_GEOTYPE),
-    //GEOHAYSTACK(
-}
-
-/**
- * Special collections for database operations, but should not be
- * accessible to users.
- */
-priv mod special {
-    pub static SYSTEM_NAMESPACE : &'static str = &'static "system.namespaces";
-    pub static SYSTEM_INDEX : &'static str = &'static "system.indexes";
-    pub static SYSTEM_PROFILE : &'static str = &'static "system.profile";
-    pub static SYSTEM_USER : &'static str = &'static "system.users";
-    pub static SYSTEM_COMMAND : &'static str = &'static "$cmd";
-    pub static SYSTEM_JS : &'static str = &'static "system.js";
+    //GEOHAYSTACK()
 }
 
 /**
@@ -193,3 +184,14 @@ pub fn _str_to_bson(s : ~str) -> Result<~BsonDocument, MongoErr> {
                         fmt!("-->\n%s", e))),
     }
 }
+
+/**
+ * Special collections for database operations, but users should not
+ * access directly.
+ */
+pub static SYSTEM_NAMESPACE : &'static str = &'static "system.namespaces";
+pub static SYSTEM_INDEX : &'static str = &'static "system.indexes";
+pub static SYSTEM_PROFILE : &'static str = &'static "system.profile";
+pub static SYSTEM_USER : &'static str = &'static "system.users";
+pub static SYSTEM_COMMAND : &'static str = &'static "$cmd";
+pub static SYSTEM_JS : &'static str = &'static "system.js";
