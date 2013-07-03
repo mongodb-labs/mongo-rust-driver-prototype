@@ -52,6 +52,8 @@ mongo: $(MONGODIR)/*
 test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
+
+ex: $(MONGODIR)/test.rs
 	$(RC) $(FLAGS) -o $(TEST)/mongo_ex $(MONGODIR)/test.rs
 
 check: test
