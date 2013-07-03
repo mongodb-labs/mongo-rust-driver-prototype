@@ -1,9 +1,25 @@
+# Copyright 2013 10gen Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 RC = rustc
-RDOC = rustdoc --output-dir $(DOCS) --output-format markdown --output-style doc-per-mod
+RDOC = rustdoc
+RDOCFLAGS = --output-dir $(DOCS) --output-format markdown --output-style doc-per-mod
 CC = gcc
 AR = ar rcs
-FLAGS = -L ./bin
-CFLAGS = -c -g -o
+FLAGS = -L ./bin -D unused-unsafe $(USERFLAGS)
+CFLAGS = -c -g -Wall -Werror
+USERFLAGS =
 RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
@@ -16,49 +32,43 @@ DOCS = ./docs
 
 .PHONY: test
 
-all: bin libs bson mongo test
+all: bin libs bson mongo
 
 bin:
 	$(MKDIR) bin
 	$(MKDIR) test
 	$(MKDIR) docs
 
-libs: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/cast.c
-	$(CC) $(CFLAGS) $(BIN)/typecast.o $(BSONDIR)/cast.c
+libs: $(BSONDIR)/cast.c
+	$(CC) $(CFLAGS) -o $(BIN)/typecast.o $(BSONDIR)/cast.c
 	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
-	$(RC) --lib --out-dir $(BIN) $(BSONDIR)/ord_hash.rs
-	$(RC) --lib --out-dir $(BIN) $(BSONDIR)/stream.rs
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson_types.rs
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/json_parse.rs
 
-bson: $(BSONDIR)/bson.rs
-	$(RC) $(FLAGS) -o $(BIN)/bson $(BSONDIR)/bson.rs
+bson: $(BSONDIR)/*
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson.rc
 
 mongo: $(MONGODIR)/*
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/cursor.rs
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rc
 
-test: $(BSONDIR)/bson.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(MONGODIR)/cursor.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/stream_test $(BSONDIR)/stream.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/json_test $(BSONDIR)/json_parse.rs
-	$(RC) $(FLAGS) --test -o $(TEST)/cursor_test $(MONGODIR)/cursor.rs
+test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
+	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
+	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
 
-runtests: $(TEST)/*
+ex: $(MONGODIR)/test.rs
+	$(RC) $(FLAGS) -o $(TEST)/mongo_ex $(MONGODIR)/test.rs
+
+check: test
 	$(TEST)/bson_test
-	$(TEST)/stream_test
-	$(TEST)/json_test
-	$(TEST)/cursor_test
+	$(TEST)/mongo_test
 
-doc: $(BSONDIR)/ord_hash.rs $(BSONDIR)/stream.rs $(BSONDIR)/json_parse.rs $(BSONDIR)/bson_types.rs $(BSONDIR)/bson.rs $(MONGODIR)/*
-	$(RDOC) $(BSONDIR)/ord_hash.rs
-	$(RDOC) $(BSONDIR)/stream.rs
-	$(RDOC) $(BSONDIR)/json_parse.rs
-	$(RDOC) $(BSONDIR)/bson_types.rs
-	$(RDOC) $(BSONDIR)/bson.rs
-	$(RDOC) $(MONGODIR)/cursor.rs
+doc: $(BSONDIR)/*.rs $(MONGODIR)/*
+	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/bson.rc
+	$(RDOC) $(RDOCFLAGS) $(MONGODIR)/mongo.rc
 
 clean:
 	$(RM) $(BIN)/*.dylib
 	$(RM) -rf $(TEST)
 	$(RM) -rf $(BIN)
 	$(RM) -rf $(DOCS)
+
+tidy:
+	sed -e 's/\s\+$$//g' ./src/*

@@ -1,389 +1,533 @@
-#[link(name="json_parse", vers="0.2", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
-#[crate_type="lib"];
-
-extern mod ord_hashmap;
-extern mod stream;
-extern mod extra;
-extern mod bson_types;
+/* Copyright 2013 10gen Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 use std::char::is_digit;
 use std::str::from_chars;
 use std::float::from_str;
 use stream::*;
-use ord_hashmap::*;
-use bson_types::*;
+use encode::*;
 
 ///This trait is for parsing non-BSON object notations such as JSON, XML, etc.
-pub trait ObjParser<T:Stream<char>, V> {
-	pub fn from_string(&mut self, s: &str) -> Result<V,~str>;
+pub trait ObjParser<V> {
+    pub fn from_string(s: &str) -> Result<V,~str>;
 }
+
 ///JSON parsing struct. T is a Stream<char>.
-pub struct PureJsonParser<T> {
-	stream: T
+pub struct ExtendedJsonParser<T> {
+    stream: T
 }
+
+/// Intermediate type returned by many parsing methods
+type DocResult = Result<Document, ~str>;
+
 ///Publicly exposes from_string.
-impl ObjParser<~[char], PureJson> for PureJsonParser<~[char]> {
-	pub fn from_string(&mut self, s: &str) -> Result<PureJson,~str> {
-		let mut stream = s.iter().collect::<~[char]>();
-		stream.pass_while(&~[' ', '\n', '\r', '\t']);
-		if !(stream.first() == &'{') {
-			return Err(~"invalid json string found!");
-		}
-		self.stream = stream;
-		self.object()
-	}
+impl ObjParser<Document> for ExtendedJsonParser<~[char]> {
+    pub fn from_string(s: &str) -> DocResult {
+        let mut stream = s.iter().collect::<~[char]>();
+        stream.pass_while(&[' ', '\n', '\r', '\t']);
+        if !(stream.first() == &'{') {
+            return Err(~"invalid json string found!");
+        }
+        let mut parser = ExtendedJsonParser::new(stream);
+        parser.object()
+    }
+}
+
+macro_rules! match_insert {
+    ($cb:ident, $key:expr) => {
+        match self.$cb() {
+            Ok(bl) => { ret.put($key, bl); }
+            Err(e) => return Err(e)
+        }
+    }
 }
 
 ///Main parser implementation for JSON
-impl<T:Stream<char>> PureJsonParser<T> {
-	///Parse an object. Returns an error string on parse failure
-	pub fn object(&mut self) -> Result<PureJson,~str> {
-		self.stream.pass(1); //pass over brace
-		let mut ret: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
-		while !(self.stream.first() == &'}') {
-			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-			if self.stream.expect(&~['\"']).is_none() { println(fmt!("stream head is: %?\n", self.stream.first())); return Err(~"keys must begin with quote marks"); }
-			let key = match self._string() {
-				PureJsonString(s) => s,
-				_ => fail!("invalid key found")//TODO
-			};
-			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-			if self.stream.expect(&~[':']).is_none() { return Err(~"keys and values should be separated by :"); }
-			self.stream.pass(1); //pass over :
-			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-			let c = self.stream.expect(&~['\"', 't', 'f', '[', '{']);
-			match c {
-				Some('\"') => { ret.insert(key, self._string()); }
-				Some('t') => { 
-					let b = self._bool();
-					match b {
-						Ok(bl) => { ret.insert(key, bl); }
-						Err(e) => return Err(e)	
-					}
-				}
-				Some('f') => { 
-					let b = self._bool();
-					match b {
-						Ok(bl) => { ret.insert(key, bl); }
-						Err(e) => return Err(e)
-					}
-				}
-				Some('[') => {
-					let l = self._list();
-					match l {
-						Ok(ls) => { ret.insert(key, ls); }
-						Err(e) => return Err(e)
-					} 
-				}
-				Some('{') => {
-					let o = self.object();
-					if o.is_err() { return o; }
-					let obj = o.unwrap();
-					let id = PureJsonParser::_objid::<T>(&obj);
-					if !id.is_none() { ret.insert(key, id.unwrap()); }
-					else { ret.insert(key, obj); }
-				}
-				_ => if is_digit(*self.stream.first()) { ret.insert(key, self._number()); } else { return Err(fmt!("invalid value found: %?", self.stream.first())); }
-			}
-			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-			let comma = self.stream.expect(&~[',', '}']);
-			match comma { 
-				Some(',') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']) }
-				Some('}') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']); return Ok(PureJsonObject(ret)); }
-				_ => return Err(~"invalid end to object: expecting , or }")
-			}
-			if !self.stream.has_next() { break; }
-		}
-		self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-		Ok(PureJsonObject(ret))
-	}
-	///Parse a string.
-	pub fn _string(&mut self) -> PureJson {
-		self.stream.pass(1); //pass over begin quote
-		let ret: ~[char] = self.stream.until(|c| *c == '\"'); 
-		self.stream.pass(1); //pass over end quote
-		self.stream.pass_while(&~[' ', '\n', '\r', '\t']); //pass over trailing whitespace
-		PureJsonString(from_chars(ret))
-	}
-	///Parse a number; converts it to float.
-	pub fn _number(&mut self) -> PureJson {
-		let ret = self.stream.until(|c| (*c == ',') || std::vec::contains([' ', '\n', '\r', '\t', ']', '}'], c));
-		PureJsonNumber(from_str(from_chars(ret)).unwrap())
-	}
-	///Parse a boolean. Errors for values other than 'true' or 'false'.
-	pub fn _bool(&mut self) -> Result<PureJson,~str> {
-		let c1 = self.stream.expect(&~['t', 'f']);
-		match c1 {
-			Some('t') => { self.stream.pass(1); 	
-					let next = ~['r', 'u', 'e'];
-					let mut i = 0;
-					while i < 3 {
-						let c = self.stream.expect(&~[next[i]]);
-						if c.is_none() { return Err(~"invalid boolean value while expecting true!"); }
-						i += 1;
-						self.stream.pass(1);
-					}
-					self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-					Ok(PureJsonBoolean(true))
-				     }
-			Some('f') => { self.stream.pass(1);
-					let next = ~['a', 'l', 's', 'e'];
-					let mut i = 0;
-					while i < 4 {
-						let c = self.stream.expect(&~[next[i]]);
-						if c.is_none() { return Err(~"invalid boolean value while expecting false!"); }
-						i += 1;
-						self.stream.pass(1);
-					}
-					self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-					Ok(PureJsonBoolean(false))
-				     }
-			_ => return Err(~"invalid boolean value!")
-		}	
-	}
-	///Parse null. Errors for values other than 'null'.
-	pub fn _null(&mut self) -> Result<PureJson,~str> {
-		let c1 = self.stream.expect(&~['n']);
-		match c1 {
-			Some('n') => { self.stream.pass(1);
-				let next = ~['u', 'l', 'l'];
-				let mut i = 0;
-				while i < 3 {
-					let c = self.stream.expect(&~[next[i]]);
-					if c.is_none() { return Err(~"invalid null value!"); }
-					i += 1;
-					self.stream.pass(1);
-				}
-				self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-				Ok(PureJsonNull)
-			}
-			_ => return Err(~"invalid null value!")
-		}
-	}
-	///Parse a list.
-	pub fn _list(&mut self) -> Result<PureJson,~str> {
-		self.stream.pass(1); //pass over [
-		let mut ret: ~[PureJson] = ~[];
-		while !(self.stream.first() == &']') {
-			let c = self.stream.expect(&~['\"', 't', 'f', '[', '{']);
-			match c {
-				Some('\"') => ret.push(self._string()),
-				Some('t') => {
-					let b = self._bool();
-					match b {
-						Ok(bl) => ret.push(bl),
-						Err(e) => return Err(e)
-					}
-				}
-				Some('f') => {
-					let b = self._bool();
-					match b {
-						Ok(bl) => ret.push(bl),
-						Err(e) => return Err(e)
-					}
-				}
-				Some('[') => {
-					let l = self._list();
-					match l {
-						Ok(ls) => ret.push(ls),
-						Err(e) => return Err(e)
-					}
-				}
-				Some('{') => {
-					let o = self.object();
-					if o.is_err() { return o; }
-					let obj = o.unwrap();
-					let id = PureJsonParser::_objid::<T>(&obj);
-					if !id.is_none() { ret.push(id.unwrap()); }
-					else { ret.push(obj); }
-				}
-				_ => if is_digit(*self.stream.first()) { ret.push(self._number()) } else { return Err(fmt!("invalid value found: %?", self.stream.first())); }
-			}
-			self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-			let comma = self.stream.expect(&~[',', ']']);
-			match comma {
-				Some(',') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']); }
-				Some(']') => { self.stream.pass(1); self.stream.pass_while(&~[' ', '\n', '\r', '\t']); return Ok(PureJsonList(ret)); }
-				_ => return Err(fmt!("invalid value found: %?", self.stream.first()))
-			}
-			if !self.stream.has_next() { break; } //this should only happen during tests
-		}
-		self.stream.pass_while(&~[' ', '\n', '\r', '\t']);
-		Ok(PureJsonList(ret))
-	}
-	///If this object was an $oid, return an ObjID.
-	pub fn _objid(json: &PureJson) -> Option<PureJson> {
-		match *json {
-			PureJsonObject(ref m) => {
-				if m.len() == 1 && m.contains_key(&~"$oid") {
-					match (m.find(&~"$oid")) {
-						Some(&PureJsonString(ref st)) => return Some(PureJsonObjID(st.bytes_iter().collect::<~[u8]>())),
-						_ => return None //fail more silently here
-					}
-				}
-			}
-			_ => return None
-		}
-		None
-	}
+impl<T:Stream<char>> ExtendedJsonParser<T> {
 
-	///Return a new JSON parser with a given stream.
-	pub fn new(stream: T) -> PureJsonParser<T> { PureJsonParser {stream: stream} }
+    ///Parse an object. Returns an error string on parse failure
+    pub fn object(&mut self) -> DocResult {
+        self.stream.pass(1); //pass over brace
+        let mut ret = BsonDocument::new();
+        while !(self.stream.first() == &'}') {
+            self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+            if self.stream.expect(&['\"']).is_none() { return Err(~"keys must begin with quote marks"); }
+            let key = match self._string() {
+                UString(s) => s,
+                _ => fail!("invalid key found")//TODO
+            };
+            self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+            if self.stream.expect(&[':']).is_none() {
+                return Err(~"keys and values should be separated by :");
+            }
+            self.stream.pass(1); //pass over :
+            self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+            let c = self.stream.expect(&['\"', 't', 'f', '[', '{']);
+            match c {
+                Some('\"') => { ret.put(key, self._string()); }
+                Some('t') => {
+                    match_insert!(_bool,key);
+                }
+                Some('f') => {
+                    match_insert!(_bool,key);
+                }
+                Some('[') => {
+                    match_insert!(_list,key)
+                }
+                Some('{') => {
+                    let o = self.object();
+                    if o.is_err() { return o; }
+                    let obj = o.unwrap();
+                    let id = ExtendedJsonParser::_keyobj::<T>(&obj);
+                    if !id.is_none() { ret.put(key, id.unwrap()); }
+                    else { ret.put(key, obj); }
+                }
+                _ => if is_digit(*self.stream.first()) { ret.put(key, self._number()); }
+                     else if (*self.stream.first()) == '-' {
+                        self.stream.pass(1);
+                        match self._number() {
+                           Double(f) => ret.put(key, Double(-1f64 * f)),
+                           _ => return Err(~"error while expecting a negative value")
+                        }
+                     }
+                     else { return Err(fmt!("invalid value found: %?", self.stream.first())); }
+            }
+            self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+            let comma = self.stream.expect(&[',', '}']);
+            match comma {
+                Some(',') => {
+                    self.stream.pass(1);
+                    self.stream.pass_while(&[' ', '\n', '\r', '\t'])
+                }
+                Some('}') => {
+                    self.stream.pass(1);
+                    self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+                    return Ok(Embedded(~ret));
+                }
+                _ => return Err(~"invalid end to object: expecting , or }")
+            }
+            if !self.stream.has_next() { break; }
+        }
+        self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+        Ok(Embedded(~ret))
+    }
+
+    ///Parse a string.
+    fn _string(&mut self) -> Document {
+        self.stream.pass(1); //pass over begin quote
+        let ret: ~[char] = self.stream.until(|c| *c == '\"');
+        self.stream.pass(1); //pass over end quote
+        self.stream.pass_while(&[' ', '\n', '\r', '\t']); //pass over trailing whitespace
+        UString(from_chars(ret))
+    }
+
+    ///Parse a number; converts it to float.
+    fn _number(&mut self) -> Document {
+        let ret = self.stream.until(|c| (*c == ',') ||
+            [' ', '\n', '\r', '\t', ']', '}'].contains(c));
+        Double(from_str(from_chars(ret)).unwrap() as f64)
+    }
+
+    ///Parse a boolean. Errors for values other than 'true' or 'false'.
+    fn _bool(&mut self) -> DocResult {
+        let c1 = self.stream.expect(&['t', 'f']);
+        match c1 {
+            Some('t') => { self.stream.pass(1);
+                    let next = ~['r', 'u', 'e'];
+                    let mut i = 0;
+                    while i < 3 {
+                        let c = self.stream.expect(&[next[i]]);
+                        if c.is_none() {
+                            return Err(~"invalid boolean value while expecting true!");
+                        }
+                        i += 1;
+                        self.stream.pass(1);
+                    }
+                    self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+                    Ok(Bool(true))
+                     }
+            Some('f') => { self.stream.pass(1);
+                    let next = ~['a', 'l', 's', 'e'];
+                    let mut i = 0;
+                    while i < 4 {
+                        let c = self.stream.expect(&[next[i]]);
+                        if c.is_none() {
+                            return Err(~"invalid boolean value while expecting false!");
+                        }
+                        i += 1;
+                        self.stream.pass(1);
+                    }
+                    self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+                    Ok(Bool(false))
+                     }
+            _ => return Err(~"invalid boolean value!")
+        }
+    }
+
+    ///Parse null. Errors for values other than 'null'.
+    fn _null(&mut self) -> DocResult {
+        let c1 = self.stream.expect(&['n']);
+        match c1 {
+            Some('n') => { self.stream.pass(1);
+                let next = ~['u', 'l', 'l'];
+                let mut i = 0;
+                while i < 3 {
+                    let c = self.stream.expect(&[next[i]]);
+                    if c.is_none() { return Err(~"invalid null value!"); }
+                    i += 1;
+                    self.stream.pass(1);
+                }
+                self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+                Ok(Null)
+            }
+            _ => return Err(~"invalid null value!")
+        }
+    }
+
+    ///Parse a list.
+    fn _list(&mut self) -> DocResult {
+        self.stream.pass(1); //pass over [
+        let mut ret = BsonDocument::new();
+        let mut i: uint = 0;
+        while !(self.stream.first() == &']') {
+            let c = self.stream.expect(&['\"', 't', 'f', '[', '{']);
+            match c {
+                Some('\"') => ret.put(i.to_str(), self._string()),
+                Some('t') => {
+                    match_insert!(_bool,i.to_str());
+                }
+                Some('f') => {
+                    match_insert!(_bool,i.to_str());
+                }
+                Some('[') => {
+                    match_insert!(_list,i.to_str());
+                }
+                Some('{') => {
+                    let o = self.object();
+                    if o.is_err() { return o; }
+                    let obj = o.unwrap();
+                    let id = ExtendedJsonParser::_keyobj::<T>(&obj);
+                    if !id.is_none() { ret.put(i.to_str(), id.unwrap()); }
+                    else { ret.put(i.to_str(), obj); }
+                }
+                _ => if is_digit(*self.stream.first()) {
+                        ret.put(i.to_str(), self._number())
+                     }
+                     else {
+                         return Err(fmt!("invalid value found: %?", self.stream.first()));
+                     }
+            }
+            i += 1;
+            self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+            let comma = self.stream.expect(&[',', ']']);
+            match comma {
+                Some(',') => {
+                    self.stream.pass(1);
+                    self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+                }
+                Some(']') => {
+                    self.stream.pass(1);
+                    self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+                    return Ok(Array(~ret));
+                }
+                _ => return Err(fmt!("invalid value found: %?", self.stream.first()))
+            }
+            if !self.stream.has_next() { break; } //this should only happen during tests
+        }
+        self.stream.pass_while(&[' ', '\n', '\r', '\t']);
+        Ok(Array(~ret))
+    }
+
+    ///If this object was an $oid, return an ObjID.
+    fn _keyobj(json: &Document) -> Option<Document> {
+        match *json {
+            Embedded(ref m) => {
+                if m.fields.len() == 1 && m.contains_key(~"$oid") { //objectid
+                    match (m.find(~"$oid")) {
+                        Some(&UString(ref st)) => return Some(
+                            ObjectId(st.bytes_iter().collect::<~[u8]>())
+                        ),
+                        _ => return None //fail more silently here
+                    }
+                }
+                else if m.fields.len() == 1 && m.contains_key(~"$date") { //utcdate
+                    match (m.find(~"$date")) {
+                        Some(&Double(f)) => return Some(UTCDate(f as i64)),
+                        _ => return None
+                    }
+                }
+                else if m.fields.len() == 1 && m.contains_key(~"$minKey") { //minkey
+                    match (m.find(~"$minKey")) {
+                        Some(&Double(1f64)) => return Some(MinKey),
+                        _ => return None
+                    }
+                }
+                else if m.fields.len() == 1 && m.contains_key(~"$maxKey") { //maxkey
+                    match (m.find(~"$maxKey")) {
+                        Some(&Double(1f64)) => return Some(MaxKey),
+                        _ => return None
+                    }
+                }
+                else if m.fields.len() == 1 && m.contains_key(~"$timestamp") { //timestamp
+                    match (m.find(~"$timestamp")) {
+                        Some(&Embedded(ref doc)) => if doc.fields.len() == 2
+                            && doc.contains_key(~"t")
+                            && doc.contains_key(~"i") {
+                                match (m.find(~"t"), m.find(~"i")) {
+                                    (Some(&Double(a)), Some(&Double(b))) =>
+                                        return Some(Timestamp((a+b) as i64)), //TODO
+                                    _ => return None
+                                }
+                            },
+                        _ => return None
+                    }
+                }
+                else if m.fields.len() == 2 //binary data
+                    && m.contains_key(~"$binary")
+                    && m.contains_key(~"$type") {
+                    match (m.find(~"$binary"), m.find(~"$type")) {
+                        (Some(&UString(ref s1)), Some(&UString(ref s2))) =>
+                            return Some(Binary(s2.bytes_iter().collect::<~[u8]>()[0],
+                                s1.bytes_iter().collect::<~[u8]>())),
+                        _ => return None
+                    }
+                }
+                else if m.fields.len() == 2 //regex
+                    && m.contains_key(~"$regex")
+                    && m.contains_key(~"$options") {
+                    match (m.find(~"$regex"), m.find(~"$options")) {
+                        (Some(&UString(ref s1)), Some(&UString(ref s2))) =>
+                            return Some(Regex(copy *s1, copy *s2)),
+                        _ => return None
+                    }
+                }
+            }
+            _ => return None
+        }
+        None
+    }
+
+    ///Return a new JSON parser with a given stream.
+    pub fn new(stream: T) -> ExtendedJsonParser<T> { ExtendedJsonParser {stream: stream} }
 }
 
 #[cfg(test)]
 mod tests {
-	extern mod ord_hashmap;
-	extern mod bson_types;
-	
-	use super::*;
-	use bson_types::*;
-	use ord_hashmap::*;
 
-	#[test]
-	fn test_string_fmt() {
-		let stream = "\"hello\"".iter().collect::<~[char]>();
-		let mut parser = PureJsonParser::new(stream);
-		let val = parser._string();
-		assert_eq!(PureJsonString(~"hello"), val);
-	}
+    use super::*;
+    use encode::*;
 
-	#[test]
-	fn test_number_fmt() {
-		let stream = "2".iter().collect::<~[char]>();
-		let mut parser = PureJsonParser::new(stream);
-		let val = parser._number();
-		assert_eq!(PureJsonNumber(2f), val);
-	}
+    #[test]
+    fn test_string_fmt() {
+        let stream = "\"hello\"".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let val = parser._string();
+        assert_eq!(UString(~"hello"), val);
+    }
 
-	#[test]
-	fn test_bool_fmt() {
-		let stream_true = "true".iter().collect::<~[char]>();
-		let stream_false = "false".iter().collect::<~[char]>();
-		let mut parse_true = PureJsonParser::new(stream_true);
-		let mut parse_false = PureJsonParser::new(stream_false);	
-		let val_t = parse_true._bool().unwrap();
-		let val_f = parse_false._bool().unwrap();
-	
-		assert_eq!(PureJsonBoolean(true), val_t);
-		assert_eq!(PureJsonBoolean(false), val_f);
-	}
+    #[test]
+    fn test_number_fmt() {
+        let stream = "2".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let val = parser._number();
+        assert_eq!(Double(2f64), val);
+    }
 
-	#[test]
-	#[should_fail]
-	fn test_invalid_true_fmt() {
-		let stream = "tasdf".iter().collect::<~[char]>();
-		let mut parser = PureJsonParser::new(stream);
-		if parser._bool().is_err() { fail!("invalid_true_fmt") }
-	}
+    #[test]
+    fn test_bool_fmt() {
+        let stream_true = "true".iter().collect::<~[char]>();
+        let stream_false = "false".iter().collect::<~[char]>();
+        let mut parse_true = ExtendedJsonParser::new(stream_true);
+        let mut parse_false = ExtendedJsonParser::new(stream_false);
+        let val_t = parse_true._bool().unwrap();
+        let val_f = parse_false._bool().unwrap();
 
-	#[test]
-	#[should_fail]
-	fn test_invalid_false_fmt() {
-		let stream = "fasdf".iter().collect::<~[char]>();
-		let mut parser = PureJsonParser::new(stream);
-		if parser._bool().is_err() { fail!("invalid_false_fmt") }
-	}
+        assert_eq!(Bool(true), val_t);
+        assert_eq!(Bool(false), val_f);
+    }
 
-	#[test]
-	#[should_fail]
-	fn test_invalid_bool_fmt() {
-		let stream = "asdf".iter().collect::<~[char]>();
-		let mut parser = PureJsonParser::new(stream);
-		if parser._bool().is_err() { fail!("invalid_bool_fmt") }
-	}
-	#[test]
-	fn test_list_fmt() {
-		let stream = "[5.01, true, \"hello\"]".iter().collect::<~[char]>();
-		let mut parser = PureJsonParser::new(stream);
-		let val = parser._list().unwrap();
-	
-		assert_eq!(PureJsonList(~[PureJsonNumber(5.01), PureJsonBoolean(true), PureJsonString(~"hello")]), val);
-	}
+    #[test]
+    #[should_fail]
+    fn test_invalid_true_fmt() {
+        let stream = "tasdf".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        if parser._bool().is_err() { fail!("invalid_true_fmt") }
+    }
 
-	#[test]
-	fn test_object_fmt() {
-		let stream = "{\"foo\": true, \"bar\": 2, \"baz\": [\"qux\"]}".iter().collect::<~[char]>();
-		let mut parser = PureJsonParser::new(stream);
-		let mut m: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
-		m.insert(~"foo", PureJsonBoolean(true));
-		m.insert(~"bar", PureJsonNumber(2f));
-		m.insert(~"baz", PureJsonList(~[PureJsonString(~"qux")]));
-		
-		assert_eq!(PureJsonObject(m), parser.object().unwrap());
-	}
+    #[test]
+    #[should_fail]
+    fn test_invalid_false_fmt() {
+        let stream = "fasdf".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        if parser._bool().is_err() { fail!("invalid_false_fmt") }
+    }
 
-	#[test]
-	fn test_objid_fmt() {
-		let stream = "{\"$oid\": \"abcdefg\"}".iter().collect::<~[char]>();
-		let mut parser = PureJsonParser::new(stream);
-		let v = parser.object();
-		let val = PureJsonParser::_objid::<~[char]>(&(v.unwrap())).unwrap();
-		
-		assert_eq!(PureJsonObjID("abcdefg".bytes_iter().collect::<~[u8]>()), val);
-	}
+    #[test]
+    #[should_fail]
+    fn test_invalid_bool_fmt() {
+        let stream = "asdf".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        if parser._bool().is_err() { fail!("invalid_bool_fmt") }
+    }
+    #[test]
+    fn test_list_fmt() {
+        let stream = "[5.01, true, \"hello\"]".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let val = parser._list().unwrap();
+        let mut l = BsonDocument::new();
+        l.put(~"0", Double(5.01f64));
+        l.put(~"1", Bool(true));
+        l.put(~"2", UString(~"hello"));
+        assert_eq!(Array(~l), val);
+    }
 
-	#[test]
-	fn test_nested_obj_fmt() {
-		let stream = "{\"qux\": {\"foo\": 5.0, \"bar\": \"baz\"}, \"fizzbuzz\": false}".iter().collect::<~[char]>();
-		let mut parser = PureJsonParser::new(stream);
-		let mut m1: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
-		m1.insert(~"foo", PureJsonNumber(5.0));
-		m1.insert(~"bar", PureJsonString(~"baz"));
-		
-		let mut m2: OrderedHashmap<~str, PureJson> = OrderedHashmap::new();
-		m2.insert(~"qux", PureJsonObject(m1));
-		m2.insert(~"fizzbuzz", PureJsonBoolean(false));
-	
-		let v = parser.object();
-		match v {
-			Ok(_) => { }
-			Err(e) => { fail!(fmt!("Object with internal object failed: %s", e)) }
-		}
+    #[test]
+    fn test_object_fmt() {
+        let stream = "{\"foo\": true, \"bar\": 2, \"baz\": [\"qux-dux\"]}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let mut d = BsonDocument::new();
+        let mut doc = BsonDocument::new();
+        doc.put(~"0", UString(~"qux-dux"));
+        d.put(~"foo", Bool(true));
+        d.put(~"bar", Double(2f64));
+        d.put(~"baz", Array(~doc));
 
-		assert_eq!(PureJsonObject(m2), v.unwrap());
-	}
+        assert_eq!(Embedded(~d), parser.object().unwrap());
+    }
 
-	#[test]
-	fn test_nested_list_fmt() {
-		//list with object inside
-		let stream1 = "[5.0, {\"foo\": true}, \"bar\"]".iter().collect::<~[char]>();
-		let mut parser1 = PureJsonParser::new(stream1);
-		let mut m = OrderedHashmap::new();
-		m.insert(~"foo", PureJsonBoolean(true));
-		let v1 = parser1._list();
-		match v1 {
-			Ok(_) => { }
-			Err(e) => { fail!(fmt!("List with internal object failed: %s", e)) }
-		}
-		
-		assert_eq!(PureJsonList(~[PureJsonNumber(5.0), PureJsonObject(m), PureJsonString(~"bar")]), v1.unwrap());
-	
-		//list with list inside
-		let stream2 = "[5.0, [true, false], \"foo\"]".iter().collect::<~[char]>();
-		let mut parser2 = PureJsonParser::new(stream2);	
-		let v2 = parser2._list();
-		match v2 {
-			Ok(_) => { }
-			Err(e) => { fail!(fmt!("List with internal list failed: %s", e)) }
-		}
-		
-		assert_eq!(PureJsonList(~[PureJsonNumber(5.0), PureJsonList(~[PureJsonBoolean(true), PureJsonBoolean(false)]), PureJsonString(~"foo")]), v2.unwrap());
-	}
+    #[test]
+    fn test_nested_obj_fmt() {
+        let stream = "{\"qux\": {\"foo\": 5.0, \"bar\": \"baz\"}, \"fizzbuzz\": false}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let mut m1 = BsonDocument::new();
+        m1.put(~"foo", Double(5f64));
+        m1.put(~"bar", UString(~"baz"));
 
-	#[test]
-	fn test_null_fmt() {
-		let stream = "null".iter().collect::<~[char]>();
-		let mut parser = PureJsonParser::new(stream);
-		assert_eq!(PureJsonNull, parser._null().unwrap());
-		
-	}
+        let mut m2 = BsonDocument::new();
+        m2.put(~"qux", Embedded(~m1));
+        m2.put(~"fizzbuzz", Bool(false));
 
-	#[test]
-	#[should_fail]
-	fn test_invalid_null_fmt() {
-		let stream = "nulf".iter().collect::<~[char]>();
-		let mut parser = PureJsonParser::new(stream);
-		if parser._null().is_err() { fail!("invalid null value") }
-	}
+        let v = parser.object();
+        match v {
+            Ok(_) => { }
+            Err(e) => { fail!(fmt!("Object with internal object failed: %s", e)) }
+        }
+
+        assert_eq!(Embedded(~m2), v.unwrap());
+    }
+
+    #[test]
+    fn test_nested_list_fmt() {
+        //list with object inside
+        let stream1 = "[5.0, {\"foo\": true}, \"bar\"]".iter().collect::<~[char]>();
+        let mut parser1 = ExtendedJsonParser::new(stream1);
+        let mut m = BsonDocument::new();
+        m.put(~"foo", Bool(true));
+        let v1 = parser1._list();
+        match v1 {
+            Ok(_) => { }
+            Err(e) => { fail!(fmt!("List with internal object failed: %s", e)) }
+        }
+
+        let mut l = BsonDocument::new();
+        l.put(~"0", Double(5f64));
+        l.put(~"1", Embedded(~m));
+        l.put(~"2", UString(~"bar"));
+        assert_eq!(Array(~l), v1.unwrap());
+
+        //list with list inside
+        let stream2 = "[5.0, [true, false], \"foo\"]".iter().collect::<~[char]>();
+        let mut parser2 = ExtendedJsonParser::new(stream2);
+        let v2 = parser2._list();
+        let mut l1 = BsonDocument::new();
+        l1.put(~"0", Bool(true));
+        l1.put(~"1", Bool(false));
+        let mut l2 = BsonDocument::new();
+        l2.put(~"0", Double(5f64));
+        l2.put(~"1", Array(~l1));
+        l2.put(~"2", UString(~"foo"));
+        match v2 {
+            Ok(_) => { }
+            Err(e) => { fail!(fmt!("List with internal list failed: %s", e)) }
+        }
+
+        assert_eq!(Array(~l2), v2.unwrap());
+    }
+
+    #[test]
+    fn test_null_fmt() {
+        let stream = "null".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        assert_eq!(Null, parser._null().unwrap());
+
+    }
+
+    #[test]
+    #[should_fail]
+    fn test_invalid_null_fmt() {
+        let stream = "nulf".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        if parser._null().is_err() { fail!("invalid null value") }
+    }
+
+    #[test]
+    fn test_objid_fmt() {
+        let stream = "{\"$oid\": \"abcdefg\"}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let v = parser.object();
+        let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
+
+        assert_eq!(ObjectId("abcdefg".bytes_iter().collect::<~[u8]>()), val);
+    }
+
+    #[test]
+    fn test_date_fmt() {
+        let stream = "{\"$date\": 12345}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let v = parser.object();
+        let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
+
+        assert_eq!(UTCDate(12345i64), val);
+    }
+
+    #[test]
+    fn test_minkey_1_fmt() {
+        let stream = "{\"$minKey\": 1}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let v = parser.object();
+        let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
+
+        assert_eq!(MinKey, val);
+    }
+
+    #[test]
+    #[should_fail]
+    fn test_minkey_otherkey_fmt() {
+        let stream = "{\"$minKey\": 3}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let v = parser.object();
+        ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
+    }
+
+    #[test]
+    fn test_regex_fmt() {
+        let stream = "{\"$regex\": \"foo\", \"$options\": \"bar\"}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        let v = parser.object();
+        let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
+
+        assert_eq!(Regex(~"foo",~"bar"), val);
+    }
 }

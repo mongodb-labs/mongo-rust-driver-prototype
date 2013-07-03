@@ -13,9 +13,16 @@
  * limitations under the License.
  */
 
-#include <string.h>
-double bytes_to_double(void* buf) {
-    double val;
-    memcpy(&val, buf, sizeof(double));
-    return val;
-}
+#[link(name="bson", vers="0.1", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
+#[crate_type="lib"];
+#[license="Apache 2.0"];
+
+extern mod std;
+extern mod extra;
+
+mod ord_hash;
+mod stream;
+pub mod json_parse;
+pub mod encode;
+pub mod decode;
+pub mod formattable;
