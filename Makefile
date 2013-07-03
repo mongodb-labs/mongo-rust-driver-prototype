@@ -14,7 +14,7 @@
 
 RC = rustc
 RDOC = rustdoc
-RDOCFLAGS = --output-dir $(DOCS) --output-format markdown --output-style doc-per-mod
+RDOCFLAGS = --output-style doc-per-mod
 CC = gcc
 AR = ar rcs
 FLAGS = -L ./bin -D unused-unsafe $(USERFLAGS)
@@ -24,6 +24,7 @@ RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
 
+SRC = ./src
 BSONDIR = ./src/bson
 MONGODIR = ./src/libmongo
 BIN = ./bin
@@ -32,7 +33,7 @@ DOCS = ./docs
 
 .PHONY: test
 
-all: bin libs bson mongo
+all: bin libs mongodb
 
 bin:
 	$(MKDIR) bin
@@ -44,14 +45,16 @@ libs: $(BSONDIR)/cast.c
 	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
 
 bson: $(BSONDIR)/*
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson.rc
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson.rs
+
+mongodb: $(SRC)/*
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(SRC)/mongo.rc
 
 mongo: $(MONGODIR)/*
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rc
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rs
 
-test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
-	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
-	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
+test: $(SRC)/mongo.rc
+	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(SRC)/mongo.rc
 
 ex: $(MONGODIR)/test.rs
 	$(RC) $(FLAGS) -o $(TEST)/mongo_ex $(MONGODIR)/test.rs
@@ -61,8 +64,8 @@ check: test
 	$(TEST)/mongo_test
 
 doc: $(BSONDIR)/*.rs $(MONGODIR)/*
-	$(RDOC) $(RDOCFLAGS) $(BSONDIR)/bson.rc
-	$(RDOC) $(RDOCFLAGS) $(MONGODIR)/mongo.rc
+	$(MKDIR) docs
+	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS) $(SRC)/mongo.rc
 
 clean:
 	$(RM) $(BIN)/*.dylib
