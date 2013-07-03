@@ -17,10 +17,10 @@ use std::num::*;
 
 use bson::encode::*;
 
-use util::*;
-use msg::*;
-use coll::Collection;
-use coll::MongoIndex;
+use libmongo::util::*;
+use libmongo::msg::*;
+use libmongo::coll::Collection;
+use libmongo::coll::MongoIndex;
 
 ///Structure representing a cursor
 pub struct Cursor {
@@ -439,12 +439,11 @@ impl Cursor {
 
 #[cfg(test)]
 mod tests {
-    extern mod bson;
     extern mod extra;
 
     use super::*;
     use bson::encode::*;
-    use util::*;
+    use libmongo::util::*;
     //use coll::*;
 
 /*    #[test]

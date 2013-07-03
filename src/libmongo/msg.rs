@@ -20,7 +20,7 @@ use std::vec::raw::*;
 use bson::encode::*;
 use bson::decode::*;
 
-use util::*;
+use libmongo::util::*;
 
 // XXX ideally, this could be used in all the len computations
 //static header_sz : uint = 4*sys::size_of::<i32>();

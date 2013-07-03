@@ -20,7 +20,7 @@ use extra::net::tcp::*;
 use extra::uv::*;
 use extra::future::*;
 
-use util::*;
+use libmongo::util::*;
 
 pub type PortResult = Result<~[u8], TcpErrData>;
 
@@ -223,7 +223,7 @@ mod tests {
     use std::comm::GenericPort;
     use extra::net::tcp::*;
     use extra::future;
-    use mockable::*;
+    use libmongo::mockable::*;
 
     struct MockPort {
         state: int

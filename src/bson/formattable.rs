@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-use encode::*;
-use json_parse::*;
+use bson::encode::*;
+use bson::json_parse::*;
 use extra::json;
 use std::hashmap::HashMap;
 
@@ -237,7 +237,7 @@ impl<V:BsonFormattable> BsonFormattable for HashMap<~str,V> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use encode::*;
+    use bson::encode::*;
     use extra::json;
 
     #[test]
