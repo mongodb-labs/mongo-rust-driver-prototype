@@ -28,21 +28,21 @@ pub type PortResult = Result<~[u8], TcpErrData>;
  * Trait for sockets used by Connection. Used as a traitobject.
  */
 pub trait Socket {
-	fn read_start(&self) -> Result<@Port<PortResult>, TcpErrData>;
-	fn read_stop(&self) -> Result<(), TcpErrData>;
-	fn write_future(&self, raw_write_data: ~[u8]) -> Future<Result<(), TcpErrData>>;
+    fn read_start(&self) -> Result<@Port<PortResult>, TcpErrData>;
+    fn read_stop(&self) -> Result<(), TcpErrData>;
+    fn write_future(&self, raw_write_data: ~[u8]) -> Future<Result<(), TcpErrData>>;
 }
 
 impl Socket for TcpSocket {
-	fn read_start(&self) -> Result<@Port<PortResult>, TcpErrData> {
-		self.read_start()
-	}
-	fn read_stop(&self) -> Result<(), TcpErrData> {
-		self.read_stop()
-	}
-	fn write_future(&self, raw_write_data: ~[u8]) -> Future<Result<(), TcpErrData>> {
-		self.write_future(raw_write_data)
-	}
+    fn read_start(&self) -> Result<@Port<PortResult>, TcpErrData> {
+        self.read_start()
+    }
+    fn read_stop(&self) -> Result<(), TcpErrData> {
+        self.read_stop()
+    }
+    fn write_future(&self, raw_write_data: ~[u8]) -> Future<Result<(), TcpErrData>> {
+        self.write_future(raw_write_data)
+    }
 }
 /**
  * Connection interface all connectors use (ReplicaSetConnection,
@@ -219,10 +219,10 @@ impl Connection for NodeConnection {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	use std::comm::GenericPort;
-	use extra::net::tcp::*;
-	use extra::future;
+    use super::*;
+    use std::comm::GenericPort;
+    use extra::net::tcp::*;
+    use extra::future;
     use mockable::*;
 
     struct MockPort {
@@ -248,102 +248,102 @@ mod tests {
         }
     }
 
-	impl Socket for MockSocket {
-		fn read_start(&self) -> Result<@Port<PortResult>, TcpErrData> {
+    impl Socket for MockSocket {
+        fn read_start(&self) -> Result<@Port<PortResult>, TcpErrData> {
             Err(Mockable::mock::<TcpErrData>(self.state)) //for now only allow fail mocking
-		}
-		fn read_stop(&self) -> Result<(), TcpErrData> {
+        }
+        fn read_stop(&self) -> Result<(), TcpErrData> {
             Mockable::mock::<Result<(), TcpErrData>>(self.state)
-		}
-		fn write_future(&self, _: ~[u8]) -> future::Future<Result<(), TcpErrData>> {
+        }
+        fn write_future(&self, _: ~[u8]) -> future::Future<Result<(), TcpErrData>> {
             Mockable::mock::<future::Future<Result<(), TcpErrData>>>(self.state)
-		}
-	}
+        }
+    }
 
-	#[test]
-	fn test_connect_preexisting_socket() {
-		let s: @Socket = @MockSocket {state: 1} as @Socket;
-		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
-		conn.sock = @mut Some(s);
-		assert!(conn.connect().is_err());
-	}
+    #[test]
+    fn test_connect_preexisting_socket() {
+        let s: @Socket = @MockSocket {state: 1} as @Socket;
+        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        conn.sock = @mut Some(s);
+        assert!(conn.connect().is_err());
+    }
 
-	#[test]
-	fn test_connect_ip_parse_fail() {
-		let conn = Connection::new::<NodeConnection>(~"invalid.ip.str", 42);
-		assert!(conn.connect().is_err());
-	}
+    #[test]
+    fn test_connect_ip_parse_fail() {
+        let conn = Connection::new::<NodeConnection>(~"invalid.ip.str", 42);
+        assert!(conn.connect().is_err());
+    }
 
-	#[test]
-	fn test_send_null_sock() {
-		let conn = Connection::new::<NodeConnection>(~"foo", 42);
-		assert!(conn.send(~[0u8]).is_err());
-	}
+    #[test]
+    fn test_send_null_sock() {
+        let conn = Connection::new::<NodeConnection>(~"foo", 42);
+        assert!(conn.send(~[0u8]).is_err());
+    }
 
-	#[test]
-	fn test_send_write_future_err() {
-		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
-		let s: @Socket = @MockSocket {state: 1} as @Socket;
-		conn.sock = @mut Some(s);
-		assert!(conn.send(~[0u8]).is_err());
-	}
+    #[test]
+    fn test_send_write_future_err() {
+        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let s: @Socket = @MockSocket {state: 1} as @Socket;
+        conn.sock = @mut Some(s);
+        assert!(conn.send(~[0u8]).is_err());
+    }
 
-	#[test]
-	fn test_send_write_future() {
-		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
-		let s: @Socket = @MockSocket {state: 0} as @Socket;
-		conn.sock = @mut Some(s);
-		assert!(conn.send(~[0u8]).is_ok());
-	}
+    #[test]
+    fn test_send_write_future() {
+        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let s: @Socket = @MockSocket {state: 0} as @Socket;
+        conn.sock = @mut Some(s);
+        assert!(conn.send(~[0u8]).is_ok());
+    }
 
-	#[test]
-	fn test_recv_null_port() {
-		let conn = Connection::new::<NodeConnection>(~"foo", 42);
-		assert!(conn.recv().is_err());
-	}
+    #[test]
+    fn test_recv_null_port() {
+        let conn = Connection::new::<NodeConnection>(~"foo", 42);
+        assert!(conn.recv().is_err());
+    }
 
-	#[test]
-	fn test_recv_read_err() {
+    #[test]
+    fn test_recv_read_err() {
 
-		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
-		let p: @GenericPort<PortResult> = @MockPort {state: 1} as @GenericPort<PortResult>;
-		conn.port = @mut Some(p);
-		assert!(conn.recv().is_err());
-	}
+        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let p: @GenericPort<PortResult> = @MockPort {state: 1} as @GenericPort<PortResult>;
+        conn.port = @mut Some(p);
+        assert!(conn.recv().is_err());
+    }
 
-	#[test]
-	fn test_recv_read() {
-		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
-		let p: @GenericPort<PortResult> = @MockPort {state: 0} as @GenericPort<PortResult>;
-		conn.port = @mut Some(p);
-		assert!(conn.recv().is_ok());
-	}
+    #[test]
+    fn test_recv_read() {
+        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let p: @GenericPort<PortResult> = @MockPort {state: 0} as @GenericPort<PortResult>;
+        conn.port = @mut Some(p);
+        assert!(conn.recv().is_ok());
+    }
 
-	#[test]
-	fn test_disconnect_no_socket() {
-		let conn = Connection::new::<NodeConnection>(~"foo", 42);
-		let e = conn.disconnect();
-		assert!(conn.sock.is_none());
-		assert!(e.is_ok());
-	}
+    #[test]
+    fn test_disconnect_no_socket() {
+        let conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let e = conn.disconnect();
+        assert!(conn.sock.is_none());
+        assert!(e.is_ok());
+    }
 
-	#[test]
-	fn test_disconnect_read_stop_err() {
-		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
-		let s: @Socket = @MockSocket {state: 1} as @Socket;
-		conn.sock = @mut Some(s);
-		let e = conn.disconnect();
-		assert!(!(conn.sock.is_none()));
-		assert!(e.is_err());
-	}
+    #[test]
+    fn test_disconnect_read_stop_err() {
+        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let s: @Socket = @MockSocket {state: 1} as @Socket;
+        conn.sock = @mut Some(s);
+        let e = conn.disconnect();
+        assert!(!(conn.sock.is_none()));
+        assert!(e.is_err());
+    }
 
-	#[test]
-	fn test_disconnect_read_stop() {
-		let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
-		let s: @Socket = @MockSocket {state: 0} as @Socket;
-		conn.sock = @mut Some(s);
-		let e = conn.disconnect();
-		assert!(conn.sock.is_none());
-		assert!(e.is_ok());
-	}
+    #[test]
+    fn test_disconnect_read_stop() {
+        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let s: @Socket = @MockSocket {state: 0} as @Socket;
+        conn.sock = @mut Some(s);
+        let e = conn.disconnect();
+        assert!(conn.sock.is_none());
+        assert!(e.is_ok());
+    }
 }

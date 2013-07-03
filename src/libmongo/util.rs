@@ -16,10 +16,10 @@
 use bson::encode::*;
 use bson::json_parse::*;
 
-/*****
+/**
  * Utility module for use internal and external to crate.
  * Users must access functionality for proper use of options, etc.
- ****/
+ */
 
 pub struct MongoErr {
     //err_code : int,
@@ -30,7 +30,7 @@ pub struct MongoErr {
 
 /**
  * MongoErr to propagate errors; would be called Err except that's
- * taken by rust...
+ * taken by Rust...
  */
 impl MongoErr {
     /**
