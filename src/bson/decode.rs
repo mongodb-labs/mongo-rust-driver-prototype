@@ -64,6 +64,8 @@ priv fn bytesum(bytes: &[u8]) -> u64 {
 impl<T:Stream<u8>> BsonParser<T> {
 
     ///Parse a byte stream into a BsonDocument. Returns an error string on parse failure.
+    ///Initializing a BsonParser and calling document() will fully convert a ~[u8]
+    ///into a BsonDocument if it was formatted correctly.
     pub fn document(&mut self) -> Result<BsonDocument,~str> {
         let size = bytesum(self.stream.aggregate(4)) as i32;
         let mut elemcode = self.stream.expect(&[
@@ -204,6 +206,7 @@ impl<T:Stream<u8>> BsonParser<T> {
 }
 
 ///Standalone decode binding.
+///This is equivalent to initializing a parser and calling document().
 pub fn decode(b: ~[u8]) -> Result<BsonDocument,~str> {
     let mut parser = BsonParser::new(b);
     parser.document()
@@ -250,7 +253,9 @@ mod tests {
         doc1.put(~"foo", Bool(true));
         assert_eq!(parser1.document().unwrap(), doc1);
 
-        let stream2: ~[u8] = ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0];
+        let stream2: ~[u8] = ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,
+            6,0,0,0,104,101,108,108,111,0,8,49,0,0,
+            0,2,98,97,122,0,4,0,0,0,113,117,120,0,0];
         let mut inside = BsonDocument::new();
         inside.put_all(~[(~"0", UString(~"hello")), (~"1", Bool(false))]);
         let mut doc2 = BsonDocument::new();

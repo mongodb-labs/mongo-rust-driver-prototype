@@ -120,15 +120,15 @@ pub fn msg_to_bytes(msg : ClientMsg) -> ~[u8] {
                         + n.to_bytes(LITTLE_ENDIAN_TRUE)
                         + [0]    // null-terminate name
                         + f.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + encode(&s)
-                        + encode(&u);
+                        + s.to_bson()
+                        + u.to_bson();
         }
         OpInsert { header:h, flags:f, full_collection_name:n, docs:d } => {
             bytes = bytes + _header_to_bytes(h)
                         + f.to_bytes(LITTLE_ENDIAN_TRUE)
                         + n.to_bytes(LITTLE_ENDIAN_TRUE)
                         + [0];   // null-terminate name
-            for d.iter().advance |doc| { bytes = bytes + encode(doc); }
+            for d.iter().advance |doc| { bytes = bytes + doc.to_bson(); }
         }
         OpQuery { header:h, flags:f, full_collection_name:n, nskip:ns, nret:nr, query:q, ret_field_selector:fi } => {
             bytes = bytes + _header_to_bytes(h)
@@ -137,8 +137,8 @@ pub fn msg_to_bytes(msg : ClientMsg) -> ~[u8] {
                         + [0]    // null-terminate name
                         + ns.to_bytes(LITTLE_ENDIAN_TRUE)
                         + nr.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + encode(&q)
-                        + match fi { None => ~[], Some(f) => encode(&f) };
+                        + q.to_bson()
+                        + match fi { None => ~[], Some(f) => f.to_bson() };
         }
         OpGetMore { header:h, RESERVED_BITS:r, full_collection_name:n, nret:nr, cursor_id:id } => {
             bytes = bytes + _header_to_bytes(h)
@@ -154,7 +154,7 @@ pub fn msg_to_bytes(msg : ClientMsg) -> ~[u8] {
                         + n.to_bytes(LITTLE_ENDIAN_TRUE)
                         + [0]    // null-terminate name
                         + f.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + encode(&s);
+                        + s.to_bson();
         }
         OpKillCursors { header:h, RESERVED_BITS:r, ncursor_ids:n, cursor_ids:ids } => {
             bytes = bytes + _header_to_bytes(h)

@@ -89,21 +89,9 @@ impl DB {
         Ok(names)
     }
 
-    /*pub fn get_collection(&self, coll : ~str) -> Collection {
-        Collection::new(copy self.name, coll, self.client);
+    pub fn get_collection(&self, coll : ~str) -> Collection {
+        Collection::new(copy self.name, coll, self.client)
     }
-
-    pub fn create_collection(&self, coll : ~str) -> result::Result<(), MongoErr> {
-
-    }
-
-    pub fn drop_collection(&self, coll : ~str) -> result::Result<(), MongoErr> {
-        
-    }
-
-    pub fn get_admin(&self) -> DB {
-        DB::new(~"admin", self.client)
-    }*/
 
     // TODO make take options? (not strictly necessary but may be good?)
     // TODO allow other query options, e.g. SLAVE_OK, with helper function
