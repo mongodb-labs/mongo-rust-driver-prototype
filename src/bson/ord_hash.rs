@@ -72,3 +72,18 @@ impl<'self, K: Hash + Eq + Copy,V: Copy> OrderedHashmap<K,V> {
         OrderedHashmap { map: HashMap::new(), order: ~[] }
     }
 }
+
+impl<K:Hash + Eq + ToStr + Copy,V:ToStr + Copy> ToStr for OrderedHashmap<K,V> {
+    pub fn to_str(&self) -> ~str {
+        let mut s = ~"{";
+        for self.iter().advance |&(@k, @v)| {
+            s.push_str(" (");
+            s.push_str(k.to_str());
+            s.push_str(", ");
+            s.push_str(v.to_str());
+            s.push_str(") ");
+        }
+        s.push_str("}");
+        s
+    }
+}
