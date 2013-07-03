@@ -10,7 +10,7 @@ This is a prototype version of a MongoDB driver for the Rust programming languag
 BSON-valid data items are represented in the ```Document``` type. (Valid types available from the [specification](http://bson-spec.org)).
 To get a document for one of these types, you can wrap it yourself or call the ```to_bson_t``` method.
     Example:
-        ```rust
+        ```
         use mongo::bson::formattable::*;
 
         let a = (1i).to_bson_t(); //Int32(1)
@@ -23,7 +23,7 @@ To get a document for one of these types, you can wrap it yourself or call the `
 A complete BSON object is represented in the BsonDocument type. BsonDocument contains a size field (```i32```) and map between ```~str```s and ```Document```s.
 This type exposes an API which is similar to that of a typical map.
     Example:
-        ```rust
+        ```
         use mongo::bson::encode::*;
         use mongo::bson::formattable::*;
 
@@ -37,7 +37,7 @@ In addition to constructing them directly, these types can also be built from JS
 The BSON library also publishes its own JSON parser, which supports [extended JSON](http://docs.mongodb.org/manual/reference/mongodb-extended-json/) and guarantees that fields will be serialized in the order they were inserted.
 Calling this JSON parser is done through the ```ObjParser``` trait's ```from_string``` method.
     Example:
-        ```rust
+        ```
         use mongo::bson::json_parse::*;
 
         let json_string = ~"{\"foo\": \"bar\", \"baz\", 5}";
@@ -52,7 +52,7 @@ Calling this JSON parser is done through the ```ObjParser``` trait's ```from_str
 ```Document```s and ```BsonDocument```s can be encoded into bytes via their ```to_bson``` methods. This will produce a ```~[u8]``` meeting the specifications outlined by the [specification](http://bson-spec.org).
 Through this method, standard BSON types can easily be serialized. Any type ```Foo``` can also be serialized in this way if it implements the ```BsonFormattable``` trait.
     Example:
-        ```rust
+        ```
         use mongo::bson::encode::*;
         use mongo::bson::formattable::*;
         
@@ -79,7 +79,7 @@ Through this method, standard BSON types can easily be serialized. Any type ```F
 ##### Decoding values
 The ```~[u8]``` representation of data is not especially useful for modifying or viewing. A ```~[u8]``` can be easily transformed into a BsonDocument for easier manipulation.
     Example:
-        ```rust
+        ```
         use mongo::bson::decode::*;
 
         let b: ~[u8] = /*get a bson document from somewhere*/
@@ -96,7 +96,7 @@ The ```~[u8]``` representation of data is not especially useful for modifying or
 
 The ```BsonFormattable``` trait also contains a method called ```from_bson_t``` as mentioned above. This static method allows a Document to be converted into the implementing type. This allows a quick path to decode a ```~[u8]``` into a ```T:BsonFormattable```.
     Example:
-        ```rust
+        ```
         use mongo::bson::decode::*;
         use mongo::bson::formattable::*;
 
