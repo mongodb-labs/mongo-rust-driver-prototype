@@ -45,17 +45,17 @@ pub enum MongoIndex {
 impl MongoIndex {
     // XXX
     fn process_index_opts(flags : i32, options : Option<~[INDEX_OPTION]>) -> (Option<~str>, ~[~str]) {
-        let mut opts_str = ~[];
+        let mut opts_str: ~[~str] = ~[];
 
         // flags
         /*if (flags & BACKGROUND as i32) != 0i32 { opts_str += [~"\"background\":true"]; }
         if (flags & UNIQUE as i32) != 0i32 { opts_str += [~"\"unique\":true"]; }
         if (flags & DROP_DUPS as i32) != 0i32 { opts_str += [~"\"dropDups\":true"]; }
         if (flags & SPARSE as i32) != 0i32 { opts_str += [~"\"spare\":true"]; } */
-        if (flags & BACKGROUND as i32) != 0i32 { opts_str = opts_str + [~"\"background\":true"]; }
-        if (flags & UNIQUE as i32) != 0i32 { opts_str = opts_str + [~"\"unique\":true"]; }
-        if (flags & DROP_DUPS as i32) != 0i32 { opts_str = opts_str + [~"\"dropDups\":true"]; }
-        if (flags & SPARSE as i32) != 0i32 { opts_str = opts_str + [~"\"spare\":true"]; }
+        if (flags & BACKGROUND as i32) != 0i32 { opts_str.push(~"\"background\":true"); }
+        if (flags & UNIQUE as i32) != 0i32 { opts_str.push(~"\"unique\":true"); }
+        if (flags & DROP_DUPS as i32) != 0i32 { opts_str.push(~"\"dropDups\":true"); }
+        if (flags & SPARSE as i32) != 0i32 { opts_str.push(~"\"spare\":true"); }
 
         // options
         let mut name = None;
