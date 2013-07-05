@@ -131,7 +131,20 @@ impl BsonFormattable for ~str {
     fn from_bson_t(doc: Document) -> Result<~str,~str> {
         match doc {
             UString(s) => Ok(copy s),
-            _ => Err(fmt!("could nto convert %? to string", doc))
+            _ => Err(fmt!("could not convert %? to string", doc))
+        }
+    }
+}
+
+impl<T:BsonFormattable> BsonFormattable for ~T {
+    fn to_bson_t(&self) -> Document {
+        (**self).to_bson_t()
+    }
+
+    fn from_bson_t(doc: Document) -> Result<~T, ~str> {
+        match BsonFormattable::from_bson_t(doc) {
+            Ok(c) => Ok(~c),
+            Err(e) => Err(e)
         }
     }
 }
@@ -230,6 +243,20 @@ impl<V:BsonFormattable> BsonFormattable for HashMap<~str,V> {
                 return Ok(m);
             }
             _ => return Err(~"can only convert Embedded or Array to hashmap")
+        }
+    }
+}
+
+impl BsonFormattable for BsonDocument {
+    fn to_bson_t(&self) -> Document {
+        Embedded(~(copy *self))
+    }
+
+    fn from_bson_t(doc: Document) -> Result<BsonDocument,~str> {
+        match doc {
+           Embedded(d) => Ok(copy *d),
+           Array(d) => Ok(copy *d),
+           _ => Err(~"can only convert Embedded and Array to BsonDocument") 
         }
     }
 }
