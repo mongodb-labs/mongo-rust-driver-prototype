@@ -16,8 +16,8 @@
 use std::char::is_digit;
 use std::str::from_chars;
 use std::float::from_str;
-use bson::stream::*;
-use bson::encode::*;
+use stream::*;
+use encode::*;
 
 ///This trait is for parsing non-BSON object notations such as JSON, XML, etc.
 pub trait ObjParser<V> {
@@ -327,7 +327,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
 mod tests {
 
     use super::*;
-    use bson::encode::*;
+    use encode::*;
 
     #[test]
     fn test_string_fmt() {

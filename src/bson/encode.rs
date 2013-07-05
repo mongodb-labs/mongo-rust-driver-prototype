@@ -18,7 +18,7 @@
 use std::to_bytes::*;
 use std::cast::transmute;
 use extra::serialize::*;
-use bson::ord_hash::*;
+use ord_hash::*;
 
 static L_END: bool = true;
 
@@ -365,7 +365,7 @@ priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bson::json_parse::*;
+    use json_parse::*;
 
     //testing size computation
     #[test]

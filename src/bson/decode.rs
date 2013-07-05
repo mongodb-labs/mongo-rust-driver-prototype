@@ -14,8 +14,8 @@
  */
 
 use std::str::from_bytes;
-use bson::encode::*;
-use bson::stream::*;
+use encode::*;
+use stream::*;
 use std::vec::raw::to_ptr;
 
 //TODO: find a way to remove this, see bson.rs:128
@@ -215,7 +215,7 @@ pub fn decode(b: ~[u8]) -> Result<BsonDocument,~str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bson::encode::*;
+    use encode::*;
 
     static l: bool = true;
 
