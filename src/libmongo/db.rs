@@ -147,4 +147,40 @@ impl DB {
                 fmt!("run_command %? failed", cmd),
                 copy *errmsg))
     }
+
+    pub fn add_user(&self, username: ~str, password: ~str) {
+        let coll = @(self.get_collection(~"system.users"));
+        let user = match coll.find_one(Some(SpecNotation(fmt!("{ user: %s }", username))), None, None)
+            {
+                Ok(u) => u,
+                Err(_) => {
+                    let mut doc = BsonDocument::new();
+                    doc.put(~"user", UString(copy username));
+                    ~doc
+                }
+            };
+        //user.put(~"pwd", md5(fmt!("%s:mongo:%s", username, pass)));
+        //TODO: get an MD5 implementation. OpenSSL bindings are available from
+        //github.com/kballard/rustcrypto
+        coll.save(user, None);
+    }
+
+    pub fn authenticate(&self, username: ~str, password: ~str) -> bool {
+        let nonce = self.run_command(SpecNotation(~"{ getnonce: 1 }"));
+        //TODO: blocked on run_command returning correct values?
+        //TODO: definitely blocked on md5
+        /*match this.runCommand(fmt!("
+              authenticate: 1,
+              username: %s,
+              nonce: %x,
+              key: %x",
+              username,
+              nonce,
+              md5(fmt!("%x%s%x", nonce, username, md5(fmt!("%s:mongo:%s",username, pass)))))) {
+           Ok(_) => return true,
+           Err(_) => return false 
+        }
+        */  
+        return false;
+    }
 }
