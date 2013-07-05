@@ -1,0 +1,182 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title>Module client</title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <style type="text/css">
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #007020; font-weight: bold; }
+code > span.dt { color: #902000; }
+code > span.dv { color: #40a070; }
+code > span.bn { color: #40a070; }
+code > span.fl { color: #40a070; }
+code > span.ch { color: #4070a0; }
+code > span.st { color: #4070a0; }
+code > span.co { color: #60a0b0; font-style: italic; }
+code > span.ot { color: #007020; }
+code > span.al { color: #ff0000; font-weight: bold; }
+code > span.fu { color: #06287e; }
+code > span.er { color: #ff0000; font-weight: bold; }
+  </style>
+  <link rel="stylesheet" href="rust.css" type="text/css" />
+</head>
+<body>
+<div id="header">
+<h1 class="title">Module client</h1>
+</div>
+<div class='index'>
+
+<ul>
+<li><a href="#struct-client">Struct <code>Client</code></a> - User interfaces with Client, which processes user requests and sends them through the connection.</li>
+<li><a href="#implementation-for-client">Implementation <code>for Client</code></a></li>
+</ul>
+</div>
+
+<div id="struct-client" class="section level2">
+<h2>Struct <code>Client</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">pub</span> <span class="kw">struct</span> Client {
+    conn: ~cell::Cell&lt;NodeConnection&gt;,
+    db: ~cell::Cell&lt;~<span class="kw">str</span>&gt;,
+    <span class="kw">priv</span> cur_requestId: ~cell::Cell&lt;<span class="kw">i32</span>&gt;,
+}</code></pre>
+<p>User interfaces with Client, which processes user requests and sends them through the connection.</p>
+<p>All communication to server goes through Client, i.e. database, collection, etc. all store their associated Client</p>
+</div>
+<div id="implementation-for-client" class="section level2">
+<h2>Implementation for <code>Client</code></h2>
+<div id="method-new" class="section level3">
+<h3>Method <code>new</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> new() -&gt; Client</code></pre>
+<p>Create a new Mongo Client.</p>
+<p>Currently can connect to single unreplicated, unsharded server via <code>connect</code>.</p>
+<div id="returns" class="section level4">
+<h4>Returns</h4>
+<p>empty Client</p>
+</div>
+</div>
+<div id="method-get_admin" class="section level3">
+<h3>Method <code>get_admin</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> get_admin(@self) -&gt; DB</code></pre>
+</div>
+<div id="method-use_db" class="section level3">
+<h3>Method <code>use_db</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> use_db(&amp;<span class="kw">self</span>, db: ~<span class="kw">str</span>)</code></pre>
+</div>
+<div id="method-drop_db" class="section level3">
+<h3>Method <code>drop_db</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> drop_db(@self, db: ~<span class="kw">str</span>) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
+<p>Drops the given database.</p>
+<div id="arguments" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>db</code> - name of database to drop</li>
+</ul>
+</div>
+<div id="returns-1" class="section level4">
+<h4>Returns</h4>
+<p>() on success, MongoErr on failure</p>
+</div>
+<div id="failure-types" class="section level4">
+<h4>Failure Types</h4>
+<ul>
+<li>anything propagated from run_command</li>
+</ul>
+</div>
+</div>
+<div id="method-connect" class="section level3">
+<h3>Method <code>connect</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> connect(&amp;<span class="kw">self</span>, server_ip_str: ~<span class="kw">str</span>, server_port: <span class="kw">uint</span>) -&gt;
+ <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
+<p>Connect to a single server.</p>
+<div id="arguments-1" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>server_ip_str</code> - string containing IP address of server</li>
+<li><code>server_port</code> - port to which to connect</li>
+</ul>
+</div>
+<div id="returns-2" class="section level4">
+<h4>Returns</h4>
+<p>() on success, MongoErr on failure</p>
+</div>
+<div id="failure-types-1" class="section level4">
+<h4>Failure Types</h4>
+<ul>
+<li>already connected</li>
+<li>network</li>
+</ul>
+</div>
+</div>
+<div id="method-disconnect" class="section level3">
+<h3>Method <code>disconnect</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> disconnect(&amp;<span class="kw">self</span>) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
+<p>Disconnect from server. Simultaneously empties connection cell.</p>
+<div id="returns-3" class="section level4">
+<h4>Returns</h4>
+<p>() on success, MongoErr on failure</p>
+</div>
+<div id="failure-types-2" class="section level4">
+<h4>Failure Types</h4>
+<ul>
+<li>network</li>
+</ul>
+</div>
+</div>
+<div id="method-send" class="section level3">
+<h3>Method <code>send</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> send(&amp;<span class="kw">self</span>, bytes: ~[<span class="kw">u8</span>]) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
+<p>Send on connection affiliated with this client.</p>
+<div id="arguments-2" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>bytes</code> - bytes to send</li>
+</ul>
+</div>
+<div id="returns-4" class="section level4">
+<h4>Returns</h4>
+<p>() on success, MongoErr on failure</p>
+</div>
+<div id="failure-types-3" class="section level4">
+<h4>Failure Types</h4>
+<ul>
+<li>not connected</li>
+<li>network</li>
+</ul>
+</div>
+</div>
+<div id="method-recv" class="section level3">
+<h3>Method <code>recv</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> recv(&amp;<span class="kw">self</span>) -&gt; <span class="kw">Result</span>&lt;~[<span class="kw">u8</span>], MongoErr&gt;</code></pre>
+<p>Receive on connection affiliated with this client.</p>
+<div id="returns-5" class="section level4">
+<h4>Returns</h4>
+<p>bytes received over connection on success, MongoErr on failure</p>
+</div>
+<div id="failure-types-4" class="section level4">
+<h4>Failure Types</h4>
+<ul>
+<li>not connected</li>
+<li>network</li>
+</ul>
+</div>
+</div>
+<div id="method-get_requestid" class="section level3">
+<h3>Method <code>get_requestId</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> get_requestId(&amp;<span class="kw">self</span>) -&gt; <span class="kw">i32</span></code></pre>
+<p>Returns first unused requestId.</p>
+</div>
+<div id="method-inc_requestid" class="section level3">
+<h3>Method <code>inc_requestId</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> inc_requestId(&amp;<span class="kw">self</span>) -&gt; <span class="kw">i32</span></code></pre>
+<p>Increments first unused requestId and returns former value.</p>
+</div>
+</div>
+</body>
+</html>

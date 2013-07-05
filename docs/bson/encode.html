@@ -1,0 +1,342 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title>Module encode</title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <style type="text/css">
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #007020; font-weight: bold; }
+code > span.dt { color: #902000; }
+code > span.dv { color: #40a070; }
+code > span.bn { color: #40a070; }
+code > span.fl { color: #40a070; }
+code > span.ch { color: #4070a0; }
+code > span.st { color: #4070a0; }
+code > span.co { color: #60a0b0; font-style: italic; }
+code > span.ot { color: #007020; }
+code > span.al { color: #ff0000; font-weight: bold; }
+code > span.fu { color: #06287e; }
+code > span.er { color: #ff0000; font-weight: bold; }
+  </style>
+  <link rel="stylesheet" href="rust.css" type="text/css" />
+</head>
+<body>
+<div id="header">
+<h1 class="title">Module encode</h1>
+</div>
+<div class='index'>
+
+<ul>
+<li><a href="#enum-document">Enum <code>Document</code></a> - Algebraic data type representing the BSON AST</li>
+<li><a href="#struct-bsondocencoder">Struct <code>BsonDocEncoder</code></a> - serialize::Encoder object for Bson</li>
+<li><a href="#struct-bsondocument">Struct <code>BsonDocument</code></a> - The type of a complete BSON document</li>
+<li><a href="#implementation-of-stdcmpeq-for-document">Implementation <code>of ::std::cmp::Eq for Document</code></a> - Automatically derived.</li>
+<li><a href="#implementation-of-stdto_strtostr-for-document">Implementation <code>of ::std::to_str::ToStr for Document</code></a> - Automatically derived.</li>
+<li><a href="#implementation-of-stdcmpeq-for-bsondocument">Implementation <code>of ::std::cmp::Eq for BsonDocument</code></a> - Automatically derived.</li>
+<li><a href="#implementation-of-stdto_strtostr-for-bsondocument">Implementation <code>of ::std::to_str::ToStr for BsonDocument</code></a> - Automatically derived.</li>
+<li><a href="#implementation-of-encoder-for-bsondocencoder">Implementation <code>of Encoder for BsonDocEncoder</code></a> - serialize::Encoder implementation.</li>
+<li><a href="#implementation-of-encodablee-for-bsondocument-where-e-encoder">Implementation <code>of Encodable&lt;E&gt; for BsonDocument where &lt;E: Encoder&gt;</code></a> - Light wrapper around a typical Map implementation.</li>
+<li><a href="#implementation-of-encodablee-for-document-where-e-encoder">Implementation <code>of Encodable&lt;E&gt; for Document where &lt;E: Encoder&gt;</code></a> - Encodable implementation for Document.</li>
+<li><a href="#implementation-for-bsondocument-where-self">Implementation <code>for BsonDocument where &lt;'self&gt;</code></a></li>
+</ul>
+</div>
+
+<div id="enum-document" class="section level2">
+<h2>Enum <code>Document</code></h2>
+<p>Algebraic data type representing the BSON AST. BsonDocument maps string keys to this type. This can be converted back and forth from BsonDocument by using the Embedded variant.</p>
+<div id="variants" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>Double(f64)</code></p></li>
+<li><p><code>UString(~str)</code></p></li>
+<li><p><code>Embedded(~BsonDocument)</code></p></li>
+<li><p><code>Array(~BsonDocument)</code></p></li>
+<li><p><code>Binary(u8, ~[u8])</code></p></li>
+<li><p><code>ObjectId(~[u8])</code></p></li>
+<li><p><code>Bool(bool)</code></p></li>
+<li><p><code>UTCDate(i64)</code></p></li>
+<li><p><code>Null</code></p></li>
+<li><p><code>Regex(~str, ~str)</code></p></li>
+<li><p><code>JScript(~str)</code></p></li>
+<li><p><code>JScriptWithScope(~str, ~BsonDocument)</code></p></li>
+<li><p><code>Int32(i32)</code></p></li>
+<li><p><code>Timestamp(i64)</code></p></li>
+<li><p><code>Int64(i64)</code></p></li>
+<li><p><code>MinKey</code></p></li>
+<li><p><code>MaxKey</code></p></li>
+</ul>
+</div>
+</div>
+<div id="struct-bsondocencoder" class="section level2">
+<h2>Struct <code>BsonDocEncoder</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">pub</span> <span class="kw">struct</span> BsonDocEncoder {
+    <span class="kw">priv</span> buf: ~[<span class="kw">u8</span>],
+}</code></pre>
+<p>serialize::Encoder object for Bson. After encoding has been done with an Encoder instance, encoder.buf will contain the resulting ~[u8].</p>
+</div>
+<div id="struct-bsondocument" class="section level2">
+<h2>Struct <code>BsonDocument</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">pub</span> <span class="kw">struct</span> BsonDocument {
+    size: <span class="kw">i32</span>,
+    fields: ~OrderedHashmap&lt;~<span class="kw">str</span>, Document&gt;,
+}</code></pre>
+<p>The type of a complete BSON document. Contains an ordered map of fields and values and the size of the document as i32.</p>
+</div>
+<div id="implementation-of-stdcmpeq-for-document" class="section level2">
+<h2>Implementation of <code>::std::cmp::Eq</code> for <code>Document</code></h2>
+<p>Automatically derived.</p>
+<div id="method-eq" class="section level3">
+<h3>Method <code>eq</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> eq(&amp;<span class="kw">self</span>, __arg_<span class="dv">0</span>: &amp;Document) -&gt; ::<span class="kw">bool</span></code></pre>
+</div>
+<div id="method-ne" class="section level3">
+<h3>Method <code>ne</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> ne(&amp;<span class="kw">self</span>, __arg_<span class="dv">0</span>: &amp;Document) -&gt; ::<span class="kw">bool</span></code></pre>
+</div>
+</div>
+<div id="implementation-of-stdto_strtostr-for-document" class="section level2">
+<h2>Implementation of <code>::std::to_str::ToStr</code> for <code>Document</code></h2>
+<p>Automatically derived.</p>
+<div id="method-to_str" class="section level3">
+<h3>Method <code>to_str</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> to_str(&amp;<span class="kw">self</span>) -&gt; ~<span class="kw">str</span></code></pre>
+</div>
+</div>
+<div id="implementation-of-stdcmpeq-for-bsondocument" class="section level2">
+<h2>Implementation of <code>::std::cmp::Eq</code> for <code>BsonDocument</code></h2>
+<p>Automatically derived.</p>
+<div id="method-eq-1" class="section level3">
+<h3>Method <code>eq</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> eq(&amp;<span class="kw">self</span>, __arg_<span class="dv">0</span>: &amp;BsonDocument) -&gt; ::<span class="kw">bool</span></code></pre>
+</div>
+<div id="method-ne-1" class="section level3">
+<h3>Method <code>ne</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> ne(&amp;<span class="kw">self</span>, __arg_<span class="dv">0</span>: &amp;BsonDocument) -&gt; ::<span class="kw">bool</span></code></pre>
+</div>
+</div>
+<div id="implementation-of-stdto_strtostr-for-bsondocument" class="section level2">
+<h2>Implementation of <code>::std::to_str::ToStr</code> for <code>BsonDocument</code></h2>
+<p>Automatically derived.</p>
+<div id="method-to_str-1" class="section level3">
+<h3>Method <code>to_str</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> to_str(&amp;<span class="kw">self</span>) -&gt; ~<span class="kw">str</span></code></pre>
+</div>
+</div>
+<div id="implementation-of-encoder-for-bsondocencoder" class="section level2">
+<h2>Implementation of <code>Encoder</code> for <code>BsonDocEncoder</code></h2>
+<p>serialize::Encoder implementation.</p>
+<div id="method-emit_nil" class="section level3">
+<h3>Method <code>emit_nil</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_nil(&amp;<span class="kw">mut</span> <span class="kw">self</span>)</code></pre>
+</div>
+<div id="method-emit_uint" class="section level3">
+<h3>Method <code>emit_uint</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_uint(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">uint</span>)</code></pre>
+</div>
+<div id="method-emit_u8" class="section level3">
+<h3>Method <code>emit_u8</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_u8(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">u8</span>)</code></pre>
+</div>
+<div id="method-emit_u16" class="section level3">
+<h3>Method <code>emit_u16</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_u16(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">u16</span>)</code></pre>
+</div>
+<div id="method-emit_u32" class="section level3">
+<h3>Method <code>emit_u32</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_u32(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">u32</span>)</code></pre>
+</div>
+<div id="method-emit_u64" class="section level3">
+<h3>Method <code>emit_u64</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_u64(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">u64</span>)</code></pre>
+</div>
+<div id="method-emit_int" class="section level3">
+<h3>Method <code>emit_int</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_int(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">int</span>)</code></pre>
+</div>
+<div id="method-emit_i64" class="section level3">
+<h3>Method <code>emit_i64</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_i64(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">i64</span>)</code></pre>
+</div>
+<div id="method-emit_i32" class="section level3">
+<h3>Method <code>emit_i32</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_i32(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">i32</span>)</code></pre>
+</div>
+<div id="method-emit_i16" class="section level3">
+<h3>Method <code>emit_i16</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_i16(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">i16</span>)</code></pre>
+</div>
+<div id="method-emit_i8" class="section level3">
+<h3>Method <code>emit_i8</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_i8(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">i8</span>)</code></pre>
+</div>
+<div id="method-emit_bool" class="section level3">
+<h3>Method <code>emit_bool</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_bool(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">bool</span>)</code></pre>
+</div>
+<div id="method-emit_f64" class="section level3">
+<h3>Method <code>emit_f64</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_f64(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">f64</span>)</code></pre>
+</div>
+<div id="method-emit_f32" class="section level3">
+<h3>Method <code>emit_f32</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_f32(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">f32</span>)</code></pre>
+</div>
+<div id="method-emit_float" class="section level3">
+<h3>Method <code>emit_float</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_float(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: <span class="kw">float</span>)</code></pre>
+</div>
+<div id="method-emit_str" class="section level3">
+<h3>Method <code>emit_str</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_str(&amp;<span class="kw">mut</span> <span class="kw">self</span>, v: &amp;<span class="kw">str</span>)</code></pre>
+</div>
+<div id="method-emit_map_elt_key" class="section level3">
+<h3>Method <code>emit_map_elt_key</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_map_elt_key(&amp;<span class="kw">mut</span> <span class="kw">self</span>, l: <span class="kw">uint</span>, f: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_map_elt_val" class="section level3">
+<h3>Method <code>emit_map_elt_val</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_map_elt_val(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: <span class="kw">uint</span>, f: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_char" class="section level3">
+<h3>Method <code>emit_char</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_char(&amp;<span class="kw">mut</span> <span class="kw">self</span>, c: <span class="kw">char</span>)</code></pre>
+</div>
+<div id="method-emit_struct" class="section level3">
+<h3>Method <code>emit_struct</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_struct(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: &amp;<span class="kw">str</span>, _: <span class="kw">uint</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_enum" class="section level3">
+<h3>Method <code>emit_enum</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_enum(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: &amp;<span class="kw">str</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_enum_variant" class="section level3">
+<h3>Method <code>emit_enum_variant</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_enum_variant(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: &amp;<span class="kw">str</span>, _: <span class="kw">uint</span>, _: <span class="kw">uint</span>,
+                     _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_enum_variant_arg" class="section level3">
+<h3>Method <code>emit_enum_variant_arg</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_enum_variant_arg(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: <span class="kw">uint</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_enum_struct_variant" class="section level3">
+<h3>Method <code>emit_enum_struct_variant</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_enum_struct_variant(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: &amp;<span class="kw">str</span>, _: <span class="kw">uint</span>, _: <span class="kw">uint</span>,
+                            _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_enum_struct_variant_field" class="section level3">
+<h3>Method <code>emit_enum_struct_variant_field</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_enum_struct_variant_field(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: &amp;<span class="kw">str</span>, _: <span class="kw">uint</span>,
+                                  _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_struct_field" class="section level3">
+<h3>Method <code>emit_struct_field</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_struct_field(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: &amp;<span class="kw">str</span>, _: <span class="kw">uint</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_tuple" class="section level3">
+<h3>Method <code>emit_tuple</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_tuple(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: <span class="kw">uint</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_tuple_arg" class="section level3">
+<h3>Method <code>emit_tuple_arg</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_tuple_arg(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: <span class="kw">uint</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_tuple_struct" class="section level3">
+<h3>Method <code>emit_tuple_struct</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_tuple_struct(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: &amp;<span class="kw">str</span>, _: <span class="kw">uint</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_tuple_struct_arg" class="section level3">
+<h3>Method <code>emit_tuple_struct_arg</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_tuple_struct_arg(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: <span class="kw">uint</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_option" class="section level3">
+<h3>Method <code>emit_option</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_option(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_option_none" class="section level3">
+<h3>Method <code>emit_option_none</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_option_none(&amp;<span class="kw">mut</span> <span class="kw">self</span>)</code></pre>
+</div>
+<div id="method-emit_option_some" class="section level3">
+<h3>Method <code>emit_option_some</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_option_some(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_seq" class="section level3">
+<h3>Method <code>emit_seq</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_seq(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: <span class="kw">uint</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_seq_elt" class="section level3">
+<h3>Method <code>emit_seq_elt</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_seq_elt(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: <span class="kw">uint</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+<div id="method-emit_map" class="section level3">
+<h3>Method <code>emit_map</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> emit_map(&amp;<span class="kw">mut</span> <span class="kw">self</span>, _: <span class="kw">uint</span>, _: &amp;<span class="kw">fn</span>(&amp;<span class="kw">mut</span> BsonDocEncoder))</code></pre>
+</div>
+</div>
+<div id="implementation-of-encodablee-for-bsondocument-where-e-encoder" class="section level2">
+<h2>Implementation of <code>Encodable&lt;E&gt;</code> for <code>BsonDocument</code> where <code>&lt;E: Encoder&gt;</code></h2>
+<p>Light wrapper around a typical Map implementation.</p>
+<div id="method-encode" class="section level3">
+<h3>Method <code>encode</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> encode(&amp;<span class="kw">self</span>, encoder: &amp;<span class="kw">mut</span> E)</code></pre>
+</div>
+</div>
+<div id="implementation-of-encodablee-for-document-where-e-encoder" class="section level2">
+<h2>Implementation of <code>Encodable&lt;E&gt;</code> for <code>Document</code> where <code>&lt;E: Encoder&gt;</code></h2>
+<p>Encodable implementation for Document.</p>
+<div id="method-encode-1" class="section level3">
+<h3>Method <code>encode</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> encode(&amp;<span class="kw">self</span>, encoder: &amp;<span class="kw">mut</span> E)</code></pre>
+<p>After encode is run, the field 'buf' in the Encoder object will contain the encoded value. See bson_types.rs:203</p>
+</div>
+</div>
+<div id="implementation-for-bsondocument-where-self" class="section level2">
+<h2>Implementation for <code>BsonDocument</code> where <code>&lt;'self&gt;</code></h2>
+<div id="method-to_bson" class="section level3">
+<h3>Method <code>to_bson</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> to_bson(&amp;<span class="kw">self</span>) -&gt; ~[<span class="kw">u8</span>]</code></pre>
+</div>
+<div id="method-contains_key" class="section level3">
+<h3>Method <code>contains_key</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> contains_key(&amp;<span class="kw">self</span>, key: ~<span class="kw">str</span>) -&gt; <span class="kw">bool</span></code></pre>
+</div>
+<div id="method-find" class="section level3">
+<h3>Method <code>find</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> find&lt;<span class="ch">&#39;a&gt;(&amp;&#39;</span>a <span class="kw">self</span>, key: ~<span class="kw">str</span>) -&gt; <span class="kw">Option</span>&lt;&amp;<span class="ch">&#39;a Document&gt;</span></code></pre>
+</div>
+<div id="method-put" class="section level3">
+<h3>Method <code>put</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> put(&amp;<span class="kw">mut</span> <span class="kw">self</span>, key: ~<span class="kw">str</span>, val: Document)</code></pre>
+<p>Adds a key/value pair and updates size appropriately. Returns nothing.</p>
+</div>
+<div id="method-put_all" class="section level3">
+<h3>Method <code>put_all</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> put_all(&amp;<span class="kw">mut</span> <span class="kw">self</span>, pairs: ~[(~<span class="kw">str</span>, Document)])</code></pre>
+<p>Adds a list of key/value pairs and updates size. Returns nothing.</p>
+</div>
+<div id="method-append" class="section level3">
+<h3>Method <code>append</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> append(&amp;<span class="ch">&#39;self mut self, key: ~str, val: Document) -&gt;</span>
+ &amp;<span class="ch">&#39;self mut BsonDocument</span></code></pre>
+<p>Adds a key/value pair and updates size appropriately. Returns a mutable self reference with a fixed lifetime, allowing calls to be chained. Ex: let a = BsonDocument::inst().append(~&quot;flag&quot;, Bool(true)).append(~&quot;msg&quot;, UString(~&quot;hello&quot;)).append(...); This may cause borrowing errors if used to make embedded objects.</p>
+</div>
+<div id="method-new" class="section level3">
+<h3>Method <code>new</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> new() -&gt; BsonDocument</code></pre>
+<p>Returns a new BsonDocument struct. The default size is 5: 4 for the size integer and 1 for the terminating 0x0.</p>
+</div>
+<div id="method-inst" class="section level3">
+<h3>Method <code>inst</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> inst() -&gt; @mut BsonDocument</code></pre>
+<p>Returns a managed pointer to a new BsonDocument. Use this if you plan on chaining calls to append() directly on your call to inst. Example: let a = BsonDocument::inst().append(...).append(...); //compiles let b = BsonDocument::new().append(...); //error let c = BsonDocument::new(); c.append(...).append(...).append(...); //compiles</p>
+</div>
+</div>
+</body>
+</html>

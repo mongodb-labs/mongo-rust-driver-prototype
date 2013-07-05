@@ -1,0 +1,86 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title>Module db</title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <style type="text/css">
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #007020; font-weight: bold; }
+code > span.dt { color: #902000; }
+code > span.dv { color: #40a070; }
+code > span.bn { color: #40a070; }
+code > span.fl { color: #40a070; }
+code > span.ch { color: #4070a0; }
+code > span.st { color: #4070a0; }
+code > span.co { color: #60a0b0; font-style: italic; }
+code > span.ot { color: #007020; }
+code > span.al { color: #ff0000; font-weight: bold; }
+code > span.fu { color: #06287e; }
+code > span.er { color: #ff0000; font-weight: bold; }
+  </style>
+  <link rel="stylesheet" href="rust.css" type="text/css" />
+</head>
+<body>
+<div id="header">
+<h1 class="title">Module db</h1>
+</div>
+<div class='index'>
+
+<ul>
+<li><a href="#struct-db">Struct <code>DB</code></a></li>
+<li><a href="#implementation-for-db">Implementation <code>for DB</code></a></li>
+</ul>
+</div>
+
+<div id="struct-db" class="section level2">
+<h2>Struct <code>DB</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">pub</span> <span class="kw">struct</span> DB {
+    name: ~<span class="kw">str</span>,
+    <span class="kw">priv</span> client: @Client,
+}</code></pre>
+</div>
+<div id="implementation-for-db" class="section level2">
+<h2>Implementation for <code>DB</code></h2>
+<div id="method-new" class="section level3">
+<h3>Method <code>new</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> new(name: ~<span class="kw">str</span>, client: @Client) -&gt; DB</code></pre>
+<p>Create a new Mongo DB with given name and associated Client.</p>
+<div id="arguments" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>name</code> - name of DB</li>
+<li><code>client</code> - Client with which this DB is associated</li>
+</ul>
+</div>
+<div id="returns" class="section level4">
+<h4>Returns</h4>
+<p>DB (handle to database)</p>
+</div>
+</div>
+<div id="method-get_collection_names" class="section level3">
+<h3>Method <code>get_collection_names</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> get_collection_names(&amp;<span class="kw">self</span>) -&gt; <span class="kw">Result</span>&lt;~[~<span class="kw">str</span>], MongoErr&gt;</code></pre>
+<p>Get names of all collections in this db, returning error if any fail. Names do not include db name.</p>
+<div id="returns-1" class="section level4">
+<h4>Returns</h4>
+<p>vector of collection names on success, MongoErr on failure</p>
+</div>
+</div>
+<div id="method-get_collection" class="section level3">
+<h3>Method <code>get_collection</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> get_collection(&amp;<span class="kw">self</span>, coll: ~<span class="kw">str</span>) -&gt; Collection</code></pre>
+</div>
+<div id="method-run_command" class="section level3">
+<h3>Method <code>run_command</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> run_command(&amp;<span class="kw">self</span>, cmd: QuerySpec) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
+</div>
+</div>
+</body>
+</html>

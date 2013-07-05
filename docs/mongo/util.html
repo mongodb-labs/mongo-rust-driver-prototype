@@ -1,0 +1,277 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title>Module util</title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <style type="text/css">
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #007020; font-weight: bold; }
+code > span.dt { color: #902000; }
+code > span.dv { color: #40a070; }
+code > span.bn { color: #40a070; }
+code > span.fl { color: #40a070; }
+code > span.ch { color: #4070a0; }
+code > span.st { color: #4070a0; }
+code > span.co { color: #60a0b0; font-style: italic; }
+code > span.ot { color: #007020; }
+code > span.al { color: #ff0000; font-weight: bold; }
+code > span.fu { color: #06287e; }
+code > span.er { color: #ff0000; font-weight: bold; }
+  </style>
+  <link rel="stylesheet" href="rust.css" type="text/css" />
+</head>
+<body>
+<div id="header">
+<h1 class="title">Module util</h1>
+</div>
+<div class='index'>
+
+<ul>
+<li><a href="#freeze-little_endian_true">Freeze <code>LITTLE_ENDIAN_TRUE</code></a> - Misc</li>
+<li><a href="#freeze-system_command">Freeze <code>SYSTEM_COMMAND</code></a></li>
+<li><a href="#freeze-system_index">Freeze <code>SYSTEM_INDEX</code></a></li>
+<li><a href="#freeze-system_js">Freeze <code>SYSTEM_JS</code></a></li>
+<li><a href="#freeze-system_namespace">Freeze <code>SYSTEM_NAMESPACE</code></a> - Special collections for database operations, but users should not access directly.</li>
+<li><a href="#freeze-system_profile">Freeze <code>SYSTEM_PROFILE</code></a></li>
+<li><a href="#freeze-system_user">Freeze <code>SYSTEM_USER</code></a></li>
+<li><a href="#enum-delete_flag">Enum <code>DELETE_FLAG</code></a></li>
+<li><a href="#enum-delete_option">Enum <code>DELETE_OPTION</code></a></li>
+<li><a href="#enum-index_field">Enum <code>INDEX_FIELD</code></a></li>
+<li><a href="#enum-index_flag">Enum <code>INDEX_FLAG</code></a></li>
+<li><a href="#enum-index_geotype">Enum <code>INDEX_GEOTYPE</code></a></li>
+<li><a href="#enum-index_option">Enum <code>INDEX_OPTION</code></a></li>
+<li><a href="#enum-index_order">Enum <code>INDEX_ORDER</code></a> - Indexing.</li>
+<li><a href="#enum-insert_flag">Enum <code>INSERT_FLAG</code></a></li>
+<li><a href="#enum-insert_option">Enum <code>INSERT_OPTION</code></a></li>
+<li><a href="#enum-query_flag">Enum <code>QUERY_FLAG</code></a></li>
+<li><a href="#enum-query_option">Enum <code>QUERY_OPTION</code></a></li>
+<li><a href="#enum-queryspec">Enum <code>QuerySpec</code></a></li>
+<li><a href="#enum-reply_flag">Enum <code>REPLY_FLAG</code></a> - Reply flags, but user shouldn't deal with them directly.</li>
+<li><a href="#enum-update_flag">Enum <code>UPDATE_FLAG</code></a> - CRUD option flags</li>
+<li><a href="#enum-update_option">Enum <code>UPDATE_OPTION</code></a></li>
+<li><a href="#enum-write_concern">Enum <code>WRITE_CONCERN</code></a></li>
+<li><a href="#struct-mongoerr">Struct <code>MongoErr</code></a> - Utility module for use internal and external to crate</li>
+<li><a href="#implementation-for-mongoerr">Implementation <code>for MongoErr</code></a> - MongoErr to propagate errors; would be called Err except that's taken by Rust...</li>
+<li><a href="#function-_str_to_bson">Function <code>_str_to_bson</code></a></li>
+</ul>
+</div>
+
+<div id="freeze-little_endian_true" class="section level2">
+<h2>Freeze <code>LITTLE_ENDIAN_TRUE</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">bool</span></code></pre>
+<p>Misc</p>
+</div>
+<div id="freeze-system_command" class="section level2">
+<h2>Freeze <code>SYSTEM_COMMAND</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust">&amp;<span class="ch">&#39;static str</span></code></pre>
+</div>
+<div id="freeze-system_index" class="section level2">
+<h2>Freeze <code>SYSTEM_INDEX</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust">&amp;<span class="ch">&#39;static str</span></code></pre>
+</div>
+<div id="freeze-system_js" class="section level2">
+<h2>Freeze <code>SYSTEM_JS</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust">&amp;<span class="ch">&#39;static str</span></code></pre>
+</div>
+<div id="freeze-system_namespace" class="section level2">
+<h2>Freeze <code>SYSTEM_NAMESPACE</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust">&amp;<span class="ch">&#39;static str</span></code></pre>
+<p>Special collections for database operations, but users should not access directly.</p>
+</div>
+<div id="freeze-system_profile" class="section level2">
+<h2>Freeze <code>SYSTEM_PROFILE</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust">&amp;<span class="ch">&#39;static str</span></code></pre>
+</div>
+<div id="freeze-system_user" class="section level2">
+<h2>Freeze <code>SYSTEM_USER</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust">&amp;<span class="ch">&#39;static str</span></code></pre>
+</div>
+<div id="enum-delete_flag" class="section level2">
+<h2>Enum <code>DELETE_FLAG</code></h2>
+<div id="variants" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><code>SINGLE_REMOVE = 1 &lt;&lt; 0</code></li>
+</ul>
+</div>
+</div>
+<div id="enum-delete_option" class="section level2">
+<h2>Enum <code>DELETE_OPTION</code></h2>
+</div>
+<div id="enum-index_field" class="section level2">
+<h2>Enum <code>INDEX_FIELD</code></h2>
+<div id="variants-1" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>NORMAL(~[(~str, INDEX_ORDER)])</code></p></li>
+<li><p><code>HASHED(~str)</code></p></li>
+<li><p><code>GEOSPATIAL(~str, INDEX_GEOTYPE)</code></p></li>
+</ul>
+</div>
+</div>
+<div id="enum-index_flag" class="section level2">
+<h2>Enum <code>INDEX_FLAG</code></h2>
+<div id="variants-2" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>BACKGROUND = 1 &lt;&lt; 0</code></p></li>
+<li><p><code>UNIQUE = 1 &lt;&lt; 1</code></p></li>
+<li><p><code>DROP_DUPS = 1 &lt;&lt; 2</code></p></li>
+<li><p><code>SPARSE = 1 &lt;&lt; 3</code></p></li>
+</ul>
+</div>
+</div>
+<div id="enum-index_geotype" class="section level2">
+<h2>Enum <code>INDEX_GEOTYPE</code></h2>
+<div id="variants-3" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>SPHERICAL</code></p></li>
+<li><p><code>FLAT</code></p></li>
+</ul>
+</div>
+</div>
+<div id="enum-index_option" class="section level2">
+<h2>Enum <code>INDEX_OPTION</code></h2>
+<div id="variants-4" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>INDEX_NAME(~str)</code></p></li>
+<li><p><code>EXPIRE_AFTER_SEC(int)</code></p></li>
+</ul>
+</div>
+</div>
+<div id="enum-index_order" class="section level2">
+<h2>Enum <code>INDEX_ORDER</code></h2>
+<p>Indexing.</p>
+<div id="variants-5" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>ASC = 1</code></p></li>
+<li><p><code>DESC = -1</code></p></li>
+</ul>
+</div>
+</div>
+<div id="enum-insert_flag" class="section level2">
+<h2>Enum <code>INSERT_FLAG</code></h2>
+<div id="variants-6" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><code>CONT_ON_ERR = 1 &lt;&lt; 0</code></li>
+</ul>
+</div>
+</div>
+<div id="enum-insert_option" class="section level2">
+<h2>Enum <code>INSERT_OPTION</code></h2>
+</div>
+<div id="enum-query_flag" class="section level2">
+<h2>Enum <code>QUERY_FLAG</code></h2>
+<div id="variants-7" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>CUR_TAILABLE = 1 &lt;&lt; 1</code></p></li>
+<li><p><code>SLAVE_OK = 1 &lt;&lt; 2</code></p></li>
+<li><p><code>OPLOG_REPLAY = 1 &lt;&lt; 3</code></p></li>
+<li><p><code>NO_CUR_TIMEOUT = 1 &lt;&lt; 4</code></p></li>
+<li><p><code>AWAIT_DATA = 1 &lt;&lt; 5</code></p></li>
+<li><p><code>EXHAUST = 1 &lt;&lt; 6</code></p></li>
+<li><p><code>PARTIAL = 1 &lt;&lt; 7</code></p></li>
+</ul>
+</div>
+</div>
+<div id="enum-query_option" class="section level2">
+<h2>Enum <code>QUERY_OPTION</code></h2>
+<div id="variants-8" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>NSKIP(int)</code></p></li>
+<li><p><code>NRET(int)</code></p></li>
+</ul>
+</div>
+</div>
+<div id="enum-queryspec" class="section level2">
+<h2>Enum <code>QuerySpec</code></h2>
+<div id="variants-9" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>SpecObj(BsonDocument)</code></p></li>
+<li><p><code>SpecNotation(~str)</code></p></li>
+</ul>
+</div>
+</div>
+<div id="enum-reply_flag" class="section level2">
+<h2>Enum <code>REPLY_FLAG</code></h2>
+<p>Reply flags, but user shouldn't deal with them directly.</p>
+<div id="variants-10" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>CUR_NOT_FOUND = 1 &lt;&lt; 0</code></p></li>
+<li><p><code>QUERY_FAIL = 1 &lt;&lt; 1</code></p></li>
+<li><p><code>SHARD_CONFIG_STALE = 1 &lt;&lt; 2</code></p></li>
+<li><p><code>AWAIT_CAPABLE = 1 &lt;&lt; 3</code></p></li>
+</ul>
+</div>
+</div>
+<div id="enum-update_flag" class="section level2">
+<h2>Enum <code>UPDATE_FLAG</code></h2>
+<p>CRUD option flags. If options ever change, modify: util.rs: appropriate enums (_FLAGs or _OPTIONs) coll.rs: appropriate flag and option helper parser functions</p>
+<div id="variants-11" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>UPSERT = 1 &lt;&lt; 0</code></p></li>
+<li><p><code>MULTI = 1 &lt;&lt; 1</code></p></li>
+</ul>
+</div>
+</div>
+<div id="enum-update_option" class="section level2">
+<h2>Enum <code>UPDATE_OPTION</code></h2>
+</div>
+<div id="enum-write_concern" class="section level2">
+<h2>Enum <code>WRITE_CONCERN</code></h2>
+<div id="variants-12" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>JOURNAL(bool)</code></p></li>
+<li><p><code>W_N(int)</code></p></li>
+<li><p><code>W_STR(~str)</code></p></li>
+<li><p><code>WTIMEOUT(int)</code></p></li>
+<li><p><code>FSYNC(bool)</code></p></li>
+</ul>
+</div>
+</div>
+<div id="struct-mongoerr" class="section level2">
+<h2>Struct <code>MongoErr</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">pub</span> <span class="kw">struct</span> MongoErr {
+    err_type: ~<span class="kw">str</span>,
+    err_name: ~<span class="kw">str</span>,
+    err_msg: ~<span class="kw">str</span>,
+}</code></pre>
+<p>Utility module for use internal and external to crate. Users must access functionality for proper use of options, etc.</p>
+</div>
+<div id="implementation-for-mongoerr" class="section level2">
+<h2>Implementation for <code>MongoErr</code></h2>
+<p>MongoErr to propagate errors; would be called Err except that's taken by Rust...</p>
+<div id="method-new" class="section level3">
+<h3>Method <code>new</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> new(typ: ~<span class="kw">str</span>, name: ~<span class="kw">str</span>, msg: ~<span class="kw">str</span>) -&gt; MongoErr</code></pre>
+<p>Create a new MongoErr of given type (e.g. &quot;connection&quot;, &quot;query&quot;), name (more specific error), and msg (description of error).</p>
+</div>
+<div id="method-to_str" class="section level3">
+<h3>Method <code>to_str</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> to_str(e: MongoErr) -&gt; ~<span class="kw">str</span></code></pre>
+<p>Print a MongoErr to string in a standard format.</p>
+</div>
+</div>
+<div id="function-_str_to_bson" class="section level2">
+<h2>Function <code>_str_to_bson</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> _str_to_bson(s: ~<span class="kw">str</span>) -&gt; <span class="kw">Result</span>&lt;~BsonDocument, MongoErr&gt;</code></pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title>Module cursor</title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <style type="text/css">
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #007020; font-weight: bold; }
+code > span.dt { color: #902000; }
+code > span.dv { color: #40a070; }
+code > span.bn { color: #40a070; }
+code > span.fl { color: #40a070; }
+code > span.ch { color: #4070a0; }
+code > span.st { color: #4070a0; }
+code > span.co { color: #60a0b0; font-style: italic; }
+code > span.ot { color: #007020; }
+code > span.al { color: #ff0000; font-weight: bold; }
+code > span.fu { color: #06287e; }
+code > span.er { color: #ff0000; font-weight: bold; }
+  </style>
+  <link rel="stylesheet" href="rust.css" type="text/css" />
+</head>
+<body>
+<div id="header">
+<h1 class="title">Module cursor</h1>
+</div>
+<div class='index'>
+
+<ul>
+<li><a href="#struct-cursor">Struct <code>Cursor</code></a> - Structure representing a cursor</li>
+<li><a href="#implementation-of-iteratorbsondocument-for-cursor">Implementation <code>of Iterator&lt;~BsonDocument&gt; for Cursor</code></a> - Iterator implementation, opens access to powerful functions like collect, advance, map, etc.</li>
+<li><a href="#implementation-for-cursor">Implementation <code>for Cursor</code></a> - Cursor API</li>
+</ul>
+</div>
+
+<div id="struct-cursor" class="section level2">
+<h2>Struct <code>Cursor</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">pub</span> <span class="kw">struct</span> Cursor {
+    <span class="kw">priv</span> id: <span class="kw">Option</span>&lt;<span class="kw">i64</span>&gt;,
+    <span class="kw">priv</span> collection: @Collection,
+    flags: <span class="kw">i32</span>,
+    batch_size: <span class="kw">i32</span>,
+    query_spec: BsonDocument,
+    open: <span class="kw">bool</span>,
+    iter_err: <span class="kw">Option</span>&lt;MongoErr&gt;,
+    <span class="kw">priv</span> retrieved: <span class="kw">i32</span>,
+    <span class="kw">priv</span> proj_spec: <span class="kw">Option</span>&lt;BsonDocument&gt;,
+    <span class="kw">priv</span> skip: <span class="kw">i32</span>,
+    <span class="kw">priv</span> limit: <span class="kw">i32</span>,
+    <span class="kw">priv</span> data: ~[~BsonDocument],
+    <span class="kw">priv</span> i: <span class="kw">i32</span>,
+}</code></pre>
+<p>Structure representing a cursor</p>
+</div>
+<div id="implementation-of-iteratorbsondocument-for-cursor" class="section level2">
+<h2>Implementation of <code>Iterator&lt;~BsonDocument&gt;</code> for <code>Cursor</code></h2>
+<p>Iterator implementation, opens access to powerful functions like collect, advance, map, etc.</p>
+<div id="method-next" class="section level3">
+<h3>Method <code>next</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> next(&amp;<span class="kw">mut</span> <span class="kw">self</span>) -&gt; <span class="kw">Option</span>&lt;~BsonDocument&gt;</code></pre>
+<p>Returns pointer to next BsonDocument.</p>
+<p>Pointers passed to avoid excessive copying. Any errors are stored in Cursor's iter_err field.</p>
+<div id="returns" class="section level4">
+<h4>Returns</h4>
+<p><code>Some(~BsonDocument)</code> if there are more BsonDocuments, <code>None</code> otherwise</p>
+</div>
+</div>
+</div>
+<div id="implementation-for-cursor" class="section level2">
+<h2>Implementation for <code>Cursor</code></h2>
+<p>Cursor API</p>
+<div id="method-new" class="section level3">
+<h3>Method <code>new</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> new(query: BsonDocument, proj: <span class="kw">Option</span>&lt;BsonDocument&gt;,
+       collection: @Collection, flags: <span class="kw">i32</span>) -&gt; Cursor</code></pre>
+<p>Initialize cursor with query, projection, collection, flags, and skip and limit, but don't query yet (i.e. constructed cursors are empty).</p>
+<div id="arguments" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>query</code> - query associated with this Cursor</li>
+<li><code>proj</code> - projection of query associated with this Cursor</li>
+<li><code>collection</code> - collection associated with this Cursor</li>
+<li><code>flags</code> - <code>CUR_TAILABLE</code>, <code>SLAVE_OK</code>, <code>OPLOG_REPLAY</code>, <code>NO_CUR_TIMEOUT</code>, <code>AWAIT_DATA</code>, <code>EXHAUST</code>, <code>PARTIAL</code></li>
+</ul>
+</div>
+<div id="returns-1" class="section level4">
+<h4>Returns</h4>
+<p>Cursor</p>
+</div>
+</div>
+<div id="method-skip" class="section level3">
+<h3>Method <code>skip</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> skip(&amp;<span class="kw">mut</span> <span class="kw">self</span>, skip: <span class="kw">i32</span>) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
+<p>CURSOR OPTIONS (must be specified pre-querying) Skip specified amount before starting to iterate.</p>
+<div id="arguments-1" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>skip</code> - amount to skip</li>
+</ul>
+</div>
+<div id="returns-2" class="section level4">
+<h4>Returns</h4>
+<p>() on success, MongoErr on failure</p>
+</div>
+<div id="failure-types" class="section level4">
+<h4>Failure Types</h4>
+<ul>
+<li>Cursor already iterated over</li>
+</ul>
+</div>
+</div>
+<div id="method-limit" class="section level3">
+<h3>Method <code>limit</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> limit(&amp;<span class="kw">mut</span> <span class="kw">self</span>, limit: <span class="kw">i32</span>) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
+<p>Limit amount to return from Cursor.</p>
+<div id="arguments-2" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>limit</code> - total amount to return</li>
+</ul>
+</div>
+<div id="returns-3" class="section level4">
+<h4>Returns</h4>
+<p>() on success, MongoErr on failure</p>
+</div>
+<div id="failure-types-1" class="section level4">
+<h4>Failure Types</h4>
+<ul>
+<li>Cursor already iterated over</li>
+</ul>
+</div>
+</div>
+<div id="method-explain" class="section level3">
+<h3>Method <code>explain</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> explain(&amp;<span class="kw">mut</span> <span class="kw">self</span>) -&gt; <span class="kw">Result</span>&lt;~BsonDocument, MongoErr&gt;</code></pre>
+<p>QUERY MODIFICATIONS Explain the query. Copies the cursor and runs the query to gather information.</p>
+<div id="returns-4" class="section level4">
+<h4>Returns</h4>
+<p>~BsonDocument explaining query on success, MongoErr on failure</p>
+</div>
+</div>
+<div id="method-hint" class="section level3">
+<h3>Method <code>hint</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> hint(&amp;<span class="kw">mut</span> <span class="kw">self</span>, index: MongoIndex)</code></pre>
+<p>Hints an index (name or fields+order) to use while querying.</p>
+<div id="arguments-3" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>index</code> - <code>MongoIndexName(name)</code> of index to use (if named), <code>MongoIndexFields(~[INDEX_FIELD])</code> to fully specify index from scratch</li>
+</ul>
+</div>
+</div>
+<div id="method-sort" class="section level3">
+<h3>Method <code>sort</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> sort(&amp;<span class="kw">mut</span> <span class="kw">self</span>, orderby: INDEX_FIELD) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
+<p>Sorts results from cursor given fields and their direction.</p>
+<div id="arguments-4" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>orderby</code> - <code>NORMAL(~[(field, direction)])</code> where <code>field</code>s are <code>~str</code> and <code>direction</code> are <code>ASC</code> or <code>DESC</code></li>
+</ul>
+</div>
+<div id="returns-5" class="section level4">
+<h4>Returns</h4>
+<p>() on success, MongoErr on failure</p>
+</div>
+<div id="failure-types-2" class="section level4">
+<h4>Failure Types</h4>
+<ul>
+<li>invalid sorting specification (<code>orderby</code>)</li>
+</ul>
+</div>
+</div>
+<div id="method-add_flags" class="section level3">
+<h3>Method <code>add_flags</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> add_flags(&amp;<span class="kw">mut</span> <span class="kw">self</span>, flags: ~[QUERY_FLAG])</code></pre>
+<p>Adds flags to Cursor.</p>
+<div id="arguments-5" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>flags</code> - array of <code>QUERY_FLAGS</code> (specified above), each of which to add</li>
+</ul>
+</div>
+</div>
+<div id="method-remove_flags" class="section level3">
+<h3>Method <code>remove_flags</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> remove_flags(&amp;<span class="kw">mut</span> <span class="kw">self</span>, flags: ~[QUERY_FLAG])</code></pre>
+<p>Removes flags from Cursor.</p>
+<div id="arguments-6" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>flags</code> - array of <code>QUERY_FLAGS</code> (specified above), each of which to remove</li>
+</ul>
+</div>
+</div>
+<div id="method-batch_size" class="section level3">
+<h3>Method <code>batch_size</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> batch_size(&amp;<span class="kw">mut</span> <span class="kw">self</span>, sz: <span class="kw">i32</span>)</code></pre>
+<p>Modify size of next batch to fetch on Cursor refresh.</p>
+<div id="arguments-7" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>sz</code> - size of next batch to fetch on Cursor refresh (<code>QUERY</code> or <code>GET_MORE</code>)</li>
+</ul>
+</div>
+</div>
+<div id="method-has_next" class="section level3">
+<h3>Method <code>has_next</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> has_next(&amp;<span class="kw">self</span>) -&gt; <span class="kw">bool</span></code></pre>
+<p>OTHER USEFUL FUNCTIONS Returns whether Cursor has a next <code>~BsonDocument</code>. Considers the last element of a Cursor to be <code>None</code>, hence returns <code>true</code> at edge case when Cursor exhausted naturally. self.data.is_empty()</p>
+</div>
+<div id="method-close" class="section level3">
+<h3>Method <code>close</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> close(&amp;<span class="kw">mut</span> <span class="kw">self</span>)</code></pre>
+</div>
+</div>
+</body>
+</html>
