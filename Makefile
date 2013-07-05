@@ -17,7 +17,7 @@ RDOC = rustdoc
 RDOCFLAGS = --output-style doc-per-mod
 CC = gcc
 AR = ar rcs
-FLAGS = -L ./bin -D unused-unsafe $(USERFLAGS)
+FLAGS = -L ./bin -D unused-unsafe $(TOOLFLAGS)
 CFLAGS = -c -g -Wall -Werror
 RM = rm
 RMDIR = rmdir -p
@@ -29,6 +29,8 @@ MONGODIR = ./src/libmongo
 BIN = ./bin
 TEST = ./test
 DOCS = ./docs
+
+INTGTEST = 0
 
 .PHONY: test
 
@@ -58,9 +60,14 @@ ex: $(MONGODIR)/test.rs
 	$(RC) $(FLAGS) -o $(TEST)/mongo_ex $(MONGODIR)/test.rs
 
 check: test
+ifeq ($(INTGTEST),1)
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 	$(TEST)/driver_test
+else
+	$(TEST)/bson_test
+	$(TEST)/mongo_test
+endif
 
 doc: $(BSONDIR)/*.rs $(MONGODIR)/*
 	$(MKDIR) docs
