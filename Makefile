@@ -33,7 +33,7 @@ DOCS = ./docs
 
 .PHONY: test
 
-all: bin libs mongodb
+all: bin libs bson mongo
 
 bin:
 	$(MKDIR) bin
@@ -45,16 +45,15 @@ libs: $(BSONDIR)/cast.c
 	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
 
 bson: $(BSONDIR)/*
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson.rs
-
-mongodb: $(SRC)/*
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(SRC)/mongo.rc
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson.rc
 
 mongo: $(MONGODIR)/*
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rs
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rc
 
-test: $(SRC)/mongo.rc
-	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(SRC)/mongo.rc
+test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
+	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
+	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
+	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rc
 
 ex: $(MONGODIR)/test.rs
 	$(RC) $(FLAGS) -o $(TEST)/mongo_ex $(MONGODIR)/test.rs
@@ -62,10 +61,14 @@ ex: $(MONGODIR)/test.rs
 check: test
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
+	$(TEST)/driver_test
 
 doc: $(BSONDIR)/*.rs $(MONGODIR)/*
 	$(MKDIR) docs
-	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS) $(SRC)/mongo.rc
+	$(MKDIR) docs/bson
+	$(MKDIR) docs/mongo
+	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/bson $(BSONDIR)/bson.rc
+	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/mongo $(MONGODIR)/mongo.rc
 
 clean:
 	$(RM) $(BIN)/*.dylib
