@@ -69,7 +69,7 @@ impl DB {
                             // ignore special collections (with "$")
                             if !s.contains_char('$') {
                                 let name = s.slice_from(self.name.len()+1).to_owned();
-                                names = names + [name];
+                                names = names + ~[name];
                             }
                         },
                         _ => return Err(MongoErr::new(

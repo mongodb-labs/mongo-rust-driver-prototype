@@ -17,6 +17,7 @@
 
 use std::to_bytes::*;
 use std::cast::transmute;
+use std::str::count_bytes;
 use extra::serialize::*;
 use ord_hash::*;
 
@@ -111,8 +112,8 @@ impl Encoder for BsonDocEncoder {
     fn emit_f32(&mut self, v: f32) { self.emit_f64(v as f64); }
     fn emit_float(&mut self, v: float) { self.emit_f64(v as f64); }
     fn emit_str(&mut self, v: &str) {
-        self.buf.push_all(((v.to_bytes(L_END) + [0]).len() as i32).to_bytes(L_END)
-            + v.to_bytes(L_END) + [0]);
+        self.buf.push_all((1 + count_bytes(v, 0, v.len()) as i32).to_bytes(L_END)
+            + v.bytes_iter().collect::<~[u8]>() + ~[0u8]);
         }
 
     fn emit_map_elt_key(&mut self, l: uint, f: &fn(&mut BsonDocEncoder)) {

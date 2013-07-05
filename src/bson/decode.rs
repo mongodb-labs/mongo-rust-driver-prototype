@@ -24,7 +24,7 @@ extern {
     fn bytes_to_double(buf: *u8) -> f64;
 }
 
-static l_end: bool = true;
+static L_END: bool = true;
 
 //Format codes
 static DOUBLE: u8 = 0x01;

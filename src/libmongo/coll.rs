@@ -67,9 +67,9 @@ impl MongoIndex {
                     opts_str = opts_str + match opt {
                         INDEX_NAME(n) => {
                             name = Some(copy n);
-                            [fmt!("\"name\":\"%s\"", n)]
+                            ~[fmt!("\"name\":\"%s\"", n)]
                         }
-                        EXPIRE_AFTER_SEC(exp) => [fmt!("\"expireAfterSeconds\":%d", exp).to_owned()],
+                        EXPIRE_AFTER_SEC(exp) => ~[fmt!("\"expireAfterSeconds\":%d", exp).to_owned()],
                         //VERS(int),
                         //WEIGHTS(BsonDocument),
                         //DEFAULT_LANG(~str),
@@ -90,19 +90,19 @@ impl MongoIndex {
                     for arr.iter().advance |&(key, order)| {
                         /*index_str += [fmt!("\"%s\":%d", copy key, order as int)];
                         if get_name { name += fmt!("%s_%d", copy key, order as int); } */
-                        index_str = index_str + [fmt!("\"%s\":%d", copy key, order as int)];
+                        index_str = index_str + ~[fmt!("\"%s\":%d", copy key, order as int)];
                         if get_name { name = name + fmt!("%s_%d", copy key, order as int); }
                     }
                 }
                 //HASHED(key) => index_str += [fmt!("\"%s\":\"hashed\"", copy key)],
-                HASHED(key) => index_str = index_str + [fmt!("\"%s\":\"hashed\"", copy key)],
+                HASHED(key) => index_str = index_str + ~[fmt!("\"%s\":\"hashed\"", copy key)],
                 GEOSPATIAL(key, geotype) => {
                     let typ = match geotype {
                         SPHERICAL => ~"2dsphere",
                         FLAT => ~"2d",
                     };
                     //index_str += [fmt!("\"%s\":\"%s\"", copy key, typ)];
-                    index_str = index_str + [fmt!("\"%s\":\"%s\"", copy key, typ)];
+                    index_str = index_str + ~[fmt!("\"%s\":\"%s\"", copy key, typ)];
                 }
             }
         }
@@ -396,7 +396,7 @@ impl Collection {
         let mut bson_docs : ~[BsonDocument] = ~[];
         for docs.iter().advance |&d| {
             //bson_docs += [match d.to_bson_t() {
-            bson_docs = bson_docs + [match d.to_bson_t() {
+            bson_docs = bson_docs + ~[match d.to_bson_t() {
                     Embedded(bson) => *bson,
                     _ => return Err(MongoErr::new(
                                     ~"coll::insert_batch",
@@ -710,7 +710,7 @@ impl Collection {
         let mut maybe_name = x; let mut opts = y;
         let (default_name, index) = MongoIndex::process_index_fields(index_arr, maybe_name.is_none());
         if maybe_name.is_none() {
-            opts = opts + [fmt!("\"name\":\"%s\"", default_name)];
+            opts = opts + ~[fmt!("\"name\":\"%s\"", default_name)];
             maybe_name = Some(default_name);
         }
 

@@ -118,7 +118,7 @@ pub fn msg_to_bytes(msg : ClientMsg) -> ~[u8] {
             bytes = bytes + _header_to_bytes(h)
                         + r.to_bytes(LITTLE_ENDIAN_TRUE)
                         + n.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + [0]    // null-terminate name
+                        + ~[0u8]    // null-terminate name
                         + f.to_bytes(LITTLE_ENDIAN_TRUE)
                         + s.to_bson()
                         + u.to_bson();
@@ -127,14 +127,14 @@ pub fn msg_to_bytes(msg : ClientMsg) -> ~[u8] {
             bytes = bytes + _header_to_bytes(h)
                         + f.to_bytes(LITTLE_ENDIAN_TRUE)
                         + n.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + [0];   // null-terminate name
+                        + ~[0u8];   // null-terminate name
             for d.iter().advance |doc| { bytes = bytes + doc.to_bson(); }
         }
         OpQuery { header:h, flags:f, full_collection_name:n, nskip:ns, nret:nr, query:q, ret_field_selector:fi } => {
             bytes = bytes + _header_to_bytes(h)
                         + f.to_bytes(LITTLE_ENDIAN_TRUE)
                         + n.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + [0]    // null-terminate name
+                        + ~[0u8]    // null-terminate name
                         + ns.to_bytes(LITTLE_ENDIAN_TRUE)
                         + nr.to_bytes(LITTLE_ENDIAN_TRUE)
                         + q.to_bson()
@@ -144,7 +144,7 @@ pub fn msg_to_bytes(msg : ClientMsg) -> ~[u8] {
             bytes = bytes + _header_to_bytes(h)
                         + r.to_bytes(LITTLE_ENDIAN_TRUE)
                         + n.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + [0]    // null-terminate name
+                        + ~[0u8]    // null-terminate name
                         + nr.to_bytes(LITTLE_ENDIAN_TRUE)
                         + id.to_bytes(LITTLE_ENDIAN_TRUE);
         }
@@ -152,7 +152,7 @@ pub fn msg_to_bytes(msg : ClientMsg) -> ~[u8] {
             bytes = bytes + _header_to_bytes(h)
                         + r.to_bytes(LITTLE_ENDIAN_TRUE)
                         + n.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + [0]    // null-terminate name
+                        + ~[0u8]    // null-terminate name
                         + f.to_bytes(LITTLE_ENDIAN_TRUE)
                         + s.to_bson();
         }
@@ -312,7 +312,7 @@ pub fn parse_reply(bytes : ~[u8]) -> Result<ServerMsg, MongoErr> {
             // TODO: make unstupid
             let mut doc_bytes : ~[u8] = ~[];
             for (size as uint).times {
-                doc_bytes = doc_bytes + [bytes[i+head]];
+                doc_bytes = doc_bytes + ~[bytes[i+head]];
                 i = i + 1;
             }
             let tmp = match decode(doc_bytes) {
@@ -322,7 +322,7 @@ pub fn parse_reply(bytes : ~[u8]) -> Result<ServerMsg, MongoErr> {
                                         ~"error unpacking documents",
                                         fmt!("-->\n%s", e))),
             };
-            docs = docs + [~tmp];
+            docs = docs + ~[~tmp];
             addr = addr + size as uint;
         }
 

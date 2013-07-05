@@ -19,7 +19,6 @@ CC = gcc
 AR = ar rcs
 FLAGS = -L ./bin -D unused-unsafe $(USERFLAGS)
 CFLAGS = -c -g -Wall -Werror
-USERFLAGS =
 RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
