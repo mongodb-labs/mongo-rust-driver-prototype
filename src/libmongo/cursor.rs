@@ -17,10 +17,10 @@ use std::num::*;
 
 use bson::encode::*;
 
-use libmongo::util::*;
-use libmongo::msg::*;
-use libmongo::coll::Collection;
-use libmongo::coll::MongoIndex;
+use util::*;
+use msg::*;
+use coll::Collection;
+use coll::MongoIndex;
 
 ///Structure representing a cursor
 pub struct Cursor {
@@ -443,7 +443,7 @@ mod tests {
 
     use super::*;
     use bson::encode::*;
-    use libmongo::util::*;
+    use util::*;
     //use coll::*;
 
 /*    #[test]

@@ -16,11 +16,11 @@
 use bson::encode::*;
 use bson::formattable::*;
 
-use libmongo::util::*;
-use libmongo::msg::*;
-use libmongo::client::Client;
-use libmongo::cursor::Cursor;
-use libmongo::db::DB;
+use util::*;
+use msg::*;
+use client::Client;
+use cursor::Cursor;
+use db::DB;
 
 // macro for compressing options array into single i32 flag
 // may need to remove if each CRUD op responsible for own options parsing

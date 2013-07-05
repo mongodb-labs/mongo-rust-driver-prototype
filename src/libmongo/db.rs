@@ -15,9 +15,9 @@
 
 use bson::encode::*;
 
-use libmongo::util::*;
-use libmongo::client::Client;
-use libmongo::coll::Collection;
+use util::*;
+use client::Client;
+use coll::Collection;
 
 pub struct DB {
     name : ~str,

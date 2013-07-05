@@ -15,9 +15,9 @@
 
 use std::*;
 
-use libmongo::util::*;
-use libmongo::conn::*;
-use libmongo::db::DB;
+use util::*;
+use conn::*;
+use db::DB;
 
 /**
  * User interfaces with Client, which processes user requests

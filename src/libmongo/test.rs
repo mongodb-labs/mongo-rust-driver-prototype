@@ -25,8 +25,6 @@ use mongo::coll::*;
 use mongo::db::*;
 
 fn main() {
-    // comment and add tests as desired
-
     test_good_insert_single();
 
     test_good_insert_batch_small();
