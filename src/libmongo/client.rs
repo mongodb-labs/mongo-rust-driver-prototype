@@ -15,6 +15,8 @@
 
 use std::*;
 
+use bson::encode::*;
+
 use util::*;
 use conn::*;
 use db::DB;
@@ -55,6 +57,77 @@ impl Client {
         DB::new(~"admin", self)
     }
 
+    /**
+     * Return vector of database names.
+     *
+     * # Returns
+     * vector of database names on success,
+     * `MongoErr` on any failure
+     *
+     * # Failure Types
+     * * errors propagated from `run_command`
+     * * response from server not in expected form (must contain
+     *      "databases" field whose value is array of docs containing
+     *      "name" fields of `UString`s)
+     */
+    pub fn get_dbs(@self) -> Result<~[~str], MongoErr> {
+        let mut names : ~[~str] = ~[];
+
+        // run_command from admin database
+        let db = DB::new(~"admin", self);
+        let resp = match db.run_command(SpecNotation(~"{ \"listDatabases\":1 }")) {
+            Ok(doc) => doc,
+            Err(e) => return Err(e),
+        };
+
+        // pull out database names
+        let list = match resp.find(~"databases") {
+            None => return Err(MongoErr::new(
+                            ~"client::get_dbs",
+                            ~"could not get databases",
+                            ~"missing \"databases\" field in reply")),
+            Some(tmp_doc) => {
+                let tmp = copy *tmp_doc;
+                match tmp {
+                    Array(l) => l,
+                    _ => return Err(MongoErr::new(
+                            ~"client::get_dbs",
+                            ~"could not get databases",
+                            ~"\"databases\" field in reply not an Array")),
+                }
+            }
+        };
+        let fields = list.fields;
+        for fields.iter().advance |&(@_, @doc)| {
+            match doc {
+                Embedded(bson_doc) => match bson_doc.find(~"name") {
+                    Some(tmp_doc) => {
+                        let tmp = copy *tmp_doc;
+                        match tmp {
+                            UString(n) => names = names + [n],
+                            x => return Err(MongoErr::new(
+                                        ~"client::get_dbs",
+                                        ~"could not extract database name",
+                                        fmt!("name field %? not UString", copy x))),
+
+                        }
+                    }
+                    None => return Err(MongoErr::new(
+                                ~"client::get_dbs",
+                                ~"could not extract database name",
+                                fmt!("no name field in %?", copy bson_doc))),
+
+                },
+                _ => return Err(MongoErr::new(
+                                ~"client::get_dbs",
+                                ~"could not extract database name",
+                                fmt!("no BsonDocument in %?", copy doc))),
+            }
+        }
+
+        Ok(names)
+    }
+
     // probably not actually needed
     pub fn use_db(&self, db : ~str) {
         if !self.db.is_empty() {
@@ -77,7 +150,10 @@ impl Client {
      */
     pub fn drop_db(@self, db : ~str) -> Result<(), MongoErr> {
         let db = @DB::new(db, self);
-        db.run_command(SpecNotation(~"{ \"dropDatabase\":1 }"))
+        match db.run_command(SpecNotation(~"{ \"dropDatabase\":1 }")) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 
     /**

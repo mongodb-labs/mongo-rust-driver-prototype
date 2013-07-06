@@ -743,9 +743,12 @@ impl Collection {
      */
     pub fn drop_index(&self, index : MongoIndex) -> Result<(), MongoErr> {
         let db = DB::new(copy self.db, self.client);
-        db.run_command(SpecNotation(
-            fmt!("{ \"deleteIndexes\":\"%s\", \"index\":\"%s\" }",
-                copy self.name,
-                index.get_name())))
+        match db.run_command(SpecNotation(
+                    fmt!("{ \"deleteIndexes\":\"%s\", \"index\":\"%s\" }",
+                        copy self.name,
+                        index.get_name()))) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 }
