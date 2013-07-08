@@ -49,9 +49,11 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><a href="#implementation-of-bsonformattable-for-i32">Implementation <code>of BsonFormattable for i32</code></a></li>
 <li><a href="#implementation-of-bsonformattable-for-i64">Implementation <code>of BsonFormattable for i64</code></a></li>
 <li><a href="#implementation-of-bsonformattable-for-str">Implementation <code>of BsonFormattable for ~str</code></a></li>
+<li><a href="#implementation-of-bsonformattable-for-t-where-t-bsonformattable">Implementation <code>of BsonFormattable for ~T where &lt;T: BsonFormattable&gt;</code></a></li>
 <li><a href="#implementation-of-bsonformattable-for-jsonjson">Implementation <code>of BsonFormattable for json::Json</code></a></li>
 <li><a href="#implementation-of-bsonformattable-for-t-where-self-t-bsonformattable-copy">Implementation <code>of BsonFormattable for ~[T] where &lt;'self, T: BsonFormattable + Copy&gt;</code></a></li>
 <li><a href="#implementation-of-bsonformattable-for-hashmapstr-v-where-v-bsonformattable">Implementation <code>of BsonFormattable for HashMap&lt;~str, V&gt; where &lt;V: BsonFormattable&gt;</code></a></li>
+<li><a href="#implementation-of-bsonformattable-for-bsondocument">Implementation <code>of BsonFormattable for BsonDocument</code></a></li>
 </ul>
 </div>
 
@@ -223,37 +225,59 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> from_bson_t(doc: Document) -&gt; <span class="kw">Result</span>&lt;~<span class="kw">str</span>, ~<span class="kw">str</span>&gt;</code></pre>
 </div>
 </div>
-<div id="implementation-of-bsonformattable-for-jsonjson" class="section level2">
-<h2>Implementation of <code>BsonFormattable</code> for <code>json::Json</code></h2>
+<div id="implementation-of-bsonformattable-for-t-where-t-bsonformattable" class="section level2">
+<h2>Implementation of <code>BsonFormattable</code> for <code>~T</code> where <code>&lt;T: BsonFormattable&gt;</code></h2>
 <div id="method-to_bson_t-15" class="section level3">
 <h3>Method <code>to_bson_t</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> to_bson_t(&amp;<span class="kw">self</span>) -&gt; Document</code></pre>
 </div>
 <div id="method-from_bson_t-15" class="section level3">
 <h3>Method <code>from_bson_t</code></h3>
-<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> from_bson_t(doc: Document) -&gt; <span class="kw">Result</span>&lt;json::Json, ~<span class="kw">str</span>&gt;</code></pre>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> from_bson_t(doc: Document) -&gt; <span class="kw">Result</span>&lt;~T, ~<span class="kw">str</span>&gt;</code></pre>
 </div>
 </div>
-<div id="implementation-of-bsonformattable-for-t-where-self-t-bsonformattable-copy" class="section level2">
-<h2>Implementation of <code>BsonFormattable</code> for <code>~[T]</code> where <code>&lt;'self, T: BsonFormattable + Copy&gt;</code></h2>
+<div id="implementation-of-bsonformattable-for-jsonjson" class="section level2">
+<h2>Implementation of <code>BsonFormattable</code> for <code>json::Json</code></h2>
 <div id="method-to_bson_t-16" class="section level3">
 <h3>Method <code>to_bson_t</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> to_bson_t(&amp;<span class="kw">self</span>) -&gt; Document</code></pre>
 </div>
 <div id="method-from_bson_t-16" class="section level3">
 <h3>Method <code>from_bson_t</code></h3>
-<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> from_bson_t(doc: Document) -&gt; <span class="kw">Result</span>&lt;~[T], ~<span class="kw">str</span>&gt;</code></pre>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> from_bson_t(doc: Document) -&gt; <span class="kw">Result</span>&lt;json::Json, ~<span class="kw">str</span>&gt;</code></pre>
 </div>
 </div>
-<div id="implementation-of-bsonformattable-for-hashmapstr-v-where-v-bsonformattable" class="section level2">
-<h2>Implementation of <code>BsonFormattable</code> for <code>HashMap&lt;~str, V&gt;</code> where <code>&lt;V: BsonFormattable&gt;</code></h2>
+<div id="implementation-of-bsonformattable-for-t-where-self-t-bsonformattable-copy" class="section level2">
+<h2>Implementation of <code>BsonFormattable</code> for <code>~[T]</code> where <code>&lt;'self, T: BsonFormattable + Copy&gt;</code></h2>
 <div id="method-to_bson_t-17" class="section level3">
 <h3>Method <code>to_bson_t</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> to_bson_t(&amp;<span class="kw">self</span>) -&gt; Document</code></pre>
 </div>
 <div id="method-from_bson_t-17" class="section level3">
 <h3>Method <code>from_bson_t</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> from_bson_t(doc: Document) -&gt; <span class="kw">Result</span>&lt;~[T], ~<span class="kw">str</span>&gt;</code></pre>
+</div>
+</div>
+<div id="implementation-of-bsonformattable-for-hashmapstr-v-where-v-bsonformattable" class="section level2">
+<h2>Implementation of <code>BsonFormattable</code> for <code>HashMap&lt;~str, V&gt;</code> where <code>&lt;V: BsonFormattable&gt;</code></h2>
+<div id="method-to_bson_t-18" class="section level3">
+<h3>Method <code>to_bson_t</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> to_bson_t(&amp;<span class="kw">self</span>) -&gt; Document</code></pre>
+</div>
+<div id="method-from_bson_t-18" class="section level3">
+<h3>Method <code>from_bson_t</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> from_bson_t(doc: Document) -&gt; <span class="kw">Result</span>&lt;HashMap&lt;~<span class="kw">str</span>, V&gt;, ~<span class="kw">str</span>&gt;</code></pre>
+</div>
+</div>
+<div id="implementation-of-bsonformattable-for-bsondocument" class="section level2">
+<h2>Implementation of <code>BsonFormattable</code> for <code>BsonDocument</code></h2>
+<div id="method-to_bson_t-19" class="section level3">
+<h3>Method <code>to_bson_t</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> to_bson_t(&amp;<span class="kw">self</span>) -&gt; Document</code></pre>
+</div>
+<div id="method-from_bson_t-19" class="section level3">
+<h3>Method <code>from_bson_t</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> from_bson_t(doc: Document) -&gt; <span class="kw">Result</span>&lt;BsonDocument, ~<span class="kw">str</span>&gt;</code></pre>
 </div>
 </div>
 </body>

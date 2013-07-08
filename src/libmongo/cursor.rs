@@ -439,11 +439,9 @@ impl Cursor {
 
 #[cfg(test)]
 mod tests {
-    extern mod extra;
-
-    use super::*;
-    use bson::encode::*;
-    use util::*;
+    //use super::*;
+    //use bson::encode::*;
+    //use util::*;
     //use coll::*;
 
 /*    #[test]
