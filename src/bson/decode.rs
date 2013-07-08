@@ -217,8 +217,6 @@ mod tests {
     use super::*;
     use encode::*;
 
-    static l: bool = true;
-
     #[test]
     fn test_decode_size() {
         let doc = decode(~[10,0,0,0,10,100,100,100,0]);
@@ -239,6 +237,7 @@ mod tests {
         let d = parser._double();
         match d {
             Double(d2) => {
+                println(fmt!("::::::::::d2 is %?", d2));
                 assert!(d2.approx_eq(&3.14159f64));
             }
             _ => fail!("failed in a test case; how did I get here?")
