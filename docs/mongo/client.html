@@ -65,6 +65,22 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <h3>Method <code>get_admin</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> get_admin(@self) -&gt; DB</code></pre>
 </div>
+<div id="method-get_dbs" class="section level3">
+<h3>Method <code>get_dbs</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> get_dbs(@self) -&gt; <span class="kw">Result</span>&lt;~[~<span class="kw">str</span>], MongoErr&gt;</code></pre>
+<p>Return vector of database names.</p>
+<div id="returns-1" class="section level4">
+<h4>Returns</h4>
+<p>vector of database names on success, <code>MongoErr</code> on any failure</p>
+</div>
+<div id="failure-types" class="section level4">
+<h4>Failure Types</h4>
+<ul>
+<li>errors propagated from <code>run_command</code></li>
+<li>response from server not in expected form (must contain &quot;databases&quot; field whose value is array of docs containing &quot;name&quot; fields of <code>UString</code>s)</li>
+</ul>
+</div>
+</div>
 <div id="method-use_db" class="section level3">
 <h3>Method <code>use_db</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> use_db(&amp;<span class="kw">self</span>, db: ~<span class="kw">str</span>)</code></pre>
@@ -79,11 +95,11 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><code>db</code> - name of database to drop</li>
 </ul>
 </div>
-<div id="returns-1" class="section level4">
+<div id="returns-2" class="section level4">
 <h4>Returns</h4>
 <p>() on success, MongoErr on failure</p>
 </div>
-<div id="failure-types" class="section level4">
+<div id="failure-types-1" class="section level4">
 <h4>Failure Types</h4>
 <ul>
 <li>anything propagated from run_command</li>
@@ -102,11 +118,11 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><code>server_port</code> - port to which to connect</li>
 </ul>
 </div>
-<div id="returns-2" class="section level4">
+<div id="returns-3" class="section level4">
 <h4>Returns</h4>
 <p>() on success, MongoErr on failure</p>
 </div>
-<div id="failure-types-1" class="section level4">
+<div id="failure-types-2" class="section level4">
 <h4>Failure Types</h4>
 <ul>
 <li>already connected</li>
@@ -118,11 +134,11 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <h3>Method <code>disconnect</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> disconnect(&amp;<span class="kw">self</span>) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
 <p>Disconnect from server. Simultaneously empties connection cell.</p>
-<div id="returns-3" class="section level4">
+<div id="returns-4" class="section level4">
 <h4>Returns</h4>
 <p>() on success, MongoErr on failure</p>
 </div>
-<div id="failure-types-2" class="section level4">
+<div id="failure-types-3" class="section level4">
 <h4>Failure Types</h4>
 <ul>
 <li>network</li>
@@ -139,11 +155,11 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><code>bytes</code> - bytes to send</li>
 </ul>
 </div>
-<div id="returns-4" class="section level4">
+<div id="returns-5" class="section level4">
 <h4>Returns</h4>
 <p>() on success, MongoErr on failure</p>
 </div>
-<div id="failure-types-3" class="section level4">
+<div id="failure-types-4" class="section level4">
 <h4>Failure Types</h4>
 <ul>
 <li>not connected</li>
@@ -155,11 +171,11 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <h3>Method <code>recv</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> recv(&amp;<span class="kw">self</span>) -&gt; <span class="kw">Result</span>&lt;~[<span class="kw">u8</span>], MongoErr&gt;</code></pre>
 <p>Receive on connection affiliated with this client.</p>
-<div id="returns-5" class="section level4">
+<div id="returns-6" class="section level4">
 <h4>Returns</h4>
 <p>bytes received over connection on success, MongoErr on failure</p>
 </div>
-<div id="failure-types-4" class="section level4">
+<div id="failure-types-5" class="section level4">
 <h4>Failure Types</h4>
 <ul>
 <li>not connected</li>

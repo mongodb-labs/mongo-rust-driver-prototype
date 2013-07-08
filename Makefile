@@ -40,7 +40,6 @@ all: bin libs bson mongo
 bin:
 	$(MKDIR) bin
 	$(MKDIR) test
-	$(MKDIR) docs
 
 libs: $(LIB)/cast.c
 	$(CC) $(CFLAGS) -o $(BIN)/typecast.o $(LIB)/cast.c
@@ -83,7 +82,6 @@ clean:
 	$(RM) $(BIN)/*.dylib
 	$(RM) -rf $(TEST)
 	$(RM) -rf $(BIN)
-	$(RM) -rf $(DOCS)
 
 tidy:
 	sed -e 's/\s\+$$//g' ./src/*
