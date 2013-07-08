@@ -104,7 +104,7 @@ impl Client {
                     Some(tmp_doc) => {
                         let tmp = copy *tmp_doc;
                         match tmp {
-                            UString(n) => names = names + [n],
+                            UString(n) => names = names + ~[n],
                             x => return Err(MongoErr::new(
                                         ~"client::get_dbs",
                                         ~"could not extract database name",
