@@ -52,7 +52,7 @@ match parsed_doc {
 ```Document```s and ```BsonDocument```s can be encoded into bytes via their ```to_bson``` methods. This will produce a ```~[u8]``` meeting the specifications outlined by the [specification](http://bson-spec.org).
 Through this method, standard BSON types can easily be serialized. Any type ```Foo``` can also be serialized in this way if it implements the ```BsonFormattable``` trait.
 Example:
-```
+```rust
 use mongo::bson::encode::*;
 use mongo::bson::formattable::*;
 
@@ -79,7 +79,7 @@ impl BsonFormattable for Foo {
 ##### Decoding values
 The ```~[u8]``` representation of data is not especially useful for modifying or viewing. A ```~[u8]``` can be easily transformed into a BsonDocument for easier manipulation.
 Example:
-```
+```rust
 use mongo::bson::decode::*;
 
 let b: ~[u8] = /*get a bson document from somewhere*/
