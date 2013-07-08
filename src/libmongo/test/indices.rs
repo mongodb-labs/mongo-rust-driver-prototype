@@ -1,10 +1,7 @@
 use mongo::client::*;
-use mongo::db::*;
 use mongo::coll::*;
 use mongo::util::*;
 
-use bson::formattable::*;
-use bson::encode::*;
 #[test]
 fn test_indices() {
     // indices

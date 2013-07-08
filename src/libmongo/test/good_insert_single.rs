@@ -1,4 +1,3 @@
-use mongo::db::*;
 use mongo::client::*;
 use mongo::coll::*;
 use mongo::util::*;
