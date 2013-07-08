@@ -277,7 +277,7 @@ impl DB {
                 _ => return Err(MongoErr::new(
                     ~"db::authenticate",
                     fmt!("error while getting nonce"),
-                    ~"an invalid nonce was returned by the server")) 
+                    ~"an invalid nonce was returned by the server"))
             },
             Err(e) => return Err(e)
         };
@@ -310,7 +310,7 @@ priv fn md5(msg: &str) -> ~str {
         md5_append(to_unsafe_ptr(&m), to_unsafe_ptr(&(msg_bytes[0])), msg_bytes.len() as i32);
         md5_finish(to_unsafe_ptr(&m), to_unsafe_ptr(&digest));
     }
-    
+
     let mut result: ~str = ~"";
     for range(0, 16) |i| {
         let mut byte = fmt!("%x", digest[i] as uint);

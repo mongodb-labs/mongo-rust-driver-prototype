@@ -23,7 +23,8 @@ To connect to an unreplicated, unsharded server running on localhost, port 27017
 ```rust
 match client.connect(~"127.0.0.1", 27017 as uint) {
     Ok(_) => (),
-    Err(e) => fail!("%s", MongoErr::to_str(e)), // if cannot connect, nothing to do; display error message
+    Err(e) => fail!("%s", MongoErr::to_str(e)),
+        // if cannot connect, nothing to do; display error message
 }
 ```
 Now we may create handles to databases and collections on the server. We start with collections to demonstrate CRUD operations.
@@ -36,7 +37,7 @@ let bar = @Collection::new(~"foo_db", ~"bar_coll", client);
 ```
 
 ##### CRUD Operations
-We input JSON as strings formatted for JSON and manipulate them:
+We input JSON as strings formatted for JSON and manipulate them (in fact, we can insert anything implementing the ```BsonFormattable``` trait [see BSON section below] as long as its ```to_bson_t``` conversion returns an ```Embedded(~BsonDocument)```, i.e. it is represented as a BSON):
 ```rust
 // insert a document into bar_coll
 let ins = ~"{ \"_id\":0, \"a\":0, \"msg\":\"first insert!\" }";
@@ -62,7 +63,7 @@ match foo.find_one(None, None, None) {
 }
 ```
 
-In general, to specify options, we put the appropriate options into a vector and wrap them in ```Some```; for the default options we use ```None```. For specific options, see ```util.rs```.
+In general, to specify options, we put the appropriate options into a vector and wrap them in ```Some```; for the default options we use ```None```. For specific options, see ```util.rs```. Nearly every method returns a ```Result```; operations usually return a ```()``` (for writes) or some variant on ```~BsonDocument``` or ```Cursor``` (for reads) if successful, and a ```MongoErr``` if unsuccessful due to improper arguments, network errors, etc.
 ```rust
 // insert a big batch of documents with duplicated _ids
 ins_batch = ~[];
@@ -70,13 +71,14 @@ for 5.times {
     ins_batch = ins_batch + ~[fmt!("{ \"_id\":%d, \"a\":%d, \"b\":\"ins %d\" }", 2*i/3, i/2, i)];
     i += 1;
 }
-// error returned
-match foo.insert_batch(ins_strs, None, None, None) {
+
+// ***error returned***
+match foo.insert_batch(ins_batch, None, None, None) {
     Ok(_) => (),                                        // should not happen
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))),
 }
-// no error returned since duplicated _ids skipped
-match foo.insert_batch(ins_strs, Some(~[CONT_ON_ERR]), None, None) {
+// ***no error returned since duplicated _ids skipped (CONT_ON_ERR specified)***
+match foo.insert_batch(ins_batch, Some(~[CONT_ON_ERR]), None, None) {
     Ok(_) => (),
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
 }
@@ -89,7 +91,7 @@ match foo.create_index(~[NORMAL(~[(~"b", ASC)])], None, Some(~[INDEX_NAME(~"fuba
 ```
 
 ##### Cursor and Query-related Operations
-To specify queries and projections, we must input them either as BsonDocuments or as properly formatted JSON strings using SpecObjs or SpecNotations. In general, the order of arguments for CRUD operations is (as applicable) query, projection or operation-dependent specification (e.g. update document for ```update```), optional array of option flags, and optional array of user-specified options (e.g. *number* to skip).
+To specify queries and projections, we must input them either as ```BsonDocument```s or as properly formatted JSON strings using ```SpecObj```s or ```SpecNotation```s. In general, the order of arguments for CRUD operations is (as applicable) query, projection or operation-dependent specification (e.g. update document for ```update```), optional array of option flags, optional array of user-specified options (e.g. *number* to skip), and write concern.
 ```rust
 // interact with a cursor projected on "b" and using indices and options
 match foo.find(None, Some(SpecNotation(~"{ \"b\":1 }")), None) {
@@ -127,10 +129,10 @@ match foo.remove(Some(SpecNotation(~"{ \"a\":1 }")), None, None, None) {
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
 }
 
-// update every element where "a" is 2 to be 3
-match foo.update(  SpecNotation(~"{ \"a\":2 }"),
+// upsert every element where "a" is 2 to be 3
+match foo.update(   SpecNotation(~"{ \"a\":2 }"),
                     SpecNotation(~"{ \"$set\": { \"a\":3 } }"),
-                    Some(~[MULTI]), None, None) {
+                    Some(~[MULTI, UPSERT]), None, None) {
     Ok(_) => (),
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
 }
@@ -139,14 +141,14 @@ match foo.update(  SpecNotation(~"{ \"a\":2 }"),
 ##### Database Operations
 Now we create a database handle.
 ```rust
-let db = DB::new(~"foo_db", client)
+let db = DB::new(~"foo_db", client);
 
 // list the collections in the database
 match db.get_collection_names() {
     Ok(names) => {
         // should output
-        //      foo_db
         //      bar_db
+        //      foo_db
         for names.iter().advance |&n| { println(fmt!("%s", n)); }
     }
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
@@ -230,7 +232,7 @@ struct Foo {
 
 impl BsonFormattable for Foo {
     fn to_bson_t(&self) -> Document {
-        //a common implementation of this might be creating a map from 
+        //a common implementation of this might be creating a map from
         //the names of the fields in a Foo to their values
     }
 
