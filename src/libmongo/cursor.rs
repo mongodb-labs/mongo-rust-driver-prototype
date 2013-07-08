@@ -192,21 +192,24 @@ impl Cursor {
 
         if cur_id == 0 {
             // exhausted cursor; return
-            self.iter_err = Some(MongoErr::new(
-                                    ~"cursor::refresh",
-                                    ~"querying on closed cursor",
-                                    ~"cannot query on closed cursor"));
+            if self.i > self.data.len() as i32 {
+                // only if cursor exhausted "abnormally", set iter_err
+                self.iter_err = Some(MongoErr::new(
+                                        ~"cursor::refresh",
+                                        ~"querying on closed cursor",
+                                        ~"cannot query on closed cursor"));
+            }
             return 0;
         }
 
         // otherwise, check if allowed to get more
-        if self.retrieved >= self.limit {
+        /*if self.retrieved >= self.limit && self.limit != 0 {
             self.iter_err = Some(MongoErr::new(
                                     ~"cursor::refresh",
                                     fmt!("cursor limit %? reached", self.limit),
                                     ~"cannot retrieve beyond limit"));
             return 0;
-        }
+        }*/
 
         // otherwise, get_more
         let msg = mk_get_more(
@@ -424,7 +427,7 @@ impl Cursor {
     pub fn has_next(&self) -> bool {
         //!self.data.is_empty()
         // return true even if right at end (normal exhaustion of cursor)
-        self.i <= self.data.len() as i32
+        self.i < self.data.len() as i32
     }
     pub fn close(&mut self) {
         //self.collection.db.connection.close_cursor(self.id);
