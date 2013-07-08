@@ -1,5 +1,4 @@
 use mongo::client::*;
-use mongo::db::*;
 use mongo::coll::*;
 use mongo::util::*;
 
