@@ -77,7 +77,10 @@ impl Client {
      */
     pub fn drop_db(@self, db : ~str) -> Result<(), MongoErr> {
         let db = @DB::new(db, self);
-        db.run_command(SpecNotation(~"{ \"dropDatabase\":1 }"))
+        match db.run_command(SpecNotation(~"{ \"dropDatabase\":1 }")) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e)
+        }
     }
 
     /**

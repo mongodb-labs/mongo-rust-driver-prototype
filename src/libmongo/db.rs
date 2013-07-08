@@ -96,7 +96,7 @@ impl DB {
     // TODO make take options? (not strictly necessary but may be good?)
     // TODO allow other query options, e.g. SLAVE_OK, with helper function
     // TODO return non-unit for things like listDatabases
-    pub fn run_command(&self, cmd : QuerySpec) -> Result<(), MongoErr> {
+    pub fn run_command(&self, cmd : QuerySpec) -> Result<~BsonDocument, MongoErr> {
         let coll = @Collection::new(copy self.name, fmt!("%s", SYSTEM_COMMAND), self.client);
 
         //let ret_msg = match coll.find_one(Some(cmd), None, None, None) {
@@ -124,7 +124,7 @@ impl DB {
         };
         match ok {
             0f64 => (),
-            _ => return Ok(())
+            _ => return Ok(ret_msg)
         }
 
         // otherwise, extract error message
@@ -169,11 +169,11 @@ impl DB {
         let nonce = self.run_command(SpecNotation(~"{ getnonce: 1 }"));
         //TODO: blocked on run_command returning correct values?
         //TODO: definitely blocked on md5
-        /*match this.runCommand(fmt!("
+        /*match this.runCommand(fmt!("{
               authenticate: 1,
               username: %s,
               nonce: %x,
-              key: %x",
+              key: %x}",
               username,
               nonce,
               md5(fmt!("%x%s%x", nonce, username, md5(fmt!("%s:mongo:%s",username, pass)))))) {
