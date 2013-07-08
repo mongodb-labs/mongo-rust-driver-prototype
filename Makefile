@@ -24,6 +24,7 @@ RMDIR = rmdir -p
 MKDIR = mkdir -p
 
 SRC = ./src
+LIB = ./lib
 BSONDIR = ./src/bson
 MONGODIR = ./src/libmongo
 BIN = ./bin
@@ -41,9 +42,11 @@ bin:
 	$(MKDIR) test
 	$(MKDIR) docs
 
-libs: $(BSONDIR)/cast.c
-	$(CC) $(CFLAGS) -o $(BIN)/typecast.o $(BSONDIR)/cast.c
+libs: $(LIB)/cast.c
+	$(CC) $(CFLAGS) -o $(BIN)/typecast.o $(LIB)/cast.c
 	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
+	$(CC) $(CFLAGS) -o $(BIN)/md5.o $(LIB)/md5.c
+	$(AR) $(BIN)/libmd5.a $(BIN)/md5.o
 
 bson: $(BSONDIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson.rc
@@ -54,7 +57,7 @@ mongo: $(MONGODIR)/*
 test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
-	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rc
+	#$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rc
 
 ex: $(MONGODIR)/test.rs
 	$(RC) $(FLAGS) -o $(TEST)/mongo_ex $(MONGODIR)/test.rs

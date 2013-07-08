@@ -13,15 +13,65 @@
  * limitations under the License.
  */
 
+use std::int::range;
+use std::libc::c_int;
+use std::ptr::to_unsafe_ptr;
+use std::to_bytes::*;
+
 use bson::encode::*;
 
 use util::*;
 use client::Client;
 use coll::Collection;
 
+static L_END: bool = true;
+
+#[link_args = "-lmd5"]
+extern {
+    fn md5_init(pms: *MD5State);
+    fn md5_append(pms: *MD5State, data: *const u8, nbytes: c_int);
+    fn md5_finish(pms: *MD5State, digest: *[u8,..16]);
+}
+
+priv struct MD5State {
+    count: [u32,..2],
+    abcd: [u32,..4],
+    buf: [u8,..64]
+}
+
 pub struct DB {
     name : ~str,
     priv client : @Client,
+}
+
+impl MD5State {
+    fn new(len: u64) -> MD5State {
+        let mut c: [u32,..2] = [0u32,0];
+        let l = len.to_bytes(L_END);
+        c[0] |= l[0] as u32;
+        c[0] |= (l[1] << 8) as u32;
+        c[0] |= (l[2] << 16) as u32;
+        c[0] |= (l[3] << 24) as u32;
+        c[1] |= l[4] as u32;
+        c[1] |= (l[5] << 8) as u32;
+        c[1] |= (l[6] << 16) as u32;
+        c[1] |= (l[7] << 24) as u32;
+
+        MD5State {
+            count: c,
+            abcd: [0u32,0,0,0],
+            buf: [
+                0,0,0,0,0,0,0,0,
+                0,0,0,0,0,0,0,0,
+                0,0,0,0,0,0,0,0,
+                0,0,0,0,0,0,0,0,
+                0,0,0,0,0,0,0,0,
+                0,0,0,0,0,0,0,0,
+                0,0,0,0,0,0,0,0,
+                0,0,0,0,0,0,0,0
+                ]
+        }
+    }
 }
 
 // TODO auth (logout, auth, add_user, remove_user, change_password)
@@ -120,7 +170,7 @@ impl DB {
 
         let mut coll : ~[@Collection] = ~[];
         for names.iter().advance |&n| {
-            coll = coll + [@Collection::new(copy self.name, n, self.client)];
+            coll = coll + ~[@Collection::new(copy self.name, n, self.client)];
         }
 
         Ok(coll)
@@ -205,7 +255,7 @@ impl DB {
 
     pub fn add_user(&self, username: ~str, password: ~str) {
         let coll = @(self.get_collection(~"system.users"));
-        let user = match coll.find_one(Some(SpecNotation(fmt!("{ user: %s }", username))), None, None)
+        let mut user = match coll.find_one(Some(SpecNotation(fmt!("{ user: %s }", username))), None, None)
             {
                 Ok(u) => u,
                 Err(_) => {
@@ -214,28 +264,67 @@ impl DB {
                     ~doc
                 }
             };
-        //user.put(~"pwd", md5(fmt!("%s:mongo:%s", username, pass)));
-        //TODO: get an MD5 implementation. OpenSSL bindings are available from
-        //github.com/kballard/rustcrypto
+        user.put(~"pwd", UString(md5(fmt!("%s:mongo:%s", username, password))));
         coll.save(user, None);
     }
 
-    pub fn authenticate(&self, username: ~str, password: ~str) -> bool {
-        let nonce = self.run_command(SpecNotation(~"{ getnonce: 1 }"));
-        //TODO: blocked on run_command returning correct values?
-        //TODO: definitely blocked on md5
-        /*match self.run_command(SpecNotation(fmt!(" {
+    pub fn authenticate(&self, username: ~str, password: ~str) -> Result<(), MongoErr> {
+        let nonce = match self.run_command(SpecNotation(~"{ getnonce: 1 }")) {
+            Ok(doc) => match *doc.find(~"nonce").unwrap() { //this unwrap should always succeed
+                Double(f) => f as uint,
+                Int32(i) => i as uint,
+                Int64(i) => i as uint,
+                _ => return Err(MongoErr::new(
+                    ~"db::authenticate",
+                    fmt!("error while getting nonce"),
+                    ~"an invalid nonce was returned by the server")) 
+            },
+            Err(e) => return Err(e)
+        };
+        match self.run_command(SpecNotation(fmt!(" {
               authenticate: 1,
               username: %s,
               nonce: %x,
-              key: %x } ",
+              key: %s } ",
               username,
               nonce,
-              md5(fmt!("%x%s%x", nonce, username, md5(fmt!("%s:mongo:%s",username, pass))))))) {
-           Ok(_) => return true,
-           Err(_) => return false
+              md5(fmt!("%x%s%s", nonce, username, md5(fmt!("%s:mongo:%s",username, password))))))) {
+           Ok(_) => return Ok(()),
+           Err(e) => return Err(e)
         }
-        */
-        return false;
     }
+}
+
+priv fn md5(msg: &str) -> ~str {
+    let msg_bytes = msg.to_bytes(L_END);
+    let m = MD5State::new(msg_bytes.len() as u64);
+    let digest: [u8,..16] = [
+        0,0,0,0,
+        0,0,0,0,
+        0,0,0,0,
+        0,0,0,0
+    ];
+
+    unsafe {
+        md5_init(to_unsafe_ptr(&m));
+        md5_append(to_unsafe_ptr(&m), to_unsafe_ptr(&(msg_bytes[0])), msg_bytes.len() as i32);
+        md5_finish(to_unsafe_ptr(&m), to_unsafe_ptr(&digest));
+    }
+    
+    let mut result: ~str = ~"";
+    for range(0, 16) |i| {
+        let mut byte = fmt!("%x", digest[i] as uint);
+        if byte.len() == 1 {
+            byte = (~"0").append(byte);
+        }
+        result.push_str(byte);
+    }
+    result
+}
+
+#[cfg(test)]
+#[test]
+fn md5_test() {
+    let s = ~"fads";
+    println(fmt!("::::::::::::::: %s", md5(s)));
 }
