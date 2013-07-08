@@ -5,6 +5,61 @@ This is a prototype version of a MongoDB driver for the Rust programming languag
 
 ## Tutorial
 
+#### Mongo Driver
+In general, aside from the BSON library imports (see below), we will need the following imports:
+```rust
+use mongo::client::*;
+use mongo::util::*;     // access to option flags and specifications, etc.
+use mongo::db::*;
+use mongo::coll::*;
+use mongo::cursor::*;
+```
+
+In order to connect with a Mongo server, we first create a client:
+```rust
+let client = Client::new();
+```
+To connect to an unreplicated, unsharded server running on localhost, port 27017, we use the ```connect``` method:
+```rust
+match client.connect(~"127.0.0.1", 27017 as uint) {
+    Ok(_) => (),
+    Err(e) => fail!("%s", MongoErr::to_str(e)), // if cannot connect, nothing to do; display error message
+}
+```
+Now we may create handles to databases and collections on the server. We start with collections to demonstrate CRUD operations.
+```rust
+// create a handle to the collection "foo_coll" in the database "foo_db"
+//      (either may already exist; if not, they will be created on the first insert)
+let coll = @Collection::new(~"foo_db", ~"foo_coll", client);
+```
+
+We can insert anything implementing the BSON ```formattable``` trait (e.g. if we implement that trait for a FooStruct, we can read and write FooStructs); in the below examples we use ```~str```.
+```rust
+// insert a document into foo_coll
+let ins = ~"{ \"_id\":0, \"a\":0, \"msg\":\"first insert!\" }";
+coll.insert(ins, None);
+    // no write concern specified---use default
+
+// insert a big batch of documents into foo_coll
+let mut ins_batch : ~[~str] = ~[];
+let n = 200;
+for n.times {
+    ins_batch = ins_batch + ~[fmt!("{ \"a\":%d, \"b\":\"ins %d\" }", i/2, i)];
+    i += 1;
+}
+coll.insert_batch(ins_strs, None, None, None);
+    // no write concern specified---use default; no special options
+
+// read one back (no specific query or query options/flags)
+//      presently, ~BsonDocuments are read back, and should be converted
+match ins_doc = match 
+match coll.find_one(None, None, None) {
+    Ok(ret_doc) => 
+}
+
+// insert a big batch of documents
+```
+
 #### BSON library
 ##### BSON data types
 BSON-valid data items are represented in the ```Document``` type. (Valid types available from the [specification](http://bson-spec.org)).
