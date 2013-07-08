@@ -17,7 +17,7 @@ RDOC = rustdoc
 RDOCFLAGS = --output-style doc-per-mod
 CC = gcc
 AR = ar rcs
-FLAGS = -L ./bin -D unused-unsafe $(TOOLFLAGS)
+FLAGS = -L ./bin -D unused-unsafe -A unnecessary-allocation $(TOOLFLAGS)
 CFLAGS = -c -g -Wall -Werror
 RM = rm
 RMDIR = rmdir -p
@@ -31,7 +31,7 @@ BIN = ./bin
 TEST = ./test
 DOCS = ./docs
 
-INTGTEST = 0
+MONGOTEST = 0
 
 .PHONY: test
 
@@ -56,13 +56,13 @@ mongo: $(MONGODIR)/*
 test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
-	#$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rc
+	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rc
 
 ex: $(MONGODIR)/test.rs
 	$(RC) $(FLAGS) -o $(TEST)/mongo_ex $(MONGODIR)/test.rs
 
 check: test
-ifeq ($(INTGTEST),1)
+ifeq ($(MONGOTEST),1)
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 	$(TEST)/driver_test
