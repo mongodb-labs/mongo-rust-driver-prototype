@@ -314,13 +314,22 @@ impl DB {
     }
 
     ///Get the profiling level of the database.
-    pub fn get_profiling_level(&self) -> Result<BsonDocument, MongoErr> {
-        self.run_command(SpecNotation(~"{ \"profile\": -1 }"))
+    pub fn get_profiling_level(&self) -> Result<int, MongoErr> {
+        match self.run_command(SpecNotation(~"{ \"profile\": -1 }")) {
+            Ok(d) => match d.find(~"was") {
+                Some(&Double(f)) => Ok(f as int),
+                _ => return Err(MongoErr::new(
+                    ~"db::get_profiling_level",
+                    ~"could not get profiling level",
+                    ~"an invalid profiling level was returned"))
+            },
+            Err(e) => return Err(e)
+        }
     }
 
     ///Set the profiling level of the database.
-    pub fn set_profiling_level(&self, level: &str) -> Result<BsonDocument, MongoErr> {
-        self.run_command(SpecNotation(fmt!("{ \"profile\": \"%s\" }", level)))
+    pub fn set_profiling_level(&self, level: int) -> Result<~BsonDocument, MongoErr> {
+        self.run_command(SpecNotation(fmt!("{ \"profile\": %d }", level)))
     }
 }
 
