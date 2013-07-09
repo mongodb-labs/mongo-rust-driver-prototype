@@ -15,6 +15,8 @@
 use mongo::client::*;
 use mongo::util::*;
 
+use fill_coll::*;
+
 #[test]
 fn test_drop_db() {
     // run_command/dropDatabase
@@ -24,10 +26,25 @@ fn test_drop_db() {
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
-    match client.drop_db(~"rust") {
-        Ok(_) => (),
+    let db = ~"rust_tmp_2";
+    fill_coll(db.clone(), ~"tmp", client, 10);
+
+    let all_dbs = match client.get_dbs() {
+        Ok(arr) => arr,
         Err(e) => fail!("%s", MongoErr::to_str(e)),
-    }
+    };
+
+    match client.drop_db(db.clone()) {
+        Ok(arr) => arr,
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    };
+
+    let cur_dbs = match client.get_dbs() {
+        Ok(arr) => arr,
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    };
+
+    assert!(cur_dbs.len() == all_dbs.len()-1);
 
     match client.disconnect() {
         Ok(_) => (),

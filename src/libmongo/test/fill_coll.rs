@@ -33,7 +33,7 @@ pub fn fill_coll(db : ~str, coll : ~str, client : @Client, n : uint)
     let mut ins_docs = ~[];
     let mut i = 0;
     for n.times {
-        let ins_str = fmt!("{ \"_id\":%d, \"a\":%d, \"b\":\"ins %d\" }", i, i/2, i);
+        let ins_str = fmt!("{ \"_id\":%d, \"a\":%d, \"b\":\"ins %d\", \"insert no\":%d }", i, i/2, i, i);
         let ins_doc = match (copy ins_str).to_bson_t() {
                 Embedded(bson) => *bson,
                 _ => fail!("what happened"),

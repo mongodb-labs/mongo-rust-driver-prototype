@@ -16,6 +16,8 @@ use mongo::client::*;
 use mongo::coll::*;
 use mongo::util::*;
 
+use fill_coll::*;
+
 #[test]
 fn test_indices() {
     // indices
@@ -25,16 +27,15 @@ fn test_indices() {
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
-    let coll = @Collection::new(~"rust", ~"good_insert_batch_big", client);
+    let n = 105;
+    let (coll, _, _) = fill_coll(~"rust", ~"test_indices", client, n);
 
     match coll.create_index(~[NORMAL(~[(~"b", ASC)])], None, None) {
-    //match coll.drop_index(MongoIndexFields(~[NORMAL(~[(~"b", ASC)])])) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
     match coll.create_index(~[NORMAL(~[(~"a", ASC)])], None, Some(~[INDEX_NAME(~"fubar")])) {
-    //match coll.drop_index(MongoIndexName(~"fubar")) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
@@ -52,6 +53,16 @@ fn test_indices() {
     assert!(explain.contains_key(~"indexOnly"));
     assert!(explain.contains_key(~"nYields"));
     assert!(explain.contains_key(~"nscannedObjects"));
+
+    match coll.drop_index(MongoIndexFields(~[NORMAL(~[(~"b", ASC)])])) {
+        Ok(_) => (),
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    }
+
+    match coll.drop_index(MongoIndexName(~"fubar")) {
+        Ok(_) => (),
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    }
 
     match client.disconnect() {
         Ok(_) => (),

@@ -13,8 +13,9 @@
  * limitations under the License.
  */
 use mongo::client::*;
-use mongo::coll::*;
 use mongo::util::*;
+
+use fill_coll::*;
 
 #[test]
 fn test_sort() {
@@ -25,20 +26,24 @@ fn test_sort() {
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
-    let coll = @Collection::new(~"rust", ~"good_insert_batch_big", client);
+    let n = 105;
+    let (coll, _, ins_docs) = fill_coll(~"rust", ~"test_sort", client, n);
 
     let mut cur = match coll.find(None, None, None) {
         Ok(cursor) => cursor,
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     };
 
-    match cur.sort(NORMAL(~[(~"b", DESC)])) {
+    match cur.sort(NORMAL(~[(~"insert no", DESC)])) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
+    let mut i = 0;
     for cur.advance |doc| {
         debug!(fmt!("\n%?", doc));
+        assert!(*doc == ins_docs[n-i-1]);
+        i += 1;
     }
 
     match client.disconnect() {

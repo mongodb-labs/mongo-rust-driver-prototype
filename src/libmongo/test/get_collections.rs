@@ -17,6 +17,8 @@ use mongo::client::*;
 use mongo::db::*;
 use mongo::util::*;
 
+use fill_coll::*;
+
 #[test]
 fn test_get_collections() {
     // get collections
@@ -26,13 +28,25 @@ fn test_get_collections() {
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
-    let db = DB::new(~"rust", client);
+    let db = ~"rust_tmp_1";
+    let n = 15;
+    let colls = [~"coll0", ~"coll1", ~"coll2"];
+    for colls.iter().advance |&name| {
+        fill_coll(db.clone(), name, client, n);
+    }
+
+    let db = DB::new(db, client);
     match db.get_collection_names() {
         Ok(names) => {
-            println("\n");
-            for names.iter().advance |&n| { println(fmt!("%s", n)); }
+            let mut i = 0;
+            for names.iter().advance |&n| {
+                if i == 0 { assert!(n == ~"system.indexes"); }
+                else { assert!(n == colls[i-1]); }
+                i += 1;
+            }
+            assert!(i-1 == colls.len());
         },
-        Err(e) => println(fmt!("\nERRRRROOOOOOORRRRRRRR%s", MongoErr::to_str(e))),
+        Err(e) => println(fmt!("%s", MongoErr::to_str(e))),
     };
 
     match client.disconnect() {

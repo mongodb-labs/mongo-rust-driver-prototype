@@ -407,9 +407,8 @@ impl Cursor {
         if self.limit != 0 {
             let diff = self.limit - self.retrieved;
             if diff >= 0 { return true; }
-        } else {
-            self.i <= self.data.len() as i32
         }
+        self.i <= self.data.len() as i32
     }
     pub fn close(&mut self) {
         //self.collection.db.connection.close_cursor(self.id);
