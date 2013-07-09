@@ -19,7 +19,7 @@ In order to connect with a Mongo server, we first create a client.
 ```rust
 let client = @Client::new();
 ```
-To connect to an unreplicated, unsharded server running on localhost, port 27017, we use the ```connect``` method:
+To connect to an unreplicated, unsharded server running on localhost, port 27017 (```MONGO_DEFAULT_PORT```), we use the ```connect``` method:
 ```rust
 match client.connect(~"127.0.0.1", 27017 as uint) {
     Ok(_) => (),

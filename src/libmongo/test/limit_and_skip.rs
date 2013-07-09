@@ -22,12 +22,12 @@ use fill_coll::*;
 fn test_limit_and_skip() {
     // limit
     let client = @Client::new();
-    match client.connect(~"127.0.0.1", 27017 as uint) {
+    match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
-    let n = 20;
+    let n = 400;
     let (coll, _, ins_docs) = fill_coll(~"rust", ~"limit_and_skip", client, n);
 
     let mut cur = match coll.find(None, None, None) {
@@ -35,13 +35,18 @@ fn test_limit_and_skip() {
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     };
 
-    let skip = 5;
-    let lim = 10;
+    let skip = 6;
+    let lim = 378;
     match cur.cursor_limit(lim) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
     match cur.cursor_skip(skip) {
+        Ok(_) => (),
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    }
+
+    match cur.sort(NORMAL(~[(~"_id", ASC)])) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
@@ -56,7 +61,7 @@ fn test_limit_and_skip() {
         Err(_) => (),
     }
     match cur.cursor_skip(skip) {
-        Ok(_) => fail!("should not be able to skipafter next()"),
+        Ok(_) => fail!("should not be able to skip after next()"),
         Err(_) => (),
     }
 

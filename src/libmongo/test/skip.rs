@@ -12,32 +12,53 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-use mongo::db::*;
 use mongo::client::*;
+use mongo::coll::*;
 use mongo::util::*;
 
+use fill_coll::*;
+
 #[test]
-fn test_authenticate() {
+fn test_skip() {
+    // limit
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
-    let db = DB::new(~"rust", client);
-    //clean up user first
-    let coll = db.get_collection(~"system.users");
-    coll.remove(Some(SpecNotation(~"{ \"user\": \"testuser2\" }")), None, None, None);
+    let n = 20;
+    let (coll, _, ins_docs) = fill_coll(~"rust", ~"limit", client, n);
 
-    //add it back; this ensures the user will be present
-    match db.add_user(~"testuser2", ~"testpassword", ~[]) {
-        Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))
+    let mut cur = match coll.find(None, None, None) {
+        Ok(cursor) => cursor,
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
     };
 
-    match db.authenticate(~"testuser2", ~"testpassword") {
+    let lim = 10;
+    match cur.limit(lim) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    }
+
+    match cur.next() {
+        None => fail!("could not find any documents"),
+        Some(_) => (),
+    }
+
+    match cur.limit(lim) {
+        Ok(_) => fail!("should not be able to limit after next()"),
+        Err(_) => (),
+    }
+
+    let mut i = 1;
+    for cur.advance |doc| {
+        i += 1;
+    }
+    assert!(i as i32 == lim);
+
+    match client.disconnect() {
+        Ok(_) => (),
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 }

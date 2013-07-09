@@ -28,6 +28,7 @@ mod indices;
 mod get_collections;
 mod sort;
 mod limit_and_skip;
+mod update;
 mod drop_db;
 mod add_user;
 mod authenticate;

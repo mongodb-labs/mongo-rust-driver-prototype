@@ -22,7 +22,7 @@ use bson::encode::*;
 fn test_bad_insert_no_cont() {
     // batch with bad documents with several fields; no cont on err
     let client = @Client::new();
-    match client.connect(~"127.0.0.1", 27017 as uint) {
+    match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
