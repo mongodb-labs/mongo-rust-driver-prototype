@@ -180,7 +180,7 @@ impl Client {
                             ~"cannot connect if already connected; please first disconnect"));
         }
 
-        let tmp = Connection::new::<NodeConnection>(server_ip_str, server_port);
+        let tmp = NodeConnection::new(server_ip_str, server_port);
         match tmp.connect() {
             Ok(_) => {
                 self.conn.put_back(tmp);
