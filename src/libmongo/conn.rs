@@ -49,7 +49,6 @@ impl Socket for TcpSocket {
  * ShardedClusterConnection, NodeConnection).
  */
 pub trait Connection {
-    fn new(server_ip_str : ~str, server_port : uint) -> Self;
     fn connect(&self) -> Result<(), MongoErr>;
     fn disconnect(&self) -> Result<(), MongoErr>;
     fn send(&self, data : ~[u8]) -> Result<(), MongoErr>;
@@ -71,17 +70,6 @@ pub struct NodeConnection {
 }
 
 impl Connection for NodeConnection {
-    pub fn new(server_ip_str : ~str, server_port : uint) -> NodeConnection {
-        NodeConnection {
-            server_ip_str : server_ip_str,
-            server_port : server_port,
-            server_ip : @mut None,
-            iotask : global_loop::get(),
-            sock : @mut None,
-            port : @mut None,
-        }
-    }
-
     /**
      * Actually connect to the server with the initialized fields.
      *
@@ -217,6 +205,30 @@ impl Connection for NodeConnection {
     }
 }
 
+impl NodeConnection {
+    /**
+     * Create a new NodeConnection with given IP and port.
+     *
+     * # Arguments
+     * `server_ip_str` - string representing IP of server
+     * `server_port` - uint representing port on server
+     *
+     * # Returns
+     * NodeConnection that can be connected to server node
+     * indicated.
+     */
+    pub fn new(server_ip_str : ~str, server_port : uint) -> NodeConnection {
+        NodeConnection {
+            server_ip_str : server_ip_str,
+            server_port : server_port,
+            server_ip : @mut None,
+            iotask : global_loop::get(),
+            sock : @mut None,
+            port : @mut None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,26 +275,26 @@ mod tests {
     #[test]
     fn test_connect_preexisting_socket() {
         let s: @Socket = @MockSocket {state: 1} as @Socket;
-        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let mut conn = NodeConnection::new(~"foo", 42);
         conn.sock = @mut Some(s);
         assert!(conn.connect().is_err());
     }
 
     #[test]
     fn test_connect_ip_parse_fail() {
-        let conn = Connection::new::<NodeConnection>(~"invalid.ip.str", 42);
+        let conn = NodeConnection::new(~"invalid.ip.str", 42);
         assert!(conn.connect().is_err());
     }
 
     #[test]
     fn test_send_null_sock() {
-        let conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let conn = NodeConnection::new(~"foo", 42);
         assert!(conn.send(~[0u8]).is_err());
     }
 
     #[test]
     fn test_send_write_future_err() {
-        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let mut conn = NodeConnection::new(~"foo", 42);
         let s: @Socket = @MockSocket {state: 1} as @Socket;
         conn.sock = @mut Some(s);
         assert!(conn.send(~[0u8]).is_err());
@@ -290,7 +302,7 @@ mod tests {
 
     #[test]
     fn test_send_write_future() {
-        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let mut conn = NodeConnection::new(~"foo", 42);
         let s: @Socket = @MockSocket {state: 0} as @Socket;
         conn.sock = @mut Some(s);
         assert!(conn.send(~[0u8]).is_ok());
@@ -298,14 +310,14 @@ mod tests {
 
     #[test]
     fn test_recv_null_port() {
-        let conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let conn = NodeConnection::new(~"foo", 42);
         assert!(conn.recv().is_err());
     }
 
     #[test]
     fn test_recv_read_err() {
 
-        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let mut conn = NodeConnection::new(~"foo", 42);
         let p: @GenericPort<PortResult> = @MockPort {state: 1} as @GenericPort<PortResult>;
         conn.port = @mut Some(p);
         assert!(conn.recv().is_err());
@@ -313,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_recv_read() {
-        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let mut conn = NodeConnection::new(~"foo", 42);
         let p: @GenericPort<PortResult> = @MockPort {state: 0} as @GenericPort<PortResult>;
         conn.port = @mut Some(p);
         assert!(conn.recv().is_ok());
@@ -321,7 +333,7 @@ mod tests {
 
     #[test]
     fn test_disconnect_no_socket() {
-        let conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let conn = NodeConnection::new(~"foo", 42);
         let e = conn.disconnect();
         assert!(conn.sock.is_none());
         assert!(e.is_ok());
@@ -329,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_disconnect_read_stop_err() {
-        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let mut conn = NodeConnection::new(~"foo", 42);
         let s: @Socket = @MockSocket {state: 1} as @Socket;
         conn.sock = @mut Some(s);
         let e = conn.disconnect();
@@ -339,7 +351,7 @@ mod tests {
 
     #[test]
     fn test_disconnect_read_stop() {
-        let mut conn = Connection::new::<NodeConnection>(~"foo", 42);
+        let mut conn = NodeConnection::new(~"foo", 42);
         let s: @Socket = @MockSocket {state: 0} as @Socket;
         conn.sock = @mut Some(s);
         let e = conn.disconnect();
