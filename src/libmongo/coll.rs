@@ -613,7 +613,7 @@ impl Collection {
         let mut cur = self.find(query, proj, flag_array);
         match cur {
             Ok(ref mut cursor) => {
-                cursor.limit(-1);
+                cursor.cursor_limit(-1);
                 match cursor.next() {
                     Some(doc) => Ok(doc),
                     None => Err(MongoErr::new(

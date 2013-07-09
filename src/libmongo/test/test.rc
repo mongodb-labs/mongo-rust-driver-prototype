@@ -17,6 +17,8 @@ extern mod bson;
 extern mod mongo;
 extern mod std;
 
+pub mod fill_coll;
+
 mod good_insert_single;
 mod good_insert_batch_small;
 mod good_insert_batch_big;
@@ -25,5 +27,6 @@ mod bad_insert_cont;
 mod indices;
 mod get_collections;
 mod sort;
+mod limit_and_skip;
 mod drop_db;
 mod add_user;

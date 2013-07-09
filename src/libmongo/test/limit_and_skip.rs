@@ -13,42 +13,59 @@
  * limitations under the License.
  */
 use mongo::client::*;
+use mongo::coll::*;
 use mongo::util::*;
 
 use fill_coll::*;
 
 #[test]
-fn test_good_insert_batch_small() {
-    // good batch insert
+fn test_limit_and_skip() {
+    // limit
     let client = @Client::new();
     match client.connect(~"127.0.0.1", 27017 as uint) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
-    let n = 5;
-    let (coll, _, ins_docs) = fill_coll(~"rust", ~"good_insert_batch_small", client, n);
+    let n = 20;
+    let (coll, _, ins_docs) = fill_coll(~"rust", ~"limit_and_skip", client, n);
 
-    // try to find all of them and compare all of them
-    match coll.find(None, None, None) {
-        Ok(c) => {
-            let mut cursor = c;
-            let mut j = 0;
-            for cursor.advance |ret_doc| {
-                if j >= n { fail!("more docs returned than inserted"); }
-                println(fmt!("\n%?", *ret_doc));
-                assert!(*ret_doc == ins_docs[j]);
-                j += 1;
-            }
-            if j < n { fail!("fewer docs returned than inserted"); }
-        }
+    let mut cur = match coll.find(None, None, None) {
+        Ok(cursor) => cursor,
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    };
+
+    let skip = 5;
+    let lim = 10;
+    match cur.cursor_limit(lim) {
+        Ok(_) => (),
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    }
+    match cur.cursor_skip(skip) {
+        Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
-    match coll.find_one(None, None, None) {
-        Ok(c) => assert!(*c == ins_docs[0]),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    match cur.next() {
+        None => fail!("could not find any documents"),
+        Some(_) => (),
     }
+
+    match cur.cursor_limit(lim) {
+        Ok(_) => fail!("should not be able to limit after next()"),
+        Err(_) => (),
+    }
+    match cur.cursor_skip(skip) {
+        Ok(_) => fail!("should not be able to skipafter next()"),
+        Err(_) => (),
+    }
+
+    let mut i = 1;
+    for cur.advance |doc| {
+        assert!(*doc == ins_docs[i+skip]);
+        i += 1;
+    }
+    assert!(i as i32 == lim);
 
     match client.disconnect() {
         Ok(_) => (),

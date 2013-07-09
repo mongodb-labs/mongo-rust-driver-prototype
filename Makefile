@@ -31,7 +31,7 @@ BIN = ./bin
 TEST = ./test
 DOCS = ./docs
 
-MONGOTEST = 0
+MONGOTEST = 1
 
 .PHONY: test
 
