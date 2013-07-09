@@ -22,13 +22,13 @@ use fill_coll::*;
 fn test_good_insert_batch_big() {
     // good batch_insert, big
     let client = @Client::new();
-    match client.connect(~"127.0.0.1", 27017 as uint) {
+    match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
     let n = 105;
-    let (coll, _, ins_docs) = fill_coll(~"rust", ~"good_insert_batch_big", client, n);
+    let (coll, _, _) = fill_coll(~"rust", ~"good_insert_batch_big", client, n);
 
     // try to find all of them and compare all of them
     match coll.find(None, None, None) {
@@ -44,7 +44,6 @@ fn test_good_insert_batch_big() {
                 None => (),
             }
             if j < n { fail!("fewer docs (%?) returned than inserted (%?)", j, n); }
-            assert!(j == n);
         }
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }

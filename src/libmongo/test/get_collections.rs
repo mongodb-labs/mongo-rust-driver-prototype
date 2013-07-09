@@ -23,7 +23,7 @@ use fill_coll::*;
 fn test_get_collections() {
     // get collections
     let client = @Client::new();
-    match client.connect(~"127.0.0.1", 27017 as uint) {
+    match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }

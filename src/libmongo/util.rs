@@ -165,6 +165,7 @@ pub enum INDEX_FIELD {
  * Misc
  */
 pub static LITTLE_ENDIAN_TRUE : bool = true;
+pub static MONGO_DEFAULT_PORT : uint = 27017;
 
 /*
  * Helper: convert string to BsonDocument if possible.
