@@ -36,7 +36,7 @@ fn test_good_insert_batch_small() {
             let mut j = 0;
             for cursor.advance |ret_doc| {
                 if j >= n { fail!("more docs returned than inserted"); }
-                println(fmt!("\n%?", *ret_doc));
+                debug!(fmt!("\n%?", *ret_doc));
                 assert!(*ret_doc == ins_docs[j]);
                 j += 1;
             }

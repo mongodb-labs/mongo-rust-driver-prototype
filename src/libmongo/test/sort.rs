@@ -38,7 +38,7 @@ fn test_sort() {
     }
 
     for cur.advance |doc| {
-        println(fmt!("\n%?", doc));
+        debug!(fmt!("\n%?", doc));
     }
 
     match client.disconnect() {
