@@ -314,6 +314,27 @@ impl<'self> BsonDocument {
         @mut BsonDocument::new()
     }
 
+    /**
+    * Compare two BsonDocuments to decide if they have the same fields.
+    * Returns true if every field except the _id field is matching.
+    * The _id field and the size are ignored.
+    * Two documents are considered to have matching fields even if
+    * their fields are not in the same order.
+    */
+    pub fn fields_match(&self, other: &BsonDocument) -> bool {
+        let mut b: bool = true;
+        for self.fields.iter().advance |&(@key, @val)| {
+            if !(key==~"_id") {
+                let mut found_match = false;
+                for other.fields.iter().advance |&(@okey, @oval)| {
+                    found_match |= ((key==okey)&&(val==oval));
+                }
+                b &= found_match;
+            }
+        }
+        b
+    }
+
     fn from_map(m: ~OrderedHashmap<~str, Document>) -> BsonDocument {
         BsonDocument { size: map_size(m), fields: m }
     }
