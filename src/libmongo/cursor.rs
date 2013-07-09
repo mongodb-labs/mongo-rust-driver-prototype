@@ -59,33 +59,6 @@ impl Iterator<~BsonDocument> for Cursor {
         Some(copy self.data[self.i-1])
     }
 }
-macro_rules! query_add (
-   ($obj:ident, $field:expr, $cb:ident) => {
-        match $obj {
-            SpecObj(doc) => {
-                let mut t = BsonDocument::new();
-                t.put($field, Embedded(~doc));
-                self.add_query_spec(&t);
-                Ok(~"added to query spec")
-            }
-            SpecNotation(ref s) => {
-                let obj = ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(copy *s);
-                if obj.is_ok() {
-                    match obj.unwrap() {
-                        Embedded(ref map) =>
-                            return self.$cb(SpecObj(BsonDocument::from_map(copy map.fields))),
-                        _ => fail!()
-                    }
-                } else {
-                    return Err(MongoErr::new(
-                                ~"cursor::query_add!",
-                                ~"query-adding macro expansion",
-                                ~"could not parse json object"));
-                }
-            }
-        }
-   }
-)
 
 ///Cursor API
 impl Cursor {
@@ -105,7 +78,6 @@ impl Cursor {
      * # Returns
      * Cursor
      */
-    //pub fn new(query : BsonDocument, proj : BsonDocument, collection : @Collection, flags : i32, nskip : i32, nlimit : i32) -> Cursor {
     pub fn new(     query : BsonDocument,
                     proj : Option<BsonDocument>,
                     collection : @Collection,
@@ -182,8 +154,13 @@ impl Cursor {
         }
 
         // otherwise, queried before; see if need to get_more
-        if self.has_next() {
-            // has_next within cursor, so don't get_more
+        if self.limit != 0 {
+            // check against limit
+            let diff = self.limit - self.retrieved;
+            if diff > 0 { return diff; }
+        }
+        if self.i < self.data.len() as i32 {
+            // has_next *within* cursor, so don't get_more
             return (self.data.len() as i32) - self.i;
         }
 
@@ -203,13 +180,13 @@ impl Cursor {
         }
 
         // otherwise, check if allowed to get more
-        /*if self.retrieved >= self.limit && self.limit != 0 {
+        if self.retrieved >= self.limit && self.limit != 0 {
             self.iter_err = Some(MongoErr::new(
                                     ~"cursor::refresh",
                                     fmt!("cursor limit %? reached", self.limit),
                                     ~"cannot retrieve beyond limit"));
             return 0;
-        }*/
+        }
 
         // otherwise, get_more
         let msg = mk_get_more(
@@ -427,7 +404,11 @@ impl Cursor {
     pub fn has_next(&self) -> bool {
         //!self.data.is_empty()
         // return true even if right at end (normal exhaustion of cursor)
-        self.i < self.data.len() as i32
+        if self.limit != 0 {
+            self.retrieved <= self.limit
+        } else {
+            self.i <= self.data.len() as i32
+        }
     }
     pub fn close(&mut self) {
         //self.collection.db.connection.close_cursor(self.id);

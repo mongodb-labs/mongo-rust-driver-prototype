@@ -326,5 +326,5 @@ priv fn md5(msg: &str) -> ~str {
 #[test]
 fn md5_test() {
     let s = ~"fads";
-    println(fmt!("::::::::::::::: %s", md5(s)));
+    assert!(md5(s) == ~"abecffaa52f529a2b83b6612a7964b02");
 }
