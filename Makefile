@@ -31,7 +31,7 @@ BIN = ./bin
 TEST = ./test
 DOCS = ./docs
 
-MONGOTEST = 1
+MONGOTEST = 0
 
 .PHONY: test
 
@@ -42,8 +42,8 @@ bin:
 	$(MKDIR) test
 
 libs: $(LIB)/cast.c
-	$(CC) $(CFLAGS) -o $(BIN)/typecast.o $(LIB)/cast.c
-	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
+#	$(CC) $(CFLAGS) -o $(BIN)/typecast.o $(LIB)/cast.c
+#	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
 	$(CC) $(CFLAGS) -o $(BIN)/md5.o $(LIB)/md5.c
 	$(AR) $(BIN)/libmd5.a $(BIN)/md5.o
 

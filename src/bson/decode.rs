@@ -14,15 +14,10 @@
  */
 
 use std::str::from_bytes;
+use std::int::range;
+use std::cast::transmute;
 use encode::*;
 use stream::*;
-use std::vec::raw::to_ptr;
-
-//TODO: find a way to remove this, see bson.rs:128
-#[link_args = "-ltypecast"]
-extern {
-    fn bytes_to_double(buf: *u8) -> f64;
-}
 
 static L_END: bool = true;
 
@@ -140,12 +135,13 @@ impl<T:Stream<u8>> BsonParser<T> {
 
     ///Parse a double.
     fn _double(&mut self) -> Document {
-        let b = self.stream.aggregate(8);
-        //TODO this is bad
-        let v: f64 = unsafe {
-            bytes_to_double(to_ptr(b))
-        };
-        Double(v)
+        let mut u: u64 = 0;
+        for range(0,8) |i| {
+            u |= (*self.stream.first() as u64 << ((8 * i)));
+            self.stream.pass(1);
+        }
+        let v: &f64 = unsafe { transmute(&u) };
+        Double(*v)
     }
 
     ///Parse a string with length.
@@ -237,7 +233,6 @@ mod tests {
         let d = parser._double();
         match d {
             Double(d2) => {
-                println(fmt!("::::::::::d2 is %?", d2));
                 assert!(d2.approx_eq(&3.14159f64));
             }
             _ => fail!("failed in a test case; how did I get here?")
