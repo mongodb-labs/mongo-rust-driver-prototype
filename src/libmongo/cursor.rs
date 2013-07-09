@@ -252,7 +252,7 @@ impl Cursor {
      * # Failure Types
      * * Cursor already iterated over
      */
-    pub fn skip(&mut self, skip: i32) -> Result<(), MongoErr> {
+    pub fn cursor_skip(&mut self, skip: i32) -> Result<(), MongoErr> {
         if self.id.is_some() {
             return Err(MongoErr::new(
                         ~"cursor::skip",
@@ -276,7 +276,7 @@ impl Cursor {
      * # Failure Types
      * * Cursor already iterated over
      */
-    pub fn limit(&mut self, limit: i32) -> Result<(), MongoErr> {
+    pub fn cursor_limit(&mut self, limit: i32) -> Result<(), MongoErr> {
         if self.id.is_some() {
             return Err(MongoErr::new(
                         ~"cursor::limit",
@@ -306,7 +306,7 @@ impl Cursor {
         let mut query = copy self.query_spec;
         query.append(~"$explain", Double(1f64));
         let mut tmp_cur = Cursor::new(query, copy self.proj_spec, self.collection, self.flags);
-        tmp_cur.limit(-1);
+        tmp_cur.cursor_limit(-1);
         match tmp_cur.next() {
             Some(exp) => Ok(exp),
             None => Err(MongoErr::new(
@@ -405,10 +405,10 @@ impl Cursor {
         //!self.data.is_empty()
         // return true even if right at end (normal exhaustion of cursor)
         if self.limit != 0 {
-            self.retrieved <= self.limit
-        } else {
-            self.i <= self.data.len() as i32
+            let diff = self.limit - self.retrieved;
+            if diff >= 0 { return true; }
         }
+        self.i <= self.data.len() as i32
     }
     pub fn close(&mut self) {
         //self.collection.db.connection.close_cursor(self.id);

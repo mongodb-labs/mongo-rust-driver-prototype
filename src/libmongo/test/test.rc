@@ -27,5 +27,5 @@ mod bad_insert_cont;
 mod indices;
 mod get_collections;
 mod sort;
-mod limit;
+mod limit_and_skip;
 mod drop_db;
