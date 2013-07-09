@@ -18,7 +18,8 @@ use std::*;
 use bson::encode::*;
 
 use util::*;
-use conn::*;
+use conn::Connection;
+use conn_node::NodeConnection;
 use db::DB;
 
 /**
