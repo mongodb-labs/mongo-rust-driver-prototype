@@ -31,3 +31,5 @@ mod limit_and_skip;
 mod update;
 mod drop_db;
 mod add_user;
+mod authenticate;
+mod logout;

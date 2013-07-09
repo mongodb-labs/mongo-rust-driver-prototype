@@ -274,26 +274,24 @@ impl DB {
 
     ///Become authenticated as the given username with the given password.
     pub fn authenticate(&self, username: ~str, password: ~str) -> Result<(), MongoErr> {
-        let nonce = match self.run_command(SpecNotation(~"{ getnonce: 1 }")) {
+        let nonce = match self.run_command(SpecNotation(~"{ \"getnonce\": 1 }")) {
             Ok(doc) => match *doc.find(~"nonce").unwrap() { //this unwrap should always succeed
-                Double(f) => f as uint,
-                Int32(i) => i as uint,
-                Int64(i) => i as uint,
+                UString(ref s) => copy *s,
                 _ => return Err(MongoErr::new(
                     ~"db::authenticate",
                     ~"error while getting nonce",
-                    ~"an invalid nonce was returned by the server"))
+                    fmt!("an invalid nonce (%?) was returned by the server", *doc.find(~"nonce").unwrap())))
             },
             Err(e) => return Err(e)
         };
         match self.run_command(SpecNotation(fmt!(" {
-              authenticate: 1,
-              username: %s,
-              nonce: %x,
-              key: %s } ",
+              \"authenticate\": 1,
+              \"user\": \"%s\",
+              \"nonce\": \"%s\",
+              \"key\": \"%s\" } ",
               username,
               nonce,
-              md5(fmt!("%x%s%s", nonce, username, md5(fmt!("%s:mongo:%s",username, password))))))) {
+              md5(fmt!("%s%s%s", nonce, username, md5(fmt!("%s:mongo:%s",username, password))))))) {
            Ok(_) => return Ok(()),
            Err(e) => return Err(e)
         }
@@ -302,7 +300,7 @@ impl DB {
     ///Log out of the current user.
     ///Closing a connection will also log out.
     pub fn logout(&self) -> Result<(), MongoErr> {
-        match self.run_command(SpecNotation(~"{ logout: 1 }")) {
+        match self.run_command(SpecNotation(~"{ \"logout\": 1 }")) {
             Ok(doc) => match *doc.find(~"ok").unwrap() {
                 Double(1f64) => return Ok(()),
                 Int32(1i32) => return Ok(()),
