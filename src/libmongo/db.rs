@@ -19,6 +19,7 @@ use std::ptr::to_unsafe_ptr;
 use std::to_bytes::*;
 
 use bson::encode::*;
+use bson::formattable::*;
 
 use util::*;
 use client::Client;
