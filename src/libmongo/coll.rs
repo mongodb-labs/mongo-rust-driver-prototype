@@ -249,7 +249,7 @@ impl Collection {
      * * `wc` - write concern, i.e. getLastError specifications
      *
      * # Returns
-     * () on success, MongoErr on failuer
+     * () on success, MongoErr on failure
      *
      * # Failure Types
      * * invalid write concern specification (should never happen)
@@ -329,7 +329,6 @@ impl Collection {
      */
 
     /// INSERT OPS
-    // TODO possibly combine anyway?
     /**
      * Insert given document with given writeconcern into Collection.
      *
@@ -370,7 +369,7 @@ impl Collection {
         }
     }
     /**
-     * Insert given batch of documents with given writeconcern
+     * Insert given batch of documents with given writeconcern and options
      * into Collection.
      *
      * # Arguments
@@ -395,7 +394,7 @@ impl Collection {
                 -> Result<(), MongoErr> {
         let mut bson_docs : ~[BsonDocument] = ~[];
         for docs.iter().advance |&d| {
-            //bson_docs += [match d.to_bson_t() {
+            //bson_docs += ~[match d.to_bson_t() {
             bson_docs = bson_docs + ~[match d.to_bson_t() {
                     Embedded(bson) => *bson,
                     _ => return Err(MongoErr::new(
