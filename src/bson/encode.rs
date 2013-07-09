@@ -13,10 +13,7 @@
  * limitations under the License.
  */
 
-//TODO: when linked_hashmap enters libextra, replace this
-
 use std::to_bytes::*;
-use std::cast::transmute;
 use std::str::count_bytes;
 use extra::serialize::*;
 use ord_hash::*;
@@ -106,8 +103,7 @@ impl Encoder for BsonDocEncoder {
         self.buf.push_all((if v {~[1]} else {~[0]}))
     }
     fn emit_f64(&mut self, v: f64) {
-        let x: [u8,..8] = unsafe { transmute(v) };
-        self.buf.push_all(x);
+        self.buf.push_all(v.to_bytes(L_END));
     }
     fn emit_f32(&mut self, v: f32) { self.emit_f64(v as f64); }
     fn emit_float(&mut self, v: float) { self.emit_f64(v as f64); }
