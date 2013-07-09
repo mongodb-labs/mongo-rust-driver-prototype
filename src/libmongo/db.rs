@@ -314,12 +314,12 @@ impl DB {
     }
 
     ///Get the profiling level of the database.
-    pub fn get_profiling_level(&self) -> Result<BsonDocument, MongoErr> {
+    pub fn get_profiling_level(&self) -> Result<~BsonDocument, MongoErr> {
         self.run_command(SpecNotation(~"{ \"profile\": -1 }"))
     }
 
     ///Set the profiling level of the database.
-    pub fn set_profiling_level(&self, level: &str) -> Result<BsonDocument, MongoErr> {
+    pub fn set_profiling_level(&self, level: &str) -> Result<~BsonDocument, MongoErr> {
         self.run_command(SpecNotation(fmt!("{ \"profile\": \"%s\" }", level)))
     }
 }
