@@ -606,7 +606,7 @@ impl Collection {
                 -> Result<~BsonDocument, MongoErr> {
         /*let options = match option_array {
             None => Some(~[NRET(1)]),
-            Some(opt) => Some(opt + [NRET(1)]),
+            Some(opt) => Some(opt + ~[NRET(1)]),
         };
 
         let mut cur = self.find(query, proj, flag_array, options); */
