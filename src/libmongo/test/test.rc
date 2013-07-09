@@ -17,11 +17,11 @@ extern mod bson;
 extern mod mongo;
 extern mod std;
 
-mod good_insert_single;
-mod good_insert_batch_small;
+//mod good_insert_single;
+//mod good_insert_batch_small;
 mod good_insert_batch_big;
-mod bad_insert_no_cont;
-mod bad_insert_cont;
+//mod bad_insert_no_cont;
+//mod bad_insert_cont;
 mod indices;
 mod get_collections;
 mod sort;

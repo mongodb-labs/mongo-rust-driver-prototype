@@ -58,21 +58,16 @@ fn test_good_insert_batch_big() {
     match coll.find(None, None, None) {
         Ok(c) => {
             let mut cursor = c;
-            //let mut j = 0;
-            for cursor.advance |ret_doc| {
-                //if j >= n { fail!("more docs returned than inserted"); }
-                //if *ret_doc != ins_docs[j] {
-                println(fmt!("\n%?", *ret_doc));
-                //    println(fmt!("\n%?\n%?", ret_doc, ins_docs[j]));
-                //}
-                //assert!(*ret_doc == ins_docs[j]);
-                //j += 1;
+            let mut j = 0;
+            for cursor.advance |_| {
+                if j >= n { fail!("more docs returned than inserted"); }
+                j += 1;
             }
             match cursor.iter_err {
                 Some(e) => println(fmt!("\n%?", MongoErr::to_str(e))),
                 None => (),
             }
-            //if j < n { fail!("fewer docs (%?) returned than inserted (%?)", j, n); }
+            if j < n { fail!("fewer docs (%?) returned than inserted (%?)", j, n); }
         }
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }

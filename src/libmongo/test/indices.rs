@@ -45,7 +45,13 @@ fn test_indices() {
     };
 
     cursor.hint(MongoIndexName(~"fubar"));
-    println(fmt!("%?", cursor.explain()));
+    let explain = cursor.explain().unwrap();
+    assert!(explain.contains_key(~"millis"));
+    assert!(explain.contains_key(~"cursor"));
+    assert!(explain.contains_key(~"nscanned"));
+    assert!(explain.contains_key(~"indexOnly"));
+    assert!(explain.contains_key(~"nYields"));
+    assert!(explain.contains_key(~"nscannedObjects"));
 
     match client.disconnect() {
         Ok(_) => (),
