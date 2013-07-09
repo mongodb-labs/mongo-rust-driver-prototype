@@ -20,9 +20,9 @@ use mongo::util::*;
 #[test]
 fn test_logout() {
     let client = @Client::new();
-    match client.connect(~"127.0.0.1", 27017u) {
+    match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))    
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
     let db = DB::new(~"rust", client);
