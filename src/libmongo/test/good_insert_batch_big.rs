@@ -28,7 +28,7 @@ fn test_good_insert_batch_big() {
     }
 
     let n = 105;
-    let (coll, _, ins_docs) = fill_coll(~"rust", ~"good_insert_batch_big", client, n);
+    let (coll, _, _) = fill_coll(~"rust", ~"good_insert_batch_big", client, n);
 
     // try to find all of them and compare all of them
     match coll.find(None, None, None) {
