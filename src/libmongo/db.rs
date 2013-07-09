@@ -252,8 +252,10 @@ impl DB {
                 fmt!("run_command %? failed", cmd),
                 copy *errmsg))
     }
-
-    pub fn add_user(&self, username: ~str, password: ~str) {
+ 
+    ///Add a new database user with the given username and password.
+    ///If the system.users collection becomes unavailable, this will fail.
+    pub fn add_user(&self, username: ~str, password: ~str, roles: ~[~str]) -> Result<(), MongoErr>{
         let coll = @(self.get_collection(~"system.users"));
         let mut user = match coll.find_one(Some(SpecNotation(fmt!("{ user: %s }", username))), None, None)
             {
@@ -265,9 +267,11 @@ impl DB {
                 }
             };
         user.put(~"pwd", UString(md5(fmt!("%s:mongo:%s", username, password))));
-        coll.save(user, None);
+        user.put(~"roles", roles.to_bson_t());
+        coll.save(user, None)
     }
 
+    ///Become authenticated as the given username with the given password.
     pub fn authenticate(&self, username: ~str, password: ~str) -> Result<(), MongoErr> {
         let nonce = match self.run_command(SpecNotation(~"{ getnonce: 1 }")) {
             Ok(doc) => match *doc.find(~"nonce").unwrap() { //this unwrap should always succeed
@@ -276,7 +280,7 @@ impl DB {
                 Int64(i) => i as uint,
                 _ => return Err(MongoErr::new(
                     ~"db::authenticate",
-                    fmt!("error while getting nonce"),
+                    ~"error while getting nonce",
                     ~"an invalid nonce was returned by the server"))
             },
             Err(e) => return Err(e)
@@ -292,6 +296,23 @@ impl DB {
            Ok(_) => return Ok(()),
            Err(e) => return Err(e)
         }
+    }
+
+    ///Log out of the current user.
+    ///Closing a connection will also log out.
+    pub fn logout(&self) -> Result<(), MongoErr> {
+        match self.run_command(SpecNotation(~"{ logout: 1 }")) {
+            Ok(doc) => match *doc.find(~"ok").unwrap() {
+                Double(1f64) => return Ok(()),
+                Int32(1i32) => return Ok(()),
+                Int64(1i64) => return Ok(()),
+                _ => return Err(MongoErr::new(
+                    ~"db::logout",
+                    ~"error while logging out",
+                    ~"the server returned ok: 0"))
+            },
+            Err(e) => return Err(e)
+        };
     }
 }
 
