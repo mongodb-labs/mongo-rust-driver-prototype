@@ -14,7 +14,6 @@
  */
 use mongo::client::*;
 use mongo::coll::*;
-use mongo::util::*;
 
 use bson::formattable::*;
 use bson::encode::*;
