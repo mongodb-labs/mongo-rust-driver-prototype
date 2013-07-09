@@ -192,7 +192,7 @@ impl BsonFormattable for json::Json {
     }
 }
 
-impl<'self, T:BsonFormattable + Copy> BsonFormattable for ~[T] {
+impl<T:BsonFormattable + Copy> BsonFormattable for ~[T] {
     fn to_bson_t(&self) -> Document {
         let mut doc = BsonDocument::new();
         let s = self.map(|elt| elt.to_bson_t());
