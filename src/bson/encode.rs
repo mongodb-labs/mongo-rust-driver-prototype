@@ -21,7 +21,7 @@ use ord_hash::*;
 static L_END: bool = true;
 
 /**
- * Algebraic data type representing the BSON AST. 
+ * Algebraic data type representing the BSON AST.
  * BsonDocument maps string keys to this type.
  * This can be converted back and forth from BsonDocument
  * by using the Embedded variant.

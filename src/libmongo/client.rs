@@ -224,9 +224,8 @@ impl Client {
      * if write operation, None on no last error, MongoErr on last error
      *      or network error
      */
-    // XXX right now, public---try to move things around so doesn't need to be?
     // TODO check_primary for replication purposes?
-    pub fn _send_msg(&self, msg : ~[u8], wc_pair : (~str, Option<~[WRITE_CONCERN]>), auto_get_reply : bool)
+    pub fn _send_msg(@self, msg : ~[u8], wc_pair : (~str, Option<~[WRITE_CONCERN]>), auto_get_reply : bool)
                 -> Result<Option<ServerMsg>, MongoErr> {
         // first send message, exiting if network error
         match self.send(msg) {
@@ -239,8 +238,10 @@ impl Client {
 
         // if not, for instance, query, handle write concern
         if !auto_get_reply {
-            let (db, wc) = wc_pair;
-            match self._parse_and_send_wc(db, wc) {
+            let (db_str, wc) = wc_pair;
+            let db = DB::new(db_str, self);
+
+            match db.get_last_error(wc) {
                 Ok(None) => return Ok(None),
                 Ok(Some(_)) => (),
                 Err(e) => return Err(MongoErr::new(
@@ -289,71 +290,6 @@ impl Client {
     }
 
     /**
-     * Parses write concern into bytes and sends to server.
-     *
-     * # Arguments
-     * * `wc` - write concern, i.e. getLastError specifications
-     *
-     * # Returns
-     * () on success, MongoErr on failure
-     *
-     * # Failure Types
-     * * invalid write concern specification (should never happen)
-     * * network
-     */
-    //fn _parse_and_send_wc(&self, wc : ~str) -> Result<(), MongoErr>{
-    fn _parse_and_send_wc(&self, db : ~str, wc : Option<~[WRITE_CONCERN]>) -> Result<Option<()>, MongoErr>{
-        // set default write concern (to 1) if not specified
-        let concern = match wc {
-            None => ~[W_N(1), FSYNC(false)],
-            Some(w) => w,
-        };
-        // parse write concern, early exiting if set to <= 0
-        let mut concern_str = ~"{ \"getLastError\":1";
-        for concern.iter().advance |&opt| {
-            //concern_str += match opt {
-            concern_str = concern_str + match opt {
-                JOURNAL(j) => fmt!(", \"j\":%?", j),
-                W_N(w) => {
-                    if w <= 0 { return Ok(None); }
-                    else { fmt!(", \"w\":%d", w) }
-                }
-                W_STR(w) => fmt!(", \"w\":\"%s\"", w),
-                WTIMEOUT(t) => fmt!(", \"wtimeout\":%d", t),
-                FSYNC(s) => fmt!(", \"fsync\":%?", s),
-            };
-        }
-        //concern_str += " }";
-        concern_str = concern_str + " }";
-
-        // parse write concern into bytes and send off
-        let concern_json = match _str_to_bson(concern_str) {
-            Ok(b) => *b,
-            Err(e) => return Err(MongoErr::new(
-                                    ~"client::_parse_and_send_wc",
-                                    ~"concern specification",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
-        };
-        let concern_query = mk_query(
-                                self.inc_requestId(),
-                                db,
-                                ~"$cmd",
-                                NO_CUR_TIMEOUT as i32,
-                                0,
-                                -1,
-                                concern_json,
-                                None);
-
-        match self.send(msg_to_bytes(concern_query)) {
-            Ok(_) => Ok(Some(())),
-            Err(e) => return Err(MongoErr::new(
-                                    ~"client::_parse_and_send_wc",
-                                    ~"sending write concern",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
-        }
-    }
-
-    /**
      * Picks up server response.
      *
      * # Returns
@@ -390,6 +326,7 @@ impl Client {
             }
         }
     }
+
     /**
      * Send on connection affiliated with this client.
      *

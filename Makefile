@@ -41,9 +41,7 @@ bin:
 	$(MKDIR) bin
 	$(MKDIR) test
 
-libs: $(LIB)/cast.c
-#	$(CC) $(CFLAGS) -o $(BIN)/typecast.o $(LIB)/cast.c
-#	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
+libs: $(LIB)/md5.c
 	$(CC) $(CFLAGS) -o $(BIN)/md5.o $(LIB)/md5.c
 	$(AR) $(BIN)/libmd5.a $(BIN)/md5.o
 
@@ -84,4 +82,5 @@ clean:
 	$(RM) -rf $(BIN)
 
 tidy:
-	sed -e 's/\s\+$$//g' ./src/*
+	for f in `find . -name '*.rs'`; do perl -pi -e "s/[ \t]*$$//" $$f; done
+	for f in `find . -name '*.rc'`; do perl -pi -e "s/[ \t]*$$//" $$f; done
