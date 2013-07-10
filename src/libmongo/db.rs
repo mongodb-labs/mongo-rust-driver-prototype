@@ -22,6 +22,7 @@ use bson::encode::*;
 use bson::formattable::*;
 
 use util::*;
+use msg::*;
 use client::Client;
 use coll::Collection;
 
@@ -162,15 +163,15 @@ impl DB {
      * # Failure Types
      * * errors propagated from `get_collection_names`
      */
-    pub fn get_collections(&self) -> Result<~[@Collection], MongoErr> {
+    pub fn get_collections(&self) -> Result<~[Collection], MongoErr> {
         let names = match self.get_collection_names() {
             Ok(n) => n,
             Err(e) => return Err(e),
         };
 
-        let mut coll : ~[@Collection] = ~[];
+        let mut coll : ~[Collection] = ~[];
         for names.iter().advance |&n| {
-            coll = coll + ~[@Collection::new(copy self.name, n, self.client)];
+            coll = coll + ~[Collection::new(copy self.name, n, self.client)];
         }
 
         Ok(coll)
@@ -184,8 +185,8 @@ impl DB {
      * # Returns
      * managed pointer to collecton handle
      */
-    pub fn get_collection(&self, coll : ~str) -> @Collection {
-        @Collection::new(copy self.name, coll, self.client)
+    pub fn get_collection(&self, coll : ~str) -> Collection {
+        Collection::new(copy self.name, coll, self.client)
     }
 
     // TODO make take options? (not strictly necessary but may be good?)
@@ -251,6 +252,71 @@ impl DB {
                 ~"db::run_command",
                 fmt!("run_command %? failed", cmd),
                 copy *errmsg))
+    }
+
+    /**
+     * Parses write concern into bytes and sends to server.
+     *
+     * # Arguments
+     * * `wc` - write concern, i.e. getLastError specifications
+     *
+     * # Returns
+     * None on success if w : 1, Some(()) on success otherwise,
+     * MongoErr on failure
+     *
+     * # Failure Types
+     * * invalid write concern specification (should never happen)
+     * * network
+     */
+    pub fn get_last_error(&self, wc : Option<~[WRITE_CONCERN]>) -> Result<Option<()>, MongoErr>{
+        // set default write concern (to 1) if not specified
+        let concern = match wc {
+            None => ~[W_N(1), FSYNC(false)],
+            Some(w) => w,
+        };
+        // parse write concern, early exiting if set to <= 0
+        let mut concern_str = ~"{ \"getLastError\":1";
+        for concern.iter().advance |&opt| {
+            //concern_str += match opt {
+            concern_str = concern_str + match opt {
+                JOURNAL(j) => fmt!(", \"j\":%?", j),
+                W_N(w) => {
+                    if w <= 0 { return Ok(None); }
+                    else { fmt!(", \"w\":%d", w) }
+                }
+                W_STR(w) => fmt!(", \"w\":\"%s\"", w),
+                WTIMEOUT(t) => fmt!(", \"wtimeout\":%d", t),
+                FSYNC(s) => fmt!(", \"fsync\":%?", s),
+            };
+        }
+        //concern_str += " }";
+        concern_str = concern_str + " }";
+
+        // parse write concern into bytes and send off
+        let concern_json = match _str_to_bson(concern_str) {
+            Ok(b) => *b,
+            Err(e) => return Err(MongoErr::new(
+                                    ~"client::_parse_and_send_wc",
+                                    ~"concern specification",
+                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+        };
+        let concern_query = mk_query(
+                                self.client.inc_requestId(),
+                                copy self.name,
+                                ~"$cmd",
+                                NO_CUR_TIMEOUT as i32,
+                                0,
+                                -1,
+                                concern_json,
+                                None);
+
+        match self.client.send(msg_to_bytes(concern_query)) {
+            Ok(_) => Ok(Some(())),
+            Err(e) => return Err(MongoErr::new(
+                                    ~"client::_parse_and_send_wc",
+                                    ~"sending write concern",
+                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+        }
     }
 
     ///Add a new database user with the given username and password.

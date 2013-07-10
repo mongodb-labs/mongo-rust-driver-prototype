@@ -19,13 +19,16 @@ use bson::encode::*;
 
 use util::*;
 use msg::*;
+use client::Client;
 use coll::Collection;
 use coll::MongoIndex;
 
 ///Structure representing a cursor
 pub struct Cursor {
     priv id : Option<i64>,                  // id on server (None->not yet queried, 0->closed)
-    priv collection : @Collection,          // XXX collection associated with cursor?
+    priv db: ~str,
+    priv coll: ~str,
+    priv client: @Client,
     flags : i32,                            // QUERY_FLAGs
     batch_size : i32,                       // size of batch in cursor fetch, may be modified
     query_spec : BsonDocument,              // query, may be modified
@@ -80,11 +83,13 @@ impl Cursor {
      */
     pub fn new(     query : BsonDocument,
                     proj : Option<BsonDocument>,
-                    collection : @Collection,
+                    collection : &Collection,
                     flags : i32) -> Cursor {
         Cursor {
             id: None,
-            collection: collection,
+            db: copy collection.db,
+            coll: copy collection.name,
+            client: collection.client,
             flags: flags,
             batch_size: 0,
             query_spec: query,
@@ -113,15 +118,15 @@ impl Cursor {
         // if cursor's never been queried, query and fill data up
         if self.id.is_none() {
             let msg = mk_query(
-                            self.collection.client.inc_requestId(),
-                            copy self.collection.db,
-                            copy self.collection.name,
+                            self.client.inc_requestId(),
+                            copy self.db,
+                            copy self.coll,
                             self.flags,
                             self.skip,
                             self.batch_size,
                             copy self.query_spec,
                             copy self.proj_spec);
-            match self.collection._send_msg(msg_to_bytes(msg), None, true) {
+            match self.client._send_msg(msg_to_bytes(msg), (copy self.db, None), true) {
                 Ok(reply) => match reply {
                     Some(r) => match r {
                         // XXX check if need start
@@ -190,12 +195,12 @@ impl Cursor {
 
         // otherwise, get_more
         let msg = mk_get_more(
-                            self.collection.client.inc_requestId(),
-                            copy self.collection.db,
-                            copy self.collection.name,
+                            self.client.inc_requestId(),
+                            copy self.db,
+                            copy self.coll,
                             self.batch_size,
                             cur_id);
-        match self.collection._send_msg(msg_to_bytes(msg), None, true) {
+        match self.client._send_msg(msg_to_bytes(msg), (copy self.db, None), true) {
             Ok(reply) => match reply {
                 Some(r) => match r {
                     // TODO check re: start
@@ -203,10 +208,10 @@ impl Cursor {
                         // send a kill cursors if needed---TODO batch
                         if id == 0 {
                             let kill_msg = mk_kill_cursor(
-                                                self.collection.client.inc_requestId(),
+                                                self.client.inc_requestId(),
                                                 1i32,
                                                 ~[cur_id]);
-                            match self.collection._send_msg(msg_to_bytes(kill_msg), None, false) {
+                            match self.client._send_msg(msg_to_bytes(kill_msg), (copy self.db, None), false) {
                                 Ok(reply) => match reply {
                                     Some(r) => self.iter_err = Some(MongoErr::new(
                                                 ~"cursor::refresh",
@@ -305,7 +310,9 @@ impl Cursor {
     pub fn explain(&mut self) -> Result<~BsonDocument, MongoErr> {
         let mut query = copy self.query_spec;
         query.append(~"$explain", Double(1f64));
-        let mut tmp_cur = Cursor::new(query, copy self.proj_spec, self.collection, self.flags);
+        let mut tmp_cur = Cursor::new(  query, copy self.proj_spec,
+                                        &Collection::new(copy self.db, copy self.coll, self.client),
+                                        self.flags);
         tmp_cur.cursor_limit(-1);
         match tmp_cur.next() {
             Some(exp) => Ok(exp),

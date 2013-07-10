@@ -142,185 +142,6 @@ impl Collection {
     }
 
     /**
-     * Sends message on connection; if write, checks write concern,
-     * and if query, picks up OP_REPLY.
-     *
-     * # Arguments
-     * * `msg` - bytes to send
-     * * `wc` - write concern (if applicable)
-     * * `auto_get_reply` - whether Client should expect an `OP_REPLY`
-     *                      from the server
-     *
-     * # Returns
-     * if read operation, `OP_REPLY` on success, MongoErr on failure;
-     * if write operation, None on no last error, MongoErr on last error
-     *      or network error
-     */
-    // XXX right now, public---try to move things around so doesn't need to be?
-    // TODO check_primary for replication purposes?
-    pub fn _send_msg(&self, msg : ~[u8], wc : Option<~[WRITE_CONCERN]>, auto_get_reply : bool)
-                -> Result<Option<ServerMsg>, MongoErr> {
-        // first send message, exiting if network error
-        match self.client.send(msg) {
-            Ok(_) => (),
-            Err(e) => return Err(MongoErr::new(
-                                    ~"coll::_send_msg",
-                                    ~"",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
-        }
-
-        // if not, for instance, query, handle write concern
-        if !auto_get_reply {
-            // set default write concern (to 1) if not specified
-            let concern = match wc {
-                None => ~[W_N(1), FSYNC(false)],
-                Some(w) => w,
-            };
-            // parse write concern, early exiting if set to <= 0
-            let mut concern_str = ~"{ \"getLastError\":1";
-            for concern.iter().advance |&opt| {
-                //concern_str += match opt {
-                concern_str = concern_str + match opt {
-                    JOURNAL(j) => fmt!(", \"j\":%?", j),
-                    W_N(w) => {
-                        if w <= 0 { return Ok(None); }
-                        else { fmt!(", \"w\":%d", w) }
-                    }
-                    W_STR(w) => fmt!(", \"w\":\"%s\"", w),
-                    WTIMEOUT(t) => fmt!(", \"wtimeout\":%d", t),
-                    FSYNC(s) => fmt!(", \"fsync\":%?", s),
-                };
-            }
-            //concern_str += " }";
-            concern_str = concern_str + " }";
-
-            // parse write concern into bytes and send off
-            match self._send_wc(concern_str) {
-                Ok(_) => (),
-                Err(e) => return Err(MongoErr::new(
-                                        ~"coll::_send_msg",
-                                        ~"sending write concern",
-                                        fmt!("-->\n%s", MongoErr::to_str(e)))),
-            }
-        }
-
-        // get response
-        let response = self._recv_msg();
-
-        // if write concern, check err field, convert to MongoErr if needed
-        match response {
-            Ok(m) => if auto_get_reply { return Ok(Some(m)) } else {
-                match m {
-                    OpReply { header:_, flags:_, cursor_id:_, start:_, nret:_, docs:d } => {
-                        match d[0].find(~"err") {
-                            None => Err(MongoErr::new(
-                                            ~"coll::_send_msg",
-                                            ~"getLastError unknown error",
-                                            ~"no $err field in reply")),
-                            Some(doc) => {
-                                let err_doc = copy *doc;
-                                match err_doc {
-                                    Null => Ok(None),
-                                    UString(s) => Err(MongoErr::new(
-                                                        ~"coll::_send_msg",
-                                                        ~"getLastError error",
-                                                        copy s)),
-                                    _ => Err(MongoErr::new(
-                                                ~"coll::_send_msg",
-                                                ~"getLastError unknown error",
-                                                ~"unknown last error in reply")),
-                                }
-                            },
-                        }
-                    }
-                }
-            },
-            Err(e) => return Err(MongoErr::new(
-                                    ~"coll::_send_msg",
-                                    ~"receiving write concern",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
-        }
-    }
-
-    /**
-     * Parses write concern into bytes and sends to server.
-     *
-     * # Arguments
-     * * `wc` - write concern, i.e. getLastError specifications
-     *
-     * # Returns
-     * () on success, MongoErr on failure
-     *
-     * # Failure Types
-     * * invalid write concern specification (should never happen)
-     * * network
-     */
-    fn _send_wc(&self, wc : ~str) -> Result<(), MongoErr>{
-        let concern_json = match _str_to_bson(wc) {
-            Ok(b) => *b,
-            Err(e) => return Err(MongoErr::new(
-                                    ~"coll::_send_wc",
-                                    ~"concern specification",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
-        };
-        let concern_query = mk_query(
-                                self.client.inc_requestId(),
-                                copy self.db,
-                                ~"$cmd",
-                                NO_CUR_TIMEOUT as i32,
-                                0,
-                                -1,
-                                concern_json,
-                                None);
-
-        match self.client.send(msg_to_bytes(concern_query)) {
-            Ok(_) => Ok(()),
-            Err(e) => return Err(MongoErr::new(
-                                    ~"coll::_send_wc",
-                                    ~"sending write concern",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
-        }
-    }
-
-    /**
-     * Picks up server response.
-     *
-     * # Returns
-     * ServerMsg on success, MongoErr on failure
-     *
-     * # Failure Types
-     * * invalid bytestring/message returned (should never happen)
-     * * server returned message with error flags
-     * * network
-     */
-    fn _recv_msg(&self) -> Result<ServerMsg, MongoErr> {
-        let m = match self.client.recv() {
-            Ok(bytes) => match parse_reply(bytes) {
-                Ok(m_tmp) => m_tmp,
-                Err(e) => return Err(e),
-            },
-            Err(e) => return Err(e),
-        };
-
-        match m {
-            OpReply { header:_, flags:f, cursor_id:_, start:_, nret:_, docs:_ } => {
-                if (f & CUR_NOT_FOUND as i32) != 0i32 {
-                    return Err(MongoErr::new(
-                                ~"coll::_recv_msg",
-                                ~"CursorNotFound",
-                                ~"cursor ID not valid at server"));
-                } else if (f & QUERY_FAIL as i32) != 0i32 {
-                    return Err(MongoErr::new(
-                                ~"coll::_recv_msg",
-                                ~"QueryFailure",
-                                ~"tmp"));
-                }
-                return Ok(m)
-            }
-        }
-    }
-
-    /**
      * CRUD ops.
      * Different methods rather than enum of arguments
      * since complexity not decreased with enum (for
@@ -360,7 +181,7 @@ impl Collection {
                         0i32,
                         bson_doc);
 
-        match self._send_msg(msg_to_bytes(msg), wc, false) {
+        match self.client._send_msg(msg_to_bytes(msg), (copy self.db, wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::insert",
@@ -412,7 +233,7 @@ impl Collection {
                         flags,
                         bson_docs);
 
-        match self._send_msg(msg_to_bytes(msg), wc, false) {
+        match self.client._send_msg(msg_to_bytes(msg), (copy self.db, wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::insert_batch",
@@ -500,7 +321,7 @@ impl Collection {
                         q,
                         up);
 
-        match self._send_msg(msg_to_bytes(msg), wc, false) {
+        match self.client._send_msg(msg_to_bytes(msg), (copy self.db, wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::update",
@@ -542,7 +363,7 @@ impl Collection {
      * # Returns
      * initialized (unqueried) Cursor on success, MongoErr on failure
      */
-    pub fn find(@self,  query : Option<QuerySpec>,
+    pub fn find(&self,  query : Option<QuerySpec>,
                         proj : Option<QuerySpec>,
                         flag_array : Option<~[QUERY_FLAG]>/*,
                         option_array : Option<~[QUERY_OPTION]>*/)
@@ -601,7 +422,7 @@ impl Collection {
      * ~BsonDocument of first result on success, MongoErr on failure
      */
     //pub fn find_one(@self, query : Option<QuerySpec>, proj : Option<QuerySpec>, flag_array : Option<~[QUERY_FLAG]>, option_array : Option<~[QUERY_OPTION]>)
-    pub fn find_one(@self, query : Option<QuerySpec>, proj : Option<QuerySpec>, flag_array : Option<~[QUERY_FLAG]>)
+    pub fn find_one(&self, query : Option<QuerySpec>, proj : Option<QuerySpec>, flag_array : Option<~[QUERY_FLAG]>)
                 -> Result<~BsonDocument, MongoErr> {
         /*let options = match option_array {
             None => Some(~[NRET(1)]),
@@ -665,7 +486,7 @@ impl Collection {
         let _ = self.process_delete_opts(option_array);
         let msg = mk_delete(self.client.inc_requestId(), copy self.db, copy self.name, flags, q);
 
-        match self._send_msg(msg_to_bytes(msg), wc, false) {
+        match self.client._send_msg(msg_to_bytes(msg), (copy self.db, wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::remove",
