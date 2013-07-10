@@ -22,7 +22,6 @@ use bson::encode::*;
 use bson::formattable::*;
 
 use util::*;
-use msg::*;
 use client::Client;
 use coll::Collection;
 
@@ -177,16 +176,69 @@ impl DB {
         Ok(coll)
     }
     /**
-     * Get `Collection` with given name, from this `DB`.
+     * Get handle to `Collection` with given name, from this `DB`.
      *
      * # Arguments
      * * `coll` - name of collection to get
      *
      * # Returns
-     * managed pointer to collecton handle
+     * collecton handle
      */
     pub fn get_collection(&self, coll : ~str) -> Collection {
         Collection::new(copy self.name, coll, self.client)
+    }
+    /**
+     * Create collection with given options.
+     */
+    pub fn create_collection(   &self,
+                                coll : ~str,
+                                flag_array : Option<~[COLLECTION_FLAG]>,
+                                option_array : Option<~[COLLECTION_OPTION]>)
+            -> Result<Collection, MongoErr> {
+        let flags = process_flags!(flag_array);
+        let cmd = fmt!( "{ \"create\":\"%s\", %s }",
+                        copy coll,
+                        self.process_create_ops(flags, option_array));
+        match self.run_command(SpecNotation(cmd)) {
+            Ok(_) => Ok(Collection::new(copy self.name, coll, self.client)),
+            Err(e) => Err(e),
+        }
+    }
+    priv fn process_create_ops(&self, flags : i32, options : Option<~[COLLECTION_OPTION]>)
+            -> ~str {
+        let mut opts_str = ~"";
+        opts_str.push_str(fmt!( "\"autoIndexId\":%? ",
+                                (flags & AUTOINDEX_ID as i32) != 0i32));
+
+        match options {
+            None => (),
+            Some(opt_arr) => {
+                for opt_arr.iter().advance |&opt| {
+                    opts_str.push_str(match opt {
+                        CAPPED(sz) => fmt!(", \"capped\":true, \"size\":%?", sz),
+                        SIZE(sz) => fmt!(", \"size\":%?", sz),
+                        MAX_DOCS(k) => fmt!(", \"max\":%?", k),
+                    })
+                }
+            }
+        }
+
+        opts_str
+    }
+    /**
+     * Drops given collection from database associated with this `DB`.
+     *
+     * # Arguments
+     * * `coll` - name of collection to get
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
+    pub fn drop_collection(&self, coll : ~str) -> Result<(), MongoErr> {
+        match self.run_command(SpecNotation(fmt!("{ \"drop\":\"%s\" }", coll))) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 
     // TODO make take options? (not strictly necessary but may be good?)
@@ -203,7 +255,7 @@ impl DB {
      * appropriately by caller, `MongoErr` on failure
      */
     pub fn run_command(&self, cmd : QuerySpec) -> Result<~BsonDocument, MongoErr> {
-        let coll = @Collection::new(copy self.name, fmt!("%s", SYSTEM_COMMAND), self.client);
+        let coll = Collection::new(copy self.name, fmt!("%s", SYSTEM_COMMAND), self.client);
 
         //let ret_msg = match coll.find_one(Some(cmd), None, None, None) {
         let ret_msg = match coll.find_one(Some(copy cmd), None, Some(~[NO_CUR_TIMEOUT])) {
@@ -261,14 +313,15 @@ impl DB {
      * * `wc` - write concern, i.e. getLastError specifications
      *
      * # Returns
-     * None on success if w : 1, Some(()) on success otherwise,
+     * None on success if w : 0, Some(()) on success otherwise,
      * MongoErr on failure
      *
      * # Failure Types
      * * invalid write concern specification (should never happen)
      * * network
+     * * getLastError error, e.g. duplicate ```_id```s
      */
-    pub fn get_last_error(&self, wc : Option<~[WRITE_CONCERN]>) -> Result<Option<()>, MongoErr>{
+    pub fn get_last_error(&self, wc : Option<~[WRITE_CONCERN]>) -> Result<(), MongoErr>{
         // set default write concern (to 1) if not specified
         let concern = match wc {
             None => ~[W_N(1), FSYNC(false)],
@@ -281,7 +334,7 @@ impl DB {
             concern_str = concern_str + match opt {
                 JOURNAL(j) => fmt!(", \"j\":%?", j),
                 W_N(w) => {
-                    if w <= 0 { return Ok(None); }
+                    if w <= 0 { return Ok(()); }
                     else { fmt!(", \"w\":%d", w) }
                 }
                 W_STR(w) => fmt!(", \"w\":\"%s\"", w),
@@ -292,37 +345,57 @@ impl DB {
         //concern_str += " }";
         concern_str = concern_str + " }";
 
-        // parse write concern into bytes and send off
-        let concern_json = match _str_to_bson(concern_str) {
-            Ok(b) => *b,
+        // run_command and get entire doc
+        let err_doc_tmp = match self.run_command(SpecNotation(concern_str)) {
+            Ok(doc) => doc,
             Err(e) => return Err(MongoErr::new(
-                                    ~"client::_parse_and_send_wc",
-                                    ~"concern specification",
+                                    ~"db::get_last_error",
+                                    ~"run_command error",
                                     fmt!("-->\n%s", MongoErr::to_str(e)))),
         };
-        let concern_query = mk_query(
-                                self.client.inc_requestId(),
-                                copy self.name,
-                                ~"$cmd",
-                                NO_CUR_TIMEOUT as i32,
-                                0,
-                                -1,
-                                concern_json,
-                                None);
 
-        match self.client.send(msg_to_bytes(concern_query)) {
-            Ok(_) => Ok(Some(())),
-            Err(e) => return Err(MongoErr::new(
-                                    ~"client::_parse_and_send_wc",
-                                    ~"sending write concern",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+        // error field name possibitilies
+        let err_field = ~[  err_doc_tmp.find(~"err"),
+                            err_doc_tmp.find(~"$err")];
+
+        // search for error field
+        let mut err_found = false;
+        let mut err_doc = Int32(1); // [invalid err_doc]
+        for err_field.iter().advance |&err_result| {
+            match err_result {
+                None => (),
+                Some(doc) => {
+                    err_found = true;
+                    err_doc = copy *doc;
+                }
+            }
+        };
+
+        if !err_found {
+            return Err(MongoErr::new(
+                            ~"client::_send_msg",
+                            ~"getLastError unexpected format",
+                            ~"no $err field in reply"));
+        }
+
+        // unwrap error message
+        match err_doc {
+            Null => Ok(()),
+            UString(s) => Err(MongoErr::new(
+                                ~"client::_send_msg",
+                                ~"getLastError error",
+                                copy s)),
+            _ => Err(MongoErr::new(
+                        ~"client::_send_msg",
+                        ~"getLastError unexpected format",
+                        ~"unknown last error in reply")),
         }
     }
 
     ///Add a new database user with the given username and password.
     ///If the system.users collection becomes unavailable, this will fail.
     pub fn add_user(&self, username: ~str, password: ~str, roles: ~[~str]) -> Result<(), MongoErr>{
-        let coll = @(self.get_collection(~"system.users"));
+        let coll = self.get_collection(~"system.users");
         let mut user = match coll.find_one(Some(SpecNotation(fmt!("{ user: %s }", username))), None, None)
             {
                 Ok(u) => u,

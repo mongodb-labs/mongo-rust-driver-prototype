@@ -32,8 +32,8 @@ Now we may create handles to databases and collections on the server. We start w
 // create handles to the collections "foo_coll" and "bar_coll" in the
 //      database "foo_db" (any may already exist; if not, it will be
 //      created on the first insert)
-let foo = @Collection::new(~"foo_db", ~"foo_coll", client);
-let bar = @Collection::new(~"foo_db", ~"bar_coll", client);
+let foo = Collection::new(~"foo_db", ~"foo_coll", client);
+let bar = Collection::new(~"foo_db", ~"bar_coll", client);
 ```
 
 ##### CRUD Operations

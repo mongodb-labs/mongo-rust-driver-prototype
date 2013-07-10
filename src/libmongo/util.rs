@@ -14,7 +14,6 @@
  */
 
 use bson::encode::*;
-use bson::json_parse::*;
 
 /**
  * Utility module for use internal and external to crate.
@@ -139,7 +138,6 @@ pub enum INDEX_FLAG {
     DROP_DUPS = 1 << 2,
     SPARSE = 1 << 3,
 }
-
 pub enum INDEX_OPTION {
     INDEX_NAME(~str),
     EXPIRE_AFTER_SEC(int),
@@ -162,30 +160,24 @@ pub enum INDEX_FIELD {
 }
 
 /**
+ * Collections.
+ */
+pub enum COLLECTION_FLAG {
+    AUTOINDEX_ID = 1 << 0,      // enable automatic index on _id?
+}
+pub enum COLLECTION_OPTION {
+    CAPPED(uint),   // max size of capped collection
+    SIZE(uint),     // preallocated size of uncapped collection
+    MAX_DOCS(int),  // max cap in number of documents
+}
+
+/**
  * Misc
  */
 pub static LITTLE_ENDIAN_TRUE : bool = true;
 pub static MONGO_DEFAULT_PORT : uint = 27017;
 
-/*
- * Helper: convert string to BsonDocument if possible.
- */
-pub fn _str_to_bson(s : ~str) -> Result<~BsonDocument, MongoErr> {
-    match ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(s) {
-        Ok(doc) => match doc {
-            Embedded(bson) => Ok(bson),
-            _ => Err(MongoErr::new(
-                        ~"coll::_str_to_bson",
-                        ~"converting string to bson",
-                        ~"non-bson string")),
-        },
-        Err(e) => Err(MongoErr::new(
-                        ~"coll::_str_to_bson",
-                        ~"converting string to bson",
-                        fmt!("-->\n%s", e))),
-    }
-}
-
+/// INTERNAL UTILITIES
 /**
  * Special collections for database operations, but users should not
  * access directly.
@@ -196,3 +188,17 @@ pub static SYSTEM_PROFILE : &'static str = &'static "system.profile";
 pub static SYSTEM_USER : &'static str = &'static "system.users";
 pub static SYSTEM_COMMAND : &'static str = &'static "$cmd";
 pub static SYSTEM_JS : &'static str = &'static "system.js";
+
+// macro for compressing options array into single i32 flag
+macro_rules! process_flags(
+    ($options:ident) => (
+        match $options {
+            None => 0i32,
+            Some(opt_array) => {
+                let mut tmp = 0i32;
+                for opt_array.iter().advance |&f| { tmp |= f as i32; }
+                tmp
+            }
+        }
+    );
+)

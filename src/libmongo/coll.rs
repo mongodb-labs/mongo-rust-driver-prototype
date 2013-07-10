@@ -22,36 +22,16 @@ use client::Client;
 use cursor::Cursor;
 use db::DB;
 
-// macro for compressing options array into single i32 flag
-// may need to remove if each CRUD op responsible for own options parsing
-macro_rules! process_flags(
-    ($options:ident) => (
-        match $options {
-            None => 0i32,
-            Some(opt_array) => {
-                let mut tmp = 0i32;
-                for opt_array.iter().advance |&f| { tmp |= f as i32; }
-                tmp
-            }
-        }
-    );
-)
-
 pub enum MongoIndex {
     MongoIndexName(~str),
     MongoIndexFields(~[INDEX_FIELD]),
 }
 
 impl MongoIndex {
-    // XXX
     fn process_index_opts(flags : i32, options : Option<~[INDEX_OPTION]>) -> (Option<~str>, ~[~str]) {
         let mut opts_str: ~[~str] = ~[];
 
         // flags
-        /*if (flags & BACKGROUND as i32) != 0i32 { opts_str += [~"\"background\":true"]; }
-        if (flags & UNIQUE as i32) != 0i32 { opts_str += [~"\"unique\":true"]; }
-        if (flags & DROP_DUPS as i32) != 0i32 { opts_str += [~"\"dropDups\":true"]; }
-        if (flags & SPARSE as i32) != 0i32 { opts_str += [~"\"spare\":true"]; } */
         if (flags & BACKGROUND as i32) != 0i32 { opts_str.push(~"\"background\":true"); }
         if (flags & UNIQUE as i32) != 0i32 { opts_str.push(~"\"unique\":true"); }
         if (flags & DROP_DUPS as i32) != 0i32 { opts_str.push(~"\"dropDups\":true"); }
@@ -126,9 +106,9 @@ impl MongoIndex {
 }
 
 pub struct Collection {
-    db : ~str,          // XXX should be private? if yes, refactor cursor
-    name : ~str,        // XXX should be private? if yes, refactor cursor
-    client : @Client,   // XXX should be private? if yes, refactor cursor
+    db : ~str,
+    name : ~str,
+    priv client : @Client,
 }
 
 // TODO: checking arguments for validity?
@@ -139,6 +119,13 @@ impl Collection {
      */
     pub fn new(db : ~str, name : ~str, client : @Client) -> Collection {
         Collection { db : db, name : name, client : client }
+    }
+
+    /**
+     * Get DB containing this Collection.
+     */
+    pub fn get_db(&self) -> DB {
+        DB::new(copy self.db, self.client)
     }
 
     /**
@@ -295,22 +282,22 @@ impl Collection {
         let _ = option_array;
         let q = match query {
             SpecObj(bson_doc) => bson_doc,
-            SpecNotation(s) => match _str_to_bson(s) {
-                Ok(b) => *b,
-                Err(e) => return Err(MongoErr::new(
+            SpecNotation(s) => match (copy s).to_bson_t() {
+                Embedded(bson) => *bson,
+                _ => return Err(MongoErr::new(
                                         ~"coll::update",
                                         ~"query specification",
-                                        fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                        fmt!("expected JSON formatted string, got %s", s))),
             },
         };
         let up = match update_spec {
             SpecObj(bson_doc) => bson_doc,
-            SpecNotation(s) => match _str_to_bson(s) {
-                Ok(b) => *b,
-                Err(e) => return Err(MongoErr::new(
+            SpecNotation(s) => match (copy s).to_bson_t() {
+                Embedded(bson) => *bson,
+                _ => return Err(MongoErr::new(
                                         ~"coll::update",
                                         ~"update specification",
-                                        fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                        fmt!("expected JSON formatted string, got %s", s))),
             },
         };
         let msg = mk_update(
@@ -372,12 +359,12 @@ impl Collection {
         let q_field = match query {
             None => BsonDocument::new(),                // empty Bson
             Some(SpecObj(bson_doc)) => bson_doc,
-            Some(SpecNotation(s)) => match _str_to_bson(s) {
-                Ok(b) => *b,
-                Err(e) => return Err(MongoErr::new(
+            Some(SpecNotation(s)) => match (copy s).to_bson_t() {
+                Embedded(bson) => *bson,
+                _ => return Err(MongoErr::new(
                                         ~"coll::find",
                                         ~"query specification",
-                                        fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                        fmt!("expected JSON formatted string, got n%s", s))),
             },
         };
         let mut q = BsonDocument::new();
@@ -387,12 +374,12 @@ impl Collection {
         let p = match proj {
             None => None,
             Some(SpecObj(bson_doc)) => Some(bson_doc),
-            Some(SpecNotation(s)) => match _str_to_bson(s) {
-                Ok(b) => Some(*b),
-                Err(e) => return Err(MongoErr::new(
+            Some(SpecNotation(s)) => match (copy s).to_bson_t() {
+                Embedded(bson) => Some(*bson),
+                _ => return Err(MongoErr::new(
                                         ~"coll::find",
                                         ~"projection specification",
-                                        fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                        fmt!("expected JSON formatted string, got %s", s))),
             },
         };
 
@@ -404,7 +391,7 @@ impl Collection {
 
         // construct cursor and return
 //        Ok(Cursor::new(q, p, @self, flags, nskip, nret))
-        Ok(Cursor::new(q, p, self, flags))
+        Ok(Cursor::new(q, p, self, self.client, flags))
     }
     /**
      * Returns pointer to first Bson from queried documents.
@@ -421,7 +408,7 @@ impl Collection {
      * # Returns
      * ~BsonDocument of first result on success, MongoErr on failure
      */
-    //pub fn find_one(@self, query : Option<QuerySpec>, proj : Option<QuerySpec>, flag_array : Option<~[QUERY_FLAG]>, option_array : Option<~[QUERY_OPTION]>)
+    //pub fn find_one(&self, query : Option<QuerySpec>, proj : Option<QuerySpec>, flag_array : Option<~[QUERY_FLAG]>, option_array : Option<~[QUERY_OPTION]>)
     pub fn find_one(&self, query : Option<QuerySpec>, proj : Option<QuerySpec>, flag_array : Option<~[QUERY_FLAG]>)
                 -> Result<~BsonDocument, MongoErr> {
         /*let options = match option_array {
@@ -474,12 +461,12 @@ impl Collection {
         let q = match query {
             None => BsonDocument::new(),
             Some(SpecObj(bson_doc)) => bson_doc,
-            Some(SpecNotation(s)) => match _str_to_bson(s) {
-                Ok(b) => *b,
-                Err(e) => return Err(MongoErr::new(
+            Some(SpecNotation(s)) => match (copy s).to_bson_t() {
+                Embedded(bson) => *bson,
+                _ => return Err(MongoErr::new(
                                         ~"coll::remove",
                                         ~"query specification",
-                                        fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                        fmt!("expected JSON formatted string, got %s", s))),
             },
         };
         let flags = process_flags!(flag_array);

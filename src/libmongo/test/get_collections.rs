@@ -28,14 +28,14 @@ fn test_get_collections() {
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
-    let db = ~"rust_tmp_1";
+    let db_str = ~"rust_get_colls";
     let n = 15;
     let colls = [~"coll0", ~"coll1", ~"coll2"];
     for colls.iter().advance |&name| {
-        fill_coll(db.clone(), name, client, n);
+        fill_coll(db_str.clone(), name, client, n);
     }
 
-    let db = DB::new(db, client);
+    let db = DB::new(db_str, client);
     match db.get_collection_names() {
         Ok(names) => {
             let mut i = 0;

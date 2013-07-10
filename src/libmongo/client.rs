@@ -236,56 +236,28 @@ impl Client {
                                     fmt!("-->\n%s", MongoErr::to_str(e)))),
         }
 
-        // if not, for instance, query, handle write concern
+        // handle write concern or handle query as appropriate
         if !auto_get_reply {
+            // requested write concern
             let (db_str, wc) = wc_pair;
             let db = DB::new(db_str, self);
 
             match db.get_last_error(wc) {
-                Ok(None) => return Ok(None),
-                Ok(Some(_)) => (),
-                Err(e) => return Err(MongoErr::new(
+                Ok(_) => Ok(None),
+                Err(e) => Err(MongoErr::new(
                                     ~"client::_send_msg",
                                     ~"write concern error",
                                     fmt!("-->\n%s", MongoErr::to_str(e)))),
             }
-        }
-
-        // get response
-        let response = self._recv_msg();
-
-        // if write concern, check err field, convert to MongoErr if needed
-        match response {
-            Ok(m) => if auto_get_reply { return Ok(Some(m)) } else {
-                match m {
-                    OpReply { header:_, flags:_, cursor_id:_, start:_, nret:_, docs:d } => {
-                        match d[0].find(~"err") {
-                            None => Err(MongoErr::new(
-                                            ~"coll::_send_msg",
-                                            ~"getLastError unknown error",
-                                            ~"no $err field in reply")),
-                            Some(doc) => {
-                                let err_doc = copy *doc;
-                                match err_doc {
-                                    Null => Ok(None),
-                                    UString(s) => Err(MongoErr::new(
-                                                        ~"coll::_send_msg",
-                                                        ~"getLastError error",
-                                                        copy s)),
-                                    _ => Err(MongoErr::new(
-                                                ~"coll::_send_msg",
-                                                ~"getLastError unknown error",
-                                                ~"unknown last error in reply")),
-                                }
-                            },
-                        }
-                    }
-                }
-            },
-            Err(e) => return Err(MongoErr::new(
-                                    ~"coll::_send_msg",
-                                    ~"receiving write concern",
+        } else {
+            // requested query
+            match self._recv_msg() {
+                Ok(m) => Ok(Some(m)),
+                Err(e) => Err(MongoErr::new(
+                                    ~"client::_send_msg",
+                                    ~"error in response",
                                     fmt!("-->\n%s", MongoErr::to_str(e)))),
+            }
         }
     }
 
@@ -313,12 +285,12 @@ impl Client {
             OpReply { header:_, flags:f, cursor_id:_, start:_, nret:_, docs:_ } => {
                 if (f & CUR_NOT_FOUND as i32) != 0i32 {
                     return Err(MongoErr::new(
-                                ~"coll::_recv_msg",
+                                ~"client::_recv_msg",
                                 ~"CursorNotFound",
                                 ~"cursor ID not valid at server"));
                 } else if (f & QUERY_FAIL as i32) != 0i32 {
                     return Err(MongoErr::new(
-                                ~"coll::_recv_msg",
+                                ~"client::_recv_msg",
                                 ~"QueryFailure",
                                 ~"tmp"));
                 }

@@ -25,12 +25,9 @@ fn test_logout() {
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
-    let db = DB::new(~"rust", client);
-    //clean up user first
-    let coll = db.get_collection(~"system.users");
-    coll.remove(Some(SpecNotation(~"{ \"user\": \"testuser3\" }")), None, None, None);
-
-    //add it back; this ensures the user will be present
+    // add user to fresh db; this ensures the user will be present
+    let db = DB::new(~"rust_logout", client);
+    db.get_collection(~"system.users").remove(None, None, None, None);
     match db.add_user(~"testuser3", ~"testpassword", ~[]) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e))

@@ -26,9 +26,9 @@ use coll::MongoIndex;
 ///Structure representing a cursor
 pub struct Cursor {
     priv id : Option<i64>,                  // id on server (None->not yet queried, 0->closed)
-    priv db: ~str,
-    priv coll: ~str,
-    priv client: @Client,
+    priv db: ~str,                          // name of DB associated with Cursor
+    priv coll: ~str,                        // name of Collection associated with Cursor
+    priv client: @Client,                   // Client (+Connection) associated with Cursor
     flags : i32,                            // QUERY_FLAGs
     batch_size : i32,                       // size of batch in cursor fetch, may be modified
     query_spec : BsonDocument,              // query, may be modified
@@ -84,12 +84,13 @@ impl Cursor {
     pub fn new(     query : BsonDocument,
                     proj : Option<BsonDocument>,
                     collection : &Collection,
+                    client : @Client,
                     flags : i32) -> Cursor {
         Cursor {
             id: None,
             db: copy collection.db,
             coll: copy collection.name,
-            client: collection.client,
+            client: client,
             flags: flags,
             batch_size: 0,
             query_spec: query,
@@ -311,7 +312,10 @@ impl Cursor {
         let mut query = copy self.query_spec;
         query.append(~"$explain", Double(1f64));
         let mut tmp_cur = Cursor::new(  query, copy self.proj_spec,
-                                        &Collection::new(copy self.db, copy self.coll, self.client),
+                                        &Collection::new(   copy self.db,
+                                                            copy self.coll,
+                                                            self.client),
+                                        self.client,
                                         self.flags);
         tmp_cur.cursor_limit(-1);
         match tmp_cur.next() {
