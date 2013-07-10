@@ -165,15 +165,15 @@ impl BsonFormattable for json::Json {
         match doc {
             Double(f) => Ok(json::Number(f as float)),
             UString(s) => Ok(json::String(copy s)),
-            Embedded(a) => Ok(json::Object(~match 
+            Embedded(a) => Ok(json::Object(~match
                 BsonFormattable::from_bson_t::<HashMap<~str, json::Json>>(Embedded(a)) {
                     Ok(d) => d,
-                    Err(e) => return Err(e)    
+                    Err(e) => return Err(e)
                 })),
-            Array(a) => Ok(json::List(match 
+            Array(a) => Ok(json::List(match
                 BsonFormattable::from_bson_t::<~[json::Json]>(Embedded(a)) {
                     Ok(d) => d,
-                    Err(e) => return Err(e)    
+                    Err(e) => return Err(e)
                 })),
             Binary(_,_) => Err(~"bindata cannot be translated to Json"),
             ObjectId(_) => Err(~"objid cannot be translated to Json"),
@@ -264,7 +264,7 @@ impl BsonFormattable for BsonDocument {
         match doc {
            Embedded(d) => Ok(copy *d),
            Array(d) => Ok(copy *d),
-           _ => Err(~"can only convert Embedded and Array to BsonDocument") 
+           _ => Err(~"can only convert Embedded and Array to BsonDocument")
         }
     }
 }

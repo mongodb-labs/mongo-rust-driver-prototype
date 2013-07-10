@@ -252,7 +252,7 @@ impl DB {
                 fmt!("run_command %? failed", cmd),
                 copy *errmsg))
     }
- 
+
     ///Add a new database user with the given username and password.
     ///If the system.users collection becomes unavailable, this will fail.
     pub fn add_user(&self, username: ~str, password: ~str, roles: ~[~str]) -> Result<(), MongoErr>{

@@ -15,7 +15,7 @@ pub mod libmongo {
     mod mockable;
 }
 pub mod bson {
-    pub mod decode;   
+    pub mod decode;
     pub mod encode;
     pub mod formattable;
     pub mod json_parse;

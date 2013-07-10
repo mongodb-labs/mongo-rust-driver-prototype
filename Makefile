@@ -82,4 +82,5 @@ clean:
 	$(RM) -rf $(BIN)
 
 tidy:
-	sed -e 's/\s\+$$//g' ./src/*
+	for f in `find . -name '*.rs'`; do perl -pi -e "s/[ \t]*$$//" $$f; done
+	for f in `find . -name '*.rc'`; do perl -pi -e "s/[ \t]*$$//" $$f; done
