@@ -61,7 +61,10 @@ impl MongoIndex {
 
         (name, opts_str)
     }
-    fn process_index_fields(index_arr : ~[INDEX_FIELD], get_name : bool) -> (~str, ~[~str]) {
+    fn process_index_fields(    index_arr : ~[INDEX_FIELD],
+                                index_opts : &mut ~[~str],
+                                get_name : bool)
+            -> (~str, ~[~str]) {
         let mut name = ~"";
         let mut index_str = ~[];
         for index_arr.iter().advance |&field| {
@@ -71,18 +74,27 @@ impl MongoIndex {
                         /*index_str += [fmt!("\"%s\":%d", copy key, order as int)];
                         if get_name { name += fmt!("%s_%d", copy key, order as int); } */
                         index_str = index_str + ~[fmt!("\"%s\":%d", copy key, order as int)];
-                        if get_name { name = name + fmt!("%s_%d", copy key, order as int); }
+                        if get_name { name.push_str(fmt!("%s_%d", key, order as int)); }
                     }
                 }
                 //HASHED(key) => index_str += [fmt!("\"%s\":\"hashed\"", copy key)],
-                HASHED(key) => index_str = index_str + ~[fmt!("\"%s\":\"hashed\"", copy key)],
+                HASHED(key) => {
+                    index_str = index_str + ~[fmt!("\"%s\":\"hashed\"", copy key)];
+                    if get_name { name.push_str(fmt!("%s_hashed", key)); }
+                }
                 GEOSPATIAL(key, geotype) => {
                     let typ = match geotype {
                         SPHERICAL => ~"2dsphere",
                         FLAT => ~"2d",
                     };
                     //index_str += [fmt!("\"%s\":\"%s\"", copy key, typ)];
-                    index_str = index_str + ~[fmt!("\"%s\":\"%s\"", copy key, typ)];
+                    index_str = index_str + ~[fmt!("\"%s\":\"%s\"", copy key, copy typ)];
+                    if get_name { name.push_str(fmt!("%s_%s", key, typ)); }
+                }
+                GEOHAYSTACK(loc, snd, sz) => {
+                    index_str = index_str + ~[fmt!("\"%s\":\"geoHaystack\", \"%s\":1", copy loc, copy snd)];
+                    if get_name { name.push_str(fmt!("%s_geoHaystack_%s_1", loc, snd)); }
+                    *index_opts = *index_opts + ~[fmt!("\"bucketSize\":%?", sz)];
                 }
             }
         }
@@ -98,7 +110,7 @@ impl MongoIndex {
         match tmp {
             MongoIndexName(s) => s,
             MongoIndexFields(arr) => {
-                let (name, _) = MongoIndex::process_index_fields(arr, true);
+                let (name, _) = MongoIndex::process_index_fields(arr, &mut ~[], true);
                 name
             }
         }
@@ -515,7 +527,7 @@ impl Collection {
         let flags = process_flags!(flag_array);
         let (x, y) = MongoIndex::process_index_opts(flags, option_array);
         let mut maybe_name = x; let mut opts = y;
-        let (default_name, index) = MongoIndex::process_index_fields(index_arr, maybe_name.is_none());
+        let (default_name, index) = MongoIndex::process_index_fields(index_arr, &mut opts, maybe_name.is_none());
         if maybe_name.is_none() {
             opts = opts + ~[fmt!("\"name\":\"%s\"", default_name)];
             maybe_name = Some(default_name);

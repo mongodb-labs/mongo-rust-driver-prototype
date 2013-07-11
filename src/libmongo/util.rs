@@ -156,7 +156,7 @@ pub enum INDEX_FIELD {
     NORMAL(~[(~str, INDEX_ORDER)]),
     HASHED(~str),
     GEOSPATIAL(~str, INDEX_GEOTYPE),
-    //GEOHAYSTACK()
+    GEOHAYSTACK(~str, ~str, uint),
 }
 
 /**
