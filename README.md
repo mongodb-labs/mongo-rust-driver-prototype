@@ -52,11 +52,12 @@ bar.insert(ins, None);
 // insert a big batch of documents into foo_coll
 let mut ins_batch : ~[~str] = ~[];
 let n = 200;
+let mut i = 0;
 for n.times {
     ins_batch = ins_batch + ~[fmt!("{ \"a\":%d, \"b\":\"ins %d\" }", i/2, i)];
     i += 1;
 }
-foo.insert_batch(ins_strs, None, None, None);
+foo.insert_batch(ins_batch, None, None, None);
     // no write concern specified---use default; no special options
 
 // read one back (no specific query or query options/flags)
@@ -110,11 +111,11 @@ match foo.find(None, Some(SpecNotation(~"{ \"b\":1 }")), None) {
         println(fmt!("%?", cursor.explain()));
 
         // sort on the cursor on the "a" field, ascending
-        cur.sort(NORMAL(~[(~"a", ASC)]));
+        cursor.sort(NORMAL(~[(~"a", ASC)]));
 
         // iterate on the cursor---no query specified so over whole collection
-        for cur.advance |&doc| {
-            println(fmt!("%?", doc));
+        for cursor.advance |doc| {
+            println(fmt!("%?", *doc));
         }
     }
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
@@ -152,8 +153,9 @@ let db = DB::new(~"foo_db", client);
 match db.get_collection_names() {
     Ok(names) => {
         // should output
-        //      bar_db
-        //      foo_db
+        //      system.indexes
+        //      bar_coll
+        //      foo_coll
         for names.iter().advance |&n| { println(fmt!("%s", n)); }
     }
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
