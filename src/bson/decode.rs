@@ -138,6 +138,7 @@ impl<T:Stream<u8>> BsonParser<T> {
     fn _double(&mut self) -> Document {
         let mut u: u64 = 0;
         for range(0,8) |i| {
+            //TODO: how will this hold up on big-endian architectures?
             u |= (*self.stream.first() as u64 << ((8 * i)));
             self.stream.pass(1);
         }

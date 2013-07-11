@@ -35,12 +35,15 @@ code > span.er { color: #ff0000; font-weight: bold; }
 
 <ul>
 <li><a href="#freeze-little_endian_true">Freeze <code>LITTLE_ENDIAN_TRUE</code></a> - Misc</li>
+<li><a href="#freeze-mongo_default_port">Freeze <code>MONGO_DEFAULT_PORT</code></a></li>
 <li><a href="#freeze-system_command">Freeze <code>SYSTEM_COMMAND</code></a></li>
 <li><a href="#freeze-system_index">Freeze <code>SYSTEM_INDEX</code></a></li>
 <li><a href="#freeze-system_js">Freeze <code>SYSTEM_JS</code></a></li>
-<li><a href="#freeze-system_namespace">Freeze <code>SYSTEM_NAMESPACE</code></a> - Special collections for database operations, but users should not access directly.</li>
+<li><a href="#freeze-system_namespace">Freeze <code>SYSTEM_NAMESPACE</code></a> - INTERNAL UTILITIES Special collections for database operations, but users should not access directly.</li>
 <li><a href="#freeze-system_profile">Freeze <code>SYSTEM_PROFILE</code></a></li>
 <li><a href="#freeze-system_user">Freeze <code>SYSTEM_USER</code></a></li>
+<li><a href="#enum-collection_flag">Enum <code>COLLECTION_FLAG</code></a> - Collections.</li>
+<li><a href="#enum-collection_option">Enum <code>COLLECTION_OPTION</code></a></li>
 <li><a href="#enum-delete_flag">Enum <code>DELETE_FLAG</code></a></li>
 <li><a href="#enum-delete_option">Enum <code>DELETE_OPTION</code></a></li>
 <li><a href="#enum-index_field">Enum <code>INDEX_FIELD</code></a></li>
@@ -59,7 +62,6 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><a href="#enum-write_concern">Enum <code>WRITE_CONCERN</code></a></li>
 <li><a href="#struct-mongoerr">Struct <code>MongoErr</code></a> - Utility module for use internal and external to crate</li>
 <li><a href="#implementation-for-mongoerr">Implementation <code>for MongoErr</code></a> - MongoErr to propagate errors; would be called Err except that's taken by Rust...</li>
-<li><a href="#function-_str_to_bson">Function <code>_str_to_bson</code></a></li>
 </ul>
 </div>
 
@@ -67,6 +69,10 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <h2>Freeze <code>LITTLE_ENDIAN_TRUE</code></h2>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">bool</span></code></pre>
 <p>Misc</p>
+</div>
+<div id="freeze-mongo_default_port" class="section level2">
+<h2>Freeze <code>MONGO_DEFAULT_PORT</code></h2>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">uint</span></code></pre>
 </div>
 <div id="freeze-system_command" class="section level2">
 <h2>Freeze <code>SYSTEM_COMMAND</code></h2>
@@ -83,7 +89,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <div id="freeze-system_namespace" class="section level2">
 <h2>Freeze <code>SYSTEM_NAMESPACE</code></h2>
 <pre class="sourceCode rust"><code class="sourceCode rust">&amp;<span class="ch">&#39;static str</span></code></pre>
-<p>Special collections for database operations, but users should not access directly.</p>
+<p>INTERNAL UTILITIES Special collections for database operations, but users should not access directly.</p>
 </div>
 <div id="freeze-system_profile" class="section level2">
 <h2>Freeze <code>SYSTEM_PROFILE</code></h2>
@@ -93,9 +99,30 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <h2>Freeze <code>SYSTEM_USER</code></h2>
 <pre class="sourceCode rust"><code class="sourceCode rust">&amp;<span class="ch">&#39;static str</span></code></pre>
 </div>
+<div id="enum-collection_flag" class="section level2">
+<h2>Enum <code>COLLECTION_FLAG</code></h2>
+<p>Collections.</p>
+<div id="variants" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><code>AUTOINDEX_ID = 1 &lt;&lt; 0</code></li>
+</ul>
+</div>
+</div>
+<div id="enum-collection_option" class="section level2">
+<h2>Enum <code>COLLECTION_OPTION</code></h2>
+<div id="variants-1" class="section level4">
+<h4>Variants</h4>
+<ul>
+<li><p><code>CAPPED(uint)</code></p></li>
+<li><p><code>SIZE(uint)</code></p></li>
+<li><p><code>MAX_DOCS(int)</code></p></li>
+</ul>
+</div>
+</div>
 <div id="enum-delete_flag" class="section level2">
 <h2>Enum <code>DELETE_FLAG</code></h2>
-<div id="variants" class="section level4">
+<div id="variants-2" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><code>SINGLE_REMOVE = 1 &lt;&lt; 0</code></li>
@@ -107,7 +134,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </div>
 <div id="enum-index_field" class="section level2">
 <h2>Enum <code>INDEX_FIELD</code></h2>
-<div id="variants-1" class="section level4">
+<div id="variants-3" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><p><code>NORMAL(~[(~str, INDEX_ORDER)])</code></p></li>
@@ -118,7 +145,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </div>
 <div id="enum-index_flag" class="section level2">
 <h2>Enum <code>INDEX_FLAG</code></h2>
-<div id="variants-2" class="section level4">
+<div id="variants-4" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><p><code>BACKGROUND = 1 &lt;&lt; 0</code></p></li>
@@ -130,7 +157,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </div>
 <div id="enum-index_geotype" class="section level2">
 <h2>Enum <code>INDEX_GEOTYPE</code></h2>
-<div id="variants-3" class="section level4">
+<div id="variants-5" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><p><code>SPHERICAL</code></p></li>
@@ -140,7 +167,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </div>
 <div id="enum-index_option" class="section level2">
 <h2>Enum <code>INDEX_OPTION</code></h2>
-<div id="variants-4" class="section level4">
+<div id="variants-6" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><p><code>INDEX_NAME(~str)</code></p></li>
@@ -151,7 +178,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <div id="enum-index_order" class="section level2">
 <h2>Enum <code>INDEX_ORDER</code></h2>
 <p>Indexing.</p>
-<div id="variants-5" class="section level4">
+<div id="variants-7" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><p><code>ASC = 1</code></p></li>
@@ -161,7 +188,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </div>
 <div id="enum-insert_flag" class="section level2">
 <h2>Enum <code>INSERT_FLAG</code></h2>
-<div id="variants-6" class="section level4">
+<div id="variants-8" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><code>CONT_ON_ERR = 1 &lt;&lt; 0</code></li>
@@ -173,7 +200,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </div>
 <div id="enum-query_flag" class="section level2">
 <h2>Enum <code>QUERY_FLAG</code></h2>
-<div id="variants-7" class="section level4">
+<div id="variants-9" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><p><code>CUR_TAILABLE = 1 &lt;&lt; 1</code></p></li>
@@ -188,7 +215,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </div>
 <div id="enum-query_option" class="section level2">
 <h2>Enum <code>QUERY_OPTION</code></h2>
-<div id="variants-8" class="section level4">
+<div id="variants-10" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><p><code>NSKIP(int)</code></p></li>
@@ -198,7 +225,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </div>
 <div id="enum-queryspec" class="section level2">
 <h2>Enum <code>QuerySpec</code></h2>
-<div id="variants-9" class="section level4">
+<div id="variants-11" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><p><code>SpecObj(BsonDocument)</code></p></li>
@@ -209,7 +236,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <div id="enum-reply_flag" class="section level2">
 <h2>Enum <code>REPLY_FLAG</code></h2>
 <p>Reply flags, but user shouldn't deal with them directly.</p>
-<div id="variants-10" class="section level4">
+<div id="variants-12" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><p><code>CUR_NOT_FOUND = 1 &lt;&lt; 0</code></p></li>
@@ -222,7 +249,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <div id="enum-update_flag" class="section level2">
 <h2>Enum <code>UPDATE_FLAG</code></h2>
 <p>CRUD option flags. If options ever change, modify: util.rs: appropriate enums (_FLAGs or _OPTIONs) coll.rs: appropriate flag and option helper parser functions</p>
-<div id="variants-11" class="section level4">
+<div id="variants-13" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><p><code>UPSERT = 1 &lt;&lt; 0</code></p></li>
@@ -235,7 +262,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </div>
 <div id="enum-write_concern" class="section level2">
 <h2>Enum <code>WRITE_CONCERN</code></h2>
-<div id="variants-12" class="section level4">
+<div id="variants-14" class="section level4">
 <h4>Variants</h4>
 <ul>
 <li><p><code>JOURNAL(bool)</code></p></li>
@@ -268,10 +295,6 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> to_str(e: MongoErr) -&gt; ~<span class="kw">str</span></code></pre>
 <p>Print a MongoErr to string in a standard format.</p>
 </div>
-</div>
-<div id="function-_str_to_bson" class="section level2">
-<h2>Function <code>_str_to_bson</code></h2>
-<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> _str_to_bson(s: ~<span class="kw">str</span>) -&gt; <span class="kw">Result</span>&lt;~BsonDocument, MongoErr&gt;</code></pre>
 </div>
 </body>
 </html>

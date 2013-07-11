@@ -145,17 +145,35 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </ul>
 </div>
 </div>
+<div id="method-_send_msg" class="section level3">
+<h3>Method <code>_send_msg</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> _send_msg(@self, msg: ~[<span class="kw">u8</span>], wc_pair: (~<span class="kw">str</span>, <span class="kw">Option</span>&lt;~[WRITE_CONCERN]&gt;),
+             auto_get_reply: <span class="kw">bool</span>) -&gt; <span class="kw">Result</span>&lt;<span class="kw">Option</span>&lt;ServerMsg&gt;, MongoErr&gt;</code></pre>
+<p>Sends message on connection; if write, checks write concern, and if query, picks up OP_REPLY.</p>
+<div id="arguments-2" class="section level4">
+<h4>Arguments</h4>
+<ul>
+<li><code>msg</code> - bytes to send</li>
+<li><code>wc</code> - write concern (if applicable)</li>
+<li><code>auto_get_reply</code> - whether Client should expect an <code>OP_REPLY</code> from the server</li>
+</ul>
+</div>
+<div id="returns-5" class="section level4">
+<h4>Returns</h4>
+<p>if read operation, <code>OP_REPLY</code> on success, MongoErr on failure; if write operation, None on no last error, MongoErr on last error or network error</p>
+</div>
+</div>
 <div id="method-send" class="section level3">
 <h3>Method <code>send</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> send(&amp;<span class="kw">self</span>, bytes: ~[<span class="kw">u8</span>]) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
 <p>Send on connection affiliated with this client.</p>
-<div id="arguments-2" class="section level4">
+<div id="arguments-3" class="section level4">
 <h4>Arguments</h4>
 <ul>
 <li><code>bytes</code> - bytes to send</li>
 </ul>
 </div>
-<div id="returns-5" class="section level4">
+<div id="returns-6" class="section level4">
 <h4>Returns</h4>
 <p>() on success, MongoErr on failure</p>
 </div>
@@ -171,7 +189,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <h3>Method <code>recv</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> recv(&amp;<span class="kw">self</span>) -&gt; <span class="kw">Result</span>&lt;~[<span class="kw">u8</span>], MongoErr&gt;</code></pre>
 <p>Receive on connection affiliated with this client.</p>
-<div id="returns-6" class="section level4">
+<div id="returns-7" class="section level4">
 <h4>Returns</h4>
 <p>bytes received over connection on success, MongoErr on failure</p>
 </div>

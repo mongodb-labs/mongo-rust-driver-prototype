@@ -67,7 +67,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><p><code>JScript(~str)</code></p></li>
 <li><p><code>JScriptWithScope(~str, ~BsonDocument)</code></p></li>
 <li><p><code>Int32(i32)</code></p></li>
-<li><p><code>Timestamp(i64)</code></p></li>
+<li><p><code>Timestamp(u32, u32)</code></p></li>
 <li><p><code>Int64(i64)</code></p></li>
 <li><p><code>MinKey</code></p></li>
 <li><p><code>MaxKey</code></p></li>
@@ -336,6 +336,11 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <h3>Method <code>inst</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> inst() -&gt; @mut BsonDocument</code></pre>
 <p>Returns a managed pointer to a new BsonDocument. Use this if you plan on chaining calls to append() directly on your call to inst. Example: let a = BsonDocument::inst().append(...).append(...); //compiles let b = BsonDocument::new().append(...); //error let c = BsonDocument::new(); c.append(...).append(...).append(...); //compiles</p>
+</div>
+<div id="method-fields_match" class="section level3">
+<h3>Method <code>fields_match</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> fields_match(&amp;<span class="kw">self</span>, other: &amp;BsonDocument) -&gt; <span class="kw">bool</span></code></pre>
+<p>Compare two BsonDocuments to decide if they have the same fields. Returns true if every field except the _id field is matching. The _id field and the size are ignored. Two documents are considered to have matching fields even if their fields are not in the same order.</p>
 </div>
 </div>
 </body>
