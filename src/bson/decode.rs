@@ -109,7 +109,8 @@ impl<T:Stream<u8>> BsonParser<T> {
                     }
                 }
                 Some(INT32) => Int32(bytesum(self.stream.aggregate(4)) as i32),
-                Some(TSTAMP) => Timestamp(bytesum(self.stream.aggregate(8)) as i64),
+                Some(TSTAMP) => Timestamp(bytesum(self.stream.aggregate(4)) as u32,
+                    bytesum(self.stream.aggregate(4)) as u32),
                 Some(INT64) => Int64(bytesum(self.stream.aggregate(8)) as i64),
                 Some(MINKEY) => MinKey,
                 Some(MAXKEY) => MaxKey,

@@ -66,7 +66,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
             if self.stream.expect(&['\"']).is_none() { return Err(~"keys must begin with quote marks"); }
             let key = match self._string() {
                 UString(s) => s,
-                _ => fail!("invalid key found")//TODO
+                _ => return Err(~"invalid key found")
             };
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
             if self.stream.expect(&[':']).is_none() {
@@ -285,9 +285,10 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                         Some(&Embedded(ref doc)) => if doc.fields.len() == 2
                             && doc.contains_key(~"t")
                             && doc.contains_key(~"i") {
-                                match (m.find(~"t"), m.find(~"i")) {
-                                    (Some(&Double(a)), Some(&Double(b))) =>
-                                        return Some(Timestamp((a+b) as i64)), //TODO
+                                match (doc.find(~"t"), doc.find(~"i")) {
+                                    (Some(&Double(a)), Some(&Double(b))) => {
+                                        return Some(Timestamp(a as u32, b as u32)); //TODO is this right??
+                                    }
                                     _ => return None
                                 }
                             },

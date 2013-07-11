@@ -114,7 +114,7 @@ impl BsonFormattable for i64 {
         match doc {
             Int64(i) => Ok(i),
             UTCDate(i) => Ok(i),
-            Timestamp(i) => Ok(i),
+            Timestamp(u1, u2) => Ok((u1 | (u2 << 32)) as i64),
             _ => Err(~"can only cast Int64, Date, and Timestamp to i64")
         }
     }
@@ -184,7 +184,7 @@ impl BsonFormattable for json::Json {
             JScript(s) => Ok(json::String(copy s)),
             JScriptWithScope(_,_) => Err(~"jscope cannot be translated to Json"),
             Int32(i) => Ok(json::Number(i as float)),
-            Timestamp(i) => Ok(json::Number(i as float)),
+            Timestamp(u1, u2) => Ok(json::Number((u1 | (u2 << 32)) as float)),
             Int64(i) => Ok(json::Number(i as float)),
             MinKey => Err(~"minkey cannot be translated to Json"),
             MaxKey => Err(~"maxkey cannot be translated to Json")
@@ -298,7 +298,7 @@ mod tests {
         assert!(BsonFormattable::from_bson_t::<json::Json>(Regex(~"A", ~"B")).is_err());
         assert!(BsonFormattable::from_bson_t::<json::Json>(JScript(~"foo")).is_ok());
         assert!(BsonFormattable::from_bson_t::<json::Json>(Int32(1i32)).is_ok());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(Timestamp(1i64)).is_ok());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(Timestamp(1, 0)).is_ok());
         assert!(BsonFormattable::from_bson_t::<json::Json>(Int64(1i64)).is_ok());
         assert!(BsonFormattable::from_bson_t::<json::Json>(MinKey).is_err());
         assert!(BsonFormattable::from_bson_t::<json::Json>(MaxKey).is_err());
