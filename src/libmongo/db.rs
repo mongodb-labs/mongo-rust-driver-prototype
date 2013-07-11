@@ -396,7 +396,7 @@ impl DB {
     ///If the system.users collection becomes unavailable, this will fail.
     pub fn add_user(&self, username: ~str, password: ~str, roles: ~[~str]) -> Result<(), MongoErr>{
         let coll = self.get_collection(~"system.users");
-        let mut user = match coll.find_one(Some(SpecNotation(fmt!("{ user: %s }", username))), None, None)
+        let mut user = match coll.find_one(Some(SpecNotation(fmt!("{ \"user\": %s }", username))), None, None)
             {
                 Ok(u) => u,
                 Err(_) => {
