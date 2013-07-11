@@ -74,7 +74,6 @@ doc: $(BSONDIR)/*.rs $(MONGODIR)/*
 	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/mongo $(MONGODIR)/mongo.rc
 
 clean:
-	$(RM) $(BIN)/*.dylib
 	$(RM) -rf $(TEST)
 	$(RM) -rf $(BIN)
 
