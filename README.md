@@ -4,6 +4,11 @@ MongoDB Rust Driver Prototype
 This is a prototype version of a MongoDB driver for the Rust programming language.
 
 ## Tutorial
+Once you've built MongoDB and have the compiled library files, you can make MongoDB available in your code with
+```rust
+extern mod bson;
+extern mod mongo;
+```
 
 #### Mongo Driver
 In general, aside from the BSON library imports (see below), we will need the following imports:
@@ -181,7 +186,7 @@ BSON-valid data items are represented in the ```Document``` type. (Valid types a
 To get a document for one of these types, you can wrap it yourself or call the ```to_bson_t``` method.
 Example:
 ```rust
-use mongo::bson::formattable::*;
+use bson::formattable::*;
 
 let a = (1i).to_bson_t(); //Int32(1)
 let b = (~"foo").to_bson_t(); //UString(~"foo")
@@ -194,8 +199,8 @@ A complete BSON object is represented in the BsonDocument type. BsonDocument con
 This type exposes an API which is similar to that of a typical map.
 Example:
 ```rust
-use mongo::bson::encode::*;
-use mongo::bson::formattable::*;
+use bson::encode::*;
+use bson::formattable::*;
 
 //Building a document {foo: "bar", baz: 5.1}
 let doc = BsonDocument::new();
@@ -223,8 +228,8 @@ match parsed_doc {
 Through this method, standard BSON types can easily be serialized. Any type ```Foo``` can also be serialized in this way if it implements the ```BsonFormattable``` trait.
 Example:
 ```rust
-use mongo::bson::encode::*;
-use mongo::bson::formattable::*;
+use bson::encode::*;
+use bson::formattable::*;
 
 struct Foo {
     ...
@@ -250,7 +255,7 @@ impl BsonFormattable for Foo {
 The ```~[u8]``` representation of data is not especially useful for modifying or viewing. A ```~[u8]``` can be easily transformed into a BsonDocument for easier manipulation.
 Example:
 ```rust
-use mongo::bson::decode::*;
+use bson::decode::*;
 
 let b: ~[u8] = /*get a bson document from somewhere*/
 let p = BsonParser::new(b);
@@ -267,8 +272,8 @@ let doc = decode(c); //the standalone 'decode' function handles creation of the 
 The ```BsonFormattable``` trait also contains a method called ```from_bson_t``` as mentioned above. This static method allows a Document to be converted into the implementing type. This allows a quick path to decode a ```~[u8]``` into a ```T:BsonFormattable```.
 Example:
 ```rust
-use mongo::bson::decode::*;
-use mongo::bson::formattable::*;
+use bson::decode::*;
+use bson::formattable::*;
 
 struct Foo {
     ...
@@ -289,4 +294,5 @@ let myfoo = BsonFormattable::from_bson_t::<Foo>(decode(b).unwrap()); //here it i
 - [ ] Implement read preferences
 - [ ] Documentation to the [API site](http://api.mongodb.org)
 - [ ] Thorough test suite for CRUD functionality
+
 To be continued...
