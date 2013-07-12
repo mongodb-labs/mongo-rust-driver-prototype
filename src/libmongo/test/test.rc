@@ -19,6 +19,8 @@ extern mod std;
 
 pub mod fill_coll;
 
+mod rs_conn;
+/*
 mod good_insert_single;
 mod good_insert_batch_small;
 mod good_insert_batch_big;
@@ -35,3 +37,4 @@ mod drop_db;
 mod add_user;
 mod authenticate;
 mod logout;
+*/

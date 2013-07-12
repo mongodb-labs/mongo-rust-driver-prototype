@@ -34,9 +34,9 @@ pub enum ServerType {
 
 pub struct ReplicaSetConnection {
     priv seed : ~[NodeConnection],
-    priv hosts : ~cell::Cell<~[~[NodeConnection]]>,   // TODO RWARC
-    priv recv_from : ~cell::Cell<~NodeConnection>,
-    priv send_to : ~cell::Cell<~NodeConnection>,
+    priv hosts : ~cell::Cell<~[~[@NodeConnection]]>,    // TODO RWARC?
+    priv send_to : ~cell::Cell<@NodeConnection>,        // convenience
+    priv recv_from : ~cell::Cell<@NodeConnection>,      // convenience
 }
 
 impl Connection for ReplicaSetConnection {
@@ -47,9 +47,11 @@ impl Connection for ReplicaSetConnection {
      * and records the primary and secondaries.
      */
     pub fn connect(&self) -> Result<(), MongoErr> {
-        if self.hosts.is_empty() {
+        if !self.hosts.is_empty() {
             Err(MongoErr::new(~"conn_replica::connect", ~"already connected", ~""))
-        } else { self.reconnect() }
+        } else {
+            self.reconnect()
+        }
     }
 
     /**
@@ -59,7 +61,6 @@ impl Connection for ReplicaSetConnection {
         let mut err = ~"";
 
         // disconnect from each of hosts
-
         if !self.hosts.is_empty() {
             let host_mat = self.hosts.take();
             for host_mat.iter().advance |&host_type| {
@@ -83,6 +84,10 @@ impl Connection for ReplicaSetConnection {
             }
         }*/
 
+        // empty out send_to and recv_from
+        if !self.send_to.is_empty() { self.send_to.take(); }
+        if !self.recv_from.is_empty() { self.recv_from.take(); }
+
         match err.len() {
             0 => Ok(()),
             _ => Err(MongoErr::new(
@@ -97,6 +102,29 @@ impl Connection for ReplicaSetConnection {
      * to which to send.
      */
     pub fn send(&self, data : ~[u8]) -> Result<(), MongoErr> {
+        /*
+        if self.hosts.is_empty() {
+            return Err(MongoErr::new(
+                        ~"conn_replica::send",
+                        ~"no send_to server",
+                        ~"no server specified to which to send"));
+        }
+
+        let hosts = self.hosts.take();
+        let len = hosts[PRIMARY as int].len();
+
+        if len == 1 {
+            let result = hosts[PRIMARY as int][0].send(data);
+            self.hosts.put_back(hosts);
+            result
+        } else {
+            return Err(MongoErr::new(
+                        ~"conn_replica::send",
+                        ~"requires single primary",
+                        fmt!("expected single primary, found %?", len)))
+        }
+        */
+
         if self.send_to.is_empty() {
             return Err(MongoErr::new(
                         ~"conn_replica::send",
@@ -154,7 +182,7 @@ impl ReplicaSetConnection {
     // XXX
     pub fn reconnect(&self) -> Result<(), MongoErr> {
         let mut host_list : ~[(~str, uint)] = ~[];
-        let mut hosts : ~[~[NodeConnection]] = ~[];
+        let mut hosts : ~[~[@NodeConnection]] = ~[];
         for NSERVER_TYPES.times { hosts.push(~[]); }
 
         if !self.hosts.is_empty() { self.hosts.take(); }
@@ -188,7 +216,7 @@ impl ReplicaSetConnection {
                             let fields = copy list_doc.unwrap().fields;
                             for fields.iter().advance |&(@_, @host_doc)| {
                                 match host_doc {
-                                    UString(s) => host_str = s,
+                                    UString(s) => host_str = copy s,
                                     _ => err = Some(MongoErr::new(
                                             ~"conn_replica::connect",
                                             ~"isMaster runcommand response in unexpected format",
@@ -266,6 +294,7 @@ impl ReplicaSetConnection {
                         }
                     }
                 }
+println(fmt!("rs:reconnection, err:%?, ismaster:%?, secondary:%?\n", err, is_master, is_secondary));
 
                 if err.is_none() {
                     if is_master { Ok(PRIMARY) }
@@ -276,18 +305,31 @@ impl ReplicaSetConnection {
 
             // record type of this server (primary or secondary) XXX
             match server_type {
-                Ok(PRIMARY) => hosts[PRIMARY as int].push(server),
-                Ok(SECONDARY) => hosts[SECONDARY as int].push(server),
-                /*Ok(ARBITER) => hosts[ARBITER as int].push(server),
-                Ok(PASSIVE) => hosts[PASSIVE as int].push(server),*/
-                Ok(OTHER) => hosts[OTHER as int].push(server),
+                Ok(PRIMARY) => hosts[PRIMARY as int].push(@server),
+                Ok(SECONDARY) => hosts[SECONDARY as int].push(@server),
+                /*Ok(ARBITER) => hosts[ARBITER as int].push(@server),
+                Ok(PASSIVE) => hosts[PASSIVE as int].push(@server),*/
+                Ok(OTHER) => hosts[OTHER as int].push(@server),
                 Err(e) => return Err(e),
             }
         }
 
+        // empty out everything first   // XXX
+        if !self.send_to.is_empty() { self.send_to.take(); }
+        if !self.recv_from.is_empty() { self.recv_from.take(); }
+
         // connect to primary iff 1
         let result = if hosts[PRIMARY as int].len() == 1 {
-            hosts[PRIMARY as int][0].connect()
+            // put alias in send_to
+            self.send_to.put_back(hosts[PRIMARY as int][0]);
+
+            // connect to primary
+            let tmp = hosts[PRIMARY as int][0].connect();
+
+            // put hosts back in
+            self.hosts.put_back(hosts);
+
+            tmp
         } else if hosts[PRIMARY as int].len() < 1 {
             Err(MongoErr::new(
                 ~"conn_replica::connect",
@@ -299,9 +341,6 @@ impl ReplicaSetConnection {
                 ~"multiple primaries",
                 ~"replica set cannot contain multiple primaries"))
         };
-
-        // put host list in
-        self.hosts.put_back(hosts);
 
         result
     }
@@ -317,19 +356,24 @@ impl ReplicaSetConnection {
      * host IP string/port pair on success, MongoErr on failure
      */
     fn _parse_host(&self, host_str : ~str) -> Result<(~str, uint), MongoErr> {
-        match host_str.find_str(":") {
-            None => Ok((fmt!("%s", host_str), MONGO_DEFAULT_PORT)),
+        let mut port_str = fmt!("%?", MONGO_DEFAULT_PORT);
+        let mut ip_str = match host_str.find_str(":") {
+            None => host_str,
             Some(i) => {
-                let ip = host_str.slice_to(i);
-                let port_str = host_str.slice_from(i+1);
-                match int::from_str(port_str) {
-                    None => Err(MongoErr::new(
-                                        ~"conn_replica::_parse_host",
-                                        ~"unexpected host string format",
-                                        fmt!("host string should be \"~str:uint\", found %s:%s", ip, port_str))),
-                    Some(k) => Ok((fmt!("%s", ip), k as uint)),
-                }
+                port_str = host_str.slice_from(i+1).to_owned();
+                host_str.slice_to(i).to_owned()
             }
+        };
+
+        if ip_str == ~"localhost" { ip_str = ~"127.0.0.1"; }    // XXX must exist better soln
+
+        match int::from_str(port_str) {
+            None => Err(MongoErr::new(
+                            ~"conn_replica::_parse_host",
+                            ~"unexpected host string format",
+                            fmt!("host string should be \"[IP ~str]:[uint]\",
+                                        found %s:%s", ip_str, port_str))),
+            Some(k) => Ok((ip_str, k as uint)),
         }
     }
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-RC = rustc
+RC = rustc -Z debug-info
 RDOC = rustdoc
 RDOCFLAGS = --output-style doc-per-mod
 CC = gcc
@@ -51,15 +51,15 @@ bson: $(BSONDIR)/*
 mongo: $(MONGODIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rc
 
-test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
-	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
-	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
+test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc $(MONGODIR)/test/test.rc
+	#$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
+	#$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rc
 
 check: test
 ifeq ($(MONGOTEST),1)
-	$(TEST)/bson_test
-	$(TEST)/mongo_test
+	#$(TEST)/bson_test
+	#$(TEST)/mongo_test
 	$(TEST)/driver_test
 else
 	$(TEST)/bson_test
