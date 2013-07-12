@@ -44,7 +44,7 @@ pub enum Document {
     JScriptWithScope(~str, ~BsonDocument),        //x0F
     //deprecated: x0E symbol
     Int32(i32),                    //x10
-    Timestamp(i64),                    //x11
+    Timestamp(u32, u32),                    //x11
     Int64(i64),                    //x12
     MinKey,                        //xFF
     MaxKey                        //x7F
@@ -67,7 +67,7 @@ pub struct BsonDocument {
  * encoder.buf will contain the resulting ~[u8].
  */
 pub struct BsonDocEncoder {
-    //TODO: is it possible this could be an IOWriter, like the extra::json encoder?
+    //XXX: is it possible this could be an IOWriter, like the extra::json encoder?
     priv buf: ~[u8]
 }
 
@@ -168,7 +168,7 @@ impl<E:Encoder> Encodable<E> for BsonDocument {
                JScript(_) => 0x0D,
                JScriptWithScope(_,_) => 0x0F,
                Int32(_) => 0x10,
-               Timestamp(_) => 0x11,
+               Timestamp(_,_) => 0x11,
                Int64(_) => 0x12,
                MinKey => 0xFF,
                MaxKey => 0x7F
@@ -241,8 +241,9 @@ impl<E:Encoder> Encodable<E> for Document {
             Int32(i) => {
                 encoder.emit_i32(i);
             }
-            Timestamp(i) => {
-                encoder.emit_i64(i);
+            Timestamp(u1, u2) => {
+                encoder.emit_u32(u1);
+                encoder.emit_u32(u2);
             }
             Int64(i) => {
                 encoder.emit_i64(i); }
@@ -275,7 +276,6 @@ impl<'self> BsonDocument {
 
     ///Adds a list of key/value pairs and updates size. Returns nothing.
     pub fn put_all(&mut self, pairs: ~[(~str, Document)]) {
-        //TODO: when is iter() going to be available?
         for pairs.iter().advance |&(k,v)| {
             self.fields.insert(k, v);
         }
@@ -363,7 +363,7 @@ impl Document {
             JScript(ref s) => 5 + (*s).to_bytes(L_END).len() as i32,
             JScriptWithScope(ref s, ref doc) => 5 + (*s).to_bytes(L_END).len() as i32 + doc.size,
             Int32(_) => 4,
-            Timestamp(_) => 8,
+            Timestamp(_,_) => 8,
             Int64(_) => 8,
             MinKey => 0,
             MaxKey => 0
@@ -461,7 +461,7 @@ mod tests {
         let doc2 = BsonDocument::inst().append(~"foo", Int64(4040404 as i64));
         assert_eq!(doc2.to_bson(), ~[18,0,0,0,18,102,111,111,0,212,166,61,0,0,0,0,0,0] );
 
-        let doc3 = BsonDocument::inst().append(~"foo", Timestamp(4040404 as i64));
+        let doc3 = BsonDocument::inst().append(~"foo", Timestamp(4040404, 0));
         assert_eq!(doc3.to_bson(), ~[18,0,0,0,17,102,111,111,0,212,166,61,0,0,0,0,0,0] );
     }
 

@@ -373,7 +373,7 @@ impl DB {
 
         if !err_found {
             return Err(MongoErr::new(
-                            ~"client::_send_msg",
+                            ~"db::get_last_error",
                             ~"getLastError unexpected format",
                             ~"no $err field in reply"));
         }
@@ -382,13 +382,13 @@ impl DB {
         match err_doc {
             Null => Ok(()),
             UString(s) => Err(MongoErr::new(
-                                ~"client::_send_msg",
-                                ~"getLastError error",
-                                copy s)),
+                            ~"db::get_last_error",
+                            ~"getLastError error",
+                            copy s)),
             _ => Err(MongoErr::new(
-                        ~"client::_send_msg",
-                        ~"getLastError unexpected format",
-                        ~"unknown last error in reply")),
+                            ~"db::get_last_error",
+                            ~"getLastError unexpected format",
+                            ~"unknown last error in reply")),
         }
     }
 
@@ -396,7 +396,7 @@ impl DB {
     ///If the system.users collection becomes unavailable, this will fail.
     pub fn add_user(&self, username: ~str, password: ~str, roles: ~[~str]) -> Result<(), MongoErr>{
         let coll = self.get_collection(~"system.users");
-        let mut user = match coll.find_one(Some(SpecNotation(fmt!("{ \"user\": %s }", username))), None, None)
+        let mut user = match coll.find_one(Some(SpecNotation(fmt!("{ \"user\": \"%s\" }", username))), None, None)
             {
                 Ok(u) => u,
                 Err(_) => {

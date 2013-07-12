@@ -56,9 +56,6 @@ test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rc
 
-ex: $(MONGODIR)/test.rs
-	$(RC) $(FLAGS) -o $(TEST)/mongo_ex $(MONGODIR)/test.rs
-
 check: test
 ifeq ($(MONGOTEST),1)
 	$(TEST)/bson_test
@@ -77,7 +74,6 @@ doc: $(BSONDIR)/*.rs $(MONGODIR)/*
 	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/mongo $(MONGODIR)/mongo.rc
 
 clean:
-	$(RM) $(BIN)/*.dylib
 	$(RM) -rf $(TEST)
 	$(RM) -rf $(BIN)
 

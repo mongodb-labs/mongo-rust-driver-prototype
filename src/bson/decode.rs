@@ -109,7 +109,8 @@ impl<T:Stream<u8>> BsonParser<T> {
                     }
                 }
                 Some(INT32) => Int32(bytesum(self.stream.aggregate(4)) as i32),
-                Some(TSTAMP) => Timestamp(bytesum(self.stream.aggregate(8)) as i64),
+                Some(TSTAMP) => Timestamp(bytesum(self.stream.aggregate(4)) as u32,
+                    bytesum(self.stream.aggregate(4)) as u32),
                 Some(INT64) => Int64(bytesum(self.stream.aggregate(8)) as i64),
                 Some(MINKEY) => MinKey,
                 Some(MAXKEY) => MaxKey,
@@ -137,6 +138,7 @@ impl<T:Stream<u8>> BsonParser<T> {
     fn _double(&mut self) -> Document {
         let mut u: u64 = 0;
         for range(0,8) |i| {
+            //TODO: how will this hold up on big-endian architectures?
             u |= (*self.stream.first() as u64 << ((8 * i)));
             self.stream.pass(1);
         }

@@ -168,7 +168,7 @@ pub enum COLLECTION_FLAG {
 pub enum COLLECTION_OPTION {
     CAPPED(uint),   // max size of capped collection
     SIZE(uint),     // preallocated size of uncapped collection
-    MAX_DOCS(int),  // max cap in number of documents
+    MAX_DOCS(uint), // max cap in number of documents
 }
 
 /**

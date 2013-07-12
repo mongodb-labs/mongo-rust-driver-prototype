@@ -418,7 +418,8 @@ impl Cursor {
                             ~"cannot close cursor never iterated upon"));
         }
 
-        let cur_id = (copy self.id).unwrap();
+        let cur_id = self.id.unwrap();
+        self.id = Some(0);
         let kill_msg = mk_kill_cursor(
                             self.client.inc_requestId(),
                             1i32,
@@ -440,8 +441,6 @@ impl Cursor {
             self.iter_err = copy error;
             Err(error.unwrap())
         }
-
-        //self.open = false
     }
 
     pub fn is_dead(&self) -> bool {

@@ -31,21 +31,21 @@ fn test_capped_coll() {
     let db = DB::new(~"rust", client);
     db.drop_collection(~"capped");
 
-    match db.create_collection(~"capped", None, Some(~[CAPPED(100000), MAX_DOCS(5)])) {
+    let n = 100;
+    match db.create_collection(~"capped", None, Some(~[CAPPED(100000), MAX_DOCS(n)])) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
     // should fail
-    match db.create_collection(~"capped", None, Some(~[CAPPED(100000), MAX_DOCS(5)])) {
+    match db.create_collection(~"capped", None, Some(~[CAPPED(100000), MAX_DOCS(n)])) {
         Ok(_) => fail!("duplicate capped collection creation succeeded"),
         Err(_) => (),
     }
 
-    let n = 5;
     let (coll, _, ins_docs) = fill_coll(~"rust", ~"capped", client, n);
 
-    let n_tmp = 10;
+    let n_tmp = 200;
     let (_, ins_strs_tmp, ins_docs_tmp) = fill_coll(~"rust", ~"capped_tmp", client, n_tmp);
     coll.insert(copy ins_strs_tmp[1], None);
 
@@ -56,12 +56,12 @@ fn test_capped_coll() {
             let mut j = 0;
             cursor.sort(NORMAL(~[(~"$natural", DESC)]));
             for cursor.advance |ret_doc| {
-                if j >= n { fail!("more docs returned than inserted"); }
+                if j >= n { fail!("more docs than in capped collection"); }
                 if j == 0 { assert!(*ret_doc == ins_docs_tmp[1]); }
                 else { assert!(*ret_doc == ins_docs[n-j]); }
                 j += 1;
             }
-            if j < n { fail!("fewer docs returned than inserted"); }
+            if j < n { fail!("fewer docs than in capped collection"); }
         }
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
@@ -108,9 +108,11 @@ fn test_capped_coll() {
             let mut cursor = c;
             let mut j = 0;
             for cursor.advance |ret_doc| {
-                assert!(*ret_doc == ins_docs_tmp[j+5]);
+                if j >= n { fail!("more docs than in capped collection"); }
+                assert!(*ret_doc == ins_docs_tmp[j+n]);
                 j += 1;
             }
+            if j < n { fail!("fewer docs than in capped collection"); }
         }
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }

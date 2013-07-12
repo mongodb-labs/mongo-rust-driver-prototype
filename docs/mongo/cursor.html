@@ -44,7 +44,9 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <h2>Struct <code>Cursor</code></h2>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">pub</span> <span class="kw">struct</span> Cursor {
     <span class="kw">priv</span> id: <span class="kw">Option</span>&lt;<span class="kw">i64</span>&gt;,
-    <span class="kw">priv</span> collection: @Collection,
+    <span class="kw">priv</span> db: ~<span class="kw">str</span>,
+    <span class="kw">priv</span> coll: ~<span class="kw">str</span>,
+    <span class="kw">priv</span> client: @Client,
     flags: <span class="kw">i32</span>,
     batch_size: <span class="kw">i32</span>,
     query_spec: BsonDocument,
@@ -79,7 +81,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <div id="method-new" class="section level3">
 <h3>Method <code>new</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> new(query: BsonDocument, proj: <span class="kw">Option</span>&lt;BsonDocument&gt;,
-       collection: @Collection, flags: <span class="kw">i32</span>) -&gt; Cursor</code></pre>
+       collection: &amp;Collection, client: @Client, flags: <span class="kw">i32</span>) -&gt; Cursor</code></pre>
 <p>Initialize cursor with query, projection, collection, flags, and skip and limit, but don't query yet (i.e. constructed cursors are empty).</p>
 <div id="arguments" class="section level4">
 <h4>Arguments</h4>
@@ -95,9 +97,9 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <p>Cursor</p>
 </div>
 </div>
-<div id="method-skip" class="section level3">
-<h3>Method <code>skip</code></h3>
-<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> skip(&amp;<span class="kw">mut</span> <span class="kw">self</span>, skip: <span class="kw">i32</span>) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
+<div id="method-cursor_skip" class="section level3">
+<h3>Method <code>cursor_skip</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> cursor_skip(&amp;<span class="kw">mut</span> <span class="kw">self</span>, skip: <span class="kw">i32</span>) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
 <p>CURSOR OPTIONS (must be specified pre-querying) Skip specified amount before starting to iterate.</p>
 <div id="arguments-1" class="section level4">
 <h4>Arguments</h4>
@@ -116,9 +118,9 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </ul>
 </div>
 </div>
-<div id="method-limit" class="section level3">
-<h3>Method <code>limit</code></h3>
-<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> limit(&amp;<span class="kw">mut</span> <span class="kw">self</span>, limit: <span class="kw">i32</span>) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
+<div id="method-cursor_limit" class="section level3">
+<h3>Method <code>cursor_limit</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> cursor_limit(&amp;<span class="kw">mut</span> <span class="kw">self</span>, limit: <span class="kw">i32</span>) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
 <p>Limit amount to return from Cursor.</p>
 <div id="arguments-2" class="section level4">
 <h4>Arguments</h4>
