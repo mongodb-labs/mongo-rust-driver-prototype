@@ -4,6 +4,28 @@ MongoDB Rust Driver Prototype
 This is a prototype version of a MongoDB driver for the Rust programming language.
 This library has been built on Rust version 0.7. If you are using a more up-to-date version of Rust, the project may not build correctly.
 
+## Installation
+
+#### Dependencies
+- [Rust](http://rust-lang.org) 0.7 (WARNING: will likely not build on other versions)
+- [gcc](http://gcc.gnu.org)
+- [MongoDB](http://mongodb.org) 2.4 or above
+- [GNU Make](http://gnu.org/software/make)
+
+#### Building
+The Rust MongoDB driver is built using ```make```. Available targets include:
+- ```all``` (default) build binaries for ```bson``` and ```mongo```
+- ```libs``` compile C dependencies
+- ```bson``` build a binary just for ```bson```
+- ```mongo``` build a binary just for ```mongo``` (note: this requires an existing ```bson``` binary)
+- ```test``` compile the test suite
+- ```check``` compile and run the test suite
+- ```doc``` generate documentation
+- ```clean``` remove generated binaries
+- ```tidy``` clean up unused whitespace
+
+By default, files are compiled with ```unused-unsafe``` warnings denied and ```unnecessary-allocation``` warnings allowed. You can pass additional flags to rustc by setting the ```TOOLFLAGS``` variable. Additionally, integration tests can be enabled by setting ```MONGOTEST=1```. _Integration tests will fail unless there is a MongoDB instance running on 127.0.0.1:27017_.
+
 ## Tutorial
 Once you've built MongoDB and have the compiled library files, you can make MongoDB available in your code with
 ```rust

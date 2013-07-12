@@ -149,6 +149,19 @@ impl<T:BsonFormattable> BsonFormattable for ~T {
     }
 }
 
+impl<T:BsonFormattable> BsonFormattable for @T {
+    fn to_bson_t(&self) -> Document {
+        (**self).to_bson_t()
+    }
+
+    fn from_bson_t(doc: Document) -> Result<@T, ~str> {
+        match BsonFormattable::from_bson_t(doc) {
+            Ok(c) => Ok(@c),
+            Err(e) => Err(e)
+        }
+    }
+}
+
 impl BsonFormattable for json::Json {
     fn to_bson_t(&self) -> Document {
         match *self {
