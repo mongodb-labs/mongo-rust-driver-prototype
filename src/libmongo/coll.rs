@@ -44,17 +44,17 @@ impl MongoIndex {
             Some(opt_arr) => {
                 for opt_arr.iter().advance |&opt| {
                     //opts_str += match opt {
-                    opts_str = opts_str + match opt {
+                    opts_str.push(match opt {
                         INDEX_NAME(n) => {
                             name = Some(copy n);
-                            ~[fmt!("\"name\":\"%s\"", n)]
+                            fmt!("\"name\":\"%s\"", n)
                         }
-                        EXPIRE_AFTER_SEC(exp) => ~[fmt!("\"expireAfterSeconds\":%d", exp).to_owned()],
-                        VERS(v) => ~[fmt!("\"v\":%d", v)],
+                        EXPIRE_AFTER_SEC(exp) => fmt!("\"expireAfterSeconds\":%d", exp).to_owned(),
+                        VERS(v) => fmt!("\"v\":%d", v),
                         //WEIGHTS(BsonDocument),
                         //DEFAULT_LANG(~str),
                         //OVERRIDE_LANG(~str),
-                    };
+                    });
                 }
             }
         };
@@ -71,12 +71,12 @@ impl MongoIndex {
             match field {
                 NORMAL(arr) => {
                     for arr.iter().advance |&(key, order)| {
-                        index_str = index_str + ~[fmt!("\"%s\":%d", copy key, order as int)];
+                        index_str.push(fmt!("\"%s\":%d", key, order as int));
                         if get_name { name.push_str(fmt!("%s_%d", key, order as int)); }
                     }
                 }
                 HASHED(key) => {
-                    index_str = index_str + ~[fmt!("\"%s\":\"hashed\"", copy key)];
+                    index_str.push(fmt!("\"%s\":\"hashed\"", key));
                     if get_name { name.push_str(fmt!("%s_hashed", key)); }
                 }
                 GEOSPATIAL(key, geotype) => {
@@ -84,13 +84,13 @@ impl MongoIndex {
                         SPHERICAL => ~"2dsphere",
                         FLAT => ~"2d",
                     };
-                    index_str = index_str + ~[fmt!("\"%s\":\"%s\"", copy key, copy typ)];
+                    index_str.push(fmt!("\"%s\":\"%s\"", key, typ));
                     if get_name { name.push_str(fmt!("%s_%s", key, typ)); }
                 }
                 GEOHAYSTACK(loc, snd, sz) => {
-                    index_str = index_str + ~[fmt!("\"%s\":\"geoHaystack\", \"%s\":1", copy loc, copy snd)];
+                    index_str.push(fmt!("\"%s\":\"geoHaystack\", \"%s\":1", loc, snd));
                     if get_name { name.push_str(fmt!("%s_geoHaystack_%s_1", loc, snd)); }
-                    *index_opts = *index_opts + ~[fmt!("\"bucketSize\":%?", sz)];
+                    (*index_opts).push(fmt!("\"bucketSize\":%?", sz));
                 }
             }
         }
@@ -102,8 +102,7 @@ impl MongoIndex {
      * From either `~str` or full specification of index, get name.
      */
     pub fn get_name(&self) -> ~str {
-        let tmp = copy *self;
-        match tmp {
+        match (copy *self) {
             MongoIndexName(s) => s,
             MongoIndexFields(arr) => {
                 let mut tmp = ~[];
@@ -172,12 +171,12 @@ impl Collection {
             }];
         let msg = mk_insert(
                         self.client.inc_requestId(),
-                        copy self.db,
-                        copy self.name,
+                        &self.db,
+                        &self.name,
                         0i32,
                         bson_doc);
 
-        match self.client._send_msg(msg_to_bytes(msg), (copy self.db, wc), false) {
+        match self.client._send_msg(msg_to_bytes(msg), (&self.db, wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::insert",
@@ -211,25 +210,24 @@ impl Collection {
                 -> Result<(), MongoErr> {
         let mut bson_docs : ~[BsonDocument] = ~[];
         for docs.iter().advance |&d| {
-            //bson_docs += ~[match d.to_bson_t() {
-            bson_docs = bson_docs + ~[match d.to_bson_t() {
+            bson_docs.push(match d.to_bson_t() {
                     Embedded(bson) => *bson,
                     _ => return Err(MongoErr::new(
                                     ~"coll::insert_batch",
                                     ~"some BsonDocument/Document error",
                                     ~"no idea")),
-                }];
+                });
         }
         let flags = process_flags!(flag_array);
         let _ = option_array;
         let msg = mk_insert(
                         self.client.inc_requestId(),
-                        copy self.db,
-                        copy self.name,
+                        &self.db,
+                        &self.name,
                         flags,
                         bson_docs);
 
-        match self.client._send_msg(msg_to_bytes(msg), (copy self.db, wc), false) {
+        match self.client._send_msg(msg_to_bytes(msg), (&self.db, wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::insert_batch",
@@ -247,13 +245,11 @@ impl Collection {
                                 ~"unknown BsonDocument/Document error",
                                 ~"BsonFormattable not actually BSON formattable")),
         };
-        let maybe_id = copy bson_doc.find(~"id");
-        match maybe_id {
+        match (copy bson_doc.find(~"id")) {
             None => self.insert(doc, wc),
             Some(id) => {
-                let new_id = copy *id;
                 let mut query = BsonDocument::new();
-                query.append(~"_id", new_id);
+                query.append(~"_id", copy *id);
                 self.update(SpecObj(query), SpecObj(copy bson_doc), Some(~[UPSERT]), None, wc)
             },
         }
@@ -311,13 +307,13 @@ impl Collection {
         };
         let msg = mk_update(
                         self.client.inc_requestId(),
-                        copy self.db,
-                        copy self.name,
+                        &self.db,
+                        &self.name,
                         flags,
                         q,
                         up);
 
-        match self.client._send_msg(msg_to_bytes(msg), (copy self.db, wc), false) {
+        match self.client._send_msg(msg_to_bytes(msg), (&self.db, wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::update",
@@ -480,9 +476,9 @@ impl Collection {
         };
         let flags = process_flags!(flag_array);
         let _ = self.process_delete_opts(option_array);
-        let msg = mk_delete(self.client.inc_requestId(), copy self.db, copy self.name, flags, q);
+        let msg = mk_delete(self.client.inc_requestId(), &self.db, &self.name, flags, q);
 
-        match self.client._send_msg(msg_to_bytes(msg), (copy self.db, wc), false) {
+        match self.client._send_msg(msg_to_bytes(msg), (&self.db, wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::remove",
@@ -527,14 +523,14 @@ impl Collection {
         let mut maybe_name = x; let mut opts = y;
         let (default_name, index) = MongoIndex::process_index_fields(index_arr, &mut opts, maybe_name.is_none());
         if maybe_name.is_none() {
-            opts = opts + ~[fmt!("\"name\":\"%s\"", default_name)];
+            opts.push(fmt!("\"name\":\"%s\"", default_name));
             maybe_name = Some(default_name);
         }
 
         let index_str = fmt!("{ \"key\":{ %s }, \"ns\":\"%s.%s\", %s }",
                             index.connect(", "),
-                            copy self.db,
-                            copy self.name,
+                            self.db,
+                            self.name,
                             opts.connect(", "));
         match coll.insert(index_str, None) {
             Ok(_) => Ok(MongoIndexName(maybe_name.unwrap())),
@@ -562,7 +558,7 @@ impl Collection {
         let db = DB::new(copy self.db, self.client);
         match db.run_command(SpecNotation(
                     fmt!("{ \"deleteIndexes\":\"%s\", \"index\":\"%s\" }",
-                        copy self.name,
+                        self.name,
                         index.get_name()))) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),

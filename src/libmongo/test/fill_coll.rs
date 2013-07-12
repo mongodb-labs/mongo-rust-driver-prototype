@@ -44,8 +44,8 @@ pub fn fill_coll(db : ~str, coll : ~str, client : @Client, n : uint)
                 Embedded(bson) => *bson,
                 _ => fail!("what happened"),
             };
-        ins_strs = ins_strs + ~[ins_str];
-        ins_docs = ins_docs + ~[ins_doc];
+        ins_strs.push(ins_str);
+        ins_docs.push(ins_doc);
         i += 1;
     }
     coll.insert_batch(ins_strs.clone(), None, None, None);

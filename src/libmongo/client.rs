@@ -104,26 +104,25 @@ impl Client {
             match doc {
                 Embedded(bson_doc) => match bson_doc.find(~"name") {
                     Some(tmp_doc) => {
-                        let tmp = copy *tmp_doc;
-                        match tmp {
-                            UString(n) => names = names + ~[n],
+                        match (copy *tmp_doc) {
+                            UString(n) => names.push(n),
                             x => return Err(MongoErr::new(
                                         ~"client::get_dbs",
                                         ~"could not extract database name",
-                                        fmt!("name field %? not UString", copy x))),
+                                        fmt!("name field %? not UString", x))),
 
                         }
                     }
                     None => return Err(MongoErr::new(
                                 ~"client::get_dbs",
                                 ~"could not extract database name",
-                                fmt!("no name field in %?", copy bson_doc))),
+                                fmt!("no name field in %?", bson_doc))),
 
                 },
                 _ => return Err(MongoErr::new(
                                 ~"client::get_dbs",
                                 ~"could not extract database name",
-                                fmt!("no BsonDocument in %?", copy doc))),
+                                fmt!("no BsonDocument in %?", doc))),
             }
         }
 
@@ -226,7 +225,7 @@ impl Client {
      *      or network error
      */
     // TODO check_primary for replication purposes?
-    pub fn _send_msg(@self, msg : ~[u8], wc_pair : (~str, Option<~[WRITE_CONCERN]>), auto_get_reply : bool)
+    pub fn _send_msg(@self, msg : ~[u8], wc_pair : (&~str, Option<~[WRITE_CONCERN]>), auto_get_reply : bool)
                 -> Result<Option<ServerMsg>, MongoErr> {
         // first send message, exiting if network error
         match self.send(msg) {
@@ -241,7 +240,7 @@ impl Client {
         if !auto_get_reply {
             // requested write concern
             let (db_str, wc) = wc_pair;
-            let db = DB::new(db_str, self);
+            let db = DB::new(copy *db_str, self);
 
             match db.get_last_error(wc) {
                 Ok(_) => Ok(None),
