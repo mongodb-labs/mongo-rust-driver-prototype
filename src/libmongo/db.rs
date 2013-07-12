@@ -133,19 +133,18 @@ impl DB {
                         UString(s) => {
                             // ignore special collections (with "$")
                             if !s.contains_char('$') {
-                                let name = s.slice_from(self.name.len()+1).to_owned();
-                                names = names + ~[name];
+                                names.push(s.slice_from(self.name.len()+1).to_owned());
                             }
                         },
                         _ => return Err(MongoErr::new(
                                     ~"db::get_collection_names",
-                                    fmt!("db %s", copy self.name),
+                                    fmt!("db %s", self.name),
                                     ~"got non-string collection name")),
                     }
                 },
                 None => return Err(MongoErr::new(
                                 ~"db::get_collection_names",
-                                fmt!("db %s", copy self.name),
+                                fmt!("db %s", self.name),
                                 ~"got no name for collection")),
 
             }
@@ -197,7 +196,7 @@ impl DB {
             -> Result<Collection, MongoErr> {
         let flags = process_flags!(flag_array);
         let cmd = fmt!( "{ \"create\":\"%s\", %s }",
-                        copy coll,
+                        coll,
                         self.process_create_ops(flags, option_array));
         match self.run_command(SpecNotation(cmd)) {
             Ok(_) => Ok(Collection::new(copy self.name, coll, self.client)),

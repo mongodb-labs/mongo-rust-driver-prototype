@@ -169,8 +169,8 @@ pub fn msg_to_bytes(msg : ClientMsg) -> ~[u8] {
 /**
  * Boilerplate for update op.
  */
-pub fn mk_update(id : i32, db : ~str, name : ~str, flags : i32, selector : BsonDocument, update_ops : BsonDocument) -> ClientMsg {
-    let full = fmt!("%s.%s", db, name);
+pub fn mk_update(id : i32, db : &~str, name : &~str, flags : i32, selector : BsonDocument, update_ops : BsonDocument) -> ClientMsg {
+    let full = fmt!("%s.%s", *db, *name);
     let len = (   4*sys::size_of::<i32>()
                 + 2*sys::size_of::<i32>()
                 + full.len() + 1
@@ -190,8 +190,8 @@ pub fn mk_update(id : i32, db : ~str, name : ~str, flags : i32, selector : BsonD
 /**
  * Boilerplate for insert op.
  */
-pub fn mk_insert(id : i32, db : ~str, name : ~str, flags : i32, docs : ~[BsonDocument]) -> ClientMsg {
-    let full = fmt!("%s.%s", db, name);
+pub fn mk_insert(id : i32, db : &~str, name : &~str, flags : i32, docs : ~[BsonDocument]) -> ClientMsg {
+    let full = fmt!("%s.%s", *db, *name);
     let mut len = (   4*sys::size_of::<i32>()
                 + sys::size_of::<i32>()
                 + full.len() + 1) as i32;
@@ -208,8 +208,8 @@ pub fn mk_insert(id : i32, db : ~str, name : ~str, flags : i32, docs : ~[BsonDoc
 /**
  * Boilerplate for query op.
  */
-pub fn mk_query(id : i32, db : ~str, name : ~str, flags : i32, nskip : i32, nret : i32, query : BsonDocument, ret_field_selector : Option<BsonDocument>) -> ClientMsg {
-    let full = fmt!("%s.%s", db, name);
+pub fn mk_query(id : i32, db : &~str, name : &~str, flags : i32, nskip : i32, nret : i32, query : BsonDocument, ret_field_selector : Option<BsonDocument>) -> ClientMsg {
+    let full = fmt!("%s.%s", *db, *name);
     let mut len = (   4*sys::size_of::<i32>()
                 + 3*sys::size_of::<i32>()
                 + full.len() + 1
@@ -233,8 +233,8 @@ pub fn mk_query(id : i32, db : ~str, name : ~str, flags : i32, nskip : i32, nret
 /**
  * Boilerplate for get_more op.
  */
-pub fn mk_get_more(id : i32, db : ~str, name : ~str, nret : i32, cursor_id : i64) -> ClientMsg {
-    let full = fmt!("%s.%s", db, name);
+pub fn mk_get_more(id : i32, db : &~str, name : &~str, nret : i32, cursor_id : i64) -> ClientMsg {
+    let full = fmt!("%s.%s", *db, *name);
     let len = (   4*sys::size_of::<i32>()
                 + 2*sys::size_of::<i32>()
                 + 1*sys::size_of::<i64>()
@@ -252,8 +252,8 @@ pub fn mk_get_more(id : i32, db : ~str, name : ~str, nret : i32, cursor_id : i64
 /**
  * Boilerplate for delete op.
  */
-pub fn mk_delete(id : i32, db : ~str, name : ~str, flags : i32, selector : BsonDocument) -> ClientMsg {
-    let full = fmt!("%s.%s", db, name);
+pub fn mk_delete(id : i32, db : &~str, name : &~str, flags : i32, selector : BsonDocument) -> ClientMsg {
+    let full = fmt!("%s.%s", *db, *name);
     let len = (   4*sys::size_of::<i32>()
                 + 2*sys::size_of::<i32>()
                 + full.len() + 1

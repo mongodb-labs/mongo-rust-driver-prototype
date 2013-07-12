@@ -47,7 +47,7 @@ impl Iterator<~BsonDocument> for Cursor {
     /**
      * Returns pointer to next BsonDocument.
      *
-     * Pointers passed to avoid excessive copying. Any errors
+     * Pointers passed for greater memory flexibility. Any errors
      * are stored in Cursor's iter_err field.
      *
      * # Returns
@@ -120,14 +120,14 @@ impl Cursor {
         if self.id.is_none() {
             let msg = mk_query(
                             self.client.inc_requestId(),
-                            copy self.db,
-                            copy self.coll,
+                            &self.db,
+                            &self.coll,
                             self.flags,
                             self.skip,
                             self.batch_size,
                             copy self.query_spec,
                             copy self.proj_spec);
-            match self.client._send_msg(msg_to_bytes(msg), (copy self.db, None), true) {
+            match self.client._send_msg(msg_to_bytes(msg), (&self.db, None), true) {
                 Ok(reply) => match reply {
                     Some(r) => match copy r {
                         // XXX check if need start
@@ -197,11 +197,11 @@ impl Cursor {
         // otherwise, get_more
         let msg = mk_get_more(
                             self.client.inc_requestId(),
-                            copy self.db,
-                            copy self.coll,
+                            &self.db,
+                            &self.coll,
                             self.batch_size,
                             cur_id);
-        match self.client._send_msg(msg_to_bytes(msg), (copy self.db, None), true) {
+        match self.client._send_msg(msg_to_bytes(msg), (&self.db, None), true) {
             Ok(reply) => match reply {
                 Some(r) => match copy r {
                     // TODO check re: start
@@ -424,7 +424,7 @@ impl Cursor {
                             self.client.inc_requestId(),
                             1i32,
                             ~[cur_id]);
-        let error = match self.client._send_msg(msg_to_bytes(kill_msg), (copy self.db, Some(~[W_N(0)])), false) {
+        let error = match self.client._send_msg(msg_to_bytes(kill_msg), (&self.db, Some(~[W_N(0)])), false) {
             Ok(reply) => match reply {
                 Some(r) => Some(MongoErr::new(
                                 ~"cursor::close",
