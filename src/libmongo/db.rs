@@ -162,30 +162,83 @@ impl DB {
      * # Failure Types
      * * errors propagated from `get_collection_names`
      */
-    pub fn get_collections(&self) -> Result<~[@Collection], MongoErr> {
+    pub fn get_collections(&self) -> Result<~[Collection], MongoErr> {
         let names = match self.get_collection_names() {
             Ok(n) => n,
             Err(e) => return Err(e),
         };
 
-        let mut coll : ~[@Collection] = ~[];
+        let mut coll : ~[Collection] = ~[];
         for names.iter().advance |&n| {
-            coll = coll + ~[@Collection::new(copy self.name, n, self.client)];
+            coll = coll + ~[Collection::new(copy self.name, n, self.client)];
         }
 
         Ok(coll)
     }
     /**
-     * Get `Collection` with given name, from this `DB`.
+     * Get handle to `Collection` with given name, from this `DB`.
      *
      * # Arguments
      * * `coll` - name of collection to get
      *
      * # Returns
-     * managed pointer to collecton handle
+     * collecton handle
      */
-    pub fn get_collection(&self, coll : ~str) -> @Collection {
-        @Collection::new(copy self.name, coll, self.client)
+    pub fn get_collection(&self, coll : ~str) -> Collection {
+        Collection::new(copy self.name, coll, self.client)
+    }
+    /**
+     * Create collection with given options.
+     */
+    pub fn create_collection(   &self,
+                                coll : ~str,
+                                flag_array : Option<~[COLLECTION_FLAG]>,
+                                option_array : Option<~[COLLECTION_OPTION]>)
+            -> Result<Collection, MongoErr> {
+        let flags = process_flags!(flag_array);
+        let cmd = fmt!( "{ \"create\":\"%s\", %s }",
+                        copy coll,
+                        self.process_create_ops(flags, option_array));
+        match self.run_command(SpecNotation(cmd)) {
+            Ok(_) => Ok(Collection::new(copy self.name, coll, self.client)),
+            Err(e) => Err(e),
+        }
+    }
+    priv fn process_create_ops(&self, flags : i32, options : Option<~[COLLECTION_OPTION]>)
+            -> ~str {
+        let mut opts_str = ~"";
+        opts_str.push_str(fmt!( "\"autoIndexId\":%? ",
+                                (flags & AUTOINDEX_ID as i32) != 0i32));
+
+        match options {
+            None => (),
+            Some(opt_arr) => {
+                for opt_arr.iter().advance |&opt| {
+                    opts_str.push_str(match opt {
+                        CAPPED(sz) => fmt!(", \"capped\":true, \"size\":%?", sz),
+                        SIZE(sz) => fmt!(", \"size\":%?", sz),
+                        MAX_DOCS(k) => fmt!(", \"max\":%?", k),
+                    })
+                }
+            }
+        }
+
+        opts_str
+    }
+    /**
+     * Drops given collection from database associated with this `DB`.
+     *
+     * # Arguments
+     * * `coll` - name of collection to get
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
+    pub fn drop_collection(&self, coll : ~str) -> Result<(), MongoErr> {
+        match self.run_command(SpecNotation(fmt!("{ \"drop\":\"%s\" }", coll))) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 
     // TODO make take options? (not strictly necessary but may be good?)
@@ -202,7 +255,7 @@ impl DB {
      * appropriately by caller, `MongoErr` on failure
      */
     pub fn run_command(&self, cmd : QuerySpec) -> Result<~BsonDocument, MongoErr> {
-        let coll = @Collection::new(copy self.name, fmt!("%s", SYSTEM_COMMAND), self.client);
+        let coll = Collection::new(copy self.name, fmt!("%s", SYSTEM_COMMAND), self.client);
 
         //let ret_msg = match coll.find_one(Some(cmd), None, None, None) {
         let ret_msg = match coll.find_one(Some(copy cmd), None, Some(~[NO_CUR_TIMEOUT])) {
@@ -252,12 +305,98 @@ impl DB {
                 fmt!("run_command %? failed", cmd),
                 copy *errmsg))
     }
- 
+
+    /**
+     * Parses write concern into bytes and sends to server.
+     *
+     * # Arguments
+     * * `wc` - write concern, i.e. getLastError specifications
+     *
+     * # Returns
+     * None on success if w : 0, Some(()) on success otherwise,
+     * MongoErr on failure
+     *
+     * # Failure Types
+     * * invalid write concern specification (should never happen)
+     * * network
+     * * getLastError error, e.g. duplicate ```_id```s
+     */
+    pub fn get_last_error(&self, wc : Option<~[WRITE_CONCERN]>) -> Result<(), MongoErr>{
+        // set default write concern (to 1) if not specified
+        let concern = match wc {
+            None => ~[W_N(1), FSYNC(false)],
+            Some(w) => w,
+        };
+        // parse write concern, early exiting if set to <= 0
+        let mut concern_str = ~"{ \"getLastError\":1";
+        for concern.iter().advance |&opt| {
+            //concern_str += match opt {
+            concern_str = concern_str + match opt {
+                JOURNAL(j) => fmt!(", \"j\":%?", j),
+                W_N(w) => {
+                    if w <= 0 { return Ok(()); }
+                    else { fmt!(", \"w\":%d", w) }
+                }
+                W_STR(w) => fmt!(", \"w\":\"%s\"", w),
+                WTIMEOUT(t) => fmt!(", \"wtimeout\":%d", t),
+                FSYNC(s) => fmt!(", \"fsync\":%?", s),
+            };
+        }
+        //concern_str += " }";
+        concern_str = concern_str + " }";
+
+        // run_command and get entire doc
+        let err_doc_tmp = match self.run_command(SpecNotation(concern_str)) {
+            Ok(doc) => doc,
+            Err(e) => return Err(MongoErr::new(
+                                    ~"db::get_last_error",
+                                    ~"run_command error",
+                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+        };
+
+        // error field name possibitilies
+        let err_field = ~[  err_doc_tmp.find(~"err"),
+                            err_doc_tmp.find(~"$err")];
+
+        // search for error field
+        let mut err_found = false;
+        let mut err_doc = Int32(1); // [invalid err_doc]
+        for err_field.iter().advance |&err_result| {
+            match err_result {
+                None => (),
+                Some(doc) => {
+                    err_found = true;
+                    err_doc = copy *doc;
+                }
+            }
+        };
+
+        if !err_found {
+            return Err(MongoErr::new(
+                            ~"db::get_last_error",
+                            ~"getLastError unexpected format",
+                            ~"no $err field in reply"));
+        }
+
+        // unwrap error message
+        match err_doc {
+            Null => Ok(()),
+            UString(s) => Err(MongoErr::new(
+                            ~"db::get_last_error",
+                            ~"getLastError error",
+                            copy s)),
+            _ => Err(MongoErr::new(
+                            ~"db::get_last_error",
+                            ~"getLastError unexpected format",
+                            ~"unknown last error in reply")),
+        }
+    }
+
     ///Add a new database user with the given username and password.
     ///If the system.users collection becomes unavailable, this will fail.
     pub fn add_user(&self, username: ~str, password: ~str, roles: ~[~str]) -> Result<(), MongoErr>{
-        let coll = @(self.get_collection(~"system.users"));
-        let mut user = match coll.find_one(Some(SpecNotation(fmt!("{ user: %s }", username))), None, None)
+        let coll = self.get_collection(~"system.users");
+        let mut user = match coll.find_one(Some(SpecNotation(fmt!("{ \"user\": \"%s\" }", username))), None, None)
             {
                 Ok(u) => u,
                 Err(_) => {
@@ -314,13 +453,22 @@ impl DB {
     }
 
     ///Get the profiling level of the database.
-    pub fn get_profiling_level(&self) -> Result<~BsonDocument, MongoErr> {
-        self.run_command(SpecNotation(~"{ \"profile\": -1 }"))
+    pub fn get_profiling_level(&self) -> Result<int, MongoErr> {
+        match self.run_command(SpecNotation(~"{ \"profile\": -1 }")) {
+            Ok(d) => match d.find(~"was") {
+                Some(&Double(f)) => Ok(f as int),
+                _ => return Err(MongoErr::new(
+                    ~"db::get_profiling_level",
+                    ~"could not get profiling level",
+                    ~"an invalid profiling level was returned"))
+            },
+            Err(e) => return Err(e)
+        }
     }
 
     ///Set the profiling level of the database.
-    pub fn set_profiling_level(&self, level: &str) -> Result<~BsonDocument, MongoErr> {
-        self.run_command(SpecNotation(fmt!("{ \"profile\": \"%s\" }", level)))
+    pub fn set_profiling_level(&self, level: int) -> Result<~BsonDocument, MongoErr> {
+        self.run_command(SpecNotation(fmt!("{ \"profile\": %d }", level)))
     }
 }
 

@@ -24,14 +24,13 @@ fn test_add_user() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))    
+        Err(e) => fail!("%s", MongoErr::to_str(e))
     }
 
-    let db = DB::new(~"rust", client);
-    //clean up user first
+    // drop users first
+    let db = DB::new(~"rust_add_user", client);
     let coll = db.get_collection(~"system.users");
-    coll.remove(Some(SpecNotation(~"{ \"user\": \"testuser\" }")), None, None, None);
-
+    coll.remove(None, None, None, None);
     match db.add_user(~"testuser", ~"testpassword", ~[]) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e))

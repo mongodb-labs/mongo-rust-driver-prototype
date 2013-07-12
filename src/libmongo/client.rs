@@ -18,6 +18,7 @@ use std::*;
 use bson::encode::*;
 
 use util::*;
+use msg::*;
 use conn::Connection;
 use conn_node::NodeConnection;
 use db::DB;
@@ -207,6 +208,96 @@ impl Client {
         if !self.conn.is_empty() { self.conn.take().disconnect() }
         // XXX currently succeeds even if not previously connected.
         else { Ok(()) }
+    }
+
+    /**
+     * Sends message on connection; if write, checks write concern,
+     * and if query, picks up OP_REPLY.
+     *
+     * # Arguments
+     * * `msg` - bytes to send
+     * * `wc` - write concern (if applicable)
+     * * `auto_get_reply` - whether Client should expect an `OP_REPLY`
+     *                      from the server
+     *
+     * # Returns
+     * if read operation, `OP_REPLY` on success, MongoErr on failure;
+     * if write operation, None on no last error, MongoErr on last error
+     *      or network error
+     */
+    // TODO check_primary for replication purposes?
+    pub fn _send_msg(@self, msg : ~[u8], wc_pair : (~str, Option<~[WRITE_CONCERN]>), auto_get_reply : bool)
+                -> Result<Option<ServerMsg>, MongoErr> {
+        // first send message, exiting if network error
+        match self.send(msg) {
+            Ok(_) => (),
+            Err(e) => return Err(MongoErr::new(
+                                    ~"client::_send_msg",
+                                    ~"",
+                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+        }
+
+        // handle write concern or handle query as appropriate
+        if !auto_get_reply {
+            // requested write concern
+            let (db_str, wc) = wc_pair;
+            let db = DB::new(db_str, self);
+
+            match db.get_last_error(wc) {
+                Ok(_) => Ok(None),
+                Err(e) => Err(MongoErr::new(
+                                    ~"client::_send_msg",
+                                    ~"write concern error",
+                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+            }
+        } else {
+            // requested query
+            match self._recv_msg() {
+                Ok(m) => Ok(Some(m)),
+                Err(e) => Err(MongoErr::new(
+                                    ~"client::_send_msg",
+                                    ~"error in response",
+                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+            }
+        }
+    }
+
+    /**
+     * Picks up server response.
+     *
+     * # Returns
+     * ServerMsg on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * invalid bytestring/message returned (should never happen)
+     * * server returned message with error flags
+     * * network
+     */
+    fn _recv_msg(&self) -> Result<ServerMsg, MongoErr> {
+        let m = match self.recv() {
+            Ok(bytes) => match parse_reply(bytes) {
+                Ok(m_tmp) => m_tmp,
+                Err(e) => return Err(e),
+            },
+            Err(e) => return Err(e),
+        };
+
+        match m {
+            OpReply { header:_, flags:f, cursor_id:_, start:_, nret:_, docs:_ } => {
+                if (f & CUR_NOT_FOUND as i32) != 0i32 {
+                    return Err(MongoErr::new(
+                                ~"client::_recv_msg",
+                                ~"CursorNotFound",
+                                ~"cursor ID not valid at server"));
+                } else if (f & QUERY_FAIL as i32) != 0i32 {
+                    return Err(MongoErr::new(
+                                ~"client::_recv_msg",
+                                ~"QueryFailure",
+                                ~"tmp"));
+                }
+                return Ok(m)
+            }
+        }
     }
 
     /**

@@ -56,7 +56,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">pub</span> <span class="kw">struct</span> Collection {
     db: ~<span class="kw">str</span>,
     name: ~<span class="kw">str</span>,
-    client: @Client,
+    <span class="kw">priv</span> client: @Client,
 }</code></pre>
 </div>
 <div id="implementation-for-mongoindex" class="section level2">
@@ -74,37 +74,24 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> new(db: ~<span class="kw">str</span>, name: ~<span class="kw">str</span>, client: @Client) -&gt; Collection</code></pre>
 <p>Collection constructor for Client, etc. use.</p>
 </div>
-<div id="method-_send_msg" class="section level3">
-<h3>Method <code>_send_msg</code></h3>
-<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> _send_msg(&amp;<span class="kw">self</span>, msg: ~[<span class="kw">u8</span>], wc: <span class="kw">Option</span>&lt;~[WRITE_CONCERN]&gt;,
-             auto_get_reply: <span class="kw">bool</span>) -&gt; <span class="kw">Result</span>&lt;<span class="kw">Option</span>&lt;ServerMsg&gt;, MongoErr&gt;</code></pre>
-<p>Sends message on connection; if write, checks write concern, and if query, picks up OP_REPLY.</p>
-<div id="arguments" class="section level4">
-<h4>Arguments</h4>
-<ul>
-<li><code>msg</code> - bytes to send</li>
-<li><code>wc</code> - write concern (if applicable)</li>
-<li><code>auto_get_reply</code> - whether Client should expect an <code>OP_REPLY</code> from the server</li>
-</ul>
-</div>
-<div id="returns" class="section level4">
-<h4>Returns</h4>
-<p>if read operation, <code>OP_REPLY</code> on success, MongoErr on failure; if write operation, None on no last error, MongoErr on last error or network error</p>
-</div>
+<div id="method-get_db" class="section level3">
+<h3>Method <code>get_db</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> get_db(&amp;<span class="kw">self</span>) -&gt; DB</code></pre>
+<p>Get DB containing this Collection.</p>
 </div>
 <div id="method-insert" class="section level3">
 <h3>Method <code>insert</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> insert&lt;U: BsonFormattable&gt;(&amp;<span class="kw">self</span>, doc: U, wc: <span class="kw">Option</span>&lt;~[WRITE_CONCERN]&gt;) -&gt;
  <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
 <p>CRUD ops. Different methods rather than enum of arguments since complexity not decreased with enum (for both users and developers), and CRUD oeprations assumed reasonably stable. INSERT OPS Insert given document with given writeconcern into Collection.</p>
-<div id="arguments-1" class="section level4">
+<div id="arguments" class="section level4">
 <h4>Arguments</h4>
 <ul>
 <li><code>doc</code>- BsonFormattable to input</li>
 <li><code>wc</code> - write concern with which to insert (None for default of 1, Some for finer specification)</li>
 </ul>
 </div>
-<div id="returns-1" class="section level4">
+<div id="returns" class="section level4">
 <h4>Returns</h4>
 <p>() on success, MongoErr on failure</p>
 </div>
@@ -123,8 +110,8 @@ code > span.er { color: #ff0000; font-weight: bold; }
                                     option_array: <span class="kw">Option</span>&lt;~[INSERT_OPTION]&gt;,
                                     wc: <span class="kw">Option</span>&lt;~[WRITE_CONCERN]&gt;) -&gt;
  <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
-<p>Insert given batch of documents with given writeconcern into Collection.</p>
-<div id="arguments-2" class="section level4">
+<p>Insert given batch of documents with given writeconcern and options into Collection.</p>
+<div id="arguments-1" class="section level4">
 <h4>Arguments</h4>
 <ul>
 <li><code>docs</code>- array of BsonFormattable to input</li>
@@ -133,7 +120,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><code>wc</code> - write concern with which to insert (None for default of 1, Some for finer specification)</li>
 </ul>
 </div>
-<div id="returns-2" class="section level4">
+<div id="returns-1" class="section level4">
 <h4>Returns</h4>
 <p>() on success, MongoErr on failure</p>
 </div>
@@ -157,7 +144,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
           option_array: <span class="kw">Option</span>&lt;~[UPDATE_OPTION]&gt;,
           wc: <span class="kw">Option</span>&lt;~[WRITE_CONCERN]&gt;) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
 <p>UPDATE OPS Update documents satisfying given query with given update specification and write concern.</p>
-<div id="arguments-3" class="section level4">
+<div id="arguments-2" class="section level4">
 <h4>Arguments</h4>
 <ul>
 <li><code>query</code> - <code>SpecNotation(~str)</code> or <code>SpecObj(BsonDocument)</code> specifying documents to update</li>
@@ -167,7 +154,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><code>wc</code> - write concern with which to update documents</li>
 </ul>
 </div>
-<div id="returns-3" class="section level4">
+<div id="returns-2" class="section level4">
 <h4>Returns</h4>
 <p>() on success, MongoErr on failure</p>
 </div>
@@ -182,10 +169,10 @@ code > span.er { color: #ff0000; font-weight: bold; }
 </div>
 <div id="method-find" class="section level3">
 <h3>Method <code>find</code></h3>
-<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> find(@self, query: <span class="kw">Option</span>&lt;QuerySpec&gt;, proj: <span class="kw">Option</span>&lt;QuerySpec&gt;,
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> find(&amp;<span class="kw">self</span>, query: <span class="kw">Option</span>&lt;QuerySpec&gt;, proj: <span class="kw">Option</span>&lt;QuerySpec&gt;,
         flag_array: <span class="kw">Option</span>&lt;~[QUERY_FLAG]&gt;) -&gt; <span class="kw">Result</span>&lt;Cursor, MongoErr&gt;</code></pre>
 <p>Returns Cursor over given projection from queried documents.</p>
-<div id="arguments-4" class="section level4">
+<div id="arguments-3" class="section level4">
 <h4>Arguments</h4>
 <ul>
 <li><code>query</code> - optional <code>SpecNotation(~str)</code> or <code>SpecObj(BsonDocument)</code> specifying documents to query</li>
@@ -193,18 +180,18 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><code>flag_array</code> - optional, <code>CUR_TAILABLE</code>, <code>SLAVE_OK</code>, <code>OPLOG_REPLAY</code>, <code>NO_CUR_TIMEOUT</code>, <code>AWAIT_DATA</code>, <code>EXHAUST</code>, <code>PARTIAL</code></li>
 </ul>
 </div>
-<div id="returns-4" class="section level4">
+<div id="returns-3" class="section level4">
 <h4>Returns</h4>
 <p>initialized (unqueried) Cursor on success, MongoErr on failure</p>
 </div>
 </div>
 <div id="method-find_one" class="section level3">
 <h3>Method <code>find_one</code></h3>
-<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> find_one(@self, query: <span class="kw">Option</span>&lt;QuerySpec&gt;, proj: <span class="kw">Option</span>&lt;QuerySpec&gt;,
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> find_one(&amp;<span class="kw">self</span>, query: <span class="kw">Option</span>&lt;QuerySpec&gt;, proj: <span class="kw">Option</span>&lt;QuerySpec&gt;,
             flag_array: <span class="kw">Option</span>&lt;~[QUERY_FLAG]&gt;) -&gt;
  <span class="kw">Result</span>&lt;~BsonDocument, MongoErr&gt;</code></pre>
 <p>Returns pointer to first Bson from queried documents.</p>
-<div id="arguments-5" class="section level4">
+<div id="arguments-4" class="section level4">
 <h4>Arguments</h4>
 <ul>
 <li><code>query</code> - optional <code>SpecNotation(~str)</code> or <code>SpecObj(BsonDocument)</code> specifying documents to query</li>
@@ -212,7 +199,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><code>flag_array</code> - optional, <code>CUR_TAILABLE</code>, <code>SLAVE_OK</code>, <code>OPLOG_REPLAY</code>, <code>NO_CUR_TIMEOUT</code>, <code>AWAIT_DATA</code>, <code>EXHAUST</code>, <code>PARTIAL</code></li>
 </ul>
 </div>
-<div id="returns-5" class="section level4">
+<div id="returns-4" class="section level4">
 <h4>Returns</h4>
 <p>~BsonDocument of first result on success, MongoErr on failure</p>
 </div>
@@ -223,7 +210,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
           option_array: <span class="kw">Option</span>&lt;~[DELETE_OPTION]&gt;,
           wc: <span class="kw">Option</span>&lt;~[WRITE_CONCERN]&gt;) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
 <p>Remove specified documents from collection.</p>
-<div id="arguments-6" class="section level4">
+<div id="arguments-5" class="section level4">
 <h4>Arguments</h4>
 <ul>
 <li><code>query</code> - optional <code>SpecNotation(~str)</code> or <code>SpecObj(BsonDocument)</code> specifying documents to query</li>
@@ -232,7 +219,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><code>wc</code> - write concern with which to perform remove</li>
 </ul>
 </div>
-<div id="returns-6" class="section level4">
+<div id="returns-5" class="section level4">
 <h4>Returns</h4>
 <p>() on success, MongoErr on failure</p>
 </div>
@@ -244,7 +231,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
                 option_array: <span class="kw">Option</span>&lt;~[INDEX_OPTION]&gt;) -&gt;
  <span class="kw">Result</span>&lt;MongoIndex, MongoErr&gt;</code></pre>
 <p>INDICES (or &quot;Indexes&quot;) Create index by specifying a vector of the different elements that can form an index (e.g. (field,order) pairs, geographical options, etc.)</p>
-<div id="arguments-7" class="section level4">
+<div id="arguments-6" class="section level4">
 <h4>Arguments</h4>
 <ul>
 <li><code>index_arr</code> - vector of index elements (NORMAL(vector of (field, order) pairs), HASHED(field), GEOSPATIAL(field, type))</li>
@@ -252,7 +239,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><code>option_array</code> - optional vector of index-creating options: INDEX_NAME(name), EXPIRE_AFTER_SEC(nsecs)</li>
 </ul>
 </div>
-<div id="returns-7" class="section level4">
+<div id="returns-6" class="section level4">
 <h4>Returns</h4>
 <p>name of index as MongoIndexName (in enum MongoIndex) on success, MongoErr on failure</p>
 </div>
@@ -268,13 +255,13 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <h3>Method <code>drop_index</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> drop_index(&amp;<span class="kw">self</span>, index: MongoIndex) -&gt; <span class="kw">Result</span>&lt;(), MongoErr&gt;</code></pre>
 <p>Drops specified index.</p>
-<div id="arguments-8" class="section level4">
+<div id="arguments-7" class="section level4">
 <h4>Arguments</h4>
 <ul>
 <li><code>index</code> - MongoIndex to drop specified either by explicit name or fields</li>
 </ul>
 </div>
-<div id="returns-8" class="section level4">
+<div id="returns-7" class="section level4">
 <h4>Returns</h4>
 <p>() on success, MongoErr on failure</p>
 </div>

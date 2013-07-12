@@ -114,7 +114,7 @@ impl BsonFormattable for i64 {
         match doc {
             Int64(i) => Ok(i),
             UTCDate(i) => Ok(i),
-            Timestamp(i) => Ok(i),
+            Timestamp(u1, u2) => Ok((u1 | (u2 << 32)) as i64),
             _ => Err(~"can only cast Int64, Date, and Timestamp to i64")
         }
     }
@@ -165,15 +165,15 @@ impl BsonFormattable for json::Json {
         match doc {
             Double(f) => Ok(json::Number(f as float)),
             UString(s) => Ok(json::String(copy s)),
-            Embedded(a) => Ok(json::Object(~match 
+            Embedded(a) => Ok(json::Object(~match
                 BsonFormattable::from_bson_t::<HashMap<~str, json::Json>>(Embedded(a)) {
                     Ok(d) => d,
-                    Err(e) => return Err(e)    
+                    Err(e) => return Err(e)
                 })),
-            Array(a) => Ok(json::List(match 
+            Array(a) => Ok(json::List(match
                 BsonFormattable::from_bson_t::<~[json::Json]>(Embedded(a)) {
                     Ok(d) => d,
-                    Err(e) => return Err(e)    
+                    Err(e) => return Err(e)
                 })),
             Binary(_,_) => Err(~"bindata cannot be translated to Json"),
             ObjectId(_) => Err(~"objid cannot be translated to Json"),
@@ -184,7 +184,7 @@ impl BsonFormattable for json::Json {
             JScript(s) => Ok(json::String(copy s)),
             JScriptWithScope(_,_) => Err(~"jscope cannot be translated to Json"),
             Int32(i) => Ok(json::Number(i as float)),
-            Timestamp(i) => Ok(json::Number(i as float)),
+            Timestamp(u1, u2) => Ok(json::Number((u1 | (u2 << 32)) as float)),
             Int64(i) => Ok(json::Number(i as float)),
             MinKey => Err(~"minkey cannot be translated to Json"),
             MaxKey => Err(~"maxkey cannot be translated to Json")
@@ -264,7 +264,7 @@ impl BsonFormattable for BsonDocument {
         match doc {
            Embedded(d) => Ok(copy *d),
            Array(d) => Ok(copy *d),
-           _ => Err(~"can only convert Embedded and Array to BsonDocument") 
+           _ => Err(~"can only convert Embedded and Array to BsonDocument")
         }
     }
 }
@@ -298,7 +298,7 @@ mod tests {
         assert!(BsonFormattable::from_bson_t::<json::Json>(Regex(~"A", ~"B")).is_err());
         assert!(BsonFormattable::from_bson_t::<json::Json>(JScript(~"foo")).is_ok());
         assert!(BsonFormattable::from_bson_t::<json::Json>(Int32(1i32)).is_ok());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(Timestamp(1i64)).is_ok());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(Timestamp(1, 0)).is_ok());
         assert!(BsonFormattable::from_bson_t::<json::Json>(Int64(1i64)).is_ok());
         assert!(BsonFormattable::from_bson_t::<json::Json>(MinKey).is_err());
         assert!(BsonFormattable::from_bson_t::<json::Json>(MaxKey).is_err());

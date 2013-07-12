@@ -25,12 +25,9 @@ fn test_authenticate() {
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
-    let db = DB::new(~"rust", client);
-    //clean up user first
-    let coll = db.get_collection(~"system.users");
-    coll.remove(Some(SpecNotation(~"{ \"user\": \"testuser2\" }")), None, None, None);
-
-    //add it back; this ensures the user will be present
+    // drop users first; this ensures the user will be present
+    let db = DB::new(~"rust_auth", client);
+    db.get_collection(~"system.users").remove(None, None, None, None);
     match db.add_user(~"testuser2", ~"testpassword", ~[]) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e))

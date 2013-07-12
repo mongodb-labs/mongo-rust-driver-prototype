@@ -2,8 +2,14 @@ MongoDB Rust Driver Prototype
 =============================
 
 This is a prototype version of a MongoDB driver for the Rust programming language.
+This library has been built on Rust version 0.7. If you are using a more up-to-date version of Rust, the project may not build correctly.
 
 ## Tutorial
+Once you've built MongoDB and have the compiled library files, you can make MongoDB available in your code with
+```rust
+extern mod bson;
+extern mod mongo;
+```
 
 #### Mongo Driver
 In general, aside from the BSON library imports (see below), we will need the following imports:
@@ -32,8 +38,8 @@ Now we may create handles to databases and collections on the server. We start w
 // create handles to the collections "foo_coll" and "bar_coll" in the
 //      database "foo_db" (any may already exist; if not, it will be
 //      created on the first insert)
-let foo = @Collection::new(~"foo_db", ~"foo_coll", client);
-let bar = @Collection::new(~"foo_db", ~"bar_coll", client);
+let foo = Collection::new(~"foo_db", ~"foo_coll", client);
+let bar = Collection::new(~"foo_db", ~"bar_coll", client);
 ```
 
 ##### CRUD Operations
@@ -47,11 +53,12 @@ bar.insert(ins, None);
 // insert a big batch of documents into foo_coll
 let mut ins_batch : ~[~str] = ~[];
 let n = 200;
+let mut i = 0;
 for n.times {
     ins_batch = ins_batch + ~[fmt!("{ \"a\":%d, \"b\":\"ins %d\" }", i/2, i)];
     i += 1;
 }
-foo.insert_batch(ins_strs, None, None, None);
+foo.insert_batch(ins_batch, None, None, None);
     // no write concern specified---use default; no special options
 
 // read one back (no specific query or query options/flags)
@@ -105,11 +112,11 @@ match foo.find(None, Some(SpecNotation(~"{ \"b\":1 }")), None) {
         println(fmt!("%?", cursor.explain()));
 
         // sort on the cursor on the "a" field, ascending
-        cur.sort(NORMAL(~[(~"a", ASC)]));
+        cursor.sort(NORMAL(~[(~"a", ASC)]));
 
         // iterate on the cursor---no query specified so over whole collection
-        for cur.advance |&doc| {
-            println(fmt!("%?", doc));
+        for cursor.advance |doc| {
+            println(fmt!("%?", *doc));
         }
     }
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
@@ -147,8 +154,9 @@ let db = DB::new(~"foo_db", client);
 match db.get_collection_names() {
     Ok(names) => {
         // should output
-        //      bar_db
-        //      foo_db
+        //      system.indexes
+        //      bar_coll
+        //      foo_coll
         for names.iter().advance |&n| { println(fmt!("%s", n)); }
     }
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
@@ -181,7 +189,7 @@ BSON-valid data items are represented in the ```Document``` type. (Valid types a
 To get a document for one of these types, you can wrap it yourself or call the ```to_bson_t``` method.
 Example:
 ```rust
-use mongo::bson::formattable::*;
+use bson::formattable::*;
 
 let a = (1i).to_bson_t(); //Int32(1)
 let b = (~"foo").to_bson_t(); //UString(~"foo")
@@ -194,8 +202,8 @@ A complete BSON object is represented in the BsonDocument type. BsonDocument con
 This type exposes an API which is similar to that of a typical map.
 Example:
 ```rust
-use mongo::bson::encode::*;
-use mongo::bson::formattable::*;
+use bson::encode::*;
+use bson::formattable::*;
 
 //Building a document {foo: "bar", baz: 5.1}
 let doc = BsonDocument::new();
@@ -223,8 +231,8 @@ match parsed_doc {
 Through this method, standard BSON types can easily be serialized. Any type ```Foo``` can also be serialized in this way if it implements the ```BsonFormattable``` trait.
 Example:
 ```rust
-use mongo::bson::encode::*;
-use mongo::bson::formattable::*;
+use bson::encode::*;
+use bson::formattable::*;
 
 struct Foo {
     ...
@@ -250,7 +258,7 @@ impl BsonFormattable for Foo {
 The ```~[u8]``` representation of data is not especially useful for modifying or viewing. A ```~[u8]``` can be easily transformed into a BsonDocument for easier manipulation.
 Example:
 ```rust
-use mongo::bson::decode::*;
+use bson::decode::*;
 
 let b: ~[u8] = /*get a bson document from somewhere*/
 let p = BsonParser::new(b);
@@ -267,8 +275,8 @@ let doc = decode(c); //the standalone 'decode' function handles creation of the 
 The ```BsonFormattable``` trait also contains a method called ```from_bson_t``` as mentioned above. This static method allows a Document to be converted into the implementing type. This allows a quick path to decode a ```~[u8]``` into a ```T:BsonFormattable```.
 Example:
 ```rust
-use mongo::bson::decode::*;
-use mongo::bson::formattable::*;
+use bson::decode::*;
+use bson::formattable::*;
 
 struct Foo {
     ...
@@ -289,4 +297,5 @@ let myfoo = BsonFormattable::from_bson_t::<Foo>(decode(b).unwrap()); //here it i
 - [ ] Implement read preferences
 - [ ] Documentation to the [API site](http://api.mongodb.org)
 - [ ] Thorough test suite for CRUD functionality
+
 To be continued...

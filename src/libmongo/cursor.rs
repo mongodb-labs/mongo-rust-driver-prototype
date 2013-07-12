@@ -19,13 +19,16 @@ use bson::encode::*;
 
 use util::*;
 use msg::*;
+use client::Client;
 use coll::Collection;
 use coll::MongoIndex;
 
 ///Structure representing a cursor
 pub struct Cursor {
     priv id : Option<i64>,                  // id on server (None->not yet queried, 0->closed)
-    priv collection : @Collection,          // XXX collection associated with cursor?
+    priv db: ~str,                          // name of DB associated with Cursor
+    priv coll: ~str,                        // name of Collection associated with Cursor
+    priv client: @Client,                   // Client (+Connection) associated with Cursor
     flags : i32,                            // QUERY_FLAGs
     batch_size : i32,                       // size of batch in cursor fetch, may be modified
     query_spec : BsonDocument,              // query, may be modified
@@ -80,11 +83,14 @@ impl Cursor {
      */
     pub fn new(     query : BsonDocument,
                     proj : Option<BsonDocument>,
-                    collection : @Collection,
+                    collection : &Collection,
+                    client : @Client,
                     flags : i32) -> Cursor {
         Cursor {
             id: None,
-            collection: collection,
+            db: copy collection.db,
+            coll: copy collection.name,
+            client: client,
             flags: flags,
             batch_size: 0,
             query_spec: query,
@@ -113,17 +119,17 @@ impl Cursor {
         // if cursor's never been queried, query and fill data up
         if self.id.is_none() {
             let msg = mk_query(
-                            self.collection.client.inc_requestId(),
-                            copy self.collection.db,
-                            copy self.collection.name,
+                            self.client.inc_requestId(),
+                            copy self.db,
+                            copy self.coll,
                             self.flags,
                             self.skip,
                             self.batch_size,
                             copy self.query_spec,
                             copy self.proj_spec);
-            match self.collection._send_msg(msg_to_bytes(msg), None, true) {
+            match self.client._send_msg(msg_to_bytes(msg), (copy self.db, None), true) {
                 Ok(reply) => match reply {
-                    Some(r) => match r {
+                    Some(r) => match copy r {
                         // XXX check if need start
                         OpReply { header:_, flags:_, cursor_id:id, start:_, nret:n, docs:d } => {
                             self.id = Some(id);
@@ -165,9 +171,9 @@ impl Cursor {
         }
 
         // otherwise, no more within cursor, so see if can get_more
-        let cur_id = self.id.unwrap();
-
+        let cur_id = (copy self.id).unwrap();
         if cur_id == 0 {
+
             // exhausted cursor; return
             if self.i > self.data.len() as i32 {
                 // only if cursor exhausted "abnormally", set iter_err
@@ -190,34 +196,18 @@ impl Cursor {
 
         // otherwise, get_more
         let msg = mk_get_more(
-                            self.collection.client.inc_requestId(),
-                            copy self.collection.db,
-                            copy self.collection.name,
+                            self.client.inc_requestId(),
+                            copy self.db,
+                            copy self.coll,
                             self.batch_size,
                             cur_id);
-        match self.collection._send_msg(msg_to_bytes(msg), None, true) {
+        match self.client._send_msg(msg_to_bytes(msg), (copy self.db, None), true) {
             Ok(reply) => match reply {
-                Some(r) => match r {
+                Some(r) => match copy r {
                     // TODO check re: start
                     OpReply { header:_, flags:_, cursor_id:id, start:_, nret:n, docs:d } => {
-                        // send a kill cursors if needed---TODO batch
-                        if id == 0 {
-                            let kill_msg = mk_kill_cursor(
-                                                self.collection.client.inc_requestId(),
-                                                1i32,
-                                                ~[cur_id]);
-                            match self.collection._send_msg(msg_to_bytes(kill_msg), None, false) {
-                                Ok(reply) => match reply {
-                                    Some(r) => self.iter_err = Some(MongoErr::new(
-                                                ~"cursor::refresh",
-                                                ~"unknown error",
-                                                fmt!("received unexpected response %? from server",
-                                                    r))),
-                                    None => (),
-                                },
-                                Err(e) => self.iter_err = Some(e),
-                            }
-                        }
+                        // close cursor if needed
+                        if id == 0 { self.close(); }
 
                         // also update this cursor's fields
                         self.id = Some(id);
@@ -305,7 +295,12 @@ impl Cursor {
     pub fn explain(&mut self) -> Result<~BsonDocument, MongoErr> {
         let mut query = copy self.query_spec;
         query.append(~"$explain", Double(1f64));
-        let mut tmp_cur = Cursor::new(query, copy self.proj_spec, self.collection, self.flags);
+        let mut tmp_cur = Cursor::new(  query, copy self.proj_spec,
+                                        &Collection::new(   copy self.db,
+                                                            copy self.coll,
+                                                            self.client),
+                                        self.client,
+                                        self.flags);
         tmp_cur.cursor_limit(-1);
         match tmp_cur.next() {
             Some(exp) => Ok(exp),
@@ -402,7 +397,6 @@ impl Cursor {
      * returns `true` at edge case when Cursor exhausted naturally.
      */
     pub fn has_next(&self) -> bool {
-        //!self.data.is_empty()
         // return true even if right at end (normal exhaustion of cursor)
         if self.limit != 0 {
             let diff = self.limit - self.retrieved;
@@ -410,9 +404,48 @@ impl Cursor {
         }
         self.i <= self.data.len() as i32
     }
-    pub fn close(&mut self) {
-        //self.collection.db.connection.close_cursor(self.id);
-        self.open = false
+
+    /**
+     * Closes cursor by sending OP_KILL_CURSORS message.
+     */
+    // XXX check with regard to write concern...?
+    // TODO batch
+    pub fn close(&mut self) -> Result<(), MongoErr> {
+        if self.id.is_none() {
+            return Err(MongoErr::new(
+                            ~"cursor::close",
+                            ~"no such cursor",
+                            ~"cannot close cursor never iterated upon"));
+        }
+
+        let cur_id = self.id.unwrap();
+        self.id = Some(0);
+        let kill_msg = mk_kill_cursor(
+                            self.client.inc_requestId(),
+                            1i32,
+                            ~[cur_id]);
+        let error = match self.client._send_msg(msg_to_bytes(kill_msg), (copy self.db, Some(~[W_N(0)])), false) {
+            Ok(reply) => match reply {
+                Some(r) => Some(MongoErr::new(
+                                ~"cursor::close",
+                                ~"unknown error",
+                                fmt!("received unexpected response %? from server",
+                                    r))),
+                None => None,
+            },
+            Err(e) => Some(e),
+        };
+
+        if error.is_none() { Ok(()) }
+        else {
+            self.iter_err = copy error;
+            Err(error.unwrap())
+        }
+    }
+
+    pub fn is_dead(&self) -> bool {
+        if self.id.is_some() { return (copy self.id).unwrap() == 0; }
+        false
     }
     fn add_query_spec(&mut self, doc: &BsonDocument) {
         for doc.fields.iter().advance |&(@k, @v)| {

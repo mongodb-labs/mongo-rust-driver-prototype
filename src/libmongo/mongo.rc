@@ -27,6 +27,7 @@ extern mod extra;
 extern mod bson;
 
 // Misc: utility module
+#[macro_escape]
 pub mod util;
 #[macro_escape]
 mod mockable;

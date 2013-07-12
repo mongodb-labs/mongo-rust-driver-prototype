@@ -41,9 +41,7 @@ bin:
 	$(MKDIR) bin
 	$(MKDIR) test
 
-libs: $(LIB)/cast.c
-#	$(CC) $(CFLAGS) -o $(BIN)/typecast.o $(LIB)/cast.c
-#	$(AR) $(BIN)/libtypecast.a $(BIN)/typecast.o
+libs: $(LIB)/md5.c
 	$(CC) $(CFLAGS) -o $(BIN)/md5.o $(LIB)/md5.c
 	$(AR) $(BIN)/libmd5.a $(BIN)/md5.o
 
@@ -57,9 +55,6 @@ test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rc
-
-ex: $(MONGODIR)/test.rs
-	$(RC) $(FLAGS) -o $(TEST)/mongo_ex $(MONGODIR)/test.rs
 
 check: test
 ifeq ($(MONGOTEST),1)
@@ -79,9 +74,9 @@ doc: $(BSONDIR)/*.rs $(MONGODIR)/*
 	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/mongo $(MONGODIR)/mongo.rc
 
 clean:
-	$(RM) $(BIN)/*.dylib
 	$(RM) -rf $(TEST)
 	$(RM) -rf $(BIN)
 
 tidy:
-	sed -e 's/\s\+$$//g' ./src/*
+	for f in `find . -name '*.rs'`; do perl -pi -e "s/[ \t]*$$//" $$f; done
+	for f in `find . -name '*.rc'`; do perl -pi -e "s/[ \t]*$$//" $$f; done

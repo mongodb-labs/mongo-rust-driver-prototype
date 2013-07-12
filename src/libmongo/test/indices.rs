@@ -40,6 +40,16 @@ fn test_indices() {
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
 
+    match coll.create_index(~[GEOHAYSTACK(~"loc", ~"a", 5)], None, None) {
+        Ok(_) => (),
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    }
+
+    match coll.create_index(~[GEOHAYSTACK(~"loc", ~"b", 5)], None, Some(~[INDEX_NAME(~"geo")])) {
+        Ok(_) => (),
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    }
+
     let mut cursor = match coll.find(None, None, None) {
         Ok(cur) => cur,
         Err(e) => fail!("%s", MongoErr::to_str(e)),
@@ -60,6 +70,21 @@ fn test_indices() {
     }
 
     match coll.drop_index(MongoIndexName(~"fubar")) {
+        Ok(_) => (),
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    }
+
+    match coll.drop_index(MongoIndexFields(~[GEOHAYSTACK(~"loc", ~"b", 5)])) {
+        Ok(_) => fail!("dropped nonexistent index"),
+        Err(_) => (),
+    }
+
+    match coll.drop_index(MongoIndexFields(~[GEOHAYSTACK(~"loc", ~"a", 5)])) {
+        Ok(_) => (),
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    }
+
+    match coll.drop_index(MongoIndexName(~"geo")) {
         Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }
