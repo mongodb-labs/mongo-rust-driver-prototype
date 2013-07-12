@@ -558,4 +558,18 @@ impl Collection {
             Err(e) => Err(e),
         }
     }
+
+    ///Validate a collection.
+    //TODO: could be using options?
+    pub fn validate(&self, full: bool, scandata: bool) -> Result<~BsonDocument, MongoErr> {
+        let db = self.get_db();
+        match db.run_command(SpecNotation(fmt!(
+            "{ \"validate\": \"%s\", \"full\": \"%s\", \"scandata\": \"%s\" }",
+            self.name,
+            full.to_str(),
+            scandata.to_str()))) {
+                Ok(doc) => Ok(doc),
+                Err(e) => Err(e)
+        }
+    }
 }
