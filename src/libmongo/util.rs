@@ -141,7 +141,7 @@ pub enum INDEX_FLAG {
 pub enum INDEX_OPTION {
     INDEX_NAME(~str),
     EXPIRE_AFTER_SEC(int),
-    //VERS(int),
+    VERS(int),
     //WEIGHTS(BsonDocument),
     //DEFAULT_LANG(~str),
     //OVERRIDE_LANG(~str),

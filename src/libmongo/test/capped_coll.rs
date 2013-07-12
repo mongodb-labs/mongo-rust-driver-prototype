@@ -16,6 +16,7 @@
 use mongo::db::*;
 use mongo::client::*;
 use mongo::util::*;
+use mongo::coll::*;
 
 use fill_coll::*;
 
@@ -27,13 +28,13 @@ fn test_capped_coll() {
         Err(e) => fail!("%s", MongoErr::to_str(e))
     }
 
-    let db = DB::new(~"rust_capped_db", client);
+    let db = DB::new(~"rust", client);
     db.drop_collection(~"capped");
 
-    let coll = match db.create_collection(~"capped", None, Some(~[CAPPED(100000), MAX_DOCS(5)])) {
-        Ok(c) => c,
+    match db.create_collection(~"capped", None, Some(~[CAPPED(100000), MAX_DOCS(5)])) {
+        Ok(_) => (),
         Err(e) => fail!("%s", MongoErr::to_str(e)),
-    };
+    }
 
     // should fail
     match db.create_collection(~"capped", None, Some(~[CAPPED(100000), MAX_DOCS(5)])) {
@@ -41,9 +42,14 @@ fn test_capped_coll() {
         Err(_) => (),
     }
 
-    coll.insert(~"{ \"a\":1 }", None);
     let n = 5;
-    let (coll, _, ins_docs) = fill_coll(~"rust_capped_db", ~"capped", client, n);
+    let (coll, _, ins_docs) = fill_coll(~"rust", ~"capped", client, n);
+
+    let n_tmp = 10;
+    let (_, ins_strs_tmp, ins_docs_tmp) = fill_coll(~"rust", ~"capped_tmp", client, n_tmp);
+    coll.insert(copy ins_strs_tmp[1], None);
+
+    // regular cursor
     match coll.find(None, None, None) {
         Ok(c) => {
             let mut cursor = c;
@@ -51,11 +57,60 @@ fn test_capped_coll() {
             cursor.sort(NORMAL(~[(~"$natural", DESC)]));
             for cursor.advance |ret_doc| {
                 if j >= n { fail!("more docs returned than inserted"); }
-                debug!(fmt!("\n%?", *ret_doc));
-                assert!(*ret_doc == ins_docs[n-j-1]);
+                if j == 0 { assert!(*ret_doc == ins_docs_tmp[1]); }
+                else { assert!(*ret_doc == ins_docs[n-j]); }
                 j += 1;
             }
             if j < n { fail!("fewer docs returned than inserted"); }
+        }
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    }
+
+    // tailable cursor now
+    let cur_maybe = coll.find(None, None, None);
+    match cur_maybe {
+        Ok(c) => {
+            let mut cursor = c;
+            cursor.add_flags(~[CUR_TAILABLE, AWAIT_DATA]);
+            do spawn {
+                let mut j = 0;
+                for n_tmp.times {
+                    let client_tmp = @Client::new();
+                    client_tmp.connect(~"127.0.0.1", MONGO_DEFAULT_PORT);
+                    let coll_tmp = Collection::new(~"rust", ~"capped", client_tmp);
+                    coll_tmp.insert(copy ins_strs_tmp[j], None);
+                    j += 1;
+                }
+            }
+
+            let mut j = 0;
+            for (n+n_tmp).times {
+                let mut tmp = cursor.next();
+                while tmp.is_none() && !cursor.is_dead() {
+                    tmp = cursor.next();
+                }
+
+                let doc = tmp.unwrap();
+                if j < n-1 { assert!(*doc == ins_docs[j+1]); }
+                else if j < n { assert!(*doc == ins_docs_tmp[1]); }
+                else { assert!(*doc == ins_docs_tmp[j-n]); }
+
+                if cursor.is_dead() { break; }
+                j += 1;
+            }
+        }
+        Err(e) => fail!("%s", MongoErr::to_str(e)),
+    }
+
+    // regular cursor again to check collection contains only 5 documents
+    match coll.find(None, None, None) {
+        Ok(c) => {
+            let mut cursor = c;
+            let mut j = 0;
+            for cursor.advance |ret_doc| {
+                assert!(*ret_doc == ins_docs_tmp[j+5]);
+                j += 1;
+            }
         }
         Err(e) => fail!("%s", MongoErr::to_str(e)),
     }

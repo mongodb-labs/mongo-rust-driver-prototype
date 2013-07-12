@@ -129,7 +129,7 @@ impl Cursor {
                             copy self.proj_spec);
             match self.client._send_msg(msg_to_bytes(msg), (copy self.db, None), true) {
                 Ok(reply) => match reply {
-                    Some(r) => match r {
+                    Some(r) => match copy r {
                         // XXX check if need start
                         OpReply { header:_, flags:_, cursor_id:id, start:_, nret:n, docs:d } => {
                             self.id = Some(id);
@@ -171,9 +171,9 @@ impl Cursor {
         }
 
         // otherwise, no more within cursor, so see if can get_more
-        let cur_id = self.id.unwrap();
-
+        let cur_id = (copy self.id).unwrap();
         if cur_id == 0 {
+
             // exhausted cursor; return
             if self.i > self.data.len() as i32 {
                 // only if cursor exhausted "abnormally", set iter_err
@@ -203,27 +203,11 @@ impl Cursor {
                             cur_id);
         match self.client._send_msg(msg_to_bytes(msg), (copy self.db, None), true) {
             Ok(reply) => match reply {
-                Some(r) => match r {
+                Some(r) => match copy r {
                     // TODO check re: start
                     OpReply { header:_, flags:_, cursor_id:id, start:_, nret:n, docs:d } => {
-                        // send a kill cursors if needed---TODO batch
-                        if id == 0 {
-                            let kill_msg = mk_kill_cursor(
-                                                self.client.inc_requestId(),
-                                                1i32,
-                                                ~[cur_id]);
-                            match self.client._send_msg(msg_to_bytes(kill_msg), (copy self.db, None), false) {
-                                Ok(reply) => match reply {
-                                    Some(r) => self.iter_err = Some(MongoErr::new(
-                                                ~"cursor::refresh",
-                                                ~"unknown error",
-                                                fmt!("received unexpected response %? from server",
-                                                    r))),
-                                    None => (),
-                                },
-                                Err(e) => self.iter_err = Some(e),
-                            }
-                        }
+                        // close cursor if needed
+                        if id == 0 { self.close(); }
 
                         // also update this cursor's fields
                         self.id = Some(id);
@@ -413,7 +397,6 @@ impl Cursor {
      * returns `true` at edge case when Cursor exhausted naturally.
      */
     pub fn has_next(&self) -> bool {
-        //!self.data.is_empty()
         // return true even if right at end (normal exhaustion of cursor)
         if self.limit != 0 {
             let diff = self.limit - self.retrieved;
@@ -421,9 +404,49 @@ impl Cursor {
         }
         self.i <= self.data.len() as i32
     }
-    pub fn close(&mut self) {
-        //self.collection.db.connection.close_cursor(self.id);
-        self.open = false
+
+    /**
+     * Closes cursor by sending OP_KILL_CURSORS message.
+     */
+    // XXX check with regard to write concern...?
+    // TODO batch
+    pub fn close(&mut self) -> Result<(), MongoErr> {
+        if self.id.is_none() {
+            return Err(MongoErr::new(
+                            ~"cursor::close",
+                            ~"no such cursor",
+                            ~"cannot close cursor never iterated upon"));
+        }
+
+        let cur_id = (copy self.id).unwrap();
+        let kill_msg = mk_kill_cursor(
+                            self.client.inc_requestId(),
+                            1i32,
+                            ~[cur_id]);
+        let error = match self.client._send_msg(msg_to_bytes(kill_msg), (copy self.db, Some(~[W_N(0)])), false) {
+            Ok(reply) => match reply {
+                Some(r) => Some(MongoErr::new(
+                                ~"cursor::close",
+                                ~"unknown error",
+                                fmt!("received unexpected response %? from server",
+                                    r))),
+                None => None,
+            },
+            Err(e) => Some(e),
+        };
+
+        if error.is_none() { Ok(()) }
+        else {
+            self.iter_err = copy error;
+            Err(error.unwrap())
+        }
+
+        //self.open = false
+    }
+
+    pub fn is_dead(&self) -> bool {
+        if self.id.is_some() { return (copy self.id).unwrap() == 0; }
+        false
     }
     fn add_query_spec(&mut self, doc: &BsonDocument) {
         for doc.fields.iter().advance |&(@k, @v)| {

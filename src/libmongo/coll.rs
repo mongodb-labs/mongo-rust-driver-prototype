@@ -50,7 +50,7 @@ impl MongoIndex {
                             ~[fmt!("\"name\":\"%s\"", n)]
                         }
                         EXPIRE_AFTER_SEC(exp) => ~[fmt!("\"expireAfterSeconds\":%d", exp).to_owned()],
-                        //VERS(int),
+                        VERS(v) => ~[fmt!("\"v\":%d", v)],
                         //WEIGHTS(BsonDocument),
                         //DEFAULT_LANG(~str),
                         //OVERRIDE_LANG(~str),
@@ -71,13 +71,10 @@ impl MongoIndex {
             match field {
                 NORMAL(arr) => {
                     for arr.iter().advance |&(key, order)| {
-                        /*index_str += [fmt!("\"%s\":%d", copy key, order as int)];
-                        if get_name { name += fmt!("%s_%d", copy key, order as int); } */
                         index_str = index_str + ~[fmt!("\"%s\":%d", copy key, order as int)];
                         if get_name { name.push_str(fmt!("%s_%d", key, order as int)); }
                     }
                 }
-                //HASHED(key) => index_str += [fmt!("\"%s\":\"hashed\"", copy key)],
                 HASHED(key) => {
                     index_str = index_str + ~[fmt!("\"%s\":\"hashed\"", copy key)];
                     if get_name { name.push_str(fmt!("%s_hashed", key)); }
@@ -87,7 +84,6 @@ impl MongoIndex {
                         SPHERICAL => ~"2dsphere",
                         FLAT => ~"2d",
                     };
-                    //index_str += [fmt!("\"%s\":\"%s\"", copy key, typ)];
                     index_str = index_str + ~[fmt!("\"%s\":\"%s\"", copy key, copy typ)];
                     if get_name { name.push_str(fmt!("%s_%s", key, typ)); }
                 }
@@ -110,7 +106,8 @@ impl MongoIndex {
         match tmp {
             MongoIndexName(s) => s,
             MongoIndexFields(arr) => {
-                let (name, _) = MongoIndex::process_index_fields(arr, &mut ~[], true);
+                let mut tmp = ~[];
+                let (name, _) = MongoIndex::process_index_fields(arr, &mut tmp, true);
                 name
             }
         }
@@ -513,6 +510,7 @@ impl Collection {
      * * `option_array` - optional vector of index-creating options:
      *                  INDEX_NAME(name),
      *                  EXPIRE_AFTER_SEC(nsecs)
+     *                  VERS(version no)
      *
      * # Returns
      * name of index as MongoIndexName (in enum MongoIndex) on success,
