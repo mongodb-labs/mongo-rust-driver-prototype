@@ -21,6 +21,7 @@ use util::*;
 use msg::*;
 use conn::Connection;
 use conn_node::NodeConnection;
+use conn_replica::ReplicaSetConnection;
 use db::DB;
 
 /**
@@ -31,7 +32,7 @@ use db::DB;
  * collection, etc. all store their associated Client
  */
 pub struct Client {
-    conn : ~cell::Cell<NodeConnection>,
+    conn : ~cell::Cell<@Connection>,
     db : ~cell::Cell<~str>,
     priv cur_requestId : ~cell::Cell<i32>,      // first unused requestId
     // XXX index cache?
@@ -171,6 +172,7 @@ impl Client {
      * * already connected
      * * network
      */
+    // XXX possibly make take enum of args for node, rs, etc.
     pub fn connect(&self, server_ip_str : ~str, server_port : uint)
                 -> Result<(), MongoErr> {
         if !self.conn.is_empty() {
@@ -183,11 +185,42 @@ impl Client {
         let tmp = NodeConnection::new(server_ip_str, server_port);
         match tmp.connect() {
             Ok(_) => {
-                self.conn.put_back(tmp);
+                self.conn.put_back(@tmp as @Connection);
                 Ok(())
             }
             Err(e) => return Err(MongoErr::new(
                                     ~"client::connect",
+                                    ~"connecting",
+                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+        }
+    }
+
+    /**
+     * Connect to replica set with specified seed list.
+     *
+     * # Arguments
+     * `seed` - seed list (vector) of ip/port pairs
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
+    // TODO uri parsing
+    pub fn connect_to_rs(&self, seed : ~[(~str, uint)]) -> Result<(), MongoErr> {
+        if !self.conn.is_empty() {
+            return Err(MongoErr::new(
+                            ~"client::connect_to_rs",
+                            ~"already connected",
+                            ~"cannot connect if already connected; please first disconnect"));
+        }
+
+        let tmp = ReplicaSetConnection::new(seed);
+        match tmp.connect() {
+            Ok(_) => {
+                self.conn.put_back(@tmp as @Connection);
+                Ok(())
+            }
+            Err(e) => return Err(MongoErr::new(
+                                    ~"client::connect_to_rs",
                                     ~"connecting",
                                     fmt!("-->\n%s", MongoErr::to_str(e)))),
         }
