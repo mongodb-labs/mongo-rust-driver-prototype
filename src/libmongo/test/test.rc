@@ -35,3 +35,4 @@ mod drop_db;
 mod add_user;
 mod authenticate;
 mod logout;
+mod validate;

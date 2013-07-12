@@ -124,7 +124,7 @@ impl BsonFormattable for ~str {
     fn to_bson_t(&self) -> Document {
         match ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(*self) {
             Ok(doc) => doc,
-            Err(e) => fail!("invalid string for parsing: %s", e),
+            Err(_) => UString(copy *self),
         }
     }
 
@@ -287,6 +287,12 @@ mod tests {
     use super::*;
     use encode::*;
     use extra::json;
+
+    #[test]
+    fn test_str_to_bson() {
+        assert_eq!((~"foo").to_bson_t(), UString(~"foo"));
+        assert!((~"{ \"foo\": 1 }").to_bson_t() != UString(~"{ \"foo\": 1 }"));
+    }
 
     #[test]
     fn test_json_to_bson() {
