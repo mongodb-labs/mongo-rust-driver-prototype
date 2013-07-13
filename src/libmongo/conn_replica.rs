@@ -13,10 +13,11 @@
  * limitations under the License.
  */
 
-use std::*;
+use std::int;
+use std::cell::*;
+use extra::priority_queue::*;
 
 use util::*;
-use client::Client;
 use conn::Connection;
 use conn_node::NodeConnection;
 
@@ -34,9 +35,10 @@ pub enum ServerType {
 
 pub struct ReplicaSetConnection {
     priv seed : ~[NodeConnection],
-    priv hosts : ~cell::Cell<~[~[@NodeConnection]]>,    // TODO RWARC?
-    priv send_to : ~cell::Cell<@NodeConnection>,        // convenience
-    priv recv_from : ~cell::Cell<@NodeConnection>,      // convenience
+    priv hosts: ~Cell<~[~PriorityQueue<@NodeConnection>]>,    // TODO RWARC?
+    priv hosts_unord : ~Cell<~[~[@NodeConnection]]>,    // TODO RWARC?
+    priv send_to : ~Cell<@NodeConnection>,        // convenience
+    priv recv_from : ~Cell<@NodeConnection>,      // XXX placeholder
 }
 
 impl Connection for ReplicaSetConnection {
@@ -60,7 +62,7 @@ impl Connection for ReplicaSetConnection {
     pub fn disconnect(&self) -> Result<(), MongoErr> {
         let mut err = ~"";
 
-        // disconnect from each of hosts
+        // disconnect from each of hosts; order doesn't matter here
         if !self.hosts.is_empty() {
             let host_mat = self.hosts.take();
             for host_mat.iter().advance |&host_type| {
@@ -167,9 +169,10 @@ impl ReplicaSetConnection {
     fn new_from_conn(seed : ~[NodeConnection]) -> ReplicaSetConnection {
         ReplicaSetConnection {
             seed : seed,
-            hosts : ~cell::Cell::new_empty(),
-            recv_from : ~cell::Cell::new_empty(),
-            send_to : ~cell::Cell::new_empty(),
+            hosts_unord : ~Cell::new_empty(),
+            hosts : ~Cell::new_empty(),
+            recv_from : ~Cell::new_empty(),
+            send_to : ~Cell::new_empty(),
         }
     }
 
@@ -182,8 +185,11 @@ impl ReplicaSetConnection {
     // XXX
     pub fn reconnect(&self) -> Result<(), MongoErr> {
         let mut host_list : ~[(~str, uint)] = ~[];
-        let mut hosts : ~[~[@NodeConnection]] = ~[];
-        for NSERVER_TYPES.times { hosts.push(~[]); }
+        let mut hosts : ~[~PriorityQueue<@NodeConnection>] = ~[];
+        for NSERVER_TYPES.times {
+            hosts.push(~PriorityQueue::new::<@NodeConnection>());
+        }
+        let get_ping = true;
 
         if !self.hosts.is_empty() { self.hosts.take(); }
 
@@ -191,6 +197,7 @@ impl ReplicaSetConnection {
         for self.seed.iter().advance |&server| {
             // TODO spawn
             host_list = match server._check_master_and_do(
+                    !get_ping,
                     |bson_doc : ~BsonDocument| -> Result<~[(~str, uint)], MongoErr> {
                 let mut list = ~[];
                 let mut err = None;
@@ -252,8 +259,9 @@ impl ReplicaSetConnection {
         // go through hosts to determine primary and secondaries
         for host_list.iter().advance |&(server_str, server_port)| {
             let server = NodeConnection::new(server_str, server_port);
-            let server_type = self._check_master_and_do(
-                    &server,
+
+            let server_type = server._check_master_and_do(
+                    get_ping,
                     |bson_doc : ~BsonDocument| -> Result<ServerType, MongoErr> {
                 // check if is master
                 let mut err = None;
@@ -294,7 +302,6 @@ impl ReplicaSetConnection {
                         }
                     }
                 }
-println(fmt!("rs:reconnection, err:%?, ismaster:%?, secondary:%?\n", err, is_master, is_secondary));
 
                 if err.is_none() {
                     if is_master { Ok(PRIMARY) }
@@ -321,10 +328,10 @@ println(fmt!("rs:reconnection, err:%?, ismaster:%?, secondary:%?\n", err, is_mas
         // connect to primary iff 1
         let result = if hosts[PRIMARY as int].len() == 1 {
             // put alias in send_to
-            self.send_to.put_back(hosts[PRIMARY as int][0]);
+            self.send_to.put_back(*(hosts[PRIMARY as int].top()));
 
             // connect to primary
-            let tmp = hosts[PRIMARY as int][0].connect();
+            let tmp = hosts[PRIMARY as int].top().connect();
 
             // put hosts back in
             self.hosts.put_back(hosts);
@@ -374,35 +381,6 @@ println(fmt!("rs:reconnection, err:%?, ismaster:%?, secondary:%?\n", err, is_mas
                             fmt!("host string should be \"[IP ~str]:[uint]\",
                                         found %s:%s", ip_str, port_str))),
             Some(k) => Ok((ip_str, k as uint)),
-        }
-    }
-
-    /**
-     * Run admin isMaster command and pass document into callback to process.
-     */
-    fn _check_master_and_do<T>(&self, node : &NodeConnection, cb : &fn(bson : ~BsonDocument) -> Result<T, MongoErr>)
-                -> Result<T, MongoErr> {
-        let client = @Client::new();
-
-        match client.connect(node.get_ip(), node.get_port()) {
-            Ok(_) => (),
-            Err(e) => return Err(e),
-        }
-
-        let admin = client.get_admin();
-        let resp = match admin.run_command(SpecNotation(~"{ \"ismaster\":1 }")) {
-            Ok(bson) => bson,
-            Err(e) => return Err(e),
-        };
-
-        let result = match cb(resp) {
-            Ok(ret) => Ok(ret),
-            Err(e) => return Err(e),
-        };
-
-        match client.disconnect() {
-            Ok(_) => result,
-            Err(e) => Err(e),
         }
     }
 }

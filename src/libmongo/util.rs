@@ -109,6 +109,16 @@ pub enum REPLY_FLAG {
     AWAIT_CAPABLE = 1 << 3,
 }
 
+pub enum QuerySpec {
+    SpecObj(BsonDocument),
+    SpecNotation(~str)
+}
+
+/*
+pub struct TagSet {
+}
+*/
+
 pub enum WRITE_CONCERN {
     JOURNAL(bool),      // wait for next journal commit?
     W_N(int),           // replicate to how many? (number)
@@ -118,11 +128,15 @@ pub enum WRITE_CONCERN {
     FSYNC(bool),        // wait for write to disk?
 }
 
-pub enum QuerySpec {
-    SpecObj(BsonDocument),
-    SpecNotation(~str)
-}
 // TODO read preference
+
+pub enum READ_PREFERENCE {
+    PRIMARY,
+    PRIMARY_PREF,
+    SECONDARY,
+    SECONDARY_PREF,
+    NEAREST,
+}
 
 /**
  * Indexing.

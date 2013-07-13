@@ -13,9 +13,11 @@
  * limitations under the License.
  */
 
+use std::cell::*;
 use extra::net::ip::*;
 use extra::net::tcp::*;
 use extra::uv::*;
+use extra::time::*;
 
 use util::*;
 use conn::*;
@@ -36,7 +38,8 @@ pub struct NodeConnection {
     priv iotask : iotask::IoTask,
     priv sock : @mut Option<@Socket>,
     //priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
-    priv port : @mut Option<@GenericPort<PortResult>>
+    priv port : @mut Option<@GenericPort<PortResult>>,
+    priv ping : Cell<u64>,
 }
 
 impl Connection for NodeConnection {
@@ -160,13 +163,24 @@ impl NodeConnection {
             iotask : global_loop::get(),
             sock : @mut None,
             port : @mut None,
+            ping : Cell::new_empty(),
         }
     }
 
     pub fn get_ip(&self) -> ~str { self.server_ip_str.clone() }
     pub fn get_port(&self) -> uint { self.server_port }
+    /*pub fn is_master(&self) -> Result<bool, MongoErr> {
+        self._check_master_and_do(|bson_doc : ~BsonDocument|
+                -> Result<bool, MongoErr> {
+            match bson_doc.find(
+        })
+    }*/
 
-    pub fn _check_master_and_do<T>(&self, cb : &fn(bson : ~BsonDocument) -> Result<T, MongoErr>)
+    /**
+     * Run admin isMaster command and pass document into callback to process.
+     * Also return result for future use. Helper function.
+     */
+    pub fn _check_master_and_do<T>(&self, get_ping : bool, cb : &fn(bson : ~BsonDocument) -> Result<T, MongoErr>)
                 -> Result<T, MongoErr> {
         let client = @Client::new();
 
@@ -176,10 +190,16 @@ impl NodeConnection {
         }
 
         let admin = client.get_admin();
+        let mut ping = precise_time_ns();
         let resp = match admin.run_command(SpecNotation(~"{ \"ismaster\":1 }")) {
             Ok(bson) => bson,
             Err(e) => return Err(e),
         };
+        ping = precise_time_ns() - ping;
+        if get_ping {
+            if !self.ping.is_empty() { self.ping.take(); }
+            self.ping.put_back(ping);
+        }
 
         let result = match cb(resp) {
             Ok(ret) => Ok(ret),
@@ -220,6 +240,80 @@ impl NodeConnection {
         })
     }
 */
+}
+
+/**
+ * Comparison of `NodeConnection`s based on their ping times.
+ */
+// Inequalities seem all backwards because max-heaps.
+impl Ord for NodeConnection {
+    pub fn lt(&self, other : &NodeConnection) -> bool {
+        if self.ping.is_empty() { return false; }
+        let ping0 = self.ping.take();
+
+
+        if other.ping.is_empty() {
+            self.ping.put_back(ping0);
+            return true;
+        }
+        let ping1 = other.ping.take();
+
+        let retval = ping0 > ping1;
+        self.ping.put_back(ping0);
+        other.ping.put_back(ping1);
+        retval
+    }
+
+    pub fn le(&self, other : &NodeConnection) -> bool {
+        if self.ping.is_empty() { return false; }
+        let ping0 = self.ping.take();
+
+
+        if other.ping.is_empty() {
+            self.ping.put_back(ping0);
+            return true;
+        }
+        let ping1 = other.ping.take();
+
+        let retval = ping0 >= ping1;
+        self.ping.put_back(ping0);
+        other.ping.put_back(ping1);
+        retval
+    }
+
+    pub fn gt(&self, other : &NodeConnection) -> bool {
+        if self.ping.is_empty() { return false; }
+        let ping0 = self.ping.take();
+
+
+        if other.ping.is_empty() {
+            self.ping.put_back(ping0);
+            return true;
+        }
+        let ping1 = other.ping.take();
+
+        let retval = ping0 < ping1;
+        self.ping.put_back(ping0);
+        other.ping.put_back(ping1);
+        retval
+    }
+
+    pub fn ge(&self, other : &NodeConnection) -> bool {
+        if self.ping.is_empty() { return false; }
+        let ping0 = self.ping.take();
+
+
+        if other.ping.is_empty() {
+            self.ping.put_back(ping0);
+            return true;
+        }
+        let ping1 = other.ping.take();
+
+        let retval = ping0 <= ping1;
+        self.ping.put_back(ping0);
+        other.ping.put_back(ping1);
+        retval
+    }
 }
 
 #[cfg(test)]
