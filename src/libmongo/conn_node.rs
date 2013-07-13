@@ -178,9 +178,9 @@ impl NodeConnection {
 
     /**
      * Run admin isMaster command and pass document into callback to process.
-     * Also return result for future use. Helper function.
+     * Helper function.
      */
-    pub fn _check_master_and_do<T>(&self, get_ping : bool, cb : &fn(bson : ~BsonDocument) -> Result<T, MongoErr>)
+    pub fn _check_master_and_do<T>(&self, get_ping : bool, cb : &fn(bson : &~BsonDocument) -> Result<T, MongoErr>)
                 -> Result<T, MongoErr> {
         let client = @Client::new();
 
@@ -201,7 +201,7 @@ impl NodeConnection {
             self.ping.put_back(ping);
         }
 
-        let result = match cb(resp) {
+        let result = match cb(&resp) {
             Ok(ret) => Ok(ret),
             Err(e) => return Err(e),
         };

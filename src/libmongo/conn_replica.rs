@@ -39,6 +39,7 @@ pub struct ReplicaSetConnection {
     priv hosts_unord : ~Cell<~[~[@NodeConnection]]>,    // TODO RWARC?
     priv send_to : ~Cell<@NodeConnection>,        // convenience
     priv recv_from : ~Cell<@NodeConnection>,      // XXX placeholder
+    priv read_mode : ~Cell<READ_PREFERENCE>,
 }
 
 impl Connection for ReplicaSetConnection {
@@ -173,6 +174,7 @@ impl ReplicaSetConnection {
             hosts : ~Cell::new_empty(),
             recv_from : ~Cell::new_empty(),
             send_to : ~Cell::new_empty(),
+            read_mode : ~Cell::new(PRIMARY),
         }
     }
 
@@ -198,7 +200,7 @@ impl ReplicaSetConnection {
             // TODO spawn
             host_list = match server._check_master_and_do(
                     !get_ping,
-                    |bson_doc : ~BsonDocument| -> Result<~[(~str, uint)], MongoErr> {
+                    |bson_doc : &~BsonDocument| -> Result<~[(~str, uint)], MongoErr> {
                 let mut list = ~[];
                 let mut err = None;
 
@@ -262,7 +264,7 @@ impl ReplicaSetConnection {
 
             let server_type = server._check_master_and_do(
                     get_ping,
-                    |bson_doc : ~BsonDocument| -> Result<ServerType, MongoErr> {
+                    |bson_doc : &~BsonDocument| -> Result<ServerType, MongoErr> {
                 // check if is master
                 let mut err = None;
                 let mut is_master = false;
@@ -312,11 +314,11 @@ impl ReplicaSetConnection {
 
             // record type of this server (primary or secondary) XXX
             match server_type {
-                Ok(PRIMARY) => hosts[PRIMARY as int].push(@server),
-                Ok(SECONDARY) => hosts[SECONDARY as int].push(@server),
-                /*Ok(ARBITER) => hosts[ARBITER as int].push(@server),
-                Ok(PASSIVE) => hosts[PASSIVE as int].push(@server),*/
-                Ok(OTHER) => hosts[OTHER as int].push(@server),
+                Ok(typ) => match typ {
+                    PRIMARY => hosts[PRIMARY as int].push(@server),
+                    SECONDARY => hosts[SECONDARY as int].push(@server),
+                    OTHER => (),
+                },
                 Err(e) => return Err(e),
             }
         }
@@ -350,6 +352,13 @@ impl ReplicaSetConnection {
         };
 
         result
+    }
+
+    /**
+     *
+     */
+    pub fn set_read_pref(&self, READ_PREFERENCE) {
+
     }
 
     /**

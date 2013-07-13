@@ -137,6 +137,9 @@ pub enum READ_PREFERENCE {
     SECONDARY_PREF,
     NEAREST,
 }
+/*pub struct HostTags {
+    tags : ~[],
+}*/
 
 /**
  * Indexing.
