@@ -39,12 +39,14 @@ impl MongoErr {
     pub fn new(typ : ~str, name : ~str, msg : ~str) -> MongoErr {
         MongoErr { err_type : typ, err_name : name, err_msg : msg }
     }
+}
 
+impl ToStr for MongoErr {
     /**
      * Print a MongoErr to string in a standard format.
      */
-    pub fn to_str(e : MongoErr) -> ~str {
-        fmt!("ERR | %s | %s => %s", e.err_type, e.err_name, e.err_msg)
+    pub fn to_str(&self) -> ~str {
+        fmt!("ERR | %s | %s => %s", self.err_type, self.err_name, self.err_msg)
     }
 }
 

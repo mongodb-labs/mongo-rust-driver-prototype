@@ -24,7 +24,7 @@ fn test_good_insert_single() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     let coll = @Collection::new(~"rust", ~"good_insert_one", client);
@@ -43,11 +43,11 @@ fn test_good_insert_single() {
     // try to extract it and compare
     match coll.find_one(None, None, None) {
         Ok(ret_doc) => assert!(*ret_doc == ins_doc),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 }

@@ -188,7 +188,7 @@ impl Client {
             Err(e) => return Err(MongoErr::new(
                                     ~"client::connect",
                                     ~"connecting",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
         }
     }
 
@@ -232,7 +232,7 @@ impl Client {
             Err(e) => return Err(MongoErr::new(
                                     ~"client::_send_msg",
                                     ~"",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
         }
 
         // handle write concern or handle query as appropriate
@@ -246,7 +246,7 @@ impl Client {
                 Err(e) => Err(MongoErr::new(
                                     ~"client::_send_msg",
                                     ~"write concern error",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
             }
         } else {
             // requested query
@@ -255,7 +255,7 @@ impl Client {
                 Err(e) => Err(MongoErr::new(
                                     ~"client::_send_msg",
                                     ~"error in response",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
             }
         }
     }

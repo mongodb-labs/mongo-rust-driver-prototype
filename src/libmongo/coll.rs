@@ -181,7 +181,7 @@ impl Collection {
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::insert",
                                     ~"sending insert",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
         }
     }
     /**
@@ -232,7 +232,7 @@ impl Collection {
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::insert_batch",
                                     ~"sending batch insert",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
         }
     }
     // TODO check
@@ -318,7 +318,7 @@ impl Collection {
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::update",
                                     ~"sending update",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
         }
     }
 
@@ -437,7 +437,7 @@ impl Collection {
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::find_one",
                                     ~"",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
         }
     }
 
@@ -483,7 +483,7 @@ impl Collection {
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::remove",
                                     ~"sending remove",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
         }
     }
 

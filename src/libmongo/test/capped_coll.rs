@@ -25,7 +25,7 @@ fn test_capped_coll() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))
+        Err(e) => fail!("%s", e.to_str())
     }
 
     let db = DB::new(~"rust", client);
@@ -34,7 +34,7 @@ fn test_capped_coll() {
     let n = 100;
     match db.create_collection(~"capped", None, Some(~[CAPPED(100000), MAX_DOCS(n)])) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     // should fail
@@ -63,7 +63,7 @@ fn test_capped_coll() {
             }
             if j < n { fail!("fewer docs than in capped collection"); }
         }
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     // tailable cursor now
@@ -99,7 +99,7 @@ fn test_capped_coll() {
                 j += 1;
             }
         }
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     // regular cursor again to check collection contains only 5 documents
@@ -114,11 +114,11 @@ fn test_capped_coll() {
             }
             if j < n { fail!("fewer docs than in capped collection"); }
         }
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 }

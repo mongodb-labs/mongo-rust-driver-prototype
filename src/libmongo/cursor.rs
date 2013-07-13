@@ -152,7 +152,7 @@ impl Cursor {
                     self.iter_err = Some(MongoErr::new(
                                         ~"cursor::refresh",
                                         ~"sending query",
-                                        fmt!("-->\n%s", MongoErr::to_str(e))));
+                                        fmt!("-->\n%s", e.to_str())));
                     return 0;
                 }
             }

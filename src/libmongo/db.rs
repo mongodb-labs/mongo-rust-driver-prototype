@@ -262,7 +262,7 @@ impl DB {
             Err(e) => return Err(MongoErr::new(
                                     ~"db::run_command",
                                     fmt!("error getting return value from run_command %?", cmd),
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
         };
 
         // check if run_command succeeded
@@ -350,7 +350,7 @@ impl DB {
             Err(e) => return Err(MongoErr::new(
                                     ~"db::get_last_error",
                                     ~"run_command error",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
         };
 
         // error field name possibitilies

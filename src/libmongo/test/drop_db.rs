@@ -23,7 +23,7 @@ fn test_drop_db() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     let db = ~"rust_drop";
@@ -31,28 +31,28 @@ fn test_drop_db() {
 
     let all_dbs = match client.get_dbs() {
         Ok(arr) => arr,
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     };
 
     match client.drop_db(db.clone()) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     };
     // oddly, should succeed (double drop of db ok)
     match client.drop_db(db.clone()) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     };
 
     let cur_dbs = match client.get_dbs() {
         Ok(arr) => arr,
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     };
 
     assert!(cur_dbs.len() == all_dbs.len()-1);
 
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 }
