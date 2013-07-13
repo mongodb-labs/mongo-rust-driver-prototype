@@ -24,7 +24,7 @@ fn test_add_user() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))
+        Err(e) => fail!("%s", e.to_str())
     }
 
     // drop users first
@@ -33,7 +33,7 @@ fn test_add_user() {
     coll.remove(None, None, None, None);
     match db.add_user(~"testuser", ~"testpassword", ~[]) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))
+        Err(e) => fail!("%s", e.to_str())
     };
 
     let mut cursor = match coll.find(Some(SpecNotation(~"{ \"user\": \"testuser\" }")), None, None) {

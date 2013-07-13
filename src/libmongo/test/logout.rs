@@ -22,7 +22,7 @@ fn test_logout() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     // add user to fresh db; this ensures the user will be present
@@ -30,16 +30,16 @@ fn test_logout() {
     db.get_collection(~"system.users").remove(None, None, None, None);
     match db.add_user(~"testuser3", ~"testpassword", ~[]) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))
+        Err(e) => fail!("%s", e.to_str())
     };
 
     match db.authenticate(~"testuser3", ~"testpassword") {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))
+        Err(e) => fail!("%s", e.to_str())
     }
 
     match db.logout() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))
+        Err(e) => fail!("%s", e.to_str())
     }
 }

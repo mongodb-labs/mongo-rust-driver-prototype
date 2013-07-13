@@ -4,6 +4,28 @@ MongoDB Rust Driver Prototype
 This is a prototype version of a MongoDB driver for the Rust programming language.
 This library has been built on Rust version 0.7. If you are using a more up-to-date version of Rust, the project may not build correctly.
 
+## Installation
+
+#### Dependencies
+- [Rust](http://rust-lang.org) 0.7 (WARNING: will likely not build on other versions)
+- [gcc](http://gcc.gnu.org)
+- [MongoDB](http://mongodb.org) 2.4 or above
+- [GNU Make](http://gnu.org/software/make)
+
+#### Building
+The Rust MongoDB driver is built using ```make```. Available targets include:
+- ```all``` (default) build binaries for ```bson``` and ```mongo```
+- ```libs``` compile C dependencies
+- ```bson``` build a binary just for ```bson```
+- ```mongo``` build a binary just for ```mongo``` (note: this requires an existing ```bson``` binary)
+- ```test``` compile the test suite
+- ```check``` compile and run the test suite
+- ```doc``` generate documentation
+- ```clean``` remove generated binaries
+- ```tidy``` clean up unused whitespace
+
+By default, files are compiled with ```unused-unsafe``` warnings denied and ```unnecessary-allocation``` warnings allowed. You can pass additional flags to rustc by setting the ```TOOLFLAGS``` variable. Additionally, integration tests can be enabled by setting ```MONGOTEST=1```. _Integration tests will fail unless there is a MongoDB instance running on 127.0.0.1:27017_.
+
 ## Tutorial
 Once you've built MongoDB and have the compiled library files, you can make MongoDB available in your code with
 ```rust
@@ -62,8 +84,6 @@ foo.insert_batch(ins_batch, None, None, None);
     // no write concern specified---use default; no special options
 
 // read one back (no specific query or query options/flags)
-//      ~BsonDocuments are read back, and should be converted---
-//      from_bson_t for JSON is a "TODO"
 match foo.find_one(None, None, None) {
     Ok(ret_doc) => println(fmt!("%?", *ret_doc)),
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
@@ -213,10 +233,10 @@ doc.put(~"baz", (5.1).to_bson_t());
 
 In addition to constructing them directly, these types can also be built from JSON-formatted strings. The parser in ```extra::json``` will return a Json object (which implements BsonFormattable) but the fields will not necessarily be ordered properly.
 The BSON library also publishes its own JSON parser, which supports [extended JSON](http://docs.mongodb.org/manual/reference/mongodb-extended-json/) and guarantees that fields will be serialized in the order they were inserted.
-Calling this JSON parser is done through the ```ObjParser``` trait's ```from_string``` method.
+Calling this JSON parser is done through the ```ObjParser``` trait's ```from_string``` method, or by using the ```to_bson_t``` method on a valid JSON ```~str```.
 Example:
 ```rust
-use mongo::bson::json_parse::*;
+use bson::json_parse::*;
 
 let json_string = ~"{\"foo\": \"bar\", \"baz\", 5}";
 let parsed_doc = ObjParser::from_string<Document, ExtendedJsonParser<~[char]>>(json_string);
@@ -224,6 +244,9 @@ match parsed_doc {
     Ok(ref d) => //the string was parsed successfully; d is a Document
     Err(e) => //the string was not valid JSON and an error was encountered while parsing
 }
+
+//alternative method; won't throw an error as above if the string is improperly formatted
+let json_obj = json_string.to_bson_t();
 ```
 
 ##### Encoding values
@@ -293,9 +316,9 @@ let myfoo = BsonFormattable::from_bson_t::<Foo>(decode(b).unwrap()); //here it i
 
 ## Roadmap
 
-- [ ] Replication set support
-- [ ] Implement read preferences
-- [ ] Documentation to the [API site](http://api.mongodb.org)
-- [ ] Thorough test suite for CRUD functionality
+- Replication set support
+- Implement read preferences
+- Documentation to the [API site](http://api.mongodb.org)
+- Thorough test suite for CRUD functionality
 
 To be continued...

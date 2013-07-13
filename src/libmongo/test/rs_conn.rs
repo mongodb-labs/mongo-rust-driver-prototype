@@ -24,7 +24,7 @@ fn test_rs_conn() {
     let client = @Client::new();
     match client.connect_to_rs(~[(~"127.0.0.1", 27018)]) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     let coll = @Collection::new(~"rust", ~"good_insert_one", client);
@@ -44,12 +44,12 @@ fn test_rs_conn() {
     // try to extract it and compare
     match coll.find_one(None, None, None) {
         Ok(ret_doc) => assert!(*ret_doc == ins_doc),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 */
 
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 }

@@ -70,7 +70,7 @@ impl Connection for ReplicaSetConnection {
                 for host_type.iter().advance |&server| {
                     match server.disconnect() {
                         Ok(_) => (),
-                        Err(e) => err.push_str(fmt!("\n\t%s", MongoErr::to_str(e))),
+                        Err(e) => err.push_str(fmt!("\n\t%s", e.to_str())),
                     }
                 }
             }
@@ -82,7 +82,7 @@ impl Connection for ReplicaSetConnection {
             for hosts.iter().advance |&server| {
                 match server.disconnect() {
                     Ok(_) => (),
-                    Err(e) => err.push_str(fmt!("\n\t%s", MongoErr::to_str(e))),
+                    Err(e) => err.push_str(fmt!("\n\t%s", e.to_str())),
                 }
             }
         }*/
@@ -174,7 +174,7 @@ impl ReplicaSetConnection {
             hosts : ~Cell::new_empty(),
             recv_from : ~Cell::new_empty(),
             send_to : ~Cell::new_empty(),
-            read_mode : ~Cell::new(PRIMARY),
+            read_mode : ~Cell::new_empty(),
         }
     }
 
@@ -239,7 +239,7 @@ impl ReplicaSetConnection {
                                     Err(e) => err = Some(MongoErr::new(
                                             ~"conn_replica::connect",
                                             ~"error parsing hosts",
-                                            fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                            fmt!("-->\n%s", e.to_str()))),
                                 }
 
                                 if (copy err).is_none() { list.push(copy pair); }
@@ -354,12 +354,12 @@ impl ReplicaSetConnection {
         result
     }
 
-    /**
+    /*
      *
      */
-    pub fn set_read_pref(&self, READ_PREFERENCE) {
+    /*pub fn set_read_pref(&self, READ_PREFERENCE) {
 
-    }
+    }*/
 
     /**
      * Parse host string found from ismaster command into host and port

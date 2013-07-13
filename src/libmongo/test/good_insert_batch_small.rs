@@ -23,7 +23,7 @@ fn test_good_insert_batch_small() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     let n = 5;
@@ -42,16 +42,16 @@ fn test_good_insert_batch_small() {
             }
             if j < n { fail!("fewer docs returned than inserted"); }
         }
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     match coll.find_one(None, None, None) {
         Ok(c) => assert!(*c == ins_docs[0]),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 }

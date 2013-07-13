@@ -25,7 +25,7 @@ fn test_drop_collection() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     let db_str = ~"rust_drop_coll";
@@ -38,14 +38,14 @@ fn test_drop_collection() {
     let db = DB::new(db_str, client);
     let before = match db.get_collection_names() {
         Ok(names) => names,
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     };
     assert!(before.len() == colls.len()+1); // system.indexes
 
     db.drop_collection(~"coll0");
     let after = match db.get_collection_names() {
         Ok(names) => names,
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     };
     assert!(after.len() == before.len()-1);
 
@@ -57,6 +57,6 @@ fn test_drop_collection() {
 
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 }

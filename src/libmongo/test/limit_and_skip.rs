@@ -24,7 +24,7 @@ fn test_limit_and_skip() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     let n = 400;
@@ -32,23 +32,23 @@ fn test_limit_and_skip() {
 
     let mut cur = match coll.find(None, None, None) {
         Ok(cursor) => cursor,
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     };
 
     let skip = 6;
     let lim = 378;
     match cur.cursor_limit(lim) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
     match cur.cursor_skip(skip) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     match cur.sort(NORMAL(~[(~"_id", ASC)])) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     match cur.next() {
@@ -74,6 +74,6 @@ fn test_limit_and_skip() {
 
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 }
