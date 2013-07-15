@@ -65,19 +65,22 @@ impl MongoIndex {
                                 index_opts : &mut ~[~str],
                                 get_name : bool)
             -> (~str, ~[~str]) {
-        let mut name = ~"";
+        //let mut name = ~"";
+        let mut name = ~[];
         let mut index_str = ~[];
         for index_arr.iter().advance |&field| {
             match field {
                 NORMAL(arr) => {
                     for arr.iter().advance |&(key, order)| {
                         index_str.push(fmt!("\"%s\":%d", key, order as int));
-                        if get_name { name.push_str(fmt!("%s_%d", key, order as int)); }
+                        //if get_name { name.push_str(fmt!("%s_%d", key, order as int)); }
+                        if get_name { name.push(fmt!("%s_%d", key, order as int)); }
                     }
                 }
                 HASHED(key) => {
                     index_str.push(fmt!("\"%s\":\"hashed\"", key));
-                    if get_name { name.push_str(fmt!("%s_hashed", key)); }
+                    //if get_name { name.push_str(fmt!("%s_hashed", key)); }
+                    if get_name { name.push(fmt!("%s_hashed", key)); }
                 }
                 GEOSPATIAL(key, geotype) => {
                     let typ = match geotype {
@@ -85,17 +88,20 @@ impl MongoIndex {
                         FLAT => ~"2d",
                     };
                     index_str.push(fmt!("\"%s\":\"%s\"", key, typ));
-                    if get_name { name.push_str(fmt!("%s_%s", key, typ)); }
+                    //if get_name { name.push_str(fmt!("%s_%s", key, typ)); }
+                    if get_name { name.push(fmt!("%s_%s", key, typ)); }
                 }
                 GEOHAYSTACK(loc, snd, sz) => {
                     index_str.push(fmt!("\"%s\":\"geoHaystack\", \"%s\":1", loc, snd));
-                    if get_name { name.push_str(fmt!("%s_geoHaystack_%s_1", loc, snd)); }
+                    //if get_name { name.push_str(fmt!("%s_geoHaystack_%s_1", loc, snd)); }
+                    if get_name { name.push(fmt!("%s_geoHaystack_%s_1", loc, snd)); }
                     (*index_opts).push(fmt!("\"bucketSize\":%?", sz));
                 }
             }
         }
 
-        (name, index_str)
+//        (name, index_str)
+        (name.connect("_"), index_str)
     }
 
     /**
