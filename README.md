@@ -62,6 +62,10 @@ Now we may create handles to databases and collections on the server. We start w
 let foo = Collection::new(~"foo_db", ~"foo_coll", client);
 let bar = Collection::new(~"foo_db", ~"bar_coll", client);
 ```
+Equivalently, we may create collection handles direction from the ```Client```:
+```rust
+let foo = client.get_collection(~"foo_db", ~"foo_coll");
+```
 
 ##### CRUD Operations
 We input JSON as strings formatted for JSON and manipulate them (in fact, we can insert anything implementing the ```BsonFormattable``` trait [see BSON section below] as long as its ```to_bson_t``` conversion returns an ```Embedded(~BsonDocument)```, i.e. it is represented as a BSON):
@@ -76,7 +80,7 @@ let mut ins_batch : ~[~str] = ~[];
 let n = 200;
 let mut i = 0;
 for n.times {
-    ins_batch = ins_batch + ~[fmt!("{ \"a\":%d, \"b\":\"ins %d\" }", i/2, i)];
+    ins_batch.push(fmt!("{ \"a\":%d, \"b\":\"ins %d\" }", i/2, i));
     i += 1;
 }
 foo.insert_batch(ins_batch, None, None, None);
@@ -85,7 +89,7 @@ foo.insert_batch(ins_batch, None, None, None);
 // read one back (no specific query or query options/flags)
 match foo.find_one(None, None, None) {
     Ok(ret_doc) => println(fmt!("%?", *ret_doc)),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)), // should not happen
 }
 ```
 
@@ -94,25 +98,25 @@ In general, to specify options, we put the appropriate options into a vector and
 // insert a big batch of documents with duplicated _ids
 ins_batch = ~[];
 for 5.times {
-    ins_batch = ins_batch + ~[fmt!("{ \"_id\":%d, \"a\":%d, \"b\":\"ins %d\" }", 2*i/3, i/2, i)];
+    ins_batch.push(fmt!("{ \"_id\":%d, \"a\":%d, \"b\":\"ins %d\" }", 2*i/3, i/2, i));
     i += 1;
 }
 
 // ***error returned***
 match foo.insert_batch(ins_batch, None, None, None) {
-    Ok(_) => (),                                        // should not happen
+    Ok(_) => fail!("bad insert succeeded"),          // should not happen
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))),
 }
 // ***no error returned since duplicated _ids skipped (CONT_ON_ERR specified)***
 match foo.insert_batch(ins_batch, Some(~[CONT_ON_ERR]), None, None) {
     Ok(_) => (),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 
 // create an ascending index on the "b" field named "fubar"
 match foo.create_index(~[NORMAL(~[(~"b", ASC)])], None, Some(~[INDEX_NAME(~"fubar")])) {
     Ok(_) => (),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 ```
 
@@ -138,7 +142,7 @@ match foo.find(None, Some(SpecNotation(~"{ \"b\":1 }")), None) {
             println(fmt!("%?", *doc));
         }
     }
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 
 // drop the index by name (if it were not given a name, specifying by
@@ -146,13 +150,13 @@ match foo.find(None, Some(SpecNotation(~"{ \"b\":1 }")), None) {
 //      constructed name)
 match foo.drop_index(MongoIndexName(~"fubar")) {
     Ok(_) => (),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 
 // remove every element where "a" is 1
 match foo.remove(Some(SpecNotation(~"{ \"a\":1 }")), None, None, None) {
     Ok(_) => (),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 
 // upsert every element where "a" is 2 to be 3
@@ -160,7 +164,7 @@ match foo.update(   SpecNotation(~"{ \"a\":2 }"),
                     SpecNotation(~"{ \"$set\": { \"a\":3 } }"),
                     Some(~[MULTI, UPSERT]), None, None) {
     Ok(_) => (),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 ```
 
