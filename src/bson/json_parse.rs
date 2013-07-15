@@ -16,7 +16,6 @@
 use std::char::is_digit;
 use std::str::from_chars;
 use std::float::from_str;
-use std::to_bytes::*;
 use stream::*;
 use encode::*;
 
@@ -64,7 +63,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
         let mut ret = BsonDocument::new();
         while !(self.stream.first() == &'}') {
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
-            if self.stream.expect(&['\"']).is_none() { return Err(~"keys must begin with quote marks"); }
+            if self.stream.expect(&['\"', '\'']).is_none() { return Err(~"keys must begin with quote marks"); }
             let key = match self._string() {
                 UString(s) => s,
                 _ => return Err(~"invalid key found")
@@ -75,9 +74,10 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
             }
             self.stream.pass(1); //pass over :
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
-            let c = self.stream.expect(&['\"', 't', 'f', '[', '{']);
+            let c = self.stream.expect(&['\"', '\'', 't', 'f', '[', '{']);
             match c {
                 Some('\"') => { ret.put(key, self._string()); }
+                Some('\'') => { ret.put(key, self._string()); }
                 Some('t') => {
                     match_insert!(_bool,key);
                 }
@@ -128,7 +128,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
     ///Parse a string.
     fn _string(&mut self) -> Document {
         self.stream.pass(1); //pass over begin quote
-        let ret: ~[char] = self.stream.until(|c| *c == '\"');
+        let ret: ~[char] = self.stream.until(|c| *c == '\"' || *c == '\'');
         self.stream.pass(1); //pass over end quote
         self.stream.pass_while(&[' ', '\n', '\r', '\t']); //pass over trailing whitespace
         UString(from_chars(ret))
@@ -203,9 +203,10 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
         let mut ret = BsonDocument::new();
         let mut i: uint = 0;
         while !(self.stream.first() == &']') {
-            let c = self.stream.expect(&['\"', 't', 'f', '[', '{']);
+            let c = self.stream.expect(&['\"', '\'', 't', 'f', '[', '{']);
             match c {
                 Some('\"') => ret.put(i.to_str(), self._string()),
+                Some('\'') => ret.put(i.to_str(), self._string()),
                 Some('t') => {
                     match_insert!(_bool,i.to_str());
                 }
@@ -300,9 +301,9 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                     && m.contains_key(~"$binary")
                     && m.contains_key(~"$type") {
                     match (m.find(~"$binary"), m.find(~"$type")) {
-                        (Some(&Double(d1)), Some(&Double(d2))) =>
-                            return Some(Binary(d2 as u8,
-                                (d1 as i64).to_bytes(true))),
+                        (Some(&UString(ref s1)), Some(&UString(ref s2))) =>
+                            return Some(Binary(s2.bytes_iter().collect::<~[u8]>()[0],
+                                s1.bytes_iter().collect::<~[u8]>())),
                         _ => return None
                     }
                 }
@@ -385,7 +386,7 @@ mod tests {
     }
     #[test]
     fn test_list_fmt() {
-        let stream = "[5.01, true, \"hello\"]".iter().collect::<~[char]>();
+        let stream = "[5.01, true, \'hello\']".iter().collect::<~[char]>();
         let mut parser = ExtendedJsonParser::new(stream);
         let val = parser._list().unwrap();
         let mut l = BsonDocument::new();
@@ -397,7 +398,7 @@ mod tests {
 
     #[test]
     fn test_object_fmt() {
-        let stream = "{\"foo\": true, \"bar\": 2, \"baz\": [\"qux-dux\"]}".iter().collect::<~[char]>();
+        let stream = "{\"foo\": true, \'bar\': 2, 'baz': [\"qux-dux\"]}".iter().collect::<~[char]>();
         let mut parser = ExtendedJsonParser::new(stream);
         let mut d = BsonDocument::new();
         let mut doc = BsonDocument::new();
@@ -411,7 +412,7 @@ mod tests {
 
     #[test]
     fn test_nested_obj_fmt() {
-        let stream = "{\"qux\": {\"foo\": 5.0, \"bar\": \"baz\"}, \"fizzbuzz\": false}".iter().collect::<~[char]>();
+        let stream = "{\"qux\": {\"foo\": 5.0, 'bar': 'baz'}, \"fizzbuzz\": false}".iter().collect::<~[char]>();
         let mut parser = ExtendedJsonParser::new(stream);
         let mut m1 = BsonDocument::new();
         m1.put(~"foo", Double(5f64));
@@ -496,7 +497,7 @@ mod tests {
 
     #[test]
     fn test_date_fmt() {
-        let stream = "{\"$date\": 12345}".iter().collect::<~[char]>();
+        let stream = "{\'$date\': 12345}".iter().collect::<~[char]>();
         let mut parser = ExtendedJsonParser::new(stream);
         let v = parser.object();
         let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
@@ -517,7 +518,7 @@ mod tests {
     #[test]
     #[should_fail]
     fn test_minkey_otherkey_fmt() {
-        let stream = "{\"$minKey\": 3}".iter().collect::<~[char]>();
+        let stream = "{\'$minKey\': 3}".iter().collect::<~[char]>();
         let mut parser = ExtendedJsonParser::new(stream);
         let v = parser.object();
         ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
