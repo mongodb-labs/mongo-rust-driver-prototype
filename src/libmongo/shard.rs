@@ -16,7 +16,7 @@
 use util::*;
 use client::*;
 use db::*;
-use coll::*;
+//use coll::*;
 
 use bson::encode::*;
 
@@ -52,13 +52,27 @@ impl ShardController {
                 Int32(1i32) => return Ok(()),
                 Int64(1i64) => return Ok(()),
                 _ => return Err(MongoErr::new(
-                    ~"db::logout",
-                    ~"error while logging out",
+                    ~"shard::enable_sharding",
+                    fmt!("error enabling sharding on %s", db),
                     ~"the server returned ok: 0"))
             },
             Err(e) => return Err(e)
         };
     }
 
-
+    pub fn add_shard(&self, hostname: ~str) -> Result<(), MongoErr> {
+        let admin = self.mongos.get_admin();
+        match admin.run_command(SpecNotation(fmt!("{ \"addShard\": %s }", copy hostname))) {
+            Ok(doc) => match *doc.find(~"ok").unwrap() {
+                Double(1f64) => return Ok(()),
+                Int32(1i32) => return Ok(()),
+                Int64(1i64) => return Ok(()),
+                _ => return Err(MongoErr::new(
+                    ~"shard::add_shard",
+                    fmt!("error adding shard at %s", hostname),
+                    ~"the server returned ok: 0"))
+            },
+            Err(e) => return Err(e)
+        };
+    }
 }
