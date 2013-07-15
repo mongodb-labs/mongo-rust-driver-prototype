@@ -45,6 +45,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><a href="#implementation-of-encodablee-for-bsondocument-where-e-encoder">Implementation <code>of Encodable&lt;E&gt; for BsonDocument where &lt;E: Encoder&gt;</code></a> - Light wrapper around a typical Map implementation.</li>
 <li><a href="#implementation-of-encodablee-for-document-where-e-encoder">Implementation <code>of Encodable&lt;E&gt; for Document where &lt;E: Encoder&gt;</code></a> - Encodable implementation for Document.</li>
 <li><a href="#implementation-for-bsondocument-where-self">Implementation <code>for BsonDocument where &lt;'self&gt;</code></a></li>
+<li><a href="#implementation-for-document">Implementation <code>for Document</code></a> - Methods on documents.</li>
 </ul>
 </div>
 
@@ -341,6 +342,15 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <h3>Method <code>fields_match</code></h3>
 <pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> fields_match(&amp;<span class="kw">self</span>, other: &amp;BsonDocument) -&gt; <span class="kw">bool</span></code></pre>
 <p>Compare two BsonDocuments to decide if they have the same fields. Returns true if every field except the _id field is matching. The _id field and the size are ignored. Two documents are considered to have matching fields even if their fields are not in the same order.</p>
+</div>
+</div>
+<div id="implementation-for-document" class="section level2">
+<h2>Implementation for <code>Document</code></h2>
+<p>Methods on documents.</p>
+<div id="method-to_bson-1" class="section level3">
+<h3>Method <code>to_bson</code></h3>
+<pre class="sourceCode rust"><code class="sourceCode rust"><span class="kw">fn</span> to_bson(&amp;<span class="kw">self</span>) -&gt; ~[<span class="kw">u8</span>]</code></pre>
+<p>Allows any document to be converted to its BSON-serialized representation.</p>
 </div>
 </div>
 </body>

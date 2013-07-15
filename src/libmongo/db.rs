@@ -27,6 +27,11 @@ use coll::Collection;
 
 static L_END: bool = true;
 
+pub struct DB {
+    name : ~str,
+    priv client : @Client,
+}
+
 #[link_args = "-lmd5"]
 extern {
     fn md5_init(pms: *MD5State);
@@ -38,11 +43,6 @@ priv struct MD5State {
     count: [u32,..2],
     abcd: [u32,..4],
     buf: [u8,..64]
-}
-
-pub struct DB {
-    name : ~str,
-    priv client : @Client,
 }
 
 impl MD5State {
@@ -75,8 +75,6 @@ impl MD5State {
     }
 }
 
-// TODO coll (drop_collection)
-
 /**
  * Having created a `Client` and connected as desired
  * to a server or cluster, users may interact with
@@ -84,7 +82,7 @@ impl MD5State {
  */
 impl DB {
     /**
-     * Create a new Mongo DB with given name and associated Client.
+     * Creates a new Mongo DB with given name and associated Client.
      *
      * # Arguments
      * * `name` - name of DB
@@ -102,8 +100,9 @@ impl DB {
 
     // COLLECTION INTERACTION
     /**
-     * Get names of all collections in this `DB`, returning error
-     * if any fail. Names do not include `DB` name.
+     * Gets names of all collections in this `DB`, returning error
+     * if any fail. Names do not include `DB` name, i.e. are not
+     * full namespaces.
      *
      * # Returns
      * vector of collection names on success, `MongoErr` on failure
@@ -153,7 +152,7 @@ impl DB {
         Ok(names)
     }
     /**
-     * Get `Collection`s in this `DB`, returning error if any fail.
+     * Gets `Collection`s in this `DB`, returning error if any fail.
      *
      * # Returns
      * vector of `Collection`s on success, `MongoErr` on failure
@@ -175,19 +174,15 @@ impl DB {
         Ok(coll)
     }
     /**
-     * Get handle to `Collection` with given name, from this `DB`.
+     * Creates collection with given options.
      *
      * # Arguments
-     * * `coll` - name of collection to get
+     * * `coll` - name of collection to create
+     * * `flag_array` - collection creation flags
+     * * `option_array` - collection creation options
      *
      * # Returns
-     * collecton handle
-     */
-    pub fn get_collection(&self, coll : ~str) -> Collection {
-        Collection::new(copy self.name, coll, self.client)
-    }
-    /**
-     * Create collection with given options.
+     * handle to collection on success, `MongoErr` on failure
      */
     pub fn create_collection(   &self,
                                 coll : ~str,
@@ -225,13 +220,25 @@ impl DB {
         opts_str
     }
     /**
+     * Gets handle to collection with given name, from this `DB`.
+     *
+     * # Arguments
+     * * `coll` - name of `Collection` to get
+     *
+     * # Returns
+     * handle to collection
+     */
+    pub fn get_collection(&self, coll : ~str) -> Collection {
+        Collection::new(copy self.name, coll, self.client)
+    }
+    /**
      * Drops given collection from database associated with this `DB`.
      *
      * # Arguments
-     * * `coll` - name of collection to get
+     * * `coll` - name of collection to drop
      *
      * # Returns
-     * () on success, MongoErr on failure
+     * () on success, `MongoErr` on failure
      */
     pub fn drop_collection(&self, coll : ~str) -> Result<(), MongoErr> {
         match self.run_command(SpecNotation(fmt!("{ \"drop\":\"%s\" }", coll))) {
@@ -312,8 +319,7 @@ impl DB {
      * * `wc` - write concern, i.e. getLastError specifications
      *
      * # Returns
-     * None on success if w : 0, Some(()) on success otherwise,
-     * MongoErr on failure
+     * () on success, `MongoErr` on failure
      *
      * # Failure Types
      * * invalid write concern specification (should never happen)
@@ -329,8 +335,7 @@ impl DB {
         // parse write concern, early exiting if set to <= 0
         let mut concern_str = ~"{ \"getLastError\":1";
         for concern.iter().advance |&opt| {
-            //concern_str += match opt {
-            concern_str = concern_str + match opt {
+            concern_str.push_str(match opt {
                 JOURNAL(j) => fmt!(", \"j\":%?", j),
                 W_N(w) => {
                     if w <= 0 { return Ok(()); }
@@ -339,10 +344,9 @@ impl DB {
                 W_STR(w) => fmt!(", \"w\":\"%s\"", w),
                 WTIMEOUT(t) => fmt!(", \"wtimeout\":%d", t),
                 FSYNC(s) => fmt!(", \"fsync\":%?", s),
-            };
+            });
         }
-        //concern_str += " }";
-        concern_str = concern_str + " }";
+        concern_str.push_str(~" }");
 
         // run_command and get entire doc
         let err_doc_tmp = match self.run_command(SpecNotation(concern_str)) {

@@ -45,10 +45,10 @@ pub struct Cursor {
 ///Iterator implementation, opens access to powerful functions like collect, advance, map, etc.
 impl Iterator<~BsonDocument> for Cursor {
     /**
-     * Returns pointer to next BsonDocument.
+     * Returns pointer to next `BsonDocument`.
      *
      * Pointers passed for greater memory flexibility. Any errors
-     * are stored in Cursor's iter_err field.
+     * are stored in `Cursor`'s `iter_err` field.
      *
      * # Returns
      * `Some(~BsonDocument)` if there are more BsonDocuments,
@@ -71,15 +71,17 @@ impl Cursor {
      * cursors are empty).
      *
      * # Arguments
-     * * `query` - query associated with this Cursor
-     * * `proj` - projection of query associated with this Cursor
-     * * `collection` - collection associated with this Cursor
+     * * `query` - query associated with this `Cursor`
+     * * `proj` - projection of query associated with this `Cursor`
+     * * `collection` - `Collection` associated with this `Cursor`;
+     *                      passed for convenience
+     * * `client` - `Client` associated with this `Cursor`,
      * * `flags` -  `CUR_TAILABLE`, `SLAVE_OK`, `OPLOG_REPLAY`,
      *              `NO_CUR_TIMEOUT`, `AWAIT_DATA`, `EXHAUST`,
      *              `PARTIAL`
      *
      * # Returns
-     * Cursor
+     * `Cursor`
      */
     pub fn new(     query : BsonDocument,
                     proj : Option<BsonDocument>,
@@ -106,11 +108,11 @@ impl Cursor {
     }
 
     /**
-     * Actual function used to refresh Cursor and iterate.
-     * Any errors go into iter_eff field of Cursor.
+     * Actual function used to refresh `Cursor` and iterate.
+     * Any errors go into iter_eff field of `Cursor`.
      *
      * # Returns
-     * amount left in what's currently held by Cursor
+     * amount left in what's currently held by `Cursor`
      */
     fn refresh(&mut self) -> i32 {
         // clear out error
@@ -231,16 +233,16 @@ impl Cursor {
 
     /// CURSOR OPTIONS (must be specified pre-querying)
     /**
-     * Skip specified amount before starting to iterate.
+     * Skips specified amount before starting to iterate.
      *
      * # Arguments
      * * `skip` - amount to skip
      *
      * # Returns
-     * () on success, MongoErr on failure
+     * () on success, `MongoErr` on failure
      *
      * # Failure Types
-     * * Cursor already iterated over
+     * * `Cursor` already iterated over
      */
     pub fn cursor_skip(&mut self, skip: i32) -> Result<(), MongoErr> {
         if self.id.is_some() {
@@ -255,16 +257,16 @@ impl Cursor {
     }
 
     /**
-     * Limit amount to return from Cursor.
+     * Limits amount to return from `Cursor`.
      *
      * # Arguments
      * * `limit` - total amount to return
      *
      * # Returns
-     * () on success, MongoErr on failure
+     * () on success, `MongoErr` on failure
      *
      * # Failure Types
-     * * Cursor already iterated over
+     * * `Cursor` already iterated over
      */
     pub fn cursor_limit(&mut self, limit: i32) -> Result<(), MongoErr> {
         if self.id.is_some() {
@@ -285,13 +287,14 @@ impl Cursor {
 
     /// QUERY MODIFICATIONS
     /**
-     * Explain the query.
-     * Copies the cursor and runs the query to gather information.
+     * Explains the query.
+     * Copies the `Cursor` and runs the query to gather information.
+     * Returns query as `~BsonDocument` to ease searching for
+     * specific fields, etc.
      *
      * # Returns
-     * ~BsonDocument explaining query on success, MongoErr on failure
+     * `~BsonDocument` explaining query on success, `MongoErr` on failure
      */
-    // TODO convert ~BsonDocument to more user-friendly form
     pub fn explain(&mut self) -> Result<~BsonDocument, MongoErr> {
         let mut query = copy self.query_spec;
         query.append(~"$explain", Double(1f64));
@@ -324,7 +327,7 @@ impl Cursor {
     }
 
     /**
-     * Sorts results from cursor given fields and their direction.
+     * Sorts results from `Cursor` given fields and their direction.
      *
      * # Arguments
      * * `orderby` - `NORMAL(~[(field, direction)])` where `field`s are
@@ -380,10 +383,10 @@ impl Cursor {
     }
 
     /**
-     * Modify size of next batch to fetch on Cursor refresh.
+     * Modifies size of next batch to fetch on `Cursor` refresh.
      *
      * # Arguments
-     * * `sz` - size of next batch to fetch on Cursor refresh (`QUERY`
+     * * `sz` - size of next batch to fetch on `Cursor` refresh (`QUERY`
      *          or `GET_MORE`)
      */
     pub fn batch_size(&mut self, sz : i32) {
@@ -393,8 +396,8 @@ impl Cursor {
     /// OTHER USEFUL FUNCTIONS
     /**
      * Returns whether Cursor has a next `~BsonDocument`.
-     * Considers the last element of a Cursor to be `None`, hence
-     * returns `true` at edge case when Cursor exhausted naturally.
+     * Considers the last element of a `Cursor` to be `None`, hence
+     * returns `true` at edge case when `Cursor` exhausted naturally.
      */
     pub fn has_next(&self) -> bool {
         // return true even if right at end (normal exhaustion of cursor)
@@ -407,8 +410,10 @@ impl Cursor {
 
     /**
      * Closes cursor by sending OP_KILL_CURSORS message.
+     *
+     * # Returns
+     * () on success, `MongoErr` on failure
      */
-    // XXX check with regard to write concern...?
     // TODO batch
     pub fn close(&mut self) -> Result<(), MongoErr> {
         if self.id.is_none() {
@@ -418,8 +423,11 @@ impl Cursor {
                             ~"cannot close cursor never iterated upon"));
         }
 
+        // set cur_id to be 0
         let cur_id = self.id.unwrap();
         self.id = Some(0);
+
+        // send kill_cursors message
         let kill_msg = mk_kill_cursor(
                             self.client.inc_requestId(),
                             1i32,
@@ -443,6 +451,14 @@ impl Cursor {
         }
     }
 
+    /**
+     * Returns whether this `Cursor` is dead, i.e. has
+     * ID of 0.
+     *
+     * # Returns
+     * whether this `Cursor` is dead and can no longer be
+     * queried
+     */
     pub fn is_dead(&self) -> bool {
         if self.id.is_some() { return (copy self.id).unwrap() == 0; }
         false

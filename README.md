@@ -9,7 +9,6 @@ This library has been built on Rust version 0.7. If you are using a more up-to-d
 #### Dependencies
 - [Rust](http://rust-lang.org) 0.7 (WARNING: will likely not build on other versions)
 - [gcc](http://gcc.gnu.org)
-- [MongoDB](http://mongodb.org) 2.4 or above
 - [GNU Make](http://gnu.org/software/make)
 
 #### Building
@@ -24,7 +23,7 @@ The Rust MongoDB driver is built using ```make```. Available targets include:
 - ```clean``` remove generated binaries
 - ```tidy``` clean up unused whitespace
 
-By default, files are compiled with ```unused-unsafe``` warnings denied and ```unnecessary-allocation``` warnings allowed. You can pass additional flags to rustc by setting the ```TOOLFLAGS``` variable. Additionally, integration tests can be enabled by setting ```MONGOTEST=1```. _Integration tests will fail unless there is a MongoDB instance running on 127.0.0.1:27017_.
+By default, files are compiled with ```unused-unsafe``` warnings denied and ```unnecessary-allocation``` warnings allowed (this is likely to change in the future to disallow all warnings). You can pass additional flags to rustc by setting the ```TOOLFLAGS``` variable. Additionally, integration tests can be enabled by setting ```MONGOTEST=1```. _Integration tests will fail unless there is a MongoDB instance running on 127.0.0.1:27017_.
 
 ## Tutorial
 Once you've built MongoDB and have the compiled library files, you can make MongoDB available in your code with
@@ -63,6 +62,10 @@ Now we may create handles to databases and collections on the server. We start w
 let foo = Collection::new(~"foo_db", ~"foo_coll", client);
 let bar = Collection::new(~"foo_db", ~"bar_coll", client);
 ```
+Equivalently, we may create collection handles direction from the ```Client```:
+```rust
+let foo = client.get_collection(~"foo_db", ~"foo_coll");
+```
 
 ##### CRUD Operations
 We input JSON as strings formatted for JSON and manipulate them (in fact, we can insert anything implementing the ```BsonFormattable``` trait [see BSON section below] as long as its ```to_bson_t``` conversion returns an ```Embedded(~BsonDocument)```, i.e. it is represented as a BSON):
@@ -77,7 +80,7 @@ let mut ins_batch : ~[~str] = ~[];
 let n = 200;
 let mut i = 0;
 for n.times {
-    ins_batch = ins_batch + ~[fmt!("{ \"a\":%d, \"b\":\"ins %d\" }", i/2, i)];
+    ins_batch.push(fmt!("{ \"a\":%d, \"b\":\"ins %d\" }", i/2, i));
     i += 1;
 }
 foo.insert_batch(ins_batch, None, None, None);
@@ -86,7 +89,7 @@ foo.insert_batch(ins_batch, None, None, None);
 // read one back (no specific query or query options/flags)
 match foo.find_one(None, None, None) {
     Ok(ret_doc) => println(fmt!("%?", *ret_doc)),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)), // should not happen
 }
 ```
 
@@ -95,25 +98,25 @@ In general, to specify options, we put the appropriate options into a vector and
 // insert a big batch of documents with duplicated _ids
 ins_batch = ~[];
 for 5.times {
-    ins_batch = ins_batch + ~[fmt!("{ \"_id\":%d, \"a\":%d, \"b\":\"ins %d\" }", 2*i/3, i/2, i)];
+    ins_batch.push(fmt!("{ \"_id\":%d, \"a\":%d, \"b\":\"ins %d\" }", 2*i/3, i/2, i));
     i += 1;
 }
 
 // ***error returned***
 match foo.insert_batch(ins_batch, None, None, None) {
-    Ok(_) => (),                                        // should not happen
+    Ok(_) => fail!("bad insert succeeded"),          // should not happen
     Err(e) => println(fmt!("%s", MongoErr::to_str(e))),
 }
 // ***no error returned since duplicated _ids skipped (CONT_ON_ERR specified)***
 match foo.insert_batch(ins_batch, Some(~[CONT_ON_ERR]), None, None) {
     Ok(_) => (),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 
 // create an ascending index on the "b" field named "fubar"
 match foo.create_index(~[NORMAL(~[(~"b", ASC)])], None, Some(~[INDEX_NAME(~"fubar")])) {
     Ok(_) => (),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 ```
 
@@ -139,7 +142,7 @@ match foo.find(None, Some(SpecNotation(~"{ \"b\":1 }")), None) {
             println(fmt!("%?", *doc));
         }
     }
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 
 // drop the index by name (if it were not given a name, specifying by
@@ -147,13 +150,13 @@ match foo.find(None, Some(SpecNotation(~"{ \"b\":1 }")), None) {
 //      constructed name)
 match foo.drop_index(MongoIndexName(~"fubar")) {
     Ok(_) => (),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 
 // remove every element where "a" is 1
 match foo.remove(Some(SpecNotation(~"{ \"a\":1 }")), None, None, None) {
     Ok(_) => (),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 
 // upsert every element where "a" is 2 to be 3
@@ -161,7 +164,7 @@ match foo.update(   SpecNotation(~"{ \"a\":2 }"),
                     SpecNotation(~"{ \"$set\": { \"a\":3 } }"),
                     Some(~[MULTI, UPSERT]), None, None) {
     Ok(_) => (),
-    Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+    Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
 }
 ```
 
@@ -215,6 +218,10 @@ let a = (1i).to_bson_t(); //Int32(1)
 let b = (~"foo").to_bson_t(); //UString(~"foo")
 let c = 3.14159.to_bson_t(); //Double(3.14159)
 let d = extra::json::String(~"bar").to_bson_t(); //UString(~"bar")
+let e = (~"{\"fizz\": \"buzz\"}").to_bson_t();
+//e is an Embeddable(hashmap associating ~"fizz" with UString(~"buzz")
+//strings will attempt to be parsed as JSON; if they fail,
+//they will be silently treated as a plain string instead
 ```
 ```to_bson_t``` is contained in the ```BsonFormattable``` trait, so any type implementing this trait can be converted to a Document.
 
@@ -310,7 +317,10 @@ impl BsonFormattable for Foo {
 }
 
 let b: ~[u8] = /*get a bson document from somewhere*/
-let myfoo = BsonFormattable::from_bson_t::<Foo>(decode(b).unwrap()); //here it is assumed b was decoded successfully, though a match could be done
+let myfoo = BsonFormattable::from_bson_t::<Foo>(Embedded(~decode(b).unwrap()));
+//here it is assumed b was decoded successfully, though a match could be done
+//the Embedded constructor is needed because decode returns a BsonDocument,
+//while from_bson_t expects a document
 ```
 
 

@@ -286,7 +286,7 @@ pub fn mk_kill_cursor(id : i32, ncursor_ids : i32, cursor_ids : ~[i64]) -> Clien
 
 /**
  * Parses bytes into msg, for reply op.
- * Assume machine little-endian; messages are.
+ * Assumes machine little-endian; messages are.
  */
 pub fn parse_reply(bytes : ~[u8]) -> Result<ServerMsg, MongoErr> {
     // prepare to pull out non-document fields with pointer arithmetic
@@ -302,19 +302,12 @@ pub fn parse_reply(bytes : ~[u8]) -> Result<ServerMsg, MongoErr> {
     unsafe {
         // pull out documents one-by-one
         let mut docs : ~[~BsonDocument] = ~[];
-        let mut addr = nret_addr + sys::size_of::<i32>();
-        let head = (addr - len_addr);
+        let mut head = nret_addr + sys::size_of::<i32>() - len_addr;
 
-        let mut i = 0;
         for (*(nret_addr as *i32) as uint).times {
-            let size = *(addr as *i32);
+            let size = *((head+len_addr) as *i32);
 
-            // TODO: make unstupid
-            let mut doc_bytes : ~[u8] = ~[];
-            for (size as uint).times {
-                doc_bytes = doc_bytes + ~[bytes[i+head]];
-                i = i + 1;
-            }
+            let doc_bytes = bytes.slice(head, head+(size as uint)).to_owned();
             let tmp = match decode(doc_bytes) {
                 Ok(d) => d,
                 Err(e) => return Err(MongoErr::new(
@@ -323,19 +316,19 @@ pub fn parse_reply(bytes : ~[u8]) -> Result<ServerMsg, MongoErr> {
                                         fmt!("-->\n%s", e))),
             };
             docs = docs + ~[~tmp];
-            addr = addr + size as uint;
+            head = head + size as uint;
         }
 
         // construct reply
         Ok(OpReply {
-            header : MsgHeader {    len : copy *(len_addr as *i32),
-                                    id : copy *(id_addr as *i32),
-                                    resp_to : copy *(resp_to_addr as *i32),
-                                    opcode : copy *(opcode_addr as *i32) },
-            flags : copy *(flags_addr as *i32),
-            cursor_id : copy *(cursor_id_addr as *i64),
-            start : copy *(start_addr as *i32),
-            nret : copy *(nret_addr as *i32),
+            header : MsgHeader {    len : *(len_addr as *i32),
+                                    id : *(id_addr as *i32),
+                                    resp_to : *(resp_to_addr as *i32),
+                                    opcode : *(opcode_addr as *i32) },
+            flags : *(flags_addr as *i32),
+            cursor_id : *(cursor_id_addr as *i64),
+            start : *(start_addr as *i32),
+            nret : *(nret_addr as *i32),
             docs : docs,
         })
     }
