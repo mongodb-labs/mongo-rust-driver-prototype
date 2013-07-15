@@ -43,7 +43,6 @@ impl MongoIndex {
             None => (),
             Some(opt_arr) => {
                 for opt_arr.iter().advance |&opt| {
-                    //opts_str += match opt {
                     opts_str.push(match opt {
                         INDEX_NAME(n) => {
                             name = Some(copy n);
@@ -65,7 +64,6 @@ impl MongoIndex {
                                 index_opts : &mut ~[~str],
                                 get_name : bool)
             -> (~str, ~[~str]) {
-        //let mut name = ~"";
         let mut name = ~[];
         let mut index_str = ~[];
         for index_arr.iter().advance |&field| {
@@ -73,13 +71,11 @@ impl MongoIndex {
                 NORMAL(arr) => {
                     for arr.iter().advance |&(key, order)| {
                         index_str.push(fmt!("\"%s\":%d", key, order as int));
-                        //if get_name { name.push_str(fmt!("%s_%d", key, order as int)); }
                         if get_name { name.push(fmt!("%s_%d", key, order as int)); }
                     }
                 }
                 HASHED(key) => {
                     index_str.push(fmt!("\"%s\":\"hashed\"", key));
-                    //if get_name { name.push_str(fmt!("%s_hashed", key)); }
                     if get_name { name.push(fmt!("%s_hashed", key)); }
                 }
                 GEOSPATIAL(key, geotype) => {
@@ -88,24 +84,25 @@ impl MongoIndex {
                         FLAT => ~"2d",
                     };
                     index_str.push(fmt!("\"%s\":\"%s\"", key, typ));
-                    //if get_name { name.push_str(fmt!("%s_%s", key, typ)); }
                     if get_name { name.push(fmt!("%s_%s", key, typ)); }
                 }
                 GEOHAYSTACK(loc, snd, sz) => {
                     index_str.push(fmt!("\"%s\":\"geoHaystack\", \"%s\":1", loc, snd));
-                    //if get_name { name.push_str(fmt!("%s_geoHaystack_%s_1", loc, snd)); }
                     if get_name { name.push(fmt!("%s_geoHaystack_%s_1", loc, snd)); }
                     (*index_opts).push(fmt!("\"bucketSize\":%?", sz));
                 }
             }
         }
 
-//        (name, index_str)
         (name.connect("_"), index_str)
     }
 
     /**
-     * From either `~str` or full specification of index, get name.
+     * From either `~str` or full specification of index, gets name.
+     *
+     * # Returns
+     * name of index (string passed in if `MongoIndexName` passed),
+     * default index name if `MongoIndexFields` passed)
      */
     pub fn get_name(&self) -> ~str {
         match (copy *self) {
@@ -129,14 +126,26 @@ pub struct Collection {
 
 impl Collection {
     /**
-     * Collection constructor for Client, etc. use.
+     * Creates a new handle to the given collection.
+     * Alternative to `client.get_collection(db, collection)`.
+     *
+     * # Arguments
+     * * `db` - name of database
+     * * `coll` - name of collection to get
+     * * `client` - name of client associated with `Collection`
+     *
+     * # Returns
+     * handle to given collection
      */
     pub fn new(db : ~str, name : ~str, client : @Client) -> Collection {
         Collection { db : db, name : name, client : client }
     }
 
     /**
-     * Get DB containing this Collection.
+     * Gets `DB` containing this `Collection`.
+     *
+     * # Returns
+     * handle to database containing this `Collection`
      */
     pub fn get_db(&self) -> DB {
         DB::new(copy self.db, self.client)
@@ -144,23 +153,27 @@ impl Collection {
 
     /**
      * CRUD ops.
+     *
      * Different methods rather than enum of arguments
      * since complexity not decreased with enum (for
      * both users and developers), and CRUD oeprations
      * assumed reasonably stable.
+     *
+     * Moreover, basic operations still do take enums
+     * for flexibility; easy to wrap for syntactic sugar.
      */
 
     /// INSERT OPS
     /**
-     * Insert given document with given writeconcern into Collection.
+     * Inserts given document with given write concern into collection.
      *
      * # Arguments
-     * * `doc`- BsonFormattable to input
-     * * `wc` - write concern with which to insert (None for default of 1,
-     *          Some for finer specification)
+     * * `doc`- `BsonFormattable` to input
+     * * `wc` - write concern with which to insert (`None` for default of 1,
+     *          `Some` for finer specification)
      *
      * # Returns
-     * () on success, MongoErr on failure
+     * () on success, `MongoErr` on failure
      *
      * # Failure Types
      * * invalid document to insert
@@ -191,18 +204,18 @@ impl Collection {
         }
     }
     /**
-     * Insert given batch of documents with given writeconcern and options
-     * into Collection.
+     * Inserts given batch of documents with given write concern and options
+     * into collection.
      *
      * # Arguments
-     * * `docs`- array of BsonFormattable to input
+     * * `docs`- array of `BsonFormattable`s to input
      * * `flag_array` - `CONT_ON_ERR`
      * * `option_array` - [none yet]
-     * * `wc` - write concern with which to insert (None for default of 1,
-     *          Some for finer specification)
+     * * `wc` - write concern with which to insert (`None` for default of 1,
+     *          `Some` for finer specification)
      *
      * # Returns
-     * () on success, MongoErr on failure
+     * () on success, `MongoErr` on failure
      *
      * # Failure Types
      * * invalid document to insert (e.g. not proper format or
@@ -263,7 +276,7 @@ impl Collection {
 
     /// UPDATE OPS
     /**
-     * Update documents satisfying given query with given update
+     * Updates documents satisfying given query with given update
      * specification and write concern.
      *
      * # Arguments
@@ -276,7 +289,7 @@ impl Collection {
      * * `wc` - write concern with which to update documents
      *
      * # Returns
-     * () on success, MongoErr on failure
+     * () on success, `MongoErr` on failure
      *
      * # Failure Types
      * * invalid query or update specification
@@ -359,14 +372,15 @@ impl Collection {
      *                  `PARTIAL`
      *
      * # Returns
-     * initialized (unqueried) Cursor on success, MongoErr on failure
+     * initialized (unqueried) Cursor on success, `MongoErr` on failure
      */
     pub fn find(&self,  query : Option<QuerySpec>,
                         proj : Option<QuerySpec>,
                         flag_array : Option<~[QUERY_FLAG]>/*,
                         option_array : Option<~[QUERY_OPTION]>*/)
                 -> Result<Cursor, MongoErr> {
-        // construct query (wrapped as { $query : {...} } for ease of query modification)
+        // construct query (wrapped as { $query : {...} }
+        //      for ease of query modification)
         let q_field = match query {
             None => BsonDocument::new(),                // empty Bson
             Some(SpecObj(bson_doc)) => bson_doc,
@@ -453,7 +467,7 @@ impl Collection {
         0i32
     }
     /**
-     * Remove specified documents from collection.
+     * Removes specified documents from collection.
      *
      * # Arguments
      * * `query` - optional `SpecNotation(~str)` or `SpecObj(BsonDocument)`
@@ -465,7 +479,7 @@ impl Collection {
      * * `wc` - write concern with which to perform remove
      *
      * # Returns
-     * () on success, MongoErr on failure
+     * () on success, `MongoErr` on failure
      */
     pub fn remove(&self, query : Option<QuerySpec>, flag_array : Option<~[DELETE_FLAG]>, option_array : Option<~[DELETE_OPTION]>, wc : Option<~[WRITE_CONCERN]>)
                 -> Result<(), MongoErr> {
@@ -495,39 +509,43 @@ impl Collection {
 
     /// INDICES (or "Indexes")
     /**
-     * Create index by specifying a vector of the different elements
+     * Creates index by specifying a vector of the different elements
      * that can form an index (e.g. (field,order) pairs, geographical
      * options, etc.)
      *
      * # Arguments
      * * `index_arr` - vector of index elements
-     *                  (NORMAL(vector of (field, order) pairs),
-     *                  HASHED(field),
-     *                  GEOSPATIAL(field, type))
+     *                  (`NORMAL(vector of (field, order) pairs)`,
+     *                  `HASHED(field)`,
+     *                  `GEOSPATIAL(field, type)`,
+     *                  `GEOHAYSTACK(loc, field, bucket)')
      * * `flag_array` - optional vector of index-creating flags:
-     *                  BACKGROUND,
-     *                  UNIQUE,
-     *                  DROP_DUPS,
-     *                  SPARSE
+     *                  `BACKGROUND`,
+     *                  `UNIQUE`,
+     *                  `DROP_DUPS`,
+     *                  `SPARSE`
      * * `option_array` - optional vector of index-creating options:
-     *                  INDEX_NAME(name),
-     *                  EXPIRE_AFTER_SEC(nsecs)
-     *                  VERS(version no)
+     *                  `INDEX_NAME(name)`,
+     *                  `EXPIRE_AFTER_SEC(nsecs)`,
+     *                  `VERS(version no)`
      *
      * # Returns
-     * name of index as MongoIndexName (in enum MongoIndex) on success,
-     * MongoErr on failure
+     * name of index as `MongoIndexName` (in enum `MongoIndex`) on success,
+     * `MongoErr` on failure
      */
     pub fn create_index(&self,  index_arr : ~[INDEX_FIELD],
                                 flag_array : Option<~[INDEX_FLAG]>,
                                 option_array : Option<~[INDEX_OPTION]>)
                 -> Result<MongoIndex, MongoErr> {
-        let coll = @Collection::new(copy self.db, fmt!("%s", SYSTEM_INDEX), self.client);
+        let coll = Collection::new(copy self.db, fmt!("%s", SYSTEM_INDEX), self.client);
 
         let flags = process_flags!(flag_array);
         let (x, y) = MongoIndex::process_index_opts(flags, option_array);
         let mut maybe_name = x; let mut opts = y;
-        let (default_name, index) = MongoIndex::process_index_fields(index_arr, &mut opts, maybe_name.is_none());
+        let (default_name, index) = MongoIndex::process_index_fields(
+                                        index_arr,
+                                        &mut opts,
+                                        maybe_name.is_none());
         if maybe_name.is_none() {
             opts.push(fmt!("\"name\":\"%s\"", default_name));
             maybe_name = Some(default_name);
@@ -550,15 +568,27 @@ impl Collection {
                 -> Result<MongoIndex, MongoErr> {
         self.create_index(index_arr, flag_array, option_array)
     }
+    pub fn get_indexes(&self) -> Result<~[~str], MongoErr> {
+        let coll = Collection::new(copy self.db, fmt!("%s", SYSTEM_INDEX), self.client);
+        let mut cursor = match coll.find(None, None, None) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let mut indices = ~[];
+        for cursor.advance |ind| {
+            indices.push(ind.to_str());
+        }
+        Ok(indices)
+    }
     /**
      * Drops specified index.
      *
      * # Arguments
-     * * `index` - MongoIndex to drop specified either by explicit name
+     * * `index` - `MongoIndex` to drop specified either by explicit name
      *              or fields
      *
      * # Returns
-     * () on success, MongoErr on failure
+     * () on success, `MongoErr` on failure
      */
     pub fn drop_index(&self, index : MongoIndex) -> Result<(), MongoErr> {
         let db = DB::new(copy self.db, self.client);
