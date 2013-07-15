@@ -158,6 +158,39 @@ impl Collection {
     }
 
     /**
+     * Converts this collection to a capped collection.
+     *
+     * # Arguments
+     * * `options` - array of options with which to create capped
+     *                  collection
+     *
+     * # Returns
+     * () on success, `MongoErr` on failure
+     */
+    // XXX test
+    pub fn to_capped(&self, options : ~[COLLECTION_OPTION])
+                -> Result<(), MongoErr> {
+        let mut cmd = ~"";
+
+        cmd.push_str(fmt!("\"convertToCapped\":\"%s\"", self.name));
+        for options.iter().advance |&opt| {
+            cmd.push_str(match opt {
+                SIZE(sz) => fmt!(", \"size\":%?", sz),
+                _ => return Err(MongoErr::new(
+                                    ~"coll::to_capped",
+                                    ~"unexpected option",
+                                    ~"to_capped only takes SIZE of new cappedcollection")),
+            });
+        }
+
+        let db = DB::new(copy self.db, self.client);
+        match db.run_command(SpecNotation(fmt!("{ %s }", cmd))) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+
+    /**
      * CRUD ops.
      *
      * Different methods rather than enum of arguments
