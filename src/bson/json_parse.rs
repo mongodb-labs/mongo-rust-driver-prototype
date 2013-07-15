@@ -16,6 +16,7 @@
 use std::char::is_digit;
 use std::str::from_chars;
 use std::float::from_str;
+use std::to_bytes::*;
 use stream::*;
 use encode::*;
 
@@ -299,9 +300,9 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                     && m.contains_key(~"$binary")
                     && m.contains_key(~"$type") {
                     match (m.find(~"$binary"), m.find(~"$type")) {
-                        (Some(&UString(ref s1)), Some(&UString(ref s2))) =>
-                            return Some(Binary(s2.bytes_iter().collect::<~[u8]>()[0],
-                                s1.bytes_iter().collect::<~[u8]>())),
+                        (Some(&Double(d1)), Some(&Double(d2))) =>
+                            return Some(Binary(d2 as u8,
+                                (d1 as i64).to_bytes(true))),
                         _ => return None
                     }
                 }
