@@ -27,6 +27,11 @@ use coll::Collection;
 
 static L_END: bool = true;
 
+pub struct DB {
+    name : ~str,
+    priv client : @Client,
+}
+
 #[link_args = "-lmd5"]
 extern {
     fn md5_init(pms: *MD5State);
@@ -38,11 +43,6 @@ priv struct MD5State {
     count: [u32,..2],
     abcd: [u32,..4],
     buf: [u8,..64]
-}
-
-pub struct DB {
-    name : ~str,
-    priv client : @Client,
 }
 
 impl MD5State {

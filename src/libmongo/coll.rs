@@ -124,6 +124,12 @@ pub struct Collection {
 
 // TODO: checking arguments for validity?
 
+/**
+ * Having created a `Client` and connected as desired
+ * to a server or cluster, users may interact with
+ * collections by creating `Collection` handles to those
+ * collections.
+ */
 impl Collection {
     /**
      * Creates a new handle to the given collection.
