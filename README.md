@@ -9,7 +9,6 @@ This library has been built on Rust version 0.7. If you are using a more up-to-d
 #### Dependencies
 - [Rust](http://rust-lang.org) 0.7 (WARNING: will likely not build on other versions)
 - [gcc](http://gcc.gnu.org)
-- [MongoDB](http://mongodb.org) 2.4 or above
 - [GNU Make](http://gnu.org/software/make)
 
 #### Building
@@ -24,7 +23,7 @@ The Rust MongoDB driver is built using ```make```. Available targets include:
 - ```clean``` remove generated binaries
 - ```tidy``` clean up unused whitespace
 
-By default, files are compiled with ```unused-unsafe``` warnings denied and ```unnecessary-allocation``` warnings allowed. You can pass additional flags to rustc by setting the ```TOOLFLAGS``` variable. Additionally, integration tests can be enabled by setting ```MONGOTEST=1```. _Integration tests will fail unless there is a MongoDB instance running on 127.0.0.1:27017_.
+By default, files are compiled with ```unused-unsafe``` warnings denied and ```unnecessary-allocation``` warnings allowed (this is likely to change in the future to disallow all warnings). You can pass additional flags to rustc by setting the ```TOOLFLAGS``` variable. Additionally, integration tests can be enabled by setting ```MONGOTEST=1```. _Integration tests will fail unless there is a MongoDB instance running on 127.0.0.1:27017_.
 
 ## Tutorial
 Once you've built MongoDB and have the compiled library files, you can make MongoDB available in your code with
@@ -215,6 +214,10 @@ let a = (1i).to_bson_t(); //Int32(1)
 let b = (~"foo").to_bson_t(); //UString(~"foo")
 let c = 3.14159.to_bson_t(); //Double(3.14159)
 let d = extra::json::String(~"bar").to_bson_t(); //UString(~"bar")
+let e = (~"{\"fizz\": \"buzz\"}").to_bson_t();
+//e is an Embeddable(hashmap associating ~"fizz" with UString(~"buzz")
+//strings will attempt to be parsed as JSON; if they fail,
+//they will be silently treated as a plain string instead
 ```
 ```to_bson_t``` is contained in the ```BsonFormattable``` trait, so any type implementing this trait can be converted to a Document.
 
@@ -310,7 +313,10 @@ impl BsonFormattable for Foo {
 }
 
 let b: ~[u8] = /*get a bson document from somewhere*/
-let myfoo = BsonFormattable::from_bson_t::<Foo>(decode(b).unwrap()); //here it is assumed b was decoded successfully, though a match could be done
+let myfoo = BsonFormattable::from_bson_t::<Foo>(Embedded(~decode(b).unwrap()));
+//here it is assumed b was decoded successfully, though a match could be done
+//the Embedded constructor is needed because decode returns a BsonDocument,
+//while from_bson_t expects a document
 ```
 
 
