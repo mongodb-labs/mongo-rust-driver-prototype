@@ -106,7 +106,7 @@ impl ShardController {
         match d.run_command(SpecNotation(
             fmt!("{ 'shardCollection': '%s.%s', 'key': %s, 'unique': '%s' }",
                 db, coll, match key {
-                    SpecObj(_) => fail!("TODO need to jsonify BsonDocuments"),
+                    SpecObj(doc) => doc.to_str(),
                     SpecNotation(ref s) => copy *s
                 }, unique.to_str()))) {
             Ok(doc) => match *doc.find(~"ok").unwrap() {
@@ -122,11 +122,12 @@ impl ShardController {
         };
      }
 
-    /*
-     pub fn status(&self, verbose: true) -> Result<~BsonDocument, MongoErr> {
-
+     pub fn status(&self, verbose: bool) -> Result<~str, MongoErr> {
+        let mut out = ~"";
+        let config = DB::new(~"config", self.mongos);
+        out.push_str(~"--- Sharding Status ---");
+        Ok(out)
      }
-     */
 
      ///Add a tag to the given shard.
      ///Requires MongoDB 2.2 or higher.
