@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+use extra::treemap::*;
+
 use bson::encode::*;
 
 /**
@@ -116,28 +118,79 @@ pub enum QuerySpec {
     SpecNotation(~str)
 }
 
-/*
 pub struct TagSet {
+    tags : TreeMap<~str, ~str>,
 }
-*/
+impl TagSet {
+    pub fn new(tag_list : ~[(~str, ~str)]) -> TagSet {
+        let mut tags = TreeMap::new();
+        for tag_list.iter().advance |&(field, val)| {
+            tags.insert(field, val);
+        }
+        TagSet { tags : tags }
+    }
+
+    pub fn get_tag_val(&self, field : ~str) -> Option<~str> {
+        match self.tags.find(&field) {
+            None => None,
+            Some(s) => Some(copy *s),
+        }
+    }
+
+    pub fn set_tag(&mut self, tag : (~str, ~str)) {
+        let (field, val) = tag;
+        if val.len() == 0 {
+            self.tags.remove(&field);
+        } else {
+            if self.tags.find_mut(&field).is_some() {
+                self.tags.remove(&field);
+            }
+            self.tags.insert(field, val);
+        }
+    }
+
+    /**
+     * Returns if self matches the other TagSet,
+     * i.e. if all of the other TagSet's tags are
+     * in self's TagSet.
+     *
+     * Usage: member.matches(tagset)
+     */
+    pub fn matches(&self, other : &TagSet) -> bool {
+        let mut my_iter = self.tags.iter();
+        let mut other_iter = other.tags.iter();
+
+        for other_iter.advance |(&f0, &v0)| {
+            let mut v1 = ~"";
+            for my_iter.advance |(&f, &v)| {
+                if f > f0 { return false; } // no such tag in other's TagSet
+                if f == f0 {
+                    v1 = copy v;
+                    break;
+                }
+            }
+            if v0 != v1 { return false; }
+        }
+
+        true
+    }
+}
 
 pub enum WRITE_CONCERN {
     JOURNAL(bool),      // wait for next journal commit?
     W_N(int),           // replicate to how many? (number)
     W_STR(~str),        // replicate to how many? (string, e.g. "majority")
-    //W_TAGSET(~str),     // replicate to what tagset? (string to parse)
+    //W_TAGSET(TagSet),   // replicate to what tagset?
     WTIMEOUT(int),      // timeout after how many ms?
     FSYNC(bool),        // wait for write to disk?
 }
 
-// TODO read preference
-
 pub enum READ_PREFERENCE {
     PRIMARY_ONLY,
-    PRIMARY_PREF,
-    SECONDARY_ONLY,
-    SECONDARY_PREF,
-    NEAREST,
+    PRIMARY_PREF(Option<~[TagSet]>),
+    SECONDARY_ONLY(Option<~[TagSet]>),
+    SECONDARY_PREF(Option<~[TagSet]>),
+    NEAREST(Option<~[TagSet]>),
 }
 /*pub struct HostTags {
     tags : ~[],

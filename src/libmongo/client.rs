@@ -179,6 +179,32 @@ impl Client {
         Collection::new(db, coll, self)
     }
 
+    /*
+     * Helper function for connections.
+     */
+    pub fn _connect_to_conn(&self, call : ~str, conn : @Connection)
+                -> Result<(), MongoErr> {
+        // check if already connected
+        if !self.conn.is_empty() {
+            return Err(MongoErr::new(
+                            call,
+                            ~"already connected",
+                            ~"cannot connect if already connected; please first disconnect"));
+        }
+
+        // otherwise, make connection and connect to it
+        match conn.connect() {
+            Ok(_) => {
+                self.conn.put_back(conn);
+                Ok(())
+            }
+            Err(e) => return Err(MongoErr::new(
+                                    call,
+                                    ~"connecting",
+                                    fmt!("-->\n%s", e.to_str()))),
+        }
+    }
+
     /**
      * Connects to a single server.
      *
@@ -196,30 +222,10 @@ impl Client {
     // XXX possibly make take enum of args for node, rs, etc.
     pub fn connect(&self, server_ip_str : ~str, server_port : uint)
                 -> Result<(), MongoErr> {
-        self._connect_to_node_conn(@NodeConnection::new(server_ip_str, server_port))
-    }
-
-    pub fn _connect_to_node_conn(&self, conn : @NodeConnection)
-                -> Result<(), MongoErr> {
-        // check if already connected
-        if !self.conn.is_empty() {
-            return Err(MongoErr::new(
-                            ~"client::connect",
-                            ~"already connected",
-                            ~"cannot connect if already connected; please first disconnect"));
-        }
-
-        // otherwise, make connection and connect to it
-        match conn.connect() {
-            Ok(_) => {
-                self.conn.put_back(conn as @Connection);
-                Ok(())
-            }
-            Err(e) => return Err(MongoErr::new(
-                                    ~"client::connect",
-                                    ~"connecting",
-                                    fmt!("-->\n%s", e.to_str()))),
-        }
+        self._connect_to_conn(  ~"client::connect",
+                                @NodeConnection::new(server_ip_str,
+                                                        server_port)
+                                    as @Connection)
     }
 
     /**
@@ -233,24 +239,9 @@ impl Client {
      */
     // TODO uri parsing
     pub fn connect_to_rs(&self, seed : ~[(~str, uint)]) -> Result<(), MongoErr> {
-        if !self.conn.is_empty() {
-            return Err(MongoErr::new(
-                            ~"client::connect_to_rs",
-                            ~"already connected",
-                            ~"cannot connect if already connected; please first disconnect"));
-        }
-
-        let tmp = ReplicaSetConnection::new(seed);
-        match tmp.connect() {
-            Ok(_) => {
-                self.conn.put_back(@tmp as @Connection);
-                Ok(())
-            }
-            Err(e) => return Err(MongoErr::new(
-                                    ~"client::connect_to_rs",
-                                    ~"connecting",
-                                    fmt!("-->\n%s", e.to_str()))),
-        }
+        self._connect_to_conn(  ~"client::connect_to_rs",
+                                @ReplicaSetConnection::new(seed)
+                                    as @Connection)
     }
 
     /**

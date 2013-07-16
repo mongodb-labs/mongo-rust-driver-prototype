@@ -34,11 +34,17 @@ pub enum ServerType {
 }
 
 pub struct ReplicaSetConnection {
-    priv seed : ~[NodeConnection],
+    /*priv seed : ~[NodeConnection],
     priv hosts: ~Cell<~[~PriorityQueue<@NodeConnection>]>,  // TODO RWARC?
     priv hosts_unord : ~Cell<~[~[@NodeConnection]]>,        // TODO RWARC?
     priv send_to : ~Cell<@NodeConnection>,                  // convenience
     priv recv_from : ~Cell<@NodeConnection>,                // XXX placeholder
+    read_mode : ~Cell<READ_PREFERENCE>,*/
+    seed : ~[NodeConnection],
+    hosts: ~Cell<~[~PriorityQueue<@NodeConnection>]>,  // TODO RWARC?
+    hosts_unord : ~Cell<~[~[@NodeConnection]]>,        // TODO RWARC?
+    send_to : ~Cell<@NodeConnection>,                  // convenience
+    recv_from : ~Cell<@NodeConnection>,                // XXX placeholder
     read_mode : ~Cell<READ_PREFERENCE>,
 }
 
@@ -100,9 +106,6 @@ impl Connection for ReplicaSetConnection {
         }
     }
 
-    /**
-     * Send data to replica set.
-     */
     pub fn send(&self, data : ~[u8]) -> Result<(), MongoErr> {
         if self.send_to.is_empty() {
             return Err(MongoErr::new(
@@ -111,22 +114,24 @@ impl Connection for ReplicaSetConnection {
                         ~"no server specified to which to send"));
         }
         let server = self.send_to.take();
+
+        if server.ping.is_empty() {
+            return Err(MongoErr::new(
+                        ~"conn_replica::send",
+                        ~"no send_to server",
+                        ~"server down"));
+        }
         let result = server.send(data);
         self.send_to.put_back(server);
         result
     }
 
-    /**
-     * Receive data from replica set. Must have already specified server
-     * from which to receive.
-     */
     pub fn recv(&self) -> Result<~[u8], MongoErr> {
-        if self.recv_from.is_empty() {
-            return Err(MongoErr::new(
-                        ~"conn_replica::recv",
-                        ~"no recv_from server",
-                        ~"no server specified from which to recv_from"));
+        match self._get_read_server() {
+            Ok(_) => (),
+            Err(e) => return Err(e),
         }
+
         let server = self.recv_from.take();
         let result = server.recv();
         self.recv_from.put_back(server);
@@ -327,7 +332,7 @@ impl ReplicaSetConnection {
         result
     }
 
-    fn _get_read_server(&self) -> Result<(), MongoErr> {
+    pub fn _get_read_server(&self) -> Result<(), MongoErr> {
         let pref =  if !self.read_mode.is_empty() {
             self.read_mode.take()
         } else {
@@ -340,83 +345,61 @@ impl ReplicaSetConnection {
         let hosts = self.hosts.take();
 
         let server = {
-            let mut pri = @NodeConnection::new(~"", 0);
-            let mut sec = @NodeConnection::new(~"", 0);
+            let mut pri = None;
 
             // hosts borrowed here, but in block so given back afterwards
             let pri_tmp = hosts[PRIMARY as int].maybe_top();
             if pri_tmp.is_some() && !pri_tmp.unwrap().ping.is_empty() {
-                 pri = *pri_tmp.unwrap();
+                 pri = pri_tmp;
             }
-            let sec_tmp = hosts[SECONDARY as int].maybe_top();
-            if sec_tmp.is_some() && !sec_tmp.unwrap().ping.is_empty() {
-                sec = *sec_tmp.unwrap();
-            }
+            let sec_list = &hosts[SECONDARY as int];
 
             if !self.recv_from.is_empty() { self.recv_from.take(); }
 
-            // determine which server to set
-            //      (primary, best secondary, best of both?)
-            match pref {
+            // determine which server to set based on preference and tagsets
+            let mut servers = ~[];
+            let (pref_str, ts_list) = match pref {
                 PRIMARY_ONLY => {
-                    if pri_tmp.is_some() {
-                        pri
-                    } else {
-                        return Err(MongoErr::new(
-                                ~"conn_replica::_get_read_server",
-                                ~"could not set PRIMARY_ONLY",
-                                ~"primary unavailable"));
-                    }
+                    if pri.is_some() { servers.push(*pri.unwrap()); }
+                    (~"PRIMARY_ONLY", &None)
                 }
-                PRIMARY_PREF => {
-                    if pri_tmp.is_some() {
-                        pri
-                    } else if sec_tmp.is_some() {
-                        sec
-                    } else {
-                        return Err(MongoErr::new(
-                                ~"conn_replica::_get_read_server",
-                                ~"could not set PRIMARY_PREF",
-                                ~"no servers available"));
+                PRIMARY_PREF(ref ts) => {
+                    if pri.is_some() { servers.push(*pri.unwrap()); }
+                    for sec_list.iter().advance |&s| {
+                        if s.ping.is_empty() { break; }
+                        servers.push(s);
                     }
+                    (~"PRIMARY_PREF", ts)
                 }
-                SECONDARY_ONLY => {
-                    if sec_tmp.is_some() {
-                        sec
-                    } else {
-                        return Err(MongoErr::new(
-                                ~"conn_replica::_get_read_server",
-                                ~"could not set SECONDARY_ONLY",
-                                ~"no secondaries available"));
+                SECONDARY_ONLY(ref ts) => {
+                    for sec_list.iter().advance |&s| {
+                        if s.ping.is_empty() { break; }
+                        servers.push(s);
                     }
+                    (~"SECONDARY_ONLY", ts)
                 }
-                SECONDARY_PREF => {
-                    if sec_tmp.is_some() {
-                        sec
-                    } else if pri_tmp.is_some() {
-                        pri
-                    } else {
-                        return Err(MongoErr::new(
-                                ~"conn_replica::_get_read_server",
-                                ~"could not set SECONDARY_PREF",
-                                ~"no servers available"));
+                SECONDARY_PREF(ref ts) => {
+                    for sec_list.iter().advance |&s| {
+                        if s.ping.is_empty() { break; }
+                        servers.push(s);
                     }
+                    if pri.is_some() { servers.push(*pri.unwrap()); }
+                    (~"SECONDARY_PREF", ts)
                 }
-                NEAREST => {
-                    match (pri_tmp, sec_tmp) {
-                        (None, None) => return Err(MongoErr::new(
-                                ~"conn_replica::_get_read_server",
-                                ~"could not set NEAREST",
-                                ~"no servers available")),
-                        (Some(_), None) => pri,
-                        (None, Some(_)) => sec,
-                        (Some(_), Some(_)) => if pri > sec {
-                            pri
-                        } else {
-                            sec
-                        },
+                NEAREST(ref ts) => {
+                    let mut tmp = copy *sec_list;
+                    if pri.is_some() { tmp.push(*pri.unwrap()); }
+                    for tmp.iter().advance |&s| {
+                        if s.ping.is_empty() { break; }
+                        servers.push(s);
                     }
+                    (~"NEAREST", ts)
                 }
+            };
+
+            match self._find_server(pref_str, servers, ts_list) {
+                Ok(s) => s,
+                Err(e) => return Err(e),
             }
         };
 
@@ -429,9 +412,31 @@ impl ReplicaSetConnection {
 
         Ok(())
     }
+    fn _find_server(&self,  pref : ~str,
+                            servers : ~[@NodeConnection],
+                            tagsets : &Option<~[TagSet]>)
+            -> Result<@NodeConnection, MongoErr> {
+        let ts_list = match copy *tagsets {
+            None => ~[TagSet::new(~[])],
+            Some(l) => l,
+        };
+
+        for servers.iter().advance |&server| {
+            for ts_list.iter().advance |ts| {
+                if server.tags.matches(ts) {
+                    return Ok(server);
+                }
+            }
+        }
+
+        Err(MongoErr::new(
+                ~"conn_replica::_get_read_server",
+                ~"could not find server matching tagset",
+                fmt!("tagset: %?, preference: %?", ts_list, pref)))
+    }
 
     /**
-     * Parse host string found from ismaster command into host and port
+     * Parse host string found from isMaster command into host and port
      * (if specified, otherwise uses default 27017).
      *
      * # Arguments

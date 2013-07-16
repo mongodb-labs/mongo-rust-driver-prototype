@@ -40,16 +40,18 @@ pub struct NodeConnection {
     //priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
     priv port : @mut Option<@GenericPort<PortResult>>,
     ping : Cell<u64>,
+    tags : TagSet,
 }
 
 impl Connection for NodeConnection {
     pub fn connect(&self) -> Result<(), MongoErr> {
         // sanity check: should not connect if already connected (?)
         if !(self.sock.is_none() && self.port.is_none()) {
-            return Err(MongoErr::new(
+            /*return Err(MongoErr::new(
                             ~"conn::connect",
                             ~"pre-existing socket",
-                            ~"cannot override existing socket"));
+                            ~"cannot override existing socket"));*/
+            return Ok(());
         }
 
         // parse IP addr
@@ -164,17 +166,34 @@ impl NodeConnection {
             sock : @mut None,
             port : @mut None,
             ping : Cell::new_empty(),
+            tags : TagSet::new(~[]),
         }
     }
 
     pub fn get_ip(&self) -> ~str { self.server_ip_str.clone() }
     pub fn get_port(&self) -> uint { self.server_port }
-    /*pub fn is_master(&self) -> Result<bool, MongoErr> {
-        self._check_master_and_do(|bson_doc : ~BsonDocument|
-                -> Result<bool, MongoErr> {
-            match bson_doc.find(
+    pub fn is_master(&self) -> Result<bool, MongoErr> {
+        let tmp = NodeConnection::new(copy self.server_ip_str, self.server_port);
+        (@tmp)._check_master_and_do(
+                            |bson_doc : &~BsonDocument|
+                                    -> Result<bool, MongoErr> {
+            match bson_doc.find(~"ismaster") {
+                None => Err(MongoErr::new(
+                                ~"conn_replica::connect",
+                                ~"isMaster runcommand response in unexpected format",
+                                ~"no \"ismaster\" field")),
+                Some(doc) => {
+                    match copy *doc {
+                        Bool(val) => Ok(val),
+                        _ => Err(MongoErr::new(
+                                ~"conn_replica::connect",
+                                ~"isMaster runcommand response in unexpected format",
+                                ~"\"ismaster\" field non-boolean")),
+                    }
+                }
+            }
         })
-    }*/
+    }
 
     /**
      * Run admin isMaster command and pass document into callback to process.
@@ -184,7 +203,7 @@ impl NodeConnection {
                 -> Result<T, MongoErr> {
         let client = @Client::new();
 
-        match client._connect_to_node_conn(self) {
+        match client._connect_to_conn(~"client::connect", self as @Connection) {
             Ok(_) => (),
             Err(e) => return Err(e),
         }
@@ -246,12 +265,12 @@ impl NodeConnection {
 // Inequalities seem all backwards because max-heaps.
 impl Ord for NodeConnection {
     pub fn lt(&self, other : &NodeConnection) -> bool {
-        if self.ping.is_empty() { return false; }
+        if self.ping.is_empty() { return true; }
         let ping0 = self.ping.take();
 
         if other.ping.is_empty() {
             self.ping.put_back(ping0);
-            return true;
+            return false;
         }
         let ping1 = other.ping.take();
 
@@ -262,12 +281,12 @@ impl Ord for NodeConnection {
     }
 
     pub fn le(&self, other : &NodeConnection) -> bool {
-        if self.ping.is_empty() { return false; }
+        if self.ping.is_empty() { return true; }
         let ping0 = self.ping.take();
 
         if other.ping.is_empty() {
             self.ping.put_back(ping0);
-            return true;
+            return false;
         }
         let ping1 = other.ping.take();
 
