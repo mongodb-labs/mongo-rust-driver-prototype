@@ -30,6 +30,20 @@ pub struct ShardController {
 
 impl ShardController {
 
+    pub fn new(client: @Client) -> ShardController {
+        //check that client points to a mongos; fail if it doesn't
+        //since a new method should not return a result (I think?)
+        let admin = client.get_admin();
+        match admin.run_command(
+            SpecNotation(~"{ 'ismaster': 1 }")) {
+                Ok(res) => match res.find(~"msg") {
+                    Some(&UString(~"isdbgrid")) => (),
+                    _ => fail!("ShardController can only connect to a mongos instance")
+                },
+                _ => fail!("ShardController can only connect to a mongos instance")
+            };
+        ShardController { mongos: client }
+    }
     /**
      * Enable sharding on the specified database.
      * The database must exist or this operation will fail.
@@ -92,7 +106,7 @@ impl ShardController {
         match d.run_command(SpecNotation(
             fmt!("{ 'shardCollection': '%s.%s', 'key': %s, 'unique': '%s' }",
                 db, coll, match key {
-                    SpecObj(_) => fail!("TODO"),
+                    SpecObj(_) => fail!("TODO need to jsonify BsonDocuments"),
                     SpecNotation(ref s) => copy *s
                 }, unique.to_str()))) {
             Ok(doc) => match *doc.find(~"ok").unwrap() {
@@ -113,4 +127,22 @@ impl ShardController {
 
      }
      */
+
+     ///Add a tag to the given shard.
+     ///Requires MongoDB 2.2 or higher.
+     pub fn add_shard_tag(&self, shard: ~str, tag: ~str) -> Result<(), MongoErr> {
+        let config = DB::new(~"config", copy self.mongos);
+        match config.get_collection(~"shards").find_one(
+           Some(SpecNotation(fmt!("{ '_id': '%s' }", shard))), None, None) {
+            Ok(_) => (),
+            Err(e) => return Err(e)
+        }
+        match config.get_collection(~"shards").update(
+            SpecNotation(fmt!("{ '_id': '%s' }", shard)),
+            SpecNotation(fmt!("{ '$addToSet': { 'tags', '%s' } }", tag)),
+            None, None, None) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e)
+        }
+     }
 }
