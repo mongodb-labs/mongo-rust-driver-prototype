@@ -40,7 +40,7 @@ pub struct NodeConnection {
     //priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
     priv port : @mut Option<@GenericPort<PortResult>>,
     ping : Cell<u64>,
-    tags : TagSet,
+    tags : ~Cell<TagSet>,
 }
 
 impl Connection for NodeConnection {
@@ -166,7 +166,7 @@ impl NodeConnection {
             sock : @mut None,
             port : @mut None,
             ping : Cell::new_empty(),
-            tags : TagSet::new(~[]),
+            tags : ~Cell::new(TagSet::new(~[])),
         }
     }
 

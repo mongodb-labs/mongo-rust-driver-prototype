@@ -352,7 +352,7 @@ impl ReplicaSetConnection {
             if pri_tmp.is_some() && !pri_tmp.unwrap().ping.is_empty() {
                  pri = pri_tmp;
             }
-            let sec_list = &hosts[SECONDARY as int];
+            let sec_list = (copy hosts[SECONDARY as int]).to_sorted_vec();
 
             if !self.recv_from.is_empty() { self.recv_from.take(); }
 
@@ -365,21 +365,21 @@ impl ReplicaSetConnection {
                 }
                 PRIMARY_PREF(ref ts) => {
                     if pri.is_some() { servers.push(*pri.unwrap()); }
-                    for sec_list.iter().advance |&s| {
+                    for sec_list.rev_iter().advance |&s| {
                         if s.ping.is_empty() { break; }
                         servers.push(s);
                     }
                     (~"PRIMARY_PREF", ts)
                 }
                 SECONDARY_ONLY(ref ts) => {
-                    for sec_list.iter().advance |&s| {
+                    for sec_list.rev_iter().advance |&s| {
                         if s.ping.is_empty() { break; }
                         servers.push(s);
                     }
                     (~"SECONDARY_ONLY", ts)
                 }
                 SECONDARY_PREF(ref ts) => {
-                    for sec_list.iter().advance |&s| {
+                    for sec_list.rev_iter().advance |&s| {
                         if s.ping.is_empty() { break; }
                         servers.push(s);
                     }
@@ -387,9 +387,10 @@ impl ReplicaSetConnection {
                     (~"SECONDARY_PREF", ts)
                 }
                 NEAREST(ref ts) => {
-                    let mut tmp = copy *sec_list;
+                    let mut tmp = copy *hosts[SECONDARY as int];
                     if pri.is_some() { tmp.push(*pri.unwrap()); }
-                    for tmp.iter().advance |&s| {
+                    let ordered = tmp.to_sorted_vec();
+                    for ordered.rev_iter().advance |&s| {
                         if s.ping.is_empty() { break; }
                         servers.push(s);
                     }
@@ -412,6 +413,10 @@ impl ReplicaSetConnection {
 
         Ok(())
     }
+    /**
+     * Find server from which to read, given a list of
+     * (available) servers and an optional list of tagsets.
+     */
     fn _find_server(&self,  pref : ~str,
                             servers : ~[@NodeConnection],
                             tagsets : &Option<~[TagSet]>)
@@ -421,9 +426,18 @@ impl ReplicaSetConnection {
             Some(l) => l,
         };
 
+        // iterate through available servers, checking
+        //      if they match the given tagset
         for servers.iter().advance |&server| {
+            let server_tags = if server.tags.is_empty() {
+                TagSet::new(~[])
+            } else {
+                server.tags.take()
+            };
+            server.tags.put_back(copy server_tags);
+
             for ts_list.iter().advance |ts| {
-                if server.tags.matches(ts) {
+                if server_tags.matches(ts) {
                     return Ok(server);
                 }
             }
