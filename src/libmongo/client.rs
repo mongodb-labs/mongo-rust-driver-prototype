@@ -196,6 +196,11 @@ impl Client {
     // XXX possibly make take enum of args for node, rs, etc.
     pub fn connect(&self, server_ip_str : ~str, server_port : uint)
                 -> Result<(), MongoErr> {
+        self._connect_to_node_conn(@NodeConnection::new(server_ip_str, server_port))
+    }
+
+    pub fn _connect_to_node_conn(&self, conn : @NodeConnection)
+                -> Result<(), MongoErr> {
         // check if already connected
         if !self.conn.is_empty() {
             return Err(MongoErr::new(
@@ -205,10 +210,9 @@ impl Client {
         }
 
         // otherwise, make connection and connect to it
-        let tmp = NodeConnection::new(server_ip_str, server_port);
-        match tmp.connect() {
+        match conn.connect() {
             Ok(_) => {
-                self.conn.put_back(@tmp as @Connection);
+                self.conn.put_back(conn as @Connection);
                 Ok(())
             }
             Err(e) => return Err(MongoErr::new(

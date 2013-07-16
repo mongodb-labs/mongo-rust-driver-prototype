@@ -180,34 +180,28 @@ impl NodeConnection {
      * Run admin isMaster command and pass document into callback to process.
      * Helper function.
      */
-    pub fn _check_master_and_do<T>(&self, get_ping : bool, cb : &fn(bson : &~BsonDocument) -> Result<T, MongoErr>)
+    pub fn _check_master_and_do<T>(@self, cb : &fn(bson : &~BsonDocument) -> Result<T, MongoErr>)
                 -> Result<T, MongoErr> {
         let client = @Client::new();
 
-        match client.connect(self.get_ip(), self.get_port()) {
+        match client._connect_to_node_conn(self) {
             Ok(_) => (),
             Err(e) => return Err(e),
         }
 
         let admin = client.get_admin();
+        if !self.ping.is_empty() { self.ping.take(); }
         let mut ping = precise_time_ns();
         let resp = match admin.run_command(SpecNotation(~"{ \"ismaster\":1 }")) {
             Ok(bson) => bson,
-            Err(e) => {
-                // indicate unavailable, return error
-                if !self.ping.is_empty() { self.ping.take(); }
-                return Err(e);
-            }
+            Err(e) => return Err(e),
         };
         ping = precise_time_ns() - ping;
-        if get_ping {
-            if !self.ping.is_empty() { self.ping.take(); }
-            self.ping.put_back(ping);
-        }
+        self.ping.put_back(ping);
 
         let result = match cb(&resp) {
             Ok(ret) => Ok(ret),
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
         };
 
         match client.disconnect() {

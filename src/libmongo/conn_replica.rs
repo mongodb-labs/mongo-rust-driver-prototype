@@ -101,33 +101,9 @@ impl Connection for ReplicaSetConnection {
     }
 
     /**
-     * Send data to replica set. Must have already specified server
-     * to which to send.
+     * Send data to replica set.
      */
     pub fn send(&self, data : ~[u8]) -> Result<(), MongoErr> {
-        /*
-        if self.hosts.is_empty() {
-            return Err(MongoErr::new(
-                        ~"conn_replica::send",
-                        ~"no send_to server",
-                        ~"no server specified to which to send"));
-        }
-
-        let hosts = self.hosts.take();
-        let len = hosts[PRIMARY as int].len();
-
-        if len == 1 {
-            let result = hosts[PRIMARY as int][0].send(data);
-            self.hosts.put_back(hosts);
-            result
-        } else {
-            return Err(MongoErr::new(
-                        ~"conn_replica::send",
-                        ~"requires single primary",
-                        fmt!("expected single primary, found %?", len)))
-        }
-        */
-
         if self.send_to.is_empty() {
             return Err(MongoErr::new(
                         ~"conn_replica::send",
@@ -191,15 +167,13 @@ impl ReplicaSetConnection {
         for NSERVER_TYPES.times {
             hosts.push(~PriorityQueue::new::<@NodeConnection>());
         }
-        let get_ping = true;
 
         if !self.hosts.is_empty() { self.hosts.take(); }
 
         // get hosts by iterating through seeds
         for self.seed.iter().advance |&server| {
             // TODO spawn
-            host_list = match server._check_master_and_do(
-                    !get_ping,
+            host_list = match (@server)._check_master_and_do(
                     |bson_doc : &~BsonDocument| -> Result<~[(~str, uint)], MongoErr> {
                 let mut list = ~[];
                 let mut err = None;
@@ -223,7 +197,7 @@ impl ReplicaSetConnection {
 
                         if (copy err).is_none() {
                             let fields = copy list_doc.unwrap().fields;
-                            for fields.iter().advance |&(@_, @host_doc)| {
+                            for fields.iter().advance |&(_, @host_doc)| {
                                 match host_doc {
                                     UString(s) => host_str = copy s,
                                     _ => err = Some(MongoErr::new(
@@ -260,10 +234,9 @@ impl ReplicaSetConnection {
 
         // go through hosts to determine primary and secondaries
         for host_list.iter().advance |&(server_str, server_port)| {
-            let server = NodeConnection::new(server_str, server_port);
+            let server = @NodeConnection::new(server_str, server_port);
 
             let server_type = server._check_master_and_do(
-                    get_ping,
                     |bson_doc : &~BsonDocument| -> Result<ServerType, MongoErr> {
                 // check if is master
                 let mut err = None;
@@ -315,8 +288,8 @@ impl ReplicaSetConnection {
             // record type of this server (primary or secondary) XXX
             match server_type {
                 Ok(typ) => match typ {
-                    PRIMARY => hosts[PRIMARY as int].push(@server),
-                    SECONDARY => hosts[SECONDARY as int].push(@server),
+                    PRIMARY => hosts[PRIMARY as int].push(server),
+                    SECONDARY => hosts[SECONDARY as int].push(server),
                     OTHER => (),
                 },
                 Err(e) => return Err(e),
@@ -366,10 +339,11 @@ impl ReplicaSetConnection {
 
         let hosts = self.hosts.take();
 
-        let mut pri = @NodeConnection::new(~"", 0);
-        let mut sec = @NodeConnection::new(~"", 0);
+        let server = {
+            let mut pri = @NodeConnection::new(~"", 0);
+            let mut sec = @NodeConnection::new(~"", 0);
 
-        {
+            // hosts borrowed here, but in block so given back afterwards
             let pri_tmp = hosts[PRIMARY as int].maybe_top();
             if pri_tmp.is_some() && !pri_tmp.unwrap().ping.is_empty() {
                  pri = *pri_tmp.unwrap();
@@ -380,10 +354,13 @@ impl ReplicaSetConnection {
             }
 
             if !self.recv_from.is_empty() { self.recv_from.take(); }
+
+            // determine which server to set
+            //      (primary, best secondary, best of both?)
             match pref {
                 PRIMARY_ONLY => {
                     if pri_tmp.is_some() {
-                        self.recv_from.put_back(pri);
+                        pri
                     } else {
                         return Err(MongoErr::new(
                                 ~"conn_replica::_get_read_server",
@@ -393,9 +370,9 @@ impl ReplicaSetConnection {
                 }
                 PRIMARY_PREF => {
                     if pri_tmp.is_some() {
-                        self.recv_from.put_back(pri);
+                        pri
                     } else if sec_tmp.is_some() {
-                        self.recv_from.put_back(sec);
+                        sec
                     } else {
                         return Err(MongoErr::new(
                                 ~"conn_replica::_get_read_server",
@@ -405,7 +382,7 @@ impl ReplicaSetConnection {
                 }
                 SECONDARY_ONLY => {
                     if sec_tmp.is_some() {
-                        self.recv_from.put_back(sec);
+                        sec
                     } else {
                         return Err(MongoErr::new(
                                 ~"conn_replica::_get_read_server",
@@ -415,9 +392,9 @@ impl ReplicaSetConnection {
                 }
                 SECONDARY_PREF => {
                     if sec_tmp.is_some() {
-                        self.recv_from.put_back(sec);
+                        sec
                     } else if pri_tmp.is_some() {
-                        self.recv_from.put_back(pri);
+                        pri
                     } else {
                         return Err(MongoErr::new(
                                 ~"conn_replica::_get_read_server",
@@ -431,17 +408,22 @@ impl ReplicaSetConnection {
                                 ~"conn_replica::_get_read_server",
                                 ~"could not set NEAREST",
                                 ~"no servers available")),
-                        (Some(_), None) => self.recv_from.put_back(pri),
-                        (None, Some(_)) => self.recv_from.put_back(sec),
-                        (Some(_), Some(_)) => if pri.lt(&sec) {
-                            self.recv_from.put_back(pri);
+                        (Some(_), None) => pri,
+                        (None, Some(_)) => sec,
+                        (Some(_), Some(_)) => if pri > sec {
+                            pri
                         } else {
-                            self.recv_from.put_back(sec);
+                            sec
                         },
                     }
                 }
             }
-        }
+        };
+
+        server.connect();
+        self.recv_from.put_back(server);
+
+        // put everything back where found
         self.hosts.put_back(hosts);
         self.read_mode.put_back(pref);
 
