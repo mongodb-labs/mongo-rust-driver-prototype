@@ -341,7 +341,7 @@ impl<'self> BsonDocument {
 impl Document {
 
     ///Allows any document to be converted to its BSON-serialized representation.
-    fn to_bson(&self) -> ~[u8] {
+    pub fn to_bson(&self) -> ~[u8] {
         let mut encoder = BsonDocEncoder::new();
         self.encode(&mut encoder);
         encoder.buf

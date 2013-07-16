@@ -46,7 +46,7 @@ impl ShardController {
         }
 
         let d = DB::new(copy db, copy self.mongos);
-        match d.run_command(SpecNotation(fmt!("{ \"enableSharding\": %s }", db))) {
+        match d.run_command(SpecNotation(fmt!("{ 'enableSharding': '%s' }", db))) {
             Ok(doc) => match *doc.find(~"ok").unwrap() {
                 Double(1f64) => return Ok(()),
                 Int32(1i32) => return Ok(()),
@@ -70,7 +70,7 @@ impl ShardController {
      */
     pub fn add_shard(&self, hostname: ~str) -> Result<(), MongoErr> {
         let admin = self.mongos.get_admin();
-        match admin.run_command(SpecNotation(fmt!("{ \"addShard\": %s }", copy hostname))) {
+        match admin.run_command(SpecNotation(fmt!("{ 'addShard': '%s' }", copy hostname))) {
             Ok(doc) => match *doc.find(~"ok").unwrap() {
                 Double(1f64) => return Ok(()),
                 Int32(1i32) => return Ok(()),
@@ -90,7 +90,7 @@ impl ShardController {
      pub fn shard_collection(&self, db: ~str, coll: ~str, key: QuerySpec, unique: bool) -> Result<(), MongoErr> {
         let d = DB::new(copy db, copy self.mongos);
         match d.run_command(SpecNotation(
-            fmt!("{ 'shardCollection': '%s.%s', 'key': '%s', 'unique': '%s' }",
+            fmt!("{ 'shardCollection': '%s.%s', 'key': %s, 'unique': '%s' }",
                 db, coll, match key {
                     SpecObj(_) => fail!("TODO"),
                     SpecNotation(ref s) => copy *s
