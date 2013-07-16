@@ -60,6 +60,14 @@ impl ShardController {
         };
     }
 
+    /**
+     * Allow this shard controller to manage a new shard.
+     * Hostname can be in a variety of formats:
+     * * <hostname>
+     * * <hostname>:<port>
+     * * <replset>/<hostname>
+     * * <replset>/<hostname>:port
+     */
     pub fn add_shard(&self, hostname: ~str) -> Result<(), MongoErr> {
         let admin = self.mongos.get_admin();
         match admin.run_command(SpecNotation(fmt!("{ \"addShard\": %s }", copy hostname))) {
@@ -75,4 +83,34 @@ impl ShardController {
             Err(e) => return Err(e)
         };
     }
+
+    /**
+     * Enable sharding on the specified collection.
+     */
+     pub fn shard_collection(&self, db: ~str, coll: ~str, key: QuerySpec, unique: bool) -> Result<(), MongoErr> {
+        let d = DB::new(copy db, copy self.mongos);
+        match d.run_command(SpecNotation(
+            fmt!("{ 'shardCollection': '%s.%s', 'key': '%s', 'unique': '%s' }",
+                db, coll, match key {
+                    SpecObj(_) => fail!("TODO"),
+                    SpecNotation(ref s) => copy *s
+                }, unique.to_str()))) {
+            Ok(doc) => match *doc.find(~"ok").unwrap() {
+                Double(1f64) => return Ok(()),
+                Int32(1i32) => return Ok(()),
+                Int64(1i64) => return Ok(()),
+                _ => return Err(MongoErr::new(
+                    ~"shard::shard_collection",
+                    fmt!("error sharding collection %s.%s", db, coll),
+                    ~"the server returned ok: 0"))
+            },
+            Err(e) => return Err(e)
+        };
+     }
+
+    /*
+     pub fn status(&self, verbose: true) -> Result<~BsonDocument, MongoErr> {
+
+     }
+     */
 }
