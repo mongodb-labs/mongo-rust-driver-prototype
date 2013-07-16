@@ -55,7 +55,7 @@ pub enum Document {
 * The type of a complete BSON document.
 * Contains an ordered map of fields and values and the size of the document as i32.
 */
-#[deriving(Eq,ToStr)]
+#[deriving(Eq)]
 pub struct BsonDocument {
     size: i32,
     fields: ~OrderedHashmap<~str, Document>
@@ -250,6 +250,12 @@ impl<E:Encoder> Encodable<E> for Document {
             MinKey => { }
             MaxKey => { }
         }
+    }
+}
+
+impl ToStr for BsonDocument {
+    pub fn to_str(&self) -> ~str {
+        self.fields.to_str()
     }
 }
 
