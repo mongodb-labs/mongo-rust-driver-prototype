@@ -133,9 +133,9 @@ pub enum WRITE_CONCERN {
 // TODO read preference
 
 pub enum READ_PREFERENCE {
-    PRIMARY,
+    PRIMARY_ONLY,
     PRIMARY_PREF,
-    SECONDARY,
+    SECONDARY_ONLY,
     SECONDARY_PREF,
     NEAREST,
 }

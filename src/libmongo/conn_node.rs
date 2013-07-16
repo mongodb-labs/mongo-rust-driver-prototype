@@ -39,7 +39,7 @@ pub struct NodeConnection {
     priv sock : @mut Option<@Socket>,
     //priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
     priv port : @mut Option<@GenericPort<PortResult>>,
-    priv ping : Cell<u64>,
+    ping : Cell<u64>,
 }
 
 impl Connection for NodeConnection {
@@ -193,7 +193,11 @@ impl NodeConnection {
         let mut ping = precise_time_ns();
         let resp = match admin.run_command(SpecNotation(~"{ \"ismaster\":1 }")) {
             Ok(bson) => bson,
-            Err(e) => return Err(e),
+            Err(e) => {
+                // indicate unavailable, return error
+                if !self.ping.is_empty() { self.ping.take(); }
+                return Err(e);
+            }
         };
         ping = precise_time_ns() - ping;
         if get_ping {
@@ -251,7 +255,6 @@ impl Ord for NodeConnection {
         if self.ping.is_empty() { return false; }
         let ping0 = self.ping.take();
 
-
         if other.ping.is_empty() {
             self.ping.put_back(ping0);
             return true;
@@ -267,7 +270,6 @@ impl Ord for NodeConnection {
     pub fn le(&self, other : &NodeConnection) -> bool {
         if self.ping.is_empty() { return false; }
         let ping0 = self.ping.take();
-
 
         if other.ping.is_empty() {
             self.ping.put_back(ping0);
@@ -285,7 +287,6 @@ impl Ord for NodeConnection {
         if self.ping.is_empty() { return false; }
         let ping0 = self.ping.take();
 
-
         if other.ping.is_empty() {
             self.ping.put_back(ping0);
             return true;
@@ -301,7 +302,6 @@ impl Ord for NodeConnection {
     pub fn ge(&self, other : &NodeConnection) -> bool {
         if self.ping.is_empty() { return false; }
         let ping0 = self.ping.take();
-
 
         if other.ping.is_empty() {
             self.ping.put_back(ping0);

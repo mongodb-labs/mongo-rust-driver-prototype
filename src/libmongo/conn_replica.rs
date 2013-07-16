@@ -35,11 +35,11 @@ pub enum ServerType {
 
 pub struct ReplicaSetConnection {
     priv seed : ~[NodeConnection],
-    priv hosts: ~Cell<~[~PriorityQueue<@NodeConnection>]>,    // TODO RWARC?
-    priv hosts_unord : ~Cell<~[~[@NodeConnection]]>,    // TODO RWARC?
-    priv send_to : ~Cell<@NodeConnection>,        // convenience
-    priv recv_from : ~Cell<@NodeConnection>,      // XXX placeholder
-    priv read_mode : ~Cell<READ_PREFERENCE>,
+    priv hosts: ~Cell<~[~PriorityQueue<@NodeConnection>]>,  // TODO RWARC?
+    priv hosts_unord : ~Cell<~[~[@NodeConnection]]>,        // TODO RWARC?
+    priv send_to : ~Cell<@NodeConnection>,                  // convenience
+    priv recv_from : ~Cell<@NodeConnection>,                // XXX placeholder
+    read_mode : ~Cell<READ_PREFERENCE>,
 }
 
 impl Connection for ReplicaSetConnection {
@@ -174,7 +174,7 @@ impl ReplicaSetConnection {
             hosts : ~Cell::new_empty(),
             recv_from : ~Cell::new_empty(),
             send_to : ~Cell::new_empty(),
-            read_mode : ~Cell::new_empty(),
+            read_mode : ~Cell::new(PRIMARY_ONLY),
         }
     }
 
@@ -354,12 +354,99 @@ impl ReplicaSetConnection {
         result
     }
 
-    /*
-     *
-     */
-    /*pub fn set_read_pref(&self, READ_PREFERENCE) {
+    fn _get_read_server(&self) -> Result<(), MongoErr> {
+        let pref =  if !self.read_mode.is_empty() {
+            self.read_mode.take()
+        } else {
+            return Err(MongoErr::new(
+                            ~"conn_replica::_get_read_server",
+                            ~"could not get server from which to read",
+                            ~"no read preference specified"));
+        };
 
-    }*/
+        let hosts = self.hosts.take();
+
+        let mut pri = @NodeConnection::new(~"", 0);
+        let mut sec = @NodeConnection::new(~"", 0);
+
+        {
+            let pri_tmp = hosts[PRIMARY as int].maybe_top();
+            if pri_tmp.is_some() && !pri_tmp.unwrap().ping.is_empty() {
+                 pri = *pri_tmp.unwrap();
+            }
+            let sec_tmp = hosts[SECONDARY as int].maybe_top();
+            if sec_tmp.is_some() && !sec_tmp.unwrap().ping.is_empty() {
+                sec = *sec_tmp.unwrap();
+            }
+
+            if !self.recv_from.is_empty() { self.recv_from.take(); }
+            match pref {
+                PRIMARY_ONLY => {
+                    if pri_tmp.is_some() {
+                        self.recv_from.put_back(pri);
+                    } else {
+                        return Err(MongoErr::new(
+                                ~"conn_replica::_get_read_server",
+                                ~"could not set PRIMARY_ONLY",
+                                ~"primary unavailable"));
+                    }
+                }
+                PRIMARY_PREF => {
+                    if pri_tmp.is_some() {
+                        self.recv_from.put_back(pri);
+                    } else if sec_tmp.is_some() {
+                        self.recv_from.put_back(sec);
+                    } else {
+                        return Err(MongoErr::new(
+                                ~"conn_replica::_get_read_server",
+                                ~"could not set PRIMARY_PREF",
+                                ~"no servers available"));
+                    }
+                }
+                SECONDARY_ONLY => {
+                    if sec_tmp.is_some() {
+                        self.recv_from.put_back(sec);
+                    } else {
+                        return Err(MongoErr::new(
+                                ~"conn_replica::_get_read_server",
+                                ~"could not set SECONDARY_ONLY",
+                                ~"no secondaries available"));
+                    }
+                }
+                SECONDARY_PREF => {
+                    if sec_tmp.is_some() {
+                        self.recv_from.put_back(sec);
+                    } else if pri_tmp.is_some() {
+                        self.recv_from.put_back(pri);
+                    } else {
+                        return Err(MongoErr::new(
+                                ~"conn_replica::_get_read_server",
+                                ~"could not set SECONDARY_PREF",
+                                ~"no servers available"));
+                    }
+                }
+                NEAREST => {
+                    match (pri_tmp, sec_tmp) {
+                        (None, None) => return Err(MongoErr::new(
+                                ~"conn_replica::_get_read_server",
+                                ~"could not set NEAREST",
+                                ~"no servers available")),
+                        (Some(_), None) => self.recv_from.put_back(pri),
+                        (None, Some(_)) => self.recv_from.put_back(sec),
+                        (Some(_), Some(_)) => if pri.lt(&sec) {
+                            self.recv_from.put_back(pri);
+                        } else {
+                            self.recv_from.put_back(sec);
+                        },
+                    }
+                }
+            }
+        }
+        self.hosts.put_back(hosts);
+        self.read_mode.put_back(pref);
+
+        Ok(())
+    }
 
     /**
      * Parse host string found from ismaster command into host and port
