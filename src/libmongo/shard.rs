@@ -125,7 +125,21 @@ impl ShardController {
      pub fn status(&self, verbose: bool) -> Result<~str, MongoErr> {
         let mut out = ~"";
         let config = DB::new(~"config", self.mongos);
-        out.push_str(~"--- Sharding Status ---");
+        let version = match config.get_collection(~"version").find_one(None, None, None) {
+            Ok(doc) => doc,
+            Err(e) => return Err(e)
+        };
+        out.push_str(~"--- Sharding Status ---\n");
+        out.push_str(fmt!("  sharding version: %s\n", version.to_str()));
+        out.push_str(~"  shards:\n");
+        match config.get_collection(~"shards").find(None, None, None) {
+            Ok(ref mut c) => {
+                for c.advance() |sh| {
+                    out.push_str(fmt!("%s\n", sh.to_str()));
+                }
+            },
+            Err(e) => return Err(e)
+        };
         Ok(out)
      }
 
