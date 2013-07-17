@@ -25,25 +25,35 @@ static MAX_LEN : uint = 16;
 
 pub struct Person {
     _id : Option<Document>,
-    ind : i32,
-    name : ~str,
-    id_str : ~str,
-    val : i32,
-    point : (f64, f64),
+    ind : Option<i32>,
+    name : Option<~str>,
+    id_str : Option<~str>,
+    val : Option<i32>,
+    point : Option<(f64, f64)>,
 }
 
 impl BsonFormattable for Person {
     pub fn to_bson_t(&self) -> Document {
         let mut bson_doc = BsonDocument::new();
-        bson_doc.put(~"ind", Int32(self.ind));
-        bson_doc.put(~"name", UString(copy self.name));
-        bson_doc.put(~"id_str", UString(copy self.id_str));
-        bson_doc.put(~"val", Int32(self.val));
+        if self.ind.is_some() {
+            bson_doc.put(~"ind", Int32((copy self.ind).unwrap()));
+        }
+        if self.name.is_some() {
+            bson_doc.put(~"name", UString((copy self.name).unwrap()));
+        }
+        if self.id_str.is_some() {
+             bson_doc.put(~"id_str", UString((copy self.id_str).unwrap()));
+        }
+        if self.val.is_some() {
+            bson_doc.put(~"val", Int32((copy self.val).unwrap()));
+        }
         let mut sub_bson_doc = BsonDocument::new();
-        let (x, y) = self.point;
-        sub_bson_doc.put(~"x", Double(x));
-        sub_bson_doc.put(~"y", Double(y));
-        bson_doc.put(~"point", Embedded(~sub_bson_doc));
+        if self.point.is_some() {
+            let (x, y) = (copy self.point).unwrap();
+            sub_bson_doc.put(~"x", Double(x));
+            sub_bson_doc.put(~"y", Double(y));
+            bson_doc.put(~"point", Embedded(~sub_bson_doc));
+        }
 
         if self._id.is_some() {
             bson_doc.put(~"_id", (copy self._id).unwrap());
@@ -64,62 +74,67 @@ impl BsonFormattable for Person {
         };
 
         let ind = match bson_doc.find(~"ind") {
-            None => return Err(~"not Person struct (no ind field)"),
+            None => None,
             Some(d) => match *d {
-                Int32(i) => i,
+                Int32(i) => Some(i),
                 _ => return Err(~"not Person struct (ind field not Int32)"),
             }
         };
 
         let name = match bson_doc.find(~"name") {
-            None => return Err(~"not Person struct (no name field)"),
+            None => None,
             Some(d) => match (copy *d) {
-                UString(i) => i,
+                UString(i) => Some(i),
                 _ => return Err(~"not Person struct (name field not UString)"),
             }
         };
 
         let id_str = match bson_doc.find(~"id_str") {
-            None => return Err(~"not Person struct (no id_str field)"),
+            None => None,
             Some(d) => match (copy *d) {
-                UString(i) => i,
+                UString(i) => Some(i),
                 _ => return Err(~"not Person struct (id_str field not UString)"),
             }
         };
 
         let val = match bson_doc.find(~"val") {
-            None => return Err(~"not Person struct (no val field)"),
+            None => None,
             Some(d) => match (copy *d) {
-                Int32(i) => i,
+                Int32(i) => Some(i),
                 _ => return Err(~"not Person struct (val field not Int32)"),
             }
         };
 
         let point_doc = match bson_doc.find(~"point") {
-            None => return Err(~"not Person struct (no point field)"),
+            None => None,
             Some(d) => match (copy *d) {
-                Embedded(i) => i,
+                Embedded(i) => Some(i),
                 _ => return Err(~"not Person struct (point field not Embedded BsonDocument)"),
             }
         };
 
-        let x = match point_doc.find(~"x") {
-            None => return Err(~"not Person struct (no x field in point)"),
-            Some(d) => match (copy *d) {
-                Double(i) => i,
-                _ => return Err(~"not Person struct (x field in point not Double)"),
-            }
-        };
+        let point = if point_doc.is_some() {
+            let tmp = (copy point_doc).unwrap();
+            let x = match tmp.find(~"x") {
+                None => return Err(~"not Person struct (no x field in point)"),
+                Some(d) => match (copy *d) {
+                    Double(i) => i,
+                    _ => return Err(~"not Person struct (x field in point not Double)"),
+                }
+            };
 
-        let y = match point_doc.find(~"y") {
-            None => return Err(~"not Person struct (no y field in point)"),
-            Some(d) => match *d {
-                Double(i) => i,
-                _ => return Err(~"not Person struct (y field in point not Double)"),
-            }
-        };
+            let y = match tmp.find(~"y") {
+                None => return Err(~"not Person struct (no y field in point)"),
+                Some(d) => match *d {
+                    Double(i) => i,
+                    _ => return Err(~"not Person struct (y field in point not Double)"),
+                }
+            };
 
-        Ok(Person { _id : _id, ind : ind, name : name, id_str : id_str, val : val, point : (x,y) })
+            Some((x,y))
+        } else { None };
+
+        Ok(Person { _id : _id, ind : ind, name : name, id_str : id_str, val : val, point : point })
     }
 }
 
@@ -128,8 +143,8 @@ impl ToStr for Person {
         fmt!("Person {
                 \t_id:\t%?,
                 \tind:\t%?,
-                \tname:\t%s,
-                \tid_str:\t%s,
+                \tname:\t%?,
+                \tid_str:\t%?,
                 \tval:\t%?,
                 \tpoint:\t%? }",
                 self._id, self.ind, self.name, self.id_str, self.val, self.point)
@@ -149,11 +164,11 @@ impl Person {
 
         Person {
             _id : _id,
-            ind : ind,
-            name : name,
-            id_str : silly_id,
-            val : val,
-            point : (rng.gen(), rng.gen()),
+            ind : Some(ind),
+            name : Some(name),
+            id_str : Some(silly_id),
+            val : Some(val),
+            point : Some((rng.gen(), rng.gen())),
         }
     }
 

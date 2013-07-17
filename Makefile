@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-RC = rustc -Z debug-info
+RC = rustc
 RDOC = rustdoc
-RDOCFLAGS = --output-style doc-per-mod
+RDOCFLAGS = --output-style doc-per-mod --output-format markdown
 CC = gcc
 AR = ar rcs
-FLAGS = -L ./bin -D unused-unsafe -A unnecessary-allocation $(TOOLFLAGS)
+FLAGS = -Z debug-info -L ./bin -D unused-unsafe -A unnecessary-allocation $(TOOLFLAGS)
 CFLAGS = -c -g -Wall -Werror
 RM = rm
 RMDIR = rmdir -p
@@ -25,8 +25,9 @@ MKDIR = mkdir -p
 
 SRC = ./src
 LIB = ./lib
-BSONDIR = ./src/bson
+BSONDIR = ./src/libbson
 MONGODIR = ./src/libmongo
+EXDIR = ./examples
 BIN = ./bin
 TEST = ./test
 DOCS = ./docs
@@ -65,6 +66,10 @@ else
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 endif
+
+ex: $(EXDIR)/*
+	$(RC) $(FLAGS) $(EXDIR)/bson_demo.rs
+	$(RC) $(FLAGS) $(EXDIR)/mongo_demo.rs
 
 doc: $(BSONDIR)/*.rs $(MONGODIR)/*
 	$(MKDIR) docs
