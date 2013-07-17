@@ -14,7 +14,7 @@
 
 RC = rustc -Z debug-info
 RDOC = rustdoc
-RDOCFLAGS = --output-style doc-per-mod
+RDOCFLAGS = --output-style doc-per-mod --output-format markdown
 CC = gcc
 AR = ar rcs
 FLAGS = -L ./bin -D unused-unsafe -A unnecessary-allocation $(TOOLFLAGS)
@@ -25,7 +25,7 @@ MKDIR = mkdir -p
 
 SRC = ./src
 LIB = ./lib
-BSONDIR = ./src/bson
+BSONDIR = ./src/libbson
 MONGODIR = ./src/libmongo
 BIN = ./bin
 TEST = ./test
