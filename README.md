@@ -219,7 +219,7 @@ let b = (~"foo").to_bson_t(); //UString(~"foo")
 let c = 3.14159.to_bson_t(); //Double(3.14159)
 let d = extra::json::String(~"bar").to_bson_t(); //UString(~"bar")
 let e = (~"{\"fizz\": \"buzz\"}").to_bson_t();
-//e is an Embeddable(hashmap associating ~"fizz" with UString(~"buzz")
+//e is an Embedded(hashmap associating ~"fizz" with UString(~"buzz"))
 //strings will attempt to be parsed as JSON; if they fail,
 //they will be silently treated as a plain string instead
 ```
