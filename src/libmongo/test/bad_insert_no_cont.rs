@@ -24,7 +24,7 @@ fn test_bad_insert_no_cont() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     let coll = @Collection::new(~"rust", ~"bad_insert_batch_no_cont", client);
@@ -49,7 +49,7 @@ fn test_bad_insert_no_cont() {
     }
     match coll.insert_batch(ins_strs, None, None, None) {
         Ok(_) => (),
-        Err(e) => println(fmt!("\nerror:%s", MongoErr::to_str(e))),
+        Err(e) => println(fmt!("\nerror:%s", e.to_str())),
     };
 
     // try to find all of them and compare all of them
@@ -64,11 +64,11 @@ fn test_bad_insert_no_cont() {
             }
             if j < 3 { fail!("fewer docs returned (%d) than successfully inserted (3)", j); }
         }
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 }

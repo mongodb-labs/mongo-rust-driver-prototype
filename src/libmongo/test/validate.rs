@@ -12,40 +12,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 use mongo::client::*;
-use mongo::coll::*;
+use mongo::db::*;
 use mongo::util::*;
 
-use bson::formattable::*;
-use bson::encode::*;
+use fill_coll::*;
+
 #[test]
-fn test_good_insert_single() {
-    // good single insert
+fn test_validate() {
+    // get collections
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
         Err(e) => fail!("%s", e.to_str()),
     }
 
-    let coll = @Collection::new(~"rust", ~"good_insert_one", client);
-
-    // clear out collection to start from scratch
-    coll.remove(None, None, None, None);
-
-    // create and insert document
-    let ins = ~"{ \"_id\":0, \"a\":0, \"msg\":\"first insert!\" }";
-    let ins_doc = match (copy ins).to_bson_t() {
-            Embedded(bson) => *bson,
-            _ => fail!("what happened"),
-        };
-    coll.insert::<~str>(ins, None);
-
-    // try to extract it and compare
-    match coll.find_one(None, None, None) {
-        Ok(ret_doc) => assert!(*ret_doc == ins_doc),
-        Err(e) => fail!("%s", e.to_str()),
+    let db_str = ~"rust_validate";
+    let n = 15;
+    let colls = [~"coll0", ~"coll1", ~"coll2"];
+    for colls.iter().advance |&name| {
+        fill_coll(db_str.clone(), name, client, n);
     }
 
+    let db = DB::new(db_str, client);
+    for colls.iter().advance |&c| {
+        assert!(db.get_collection(c).validate(false, false).is_ok());
+        //TODO should check other opts as well
+    }
     match client.disconnect() {
         Ok(_) => (),
         Err(e) => fail!("%s", e.to_str()),

@@ -24,7 +24,7 @@ fn test_good_insert_batch_big() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     let n = 105;
@@ -40,16 +40,16 @@ fn test_good_insert_batch_big() {
                 j += 1;
             }
             match cursor.iter_err {
-                Some(e) => fail!("\n%?", MongoErr::to_str(e)),
+                Some(e) => fail!("\n%?", e.to_str()),
                 None => (),
             }
             if j < n { fail!("fewer docs (%?) returned than inserted (%?)", j, n); }
         }
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 }

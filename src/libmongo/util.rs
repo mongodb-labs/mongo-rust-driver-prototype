@@ -39,12 +39,14 @@ impl MongoErr {
     pub fn new(typ : ~str, name : ~str, msg : ~str) -> MongoErr {
         MongoErr { err_type : typ, err_name : name, err_msg : msg }
     }
+}
 
+impl ToStr for MongoErr {
     /**
      * Print a MongoErr to string in a standard format.
      */
-    pub fn to_str(e : MongoErr) -> ~str {
-        fmt!("ERR | %s | %s => %s", e.err_type, e.err_name, e.err_msg)
+    pub fn to_str(&self) -> ~str {
+        fmt!("ERR | %s | %s => %s", self.err_type, self.err_name, self.err_msg)
     }
 }
 
@@ -138,13 +140,11 @@ pub enum INDEX_FLAG {
     DROP_DUPS = 1 << 2,
     SPARSE = 1 << 3,
 }
+
 pub enum INDEX_OPTION {
     INDEX_NAME(~str),
     EXPIRE_AFTER_SEC(int),
-    //VERS(int),
-    //WEIGHTS(BsonDocument),
-    //DEFAULT_LANG(~str),
-    //OVERRIDE_LANG(~str),
+    VERS(int),
 }
 
 pub enum INDEX_GEOTYPE {
@@ -156,7 +156,7 @@ pub enum INDEX_FIELD {
     NORMAL(~[(~str, INDEX_ORDER)]),
     HASHED(~str),
     GEOSPATIAL(~str, INDEX_GEOTYPE),
-    //GEOHAYSTACK()
+    GEOHAYSTACK(~str, ~str, uint),
 }
 
 /**
@@ -165,10 +165,11 @@ pub enum INDEX_FIELD {
 pub enum COLLECTION_FLAG {
     AUTOINDEX_ID = 1 << 0,      // enable automatic index on _id?
 }
+
 pub enum COLLECTION_OPTION {
     CAPPED(uint),   // max size of capped collection
     SIZE(uint),     // preallocated size of uncapped collection
-    MAX_DOCS(int),  // max cap in number of documents
+    MAX_DOCS(uint), // max cap in number of documents
 }
 
 /**

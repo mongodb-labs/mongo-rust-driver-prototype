@@ -21,35 +21,34 @@ use util::*;
 use msg::*;
 use conn::*;
 use db::DB;
+use coll::Collection;
 
 /**
- * User interfaces with Client, which processes user requests
+ * User interfaces with `Client`, which processes user requests
  * and sends them through the connection.
  *
- * All communication to server goes through Client, i.e. database,
- * collection, etc. all store their associated Client
+ * All communication to server goes through `Client`, i.e. `DB`,
+ * `Collection`, etc. all store their associated `Client`
  */
 pub struct Client {
     conn : ~cell::Cell<NodeConnection>,
-    db : ~cell::Cell<~str>,
     priv cur_requestId : ~cell::Cell<i32>,      // first unused requestId
     // XXX index cache?
 }
 
 impl Client {
     /**
-     * Create a new Mongo Client.
+     * Creates a new Mongo client.
      *
      * Currently can connect to single unreplicated, unsharded
      * server via `connect`.
      *
      * # Returns
-     * empty Client
+     * empty `Client`
      */
     pub fn new() -> Client {
         Client {
             conn : ~cell::Cell::new_empty(),
-            db : ~cell::Cell::new_empty(),
             cur_requestId : ~cell::Cell::new(0),
         }
     }
@@ -59,11 +58,10 @@ impl Client {
     }
 
     /**
-     * Return vector of database names.
+     * Returns vector of database names.
      *
      * # Returns
-     * vector of database names on success,
-     * `MongoErr` on any failure
+     * vector of database names on success, `MongoErr` on any failure
      *
      * # Failure Types
      * * errors propagated from `run_command`
@@ -99,42 +97,48 @@ impl Client {
             }
         };
         let fields = list.fields;
-        for fields.iter().advance |&(@_, @doc)| {
+        for fields.iter().advance |&(_, @doc)| {
             match doc {
                 Embedded(bson_doc) => match bson_doc.find(~"name") {
                     Some(tmp_doc) => {
-                        let tmp = copy *tmp_doc;
-                        match tmp {
-                            UString(n) => names = names + ~[n],
+                        match (copy *tmp_doc) {
+                            UString(n) => names.push(n),
                             x => return Err(MongoErr::new(
                                         ~"client::get_dbs",
                                         ~"could not extract database name",
-                                        fmt!("name field %? not UString", copy x))),
+                                        fmt!("name field %? not UString", x))),
 
                         }
                     }
                     None => return Err(MongoErr::new(
                                 ~"client::get_dbs",
                                 ~"could not extract database name",
-                                fmt!("no name field in %?", copy bson_doc))),
+                                fmt!("no name field in %?", bson_doc))),
 
                 },
                 _ => return Err(MongoErr::new(
                                 ~"client::get_dbs",
                                 ~"could not extract database name",
-                                fmt!("no BsonDocument in %?", copy doc))),
+                                fmt!("no BsonDocument in %?", doc))),
             }
         }
 
         Ok(names)
     }
 
-    // probably not actually needed
-    pub fn use_db(&self, db : ~str) {
-        if !self.db.is_empty() {
-            self.db.take();
-        }
-        self.db.put_back(db);
+    /**
+     * Gets the specified `DB`.
+     * Alternative to constructing the `DB` explicitly
+     * (`DB::new(db, client)`).
+     *
+     * # Arguments
+     * * `db` - name of `DB` to get
+     *
+     * # Returns
+     * handle to specified database
+     */
+    pub fn get_db(@self, db : ~str) -> DB {
+        DB::new(db, self)
     }
 
     /**
@@ -150,7 +154,7 @@ impl Client {
      * * anything propagated from run_command
      */
     pub fn drop_db(@self, db : ~str) -> Result<(), MongoErr> {
-        let db = @DB::new(db, self);
+        let db = DB::new(db, self);
         match db.run_command(SpecNotation(~"{ \"dropDatabase\":1 }")) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -158,14 +162,30 @@ impl Client {
     }
 
     /**
-     * Connect to a single server.
+     * Gets the specified `Collection`.
+     * Alternative to constructing the `Collection` explicitly
+     * (`Collection::new(db, collection, client)`).
+     *
+     * # Arguments
+     * * `db` - database from which to get collection
+     * * `coll` - name of `Collection` to get
+     *
+     * # Returns
+     * handle to specified collection
+     */
+    pub fn get_collection(@self, db : ~str, coll : ~str) -> Collection {
+        Collection::new(db, coll, self)
+    }
+
+    /**
+     * Connects to a single server.
      *
      * # Arguments
      * * `server_ip_str` - string containing IP address of server
      * * `server_port` - port to which to connect
      *
      * # Returns
-     * () on success, MongoErr on failure
+     * () on success, `MongoErr` on failure
      *
      * # Failure Types
      * * already connected
@@ -173,6 +193,7 @@ impl Client {
      */
     pub fn connect(&self, server_ip_str : ~str, server_port : uint)
                 -> Result<(), MongoErr> {
+        // check if already connected
         if !self.conn.is_empty() {
             return Err(MongoErr::new(
                             ~"client::connect",
@@ -180,6 +201,7 @@ impl Client {
                             ~"cannot connect if already connected; please first disconnect"));
         }
 
+        // otherwise, make connection and connect to it
         let tmp = NodeConnection::new(server_ip_str, server_port);
         match tmp.connect() {
             Ok(_) => {
@@ -189,23 +211,24 @@ impl Client {
             Err(e) => return Err(MongoErr::new(
                                     ~"client::connect",
                                     ~"connecting",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
         }
     }
 
     /**
-     * Disconnect from server.
+     * Disconnects from server.
      * Simultaneously empties connection cell.
      *
      * # Returns
-     * () on success, MongoErr on failure
+     * () on success, `MongoErr` on failure
      *
      * # Failure Types
      * * network
      */
     pub fn disconnect(&self) -> Result<(), MongoErr> {
         if !self.conn.is_empty() { self.conn.take().disconnect() }
-        // XXX currently succeeds even if not previously connected.
+        // XXX currently succeeds even if not previously connected
+        //      (may or may not be desired)
         else { Ok(()) }
     }
 
@@ -216,16 +239,18 @@ impl Client {
      * # Arguments
      * * `msg` - bytes to send
      * * `wc` - write concern (if applicable)
-     * * `auto_get_reply` - whether Client should expect an `OP_REPLY`
+     * * `auto_get_reply` - whether `Client` should expect an `OP_REPLY`
      *                      from the server
      *
      * # Returns
-     * if read operation, `OP_REPLY` on success, MongoErr on failure;
-     * if write operation, None on no last error, MongoErr on last error
+     * if read operation, `OP_REPLY` on success, `MongoErr` on failure;
+     * if write operation, `None` on no last error, `MongoErr` on last error
      *      or network error
      */
     // TODO check_primary for replication purposes?
-    pub fn _send_msg(@self, msg : ~[u8], wc_pair : (~str, Option<~[WRITE_CONCERN]>), auto_get_reply : bool)
+    pub fn _send_msg(@self, msg : ~[u8],
+                            wc_pair : (&~str, Option<~[WRITE_CONCERN]>),
+                            auto_get_reply : bool)
                 -> Result<Option<ServerMsg>, MongoErr> {
         // first send message, exiting if network error
         match self.send(msg) {
@@ -233,21 +258,21 @@ impl Client {
             Err(e) => return Err(MongoErr::new(
                                     ~"client::_send_msg",
                                     ~"",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
         }
 
         // handle write concern or handle query as appropriate
         if !auto_get_reply {
             // requested write concern
             let (db_str, wc) = wc_pair;
-            let db = DB::new(db_str, self);
+            let db = DB::new(copy *db_str, self);
 
             match db.get_last_error(wc) {
                 Ok(_) => Ok(None),
                 Err(e) => Err(MongoErr::new(
                                     ~"client::_send_msg",
                                     ~"write concern error",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
             }
         } else {
             // requested query
@@ -256,7 +281,7 @@ impl Client {
                 Err(e) => Err(MongoErr::new(
                                     ~"client::_send_msg",
                                     ~"error in response",
-                                    fmt!("-->\n%s", MongoErr::to_str(e)))),
+                                    fmt!("-->\n%s", e.to_str()))),
             }
         }
     }
@@ -265,7 +290,7 @@ impl Client {
      * Picks up server response.
      *
      * # Returns
-     * ServerMsg on success, MongoErr on failure
+     * `ServerMsg` on success, `MongoErr` on failure
      *
      * # Failure Types
      * * invalid bytestring/message returned (should never happen)
@@ -273,6 +298,7 @@ impl Client {
      * * network
      */
     fn _recv_msg(&self) -> Result<ServerMsg, MongoErr> {
+        // receive message
         let m = match self.recv() {
             Ok(bytes) => match parse_reply(bytes) {
                 Ok(m_tmp) => m_tmp,
@@ -281,7 +307,9 @@ impl Client {
             Err(e) => return Err(e),
         };
 
-        match m {
+        // check if any errors in response and convert to MongoErr,
+        //      else pass along
+        match copy m {
             OpReply { header:_, flags:f, cursor_id:_, start:_, nret:_, docs:_ } => {
                 if (f & CUR_NOT_FOUND as i32) != 0i32 {
                     return Err(MongoErr::new(
@@ -300,13 +328,13 @@ impl Client {
     }
 
     /**
-     * Send on connection affiliated with this client.
+     * Sends on `Connection` affiliated with this `Client`.
      *
      * # Arguments
      * * `bytes` - bytes to send
      *
      * # Returns
-     * () on success, MongoErr on failure
+     * () on success, `MongoErr` on failure
      *
      * # Failure Types
      * * not connected
@@ -327,10 +355,10 @@ impl Client {
     }
 
     /**
-     * Receive on connection affiliated with this client.
+     * Receives on `Connection` affiliated with this `Client`.
      *
      * # Returns
-     * bytes received over connection on success, MongoErr on failure
+     * bytes received over connection on success, `MongoErr` on failure
      *
      * # Failure Types
      * * not connected

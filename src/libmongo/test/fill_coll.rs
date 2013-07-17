@@ -33,13 +33,19 @@ pub fn fill_coll(db : ~str, coll : ~str, client : @Client, n : uint)
     let mut ins_docs = ~[];
     let mut i = 0;
     for n.times {
-        let ins_str = fmt!("{ \"_id\":%d, \"a\":%d, \"b\":\"ins %d\", \"insert no\":%d }", i, i/2, i, i);
+        let ins_str = fmt!("{
+                                \"_id\":%d,
+                                \"a\":%d,
+                                \"b\":\"ins %d\",
+                                \"loc\":{ \"x\":%d, \"y\":%d },
+                                \"insert no\":%d
+                            }", i, i/2, i, -i, i+4, i);
         let ins_doc = match (copy ins_str).to_bson_t() {
                 Embedded(bson) => *bson,
                 _ => fail!("what happened"),
             };
-        ins_strs = ins_strs + ~[ins_str];
-        ins_docs = ins_docs + ~[ins_doc];
+        ins_strs.push(ins_str);
+        ins_docs.push(ins_doc);
         i += 1;
     }
     coll.insert_batch(ins_strs.clone(), None, None, None);

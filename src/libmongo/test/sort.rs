@@ -23,7 +23,7 @@ fn test_sort() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     let n = 105;
@@ -31,12 +31,12 @@ fn test_sort() {
 
     let mut cur = match coll.find(None, None, None) {
         Ok(cursor) => cursor,
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     };
 
     match cur.sort(NORMAL(~[(~"insert no", DESC)])) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     let mut i = 0;
@@ -48,6 +48,6 @@ fn test_sort() {
 
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 }

@@ -25,7 +25,7 @@ fn test_get_collections() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     let db_str = ~"rust_get_colls";
@@ -46,11 +46,11 @@ fn test_get_collections() {
             }
             assert!(i-1 == colls.len());
         },
-        Err(e) => println(fmt!("%s", MongoErr::to_str(e))),
+        Err(e) => println(fmt!("%s", e.to_str())),
     };
 
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 }

@@ -22,7 +22,7 @@ fn test_authenticate() {
     let client = @Client::new();
     match client.connect(~"127.0.0.1", MONGO_DEFAULT_PORT) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
     }
 
     // drop users first; this ensures the user will be present
@@ -30,11 +30,11 @@ fn test_authenticate() {
     db.get_collection(~"system.users").remove(None, None, None, None);
     match db.add_user(~"testuser2", ~"testpassword", ~[]) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))
+        Err(e) => fail!("%s", e.to_str())
     };
 
     match db.authenticate(~"testuser2", ~"testpassword") {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e))
+        Err(e) => fail!("%s", e.to_str())
     }
 }
