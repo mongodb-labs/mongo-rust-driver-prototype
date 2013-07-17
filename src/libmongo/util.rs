@@ -140,13 +140,11 @@ pub enum INDEX_FLAG {
     DROP_DUPS = 1 << 2,
     SPARSE = 1 << 3,
 }
+
 pub enum INDEX_OPTION {
     INDEX_NAME(~str),
     EXPIRE_AFTER_SEC(int),
     VERS(int),
-    //WEIGHTS(BsonDocument),
-    //DEFAULT_LANG(~str),
-    //OVERRIDE_LANG(~str),
 }
 
 pub enum INDEX_GEOTYPE {
@@ -167,6 +165,7 @@ pub enum INDEX_FIELD {
 pub enum COLLECTION_FLAG {
     AUTOINDEX_ID = 1 << 0,      // enable automatic index on _id?
 }
+
 pub enum COLLECTION_OPTION {
     CAPPED(uint),   // max size of capped collection
     SIZE(uint),     // preallocated size of uncapped collection
