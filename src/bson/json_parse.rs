@@ -64,7 +64,8 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
         while !(self.stream.first() == &'}') {
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
             if self.stream.expect(&['\"', '\'']).is_none() { return Err(~"keys must begin with quote marks"); }
-            let key = match self._string() {
+            let keych = *self.stream.first();
+            let key = match self._string(keych) {
                 UString(s) => s,
                 _ => return Err(~"invalid key found")
             };
@@ -76,8 +77,8 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
             self.stream.pass_while(&[' ', '\n', '\r', '\t']);
             let c = self.stream.expect(&['\"', '\'', 't', 'f', '[', '{']);
             match c {
-                Some('\"') => { ret.put(key, self._string()); }
-                Some('\'') => { ret.put(key, self._string()); }
+                Some('\"') => { ret.put(key, self._string('\"')); }
+                Some('\'') => { ret.put(key, self._string('\'')); }
                 Some('t') => {
                     match_insert!(_bool,key);
                 }
@@ -126,9 +127,9 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
     }
 
     ///Parse a string.
-    fn _string(&mut self) -> Document {
+    fn _string(&mut self, delim: char) -> Document {
         self.stream.pass(1); //pass over begin quote
-        let ret: ~[char] = self.stream.until(|c| *c == '\"' || *c == '\'');
+        let ret: ~[char] = self.stream.until(|c| *c == delim);
         self.stream.pass(1); //pass over end quote
         self.stream.pass_while(&[' ', '\n', '\r', '\t']); //pass over trailing whitespace
         UString(from_chars(ret))
@@ -205,8 +206,8 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
         while !(self.stream.first() == &']') {
             let c = self.stream.expect(&['\"', '\'', 't', 'f', '[', '{']);
             match c {
-                Some('\"') => ret.put(i.to_str(), self._string()),
-                Some('\'') => ret.put(i.to_str(), self._string()),
+                Some('\"') => ret.put(i.to_str(), self._string('\"')),
+                Some('\'') => ret.put(i.to_str(), self._string('\'')),
                 Some('t') => {
                     match_insert!(_bool,i.to_str());
                 }
@@ -336,7 +337,7 @@ mod tests {
     fn test_string_fmt() {
         let stream = "\"hello\"".iter().collect::<~[char]>();
         let mut parser = ExtendedJsonParser::new(stream);
-        let val = parser._string();
+        let val = parser._string('\"');
         assert_eq!(UString(~"hello"), val);
     }
 
@@ -532,5 +533,13 @@ mod tests {
         let val = ExtendedJsonParser::_keyobj::<~[char]>(&(v.unwrap())).unwrap();
 
         assert_eq!(Regex(~"foo",~"bar"), val);
+    }
+
+    #[test]
+    #[should_fail]
+    fn test_mismatched_quotes() {
+        let stream = "{\"foo': 'bar\"}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream);
+        if parser.object().is_err() { fail!("test_mismatched_quotes") }
     }
 }
