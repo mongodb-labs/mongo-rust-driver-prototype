@@ -261,7 +261,7 @@ let json_obj = json_string.to_bson_t();
 ```
 
 ##### Encoding values
-```Document```s and ```BsonDocument```s can be encoded into bytes via their ```to_bson``` methods. This will produce a ```~[u8]``` meeting the specifications outlined by the [specification](http://bson-spec.org).
+```Document```s and ```BsonDocument```s can be encoded into bytes via their ```to_bson``` methods. This will produce a ```~[u8]``` meeting the specifications outlined by the [specification](http://bsonspec.org).
 Through this method, standard BSON types can easily be serialized. Any type ```Foo``` can also be serialized in this way if it implements the ```BsonFormattable``` trait.
 Example:
 ```rust
