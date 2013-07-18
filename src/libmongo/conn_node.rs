@@ -34,11 +34,11 @@ pub type PortResult = Result<~[u8], TcpErrData>;
 pub struct NodeConnection {
     priv server_ip_str : ~str,
     priv server_port : uint,
-    priv server_ip : @mut Option<IpAddr>,
+    priv server_ip : Cell<IpAddr>,
     priv iotask : iotask::IoTask,
-    priv sock : @mut Option<@Socket>,
+    priv sock : Cell<@Socket>,
     //priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
-    priv port : @mut Option<@GenericPort<PortResult>>,
+    priv port : Cell<@GenericPort<PortResult>>,
     ping : Cell<u64>,
     tags : ~Cell<TagSet>,
 }
@@ -46,7 +46,7 @@ pub struct NodeConnection {
 impl Connection for NodeConnection {
     pub fn connect(&self) -> Result<(), MongoErr> {
         // sanity check: should not connect if already connected (?)
-        if !(self.sock.is_none() && self.port.is_none()) {
+        if !(self.sock.is_empty() && self.port.is_empty()) {
             /*return Err(MongoErr::new(
                             ~"conn::connect",
                             ~"pre-existing socket",
@@ -72,17 +72,18 @@ impl Connection for NodeConnection {
         };
 
         // start the read port
-        *(self.port) = match tmp_sock.read_start() {
+        let tmp_port = match tmp_sock.read_start() {
             Err(e) => return Err(MongoErr::new(
                                     ~"conn::connect",
                                     e.err_name.clone(),
                                     e.err_msg.clone())),
-            Ok(port) => Some(port as @GenericPort<PortResult>),
+            Ok(port) => port as @GenericPort<PortResult>,
         };
 
         // hand initialized fields to self
-        *(self.sock) = Some(tmp_sock);
-        *(self.server_ip) = Some(tmp_ip);
+        self.sock.put_back(tmp_sock);
+        self.port.put_back(tmp_port);
+        self.server_ip.put_back(tmp_ip);
 
         Ok(())
     }
@@ -91,57 +92,62 @@ impl Connection for NodeConnection {
         // NO sanity check: don't really care if disconnect unconnected connection
 
         // nuke port first (we can keep the ip)
-        *(self.port) = None;
+        if !self.port.is_empty() { self.port.take(); }
 
-        match *(self.sock) {
-            None => (),
-            Some(sock) => {
-                match sock.read_stop() {
-                    Err(e) => return Err(MongoErr::new(
-                                            ~"conn::disconnect",
-                                            e.err_name.clone(),
-                                            e.err_msg.clone())),
-                    Ok(_) => (),
-                }
+        if !self.sock.is_empty() {
+            match self.sock.take().read_stop() {
+                Err(e) => return Err(MongoErr::new(
+                                        ~"conn::disconnect",
+                                        e.err_name.clone(),
+                                        e.err_msg.clone())),
+                Ok(_) => (),
             }
         }
-        *(self.sock) = None;
 
         Ok(())
     }
 
     pub fn send(&self, data : ~[u8]) -> Result<(), MongoErr> {
-        match *(self.sock) {
-            None => return Err(MongoErr::new(~"connection", ~"unknown send err", ~"cannot send on null socket")),
-            Some(sock) => {
-                match sock.write_future(data).get() {
-                    Err(e) => return Err(MongoErr::new(
-                                            ~"conn::send",
-                                            e.err_name.clone(),
-                                            e.err_msg.clone())),
-                    Ok(_) => Ok(()),
-                }
-            }
+        if self.sock.is_empty() {
+            return Err(MongoErr::new(
+                        ~"connection",
+                        ~"unknown send err",
+                        ~"cannot send on null socket"));
         }
+
+        let sock = self.sock.take();
+        let result = match sock.write_future(data).get() {
+            Err(e) => Err(MongoErr::new(
+                                    ~"conn::send",
+                                    e.err_name.clone(),
+                                    e.err_msg.clone())),
+            Ok(_) => Ok(()),
+        };
+
+        self.sock.put_back(sock);
+        result
     }
 
     pub fn recv(&self) -> Result<~[u8], MongoErr> {
          // sanity check and unwrap: should not send on an unconnected connection
-        match *(self.port) {
-            None => return Err(MongoErr::new(
-                                    ~"conn::recv",
-                                    ~"unknown recv err",
-                                    ~"cannot receive from null port")),
-            Some(port) => {
-                match port.recv() {
-                    Err(e) => Err(MongoErr::new(
-                                    ~"conn::recv",
-                                    e.err_name.clone(),
-                                    e.err_msg.clone())),
-                    Ok(msg) => Ok(msg),
-                }
-            }
+        if self.port.is_empty() {
+            return Err(MongoErr::new(
+                        ~"conn::recv",
+                        ~"unknown recv err",
+                        ~"cannot receive from null port"));
         }
+
+        let port = self.port.take();
+        let result = match port.recv() {
+            Err(e) => Err(MongoErr::new(
+                            ~"conn::recv",
+                            e.err_name.clone(),
+                            e.err_msg.clone())),
+            Ok(msg) => Ok(msg),
+        };
+
+        self.port.put_back(port);
+        result
     }
 }
 
@@ -161,10 +167,10 @@ impl NodeConnection {
         NodeConnection {
             server_ip_str : server_ip_str,
             server_port : server_port,
-            server_ip : @mut None,
+            server_ip : Cell::new_empty(),
             iotask : global_loop::get(),
-            sock : @mut None,
-            port : @mut None,
+            sock : Cell::new_empty(),
+            port : Cell::new_empty(),
             ping : Cell::new_empty(),
             tags : ~Cell::new(TagSet::new(~[])),
         }
