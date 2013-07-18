@@ -11,6 +11,9 @@ This library has been built on Rust version 0.7. If you are using a more up-to-d
 - [gcc](http://gcc.gnu.org)
 - [GNU Make](http://gnu.org/software/make)
 
+#### Documentation
+Please find documentation in the docs folder; BSON library documentation can be found [here](https://github.com/10gen-interns/mongo-rust-driver-prototype/tree/master/docs/bson) and Mongo library documentation can be found [here](https://github.com/10gen-interns/mongo-rust-driver-prototype/tree/master/docs/mongo). Documentation is built using rustdoc (please run ```make doc```).
+
 #### Building
 The Rust MongoDB driver is built using ```make```. Available targets include:
 - ```all``` (default) build binaries for ```bson``` and ```mongo```
@@ -209,7 +212,7 @@ Please refer to the documentation for a complete list of available operations.
 
 #### BSON library
 ##### BSON data types
-BSON-valid data items are represented in the ```Document``` type. (Valid types available from the [specification](http://bson-spec.org)).
+BSON-valid data items are represented in the ```Document``` type. (Valid types available from the [specification](http://bsonspec.org)).
 To get a document for one of these types, you can wrap it yourself or call the ```to_bson_t``` method.
 Example:
 ```rust
