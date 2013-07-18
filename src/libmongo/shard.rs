@@ -30,6 +30,9 @@ pub struct ShardController {
 
 impl ShardController {
 
+    ///Create a new ShardController.
+    ///Will fail if the given Client is not connected
+    ///to a mongos instance.
     pub fn new(client: @Client) -> ShardController {
         //check that client points to a mongos; fail if it doesn't
         //since a new method should not return a result (I think?)
@@ -44,6 +47,7 @@ impl ShardController {
             };
         ShardController { mongos: client }
     }
+
     /**
      * Enable sharding on the specified database.
      * The database must exist or this operation will fail.
@@ -74,6 +78,12 @@ impl ShardController {
         };
     }
 
+    ///Return a list of all shards on the current cluster.
+    pub fn list_shards(&self) -> Result<~BsonDocument, MongoErr> {
+        let admin = self.mongos.get_admin();
+        admin.run_command(SpecNotation("{ 'listShards': 1 }"))
+    }
+
     /**
      * Allow this shard controller to manage a new shard.
      * Hostname can be in a variety of formats:
@@ -84,7 +94,7 @@ impl ShardController {
      */
     pub fn add_shard(&self, hostname: ~str) -> Result<(), MongoErr> {
         let admin = self.mongos.get_admin();
-        match admin.run_command(SpecNotation(fmt!("{ 'addShard': '%s' }", copy hostname))) {
+        match admin.run_command(SpecNotation(fmt!("{ 'addShard': '%s' }", hostname))) {
             Ok(doc) => match *doc.find(~"ok").unwrap() {
                 Double(1f64) => return Ok(()),
                 Int32(1i32) => return Ok(()),
@@ -96,6 +106,16 @@ impl ShardController {
             },
             Err(e) => return Err(e)
         };
+    }
+
+    /**
+     * Begins removing a shard from this cluster.
+     * If called while a shard is being removed, will instead return
+     * a document describing the current removal status.
+     */
+    pub fn remove_shard(&self, shardname: ~str) -> Result<~BsonDocument, MongoErr> {
+        let db = self.mongos.get_admin();
+        db.run_command(SpecNotation(fmt!("{ 'removeShard': '%s' }", shardname)))
     }
 
     /**
@@ -140,6 +160,7 @@ impl ShardController {
             },
             Err(e) => return Err(e)
         };
+        //TODO finish this
         Ok(out)
      }
 
