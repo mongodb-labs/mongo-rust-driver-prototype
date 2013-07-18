@@ -81,7 +81,7 @@ impl ShardController {
     ///Return a list of all shards on the current cluster.
     pub fn list_shards(&self) -> Result<~BsonDocument, MongoErr> {
         let admin = self.mongos.get_admin();
-        admin.run_command(SpecNotation("{ 'listShards': 1 }"))
+        admin.run_command(SpecNotation(~"{ 'listShards': 1 }"))
     }
 
     /**
@@ -167,6 +167,8 @@ impl ShardController {
      ///Add a tag to the given shard.
      ///Requires MongoDB 2.2 or higher.
      pub fn add_shard_tag(&self, shard: ~str, tag: ~str) -> Result<(), MongoErr> {
+         let ch = self.mongos.check_version(~"2.2.0");
+         if ch.is_err() { return ch; }
         let config = DB::new(~"config", copy self.mongos);
         match config.get_collection(~"shards").find_one(
            Some(SpecNotation(fmt!("{ '_id': '%s' }", shard))), None, None) {
@@ -185,6 +187,8 @@ impl ShardController {
      ///Remove a tag from the given shard.
      ///Requires MongoDB 2.2 or higher.
      pub fn remove_shard_tag(&self, shard: ~str, tag: ~str) -> Result<(), MongoErr> {
+         let ch = self.mongos.check_version(~"2.2.0");
+         if ch.is_err() { return ch; }
         let config = DB::new(~"config", copy self.mongos);
         match config.get_collection(~"shards").find_one(
            Some(SpecNotation(fmt!("{ '_id': '%s' }", shard))), None, None) {
