@@ -160,4 +160,22 @@ impl ShardController {
             Err(e) => Err(e)
         }
      }
+
+     ///Remove a tag from the given shard.
+     ///Requires MongoDB 2.2 or higher.
+     pub fn remove_shard_tag(&self, shard: ~str, tag: ~str) -> Result<(), MongoErr> {
+        let config = DB::new(~"config", copy self.mongos);
+        match config.get_collection(~"shards").find_one(
+           Some(SpecNotation(fmt!("{ '_id': '%s' }", shard))), None, None) {
+            Ok(_) => (),
+            Err(e) => return Err(e)
+        }
+        match config.get_collection(~"shards").update(
+            SpecNotation(fmt!("{ '_id': '%s' }", shard)),
+            SpecNotation(fmt!("{ '$pull': { 'tags', '%s' } }", tag)),
+            None, None, None) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e)
+        }
+     }
 }
