@@ -199,11 +199,12 @@ impl NodeConnection {
      * Run admin isMaster command and pass document into callback to process.
      * Helper function.
      */
-    pub fn _check_master_and_do<T>(@self, cb : &fn(bson : &~BsonDocument) -> Result<T, MongoErr>)
+    pub fn _check_master_and_do<T>(&self, cb : &fn(bson : &~BsonDocument) -> Result<T, MongoErr>)
                 -> Result<T, MongoErr> {
         let client = @Client::new();
 
-        match client._connect_to_conn(~"client::connect", self as @Connection) {
+        let server = @NodeConnection::new(self.get_ip(), self.get_port());
+        match client._connect_to_conn(~"client::connect", server as @Connection) {
             Ok(_) => (),
             Err(e) => return Err(e),
         }

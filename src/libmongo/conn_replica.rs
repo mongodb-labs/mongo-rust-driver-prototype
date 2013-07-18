@@ -15,7 +15,9 @@
 
 use std::int;
 use std::cell::*;
+use std::comm::*;
 use extra::priority_queue::*;
+use extra::comm::*;
 
 use util::*;
 use conn::Connection;
@@ -40,12 +42,51 @@ pub struct ReplicaSetConnection {
     priv send_to : ~Cell<@NodeConnection>,                  // convenience
     priv recv_from : ~Cell<@NodeConnection>,                // XXX placeholder
     read_mode : ~Cell<READ_PREFERENCE>,*/
-    seed : ~[NodeConnection],
-    hosts: ~Cell<~[~PriorityQueue<@NodeConnection>]>,  // TODO RWARC?
-    hosts_unord : ~Cell<~[~[@NodeConnection]]>,        // TODO RWARC?
-    send_to : ~Cell<@NodeConnection>,                  // convenience
-    recv_from : ~Cell<@NodeConnection>,                // XXX placeholder
+    /*seed : ~[NodeConnection],
+    hosts : ~Cell<~[~PriorityQueue<NodeConnection>]>,  // TODO RWARC?*/
+    seed : ~[(~str, uint)],
+    host_list : ~Cell<~[~PriorityQueue<NodeConnectionData>]>,
+    send_to : ~Cell<NodeConnection>,
+    recv_from : ~Cell<NodeConnection>,
     read_mode : ~Cell<READ_PREFERENCE>,
+}
+
+struct NodeConnectionData {
+    ip : ~str,
+    port : uint,
+    ping : Option<uint>,
+    tagset : TagSet,
+}
+// Inequalities seem all backwards because max-heaps.
+impl Ord for NodeConnectionData {
+    pub fn lt(&self, other : &NodeConnectionData) -> bool {
+        match (self.ping, other.ping) {
+            (None, _) => true,
+            (Some(_), None) => false,
+            (Some(t1), Some(t2)) => t1 >= t2,
+        }
+    }
+    pub fn le(&self, other : &NodeConnectionData) -> bool {
+        match (self.ping, other.ping) {
+            (None, _) => true,
+            (Some(_), None) => false,
+            (Some(t1), Some(t2)) => t1 > t2,
+        }
+    }
+    pub fn gt(&self, other : &NodeConnectionData) -> bool {
+        match (self.ping, other.ping) {
+            (None, _) => false,
+            (Some(_), None) => true,
+            (Some(t1), Some(t2)) => t1 <= t2,
+        }
+    }
+    pub fn ge(&self, other : &NodeConnectionData) -> bool {
+        match (self.ping, other.ping) {
+            (None, _) => false,
+            (Some(_), None) => true,
+            (Some(t1), Some(t2)) => t1 < t2,
+        }
+    }
 }
 
 impl Connection for ReplicaSetConnection {
@@ -56,10 +97,10 @@ impl Connection for ReplicaSetConnection {
      * and records the primary and secondaries.
      */
     pub fn connect(&self) -> Result<(), MongoErr> {
-        if !self.hosts.is_empty() {
+        if !self.host_list.is_empty() {
             Err(MongoErr::new(~"conn_replica::connect", ~"already connected", ~""))
         } else {
-            self.reconnect()
+            ReplicaSetConnection::reconnect_with_seed(&self.seed)
         }
     }
 
@@ -69,7 +110,21 @@ impl Connection for ReplicaSetConnection {
     pub fn disconnect(&self) -> Result<(), MongoErr> {
         let mut err = ~"";
 
-        // disconnect from each of hosts; order doesn't matter here
+        if !self.send_to.is_empty() {
+            match self.send_to.take().disconnect() {
+                Ok(_) => (),
+                Err(e) => err.push_str(fmt!("\n\t%s", e.to_str())),
+            }
+        }
+
+        if !self.recv_from.is_empty() {
+            match self.recv_from.take().disconnect() {
+                Ok(_) => (),
+                Err(e) => err.push_str(fmt!("\n\t%s", e.to_str())),
+            }
+        }
+
+        /*// disconnect from each of hosts; order doesn't matter here
         if !self.hosts.is_empty() {
             let host_mat = self.hosts.take();
             for host_mat.iter().advance |&host_type| {
@@ -80,7 +135,7 @@ impl Connection for ReplicaSetConnection {
                     }
                 }
             }
-        }
+        }*/
         // XXX above dumb; would do below but cannot vec::concat
         //      since NodeConnection does not fufill Copy
         /*if !self.hosts.is_empty() {
@@ -92,10 +147,6 @@ impl Connection for ReplicaSetConnection {
                 }
             }
         }*/
-
-        // empty out send_to and recv_from
-        if !self.send_to.is_empty() { self.send_to.take(); }
-        if !self.recv_from.is_empty() { self.recv_from.take(); }
 
         match err.len() {
             0 => Ok(()),
@@ -109,55 +160,76 @@ impl Connection for ReplicaSetConnection {
     pub fn send(&self, data : ~[u8]) -> Result<(), MongoErr> {
         if self.send_to.is_empty() {
             return Err(MongoErr::new(
-                        ~"conn_replica::send",
-                        ~"no send_to server",
-                        ~"no server specified to which to send"));
+                            ~"conn_replica::send",
+                            ~"no send_to server",
+                            ~"no server specified to which to send"));
         }
-        let server = self.send_to.take();
 
-        if server.ping.is_empty() {
-            return Err(MongoErr::new(
-                        ~"conn_replica::send",
-                        ~"no send_to server",
-                        ~"server down"));
-        }
+        let server = self.send_to.take();
         let result = server.send(data);
         self.send_to.put_back(server);
         result
+
+/*
+        let hosts = self.hosts.take();
+        let result = {
+            if hosts[PRIMARY as int].len() != 1 {
+                return Err(MongoErr::new(
+                            ~"conn_replica::send",
+                            ~"no send_to server",
+                            ~"no server specified to which to send"));
+            }
+
+            let server = hosts[PRIMARY as int].top();
+
+            if server.ping.is_empty() {
+                return Err(MongoErr::new(
+                            ~"conn_replica::send",
+                            ~"no send_to server",
+                            ~"server down"));
+            }
+            server.send(data)
+        };
+        self.hosts.put_back(hosts);
+        result
+*/
     }
 
     pub fn recv(&self) -> Result<~[u8], MongoErr> {
-        match self._get_read_server() {
-            Ok(_) => (),
+        let server = match self._get_read_server() {
+            Ok(s) => s,
             Err(e) => return Err(e),
-        }
+        };
 
-        let server = self.recv_from.take();
-        let result = server.recv();
-        self.recv_from.put_back(server);
-        result
+        server.recv()
     }
 }
 
 impl ReplicaSetConnection {
     pub fn new(seed_pairs : ~[(~str, uint)]) -> ReplicaSetConnection {
-        let mut seed : ~[NodeConnection] = ~[];
+        /*let mut seed : ~[NodeConnection] = ~[];
         for seed_pairs.iter().advance |&(host, port)| {
             seed.push(NodeConnection::new(host.clone(), port));
         }
-        ReplicaSetConnection::new_from_conn(seed)
-    }
-
-    fn new_from_conn(seed : ~[NodeConnection]) -> ReplicaSetConnection {
+        ReplicaSetConnection::new_from_conn(seed)*/
         ReplicaSetConnection {
-            seed : seed,
-            hosts_unord : ~Cell::new_empty(),
-            hosts : ~Cell::new_empty(),
-            recv_from : ~Cell::new_empty(),
+            seed : seed_pairs,
+            host_list : ~Cell::new_empty(),
             send_to : ~Cell::new_empty(),
+            recv_from : ~Cell::new_empty(),
             read_mode : ~Cell::new(PRIMARY_ONLY),
         }
     }
+
+    /*fn new_from_conn(seed : ~[NodeConnection]) -> ReplicaSetConnection {
+        ReplicaSetConnection {
+            seed : seed,
+            host_list : ~Cell::new_empty(),
+            send_to : ~Cell::new_empty(),
+            recv_from : ~Cell::new_empty(),
+            read_mode : ~Cell::new(PRIMARY_ONLY),
+        }
+    }*/
 
     /*pub fn add_node(&mut self, node : NodeConnection, server_type : ServerType) {
     }*/
@@ -166,7 +238,34 @@ impl ReplicaSetConnection {
      * Reconnects to the ReplicaSetConnection.
      */
     // XXX
-    pub fn reconnect(&self) -> Result<(), MongoErr> {
+    fn reconnect_with_seed(seed : &~[(~str, uint)]) -> Result<(), MongoErr> {
+        let mut host_list : ~[~PriorityQueue<NodeConnectionData>] = ~[];
+        for NSERVER_TYPES.times {
+            host_list.push(~PriorityQueue::new::<NodeConnectionData>());
+        }
+
+        let (port_hosts, chan_hosts) = stream();
+        let chan_hosts = SharedChan::new(chan_hosts);
+        for seed.iter().advance |&pair| {
+            let (port_pairs, chan_pairs) = stream();
+            let chan_hosts_tmp = chan_hosts.clone();
+
+            // spawn a new thread to get host list
+            chan_pairs.send(pair.clone());
+            do spawn {
+                let (ip, port_no) = port_pairs.recv();
+                let server = NodeConnection::new(ip, port_no);
+                let host_list = match server._check_master_and_do (
+                    
+                ) {
+
+                };
+                chan_hosts_tmp.send(~[(~"foo", 0), (~"bar", 1)]);
+            }
+        }
+
+        Ok(())
+/*
         let mut host_list : ~[(~str, uint)] = ~[];
         let mut hosts : ~[~PriorityQueue<@NodeConnection>] = ~[];
         for NSERVER_TYPES.times {
@@ -330,10 +429,12 @@ impl ReplicaSetConnection {
         };
 
         result
+        */
     }
 
-    pub fn _get_read_server(&self) -> Result<(), MongoErr> {
-        let pref =  if !self.read_mode.is_empty() {
+    pub fn _get_read_server(&self) -> Result<&NodeConnection, MongoErr> {
+        Err(MongoErr::new(~"", ~"", ~""))
+        /*let pref =  if !self.read_mode.is_empty() {
             self.read_mode.take()
         } else {
             return Err(MongoErr::new(
@@ -412,11 +513,13 @@ impl ReplicaSetConnection {
         self.read_mode.put_back(pref);
 
         Ok(())
+        */
     }
-    /**
+    /*
      * Find server from which to read, given a list of
      * (available) servers and an optional list of tagsets.
      */
+/*
     fn _find_server(&self,  pref : ~str,
                             servers : ~[@NodeConnection],
                             tagsets : &Option<~[TagSet]>)
@@ -448,6 +551,7 @@ impl ReplicaSetConnection {
                 ~"could not find server matching tagset",
                 fmt!("tagset: %?, preference: %?", ts_list, pref)))
     }
+    */
 
     /**
      * Parse host string found from isMaster command into host and port
