@@ -79,10 +79,10 @@ impl Connection for NodeConnection {
                                     e.err_msg.clone())),
             Ok(port) => port as @GenericPort<PortResult>,
         };
+        self.port.put_back(tmp_port);
 
         // hand initialized fields to self
         self.sock.put_back(tmp_sock);
-        self.port.put_back(tmp_port);
         self.server_ip.put_back(tmp_ip);
 
         Ok(())
@@ -107,7 +107,7 @@ impl Connection for NodeConnection {
         Ok(())
     }
 
-    pub fn send(&self, data : ~[u8]) -> Result<(), MongoErr> {
+    pub fn send(&self, data : ~[u8], _ : bool) -> Result<(), MongoErr> {
         if self.sock.is_empty() {
             return Err(MongoErr::new(
                         ~"connection",
@@ -168,7 +168,7 @@ impl NodeConnection {
             server_ip_str : server_ip_str,
             server_port : server_port,
             server_ip : Cell::new_empty(),
-            iotask : global_loop::get(),
+            iotask : global_loop::get().clone(),
             sock : Cell::new_empty(),
             port : Cell::new_empty(),
             ping : Cell::new_empty(),

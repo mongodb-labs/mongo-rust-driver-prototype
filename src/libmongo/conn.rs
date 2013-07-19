@@ -47,6 +47,6 @@ impl Socket for TcpSocket {
 pub trait Connection {
     fn connect(&self) -> Result<(), MongoErr>;
     fn disconnect(&self) -> Result<(), MongoErr>;
-    fn send(&self, data : ~[u8]) -> Result<(), MongoErr>;
+    fn send(&self, data : ~[u8], read : bool) -> Result<(), MongoErr>;
     fn recv(&self) -> Result<~[u8], MongoErr>;
 }

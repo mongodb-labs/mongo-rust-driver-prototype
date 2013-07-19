@@ -21,7 +21,7 @@ use bson::encode::*;
  * Utility module for use internal and external to crate.
  * Users must access functionality for proper use of options, etc.
  */
-
+#[deriving(Clone)]
 pub struct MongoErr {
     //err_code : int,
     err_type : ~str,
@@ -118,8 +118,18 @@ pub enum QuerySpec {
     SpecNotation(~str)
 }
 
+#[deriving(Eq)]
 pub struct TagSet {
     tags : TreeMap<~str, ~str>,
+}
+impl Clone for TagSet {
+    pub fn clone(&self) -> TagSet {
+        let mut tags = TreeMap::new();
+        for self.tags.iter().advance |(&k,&v)| {
+            tags.insert(k.clone(), v.clone());
+        }
+        TagSet { tags : tags }
+    }
 }
 impl TagSet {
     pub fn new(tag_list : ~[(~str, ~str)]) -> TagSet {
@@ -185,6 +195,7 @@ pub enum WRITE_CONCERN {
     FSYNC(bool),        // wait for write to disk?
 }
 
+#[deriving(Clone, Eq)]
 pub enum READ_PREFERENCE {
     PRIMARY_ONLY,
     PRIMARY_PREF(Option<~[TagSet]>),
@@ -192,9 +203,6 @@ pub enum READ_PREFERENCE {
     SECONDARY_PREF(Option<~[TagSet]>),
     NEAREST(Option<~[TagSet]>),
 }
-/*pub struct HostTags {
-    tags : ~[],
-}*/
 
 /**
  * Indexing.

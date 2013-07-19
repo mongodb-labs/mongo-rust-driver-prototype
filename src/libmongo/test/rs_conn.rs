@@ -12,6 +12,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+use extra::uv::*;
+use extra::timer::*;
+
 use mongo::client::*;
 use mongo::coll::*;
 use mongo::util::*;
@@ -27,26 +30,28 @@ fn test_rs_conn() {
         Err(e) => fail!("%s", e.to_str()),
     }
 
-    let coll = @Collection::new(~"rust", ~"good_insert_one", client);
+    let coll = Collection::new(~"rust", ~"good_insert_one", client);
 
     // clear out collection to start from scratch
     //coll.remove(None, None, None, None);
 
     // create and insert document
-    let ins = ~"{ \"a\":0, \"msg\":\"first insert!\" }";
+    let ins = ~"{ 'a':0, 'msg':'first insert!' }";
     let ins_doc = match (copy ins).to_bson_t() {
             Embedded(bson) => *bson,
             _ => fail!("what happened"),
         };
-    coll.insert::<~str>(ins, None);
+    coll.insert::<~str>(ins, Some(~[W_N(0)]));
 
-/*
+//    let iotask = global_loop::get();
+ //   sleep(&iotask, 1000);
+
     // try to extract it and compare
     match coll.find_one(None, None, None) {
-        Ok(ret_doc) => assert!(*ret_doc == ins_doc),
+        //Ok(ret_doc) => assert!(*ret_doc == ins_doc),
+        Ok(ret_doc) => println(fmt!("%?\n", *ret_doc)),
         Err(e) => fail!("%s", e.to_str()),
     }
-*/
 
     match client.disconnect() {
         Ok(_) => (),
