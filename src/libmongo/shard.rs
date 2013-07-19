@@ -154,12 +154,23 @@ impl ShardController {
         out.push_str(~"  shards:\n");
         match config.get_collection(~"shards").find(None, None, None) {
             Ok(ref mut c) => {
-                for c.advance() |sh| {
-                    out.push_str(fmt!("%s\n", sh.to_str()));
+                for c.advance |sh| {
+                    out.push_str(fmt!("\t%s\n", sh.to_str()));
                 }
             },
             Err(e) => return Err(e)
         };
+        out.push_str(~"  databases:\n");
+        match config.get_collection(~"databases").find(None,
+            None, None) {
+            Ok(ref mut c) => {
+                for c.advance |d| {
+                    out.push_str(fmt!("\t%s\n", d.to_str()));
+                    //TODO chunk info
+                }
+            }
+            Err(e) => return Err(e)
+        }
         //TODO finish this
         Ok(out)
      }

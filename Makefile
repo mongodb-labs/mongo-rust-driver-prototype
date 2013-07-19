@@ -12,17 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Rust compilation
 RC = rustc
 RDOC = rustdoc
 RDOCFLAGS = --output-style doc-per-mod --output-format markdown
+FLAGS = -Z debug-info -L ./bin -D unused-unsafe -A unnecessary-allocation $(TOOLFLAGS)
+
+# C compilation
 CC = gcc
 AR = ar rcs
-FLAGS = -Z debug-info -L ./bin -D unused-unsafe -A unnecessary-allocation $(TOOLFLAGS)
 CFLAGS = -c -g -Wall -Werror
+
+# Programs and utilities
 RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
+START_SHARDS = ./.start_shards
+CLOSE_SHARDS = ./.close_shards
 
+# Directories
 SRC = ./src
 LIB = ./lib
 BSONDIR = ./src/libbson
@@ -32,7 +40,9 @@ BIN = ./bin
 TEST = ./test
 DOCS = ./docs
 
+# Variables
 MONGOTEST = 0
+TOOLFLAGS =
 
 .PHONY: test
 
@@ -59,9 +69,24 @@ test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 
 check: test
 ifeq ($(MONGOTEST),1)
+	$(MKDIR) src/libmongo/test/s1
+	$(MKDIR) src/libmongo/test/s2
+	$(MKDIR) src/libmongo/test/cfg1
+	$(MKDIR) src/libmongo/test/cfg2
+	$(MKDIR) src/libmongo/test/cfg3
+	$(START_SHARDS)
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 	$(TEST)/driver_test
+	$(CLOSE_SHARDS)
+	$(RM) src/libmongo/test/*.log
+	$(RM) src/libmongo/test/mongos.log*
+	$(RM) -rf src/libmongo/test/s1
+	$(RM) -rf src/libmongo/test/s2
+	$(RM) -rf src/libmongo/test/cfg1
+	$(RM) -rf src/libmongo/test/cfg2
+	$(RM) -rf src/libmongo/test/cfg3
+	#$(RM) .shard.tmp
 else
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
