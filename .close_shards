@@ -1,0 +1,10 @@
+#!/usr/bin/python
+import subprocess
+
+f = open('.shard.tmp', 'r').readlines()
+
+for line in f:
+    try:
+        subprocess.check_output(['kill', '-9', line.strip()])
+    except:
+        pass
