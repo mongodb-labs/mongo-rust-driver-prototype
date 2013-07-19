@@ -27,14 +27,15 @@ CFLAGS = -c -g -Wall -Werror
 RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
-START_SHARDS = ./.start_shards
-CLOSE_SHARDS = ./.close_shards
+START_SHARDS = ./tools/start_testdb.py
+CLOSE_SHARDS = ./tools/close_testdb.py
 
 # Directories
 SRC = ./src
 LIB = ./lib
 BSONDIR = ./src/libbson
 MONGODIR = ./src/libmongo
+TOOLDIR = ./tools
 EXDIR = ./examples
 BIN = ./bin
 TEST = ./test
@@ -69,24 +70,11 @@ test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 
 check: test
 ifeq ($(MONGOTEST),1)
-	$(MKDIR) src/libmongo/test/s1
-	$(MKDIR) src/libmongo/test/s2
-	$(MKDIR) src/libmongo/test/cfg1
-	$(MKDIR) src/libmongo/test/cfg2
-	$(MKDIR) src/libmongo/test/cfg3
-	$(START_SHARDS)
+	python $(START_SHARDS)
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 	$(TEST)/driver_test
-	$(CLOSE_SHARDS)
-	$(RM) src/libmongo/test/*.log
-	$(RM) src/libmongo/test/mongos.log*
-	$(RM) -rf src/libmongo/test/s1
-	$(RM) -rf src/libmongo/test/s2
-	$(RM) -rf src/libmongo/test/cfg1
-	$(RM) -rf src/libmongo/test/cfg2
-	$(RM) -rf src/libmongo/test/cfg3
-	#$(RM) .shard.tmp
+	python $(CLOSE_SHARDS)
 else
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
