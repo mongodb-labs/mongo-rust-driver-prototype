@@ -3,5 +3,4 @@
 *.bin
 *.o
 bin/
-docs/
 test/
