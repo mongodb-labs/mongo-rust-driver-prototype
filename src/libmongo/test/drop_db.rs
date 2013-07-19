@@ -38,6 +38,7 @@ fn test_drop_db() {
         Ok(_) => (),
         Err(e) => fail!("%s", e.to_str()),
     };
+
     // oddly, should succeed (double drop of db ok)
     match client.drop_db(db.clone()) {
         Ok(_) => (),
@@ -49,7 +50,7 @@ fn test_drop_db() {
         Err(e) => fail!("%s", e.to_str()),
     };
 
-    assert!(cur_dbs.len() == all_dbs.len()-1);
+    assert!(cur_dbs.len() <= all_dbs.len());
 
     match client.disconnect() {
         Ok(_) => (),
