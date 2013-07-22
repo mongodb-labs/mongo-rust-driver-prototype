@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-#[link(name="mongo", vers="0.1", author="jaoke.chinlee@10gen.com, austin.estep@10gen.com")];
+#[link(name="mongo", vers="0.1.0", author="jaoke.chinlee@10gen.com, austin.estep@10gen.com")];
 #[comment="a huMONGOus crate"];
 #[license="Apache 2.0"];
 #[crate_type="lib"];
