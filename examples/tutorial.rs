@@ -28,7 +28,7 @@ fn main() {
     // To connect to an unreplicated, unsharded server running on localhost, port 27017 (```MONGO_DEFAULT_PORT```), we use the ```connect``` method:
     match client.connect(~"127.0.0.1", 27017 as uint) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),
+        Err(e) => fail!("%s", e.to_str()),
             // if cannot connect, nothing to do; display error message
     }
 
@@ -62,7 +62,7 @@ fn main() {
     // read one back (no specific query or query options/flags)
     match foo.find_one(None, None, None) {
         Ok(ret_doc) => println(fmt!("%?", *ret_doc)),
-        Err(e) => fail!("%s", MongoErr::to_str(e)), // should not happen
+        Err(e) => fail!("%s", e.to_str()), // should not happen
     }
 
     // In general, to specify options, we put the appropriate options into a vector and wrap them in ```Some```; for the default options we use ```None```. For specific options, see ```util.rs```. Nearly every method returns a ```Result```; operations usually return a ```()``` (for writes) or some variant on ```~BsonDocument``` or ```Cursor``` (for reads) if successful, and a ```MongoErr``` if unsuccessful due to improper arguments, network errors, etc.
@@ -73,21 +73,22 @@ fn main() {
         i += 1;
     }
 
+    // run with only one of the below uncommented
     // ***error returned***
     match foo.insert_batch(ins_batch, None, None, None) {
         Ok(_) => fail!("bad insert succeeded"),          // should not happen
-        Err(e) => println(fmt!("%s", MongoErr::to_str(e))),
+        Err(e) => println(fmt!("%s", e.to_str())),
     }
     // ***no error returned since duplicated _ids skipped (CONT_ON_ERR specified)***
-    match foo.insert_batch(ins_batch, Some(~[CONT_ON_ERR]), None, None) {
+    /*match foo.insert_batch(ins_batch, Some(~[CONT_ON_ERR]), None, None) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
-    }
+        Err(e) => fail!("%s", e.to_str()),     // should not happen
+    }*/
 
     // create an ascending index on the "b" field named "fubar"
     match foo.create_index(~[NORMAL(~[(~"b", ASC)])], None, Some(~[INDEX_NAME(~"fubar")])) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
+        Err(e) => fail!("%s", e.to_str()),     // should not happen
     }
 
     // ##### Cursor and Query-related Operations
@@ -111,7 +112,7 @@ fn main() {
                 println(fmt!("%?", *doc));
             }
         }
-        Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
+        Err(e) => fail!("%s", e.to_str()),     // should not happen
     }
 
     // drop the index by name (if it were not given a name, specifying by
@@ -119,13 +120,13 @@ fn main() {
     //      constructed name)
     match foo.drop_index(MongoIndexName(~"fubar")) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
+        Err(e) => fail!("%s", e.to_str()),     // should not happen
     }
 
     // remove every element where "a" is 1
     match foo.remove(Some(SpecNotation(~"{ \"a\":1 }")), None, None, None) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
+        Err(e) => fail!("%s", e.to_str()),     // should not happen
     }
 
     // upsert every element where "a" is 2 to be 3
@@ -133,7 +134,7 @@ fn main() {
                         SpecNotation(~"{ \"$set\": { \"a\":3 } }"),
                         Some(~[MULTI, UPSERT]), None, None) {
         Ok(_) => (),
-        Err(e) => fail!("%s", MongoErr::to_str(e)),     // should not happen
+        Err(e) => fail!("%s", e.to_str()),     // should not happen
     }
 
     // ##### Database Operations
@@ -149,7 +150,7 @@ fn main() {
             //      foo_coll
             for names.iter().advance |&n| { println(fmt!("%s", n)); }
         }
-        Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+        Err(e) => println(fmt!("%s", e.to_str())), // should not happen
     }
 
     // perform a run_command, but the result (if successful, a ~BsonDocument)
@@ -159,12 +160,12 @@ fn main() {
     // drop the database
     match client.drop_db(~"foo_db") {
         Ok(_) => (),
-        Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+        Err(e) => println(fmt!("%s", e.to_str())), // should not happen
     }
 
     // Finally, we should disconnect the client. It can be reconnected to another server after disconnection.
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => println(fmt!("%s", MongoErr::to_str(e))), // should not happen
+        Err(e) => println(fmt!("%s", e.to_str())), // should not happen
     }
 }

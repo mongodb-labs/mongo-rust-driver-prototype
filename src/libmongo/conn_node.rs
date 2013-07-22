@@ -25,8 +25,6 @@ use client::Client;
 
 use bson::encode::*;
 
-pub type PortResult = Result<~[u8], TcpErrData>;
-
 /**
  * Connection between Client and Server. Routes user requests to
  * server and hands back wrapped result for Client to parse.
@@ -55,7 +53,7 @@ impl Connection for NodeConnection {
         }
 
         // parse IP addr
-        let tmp_ip = match v4::try_parse_addr(self.server_ip_str) {
+        let ip = match v4::try_parse_addr(self.server_ip_str) {
             Err(e) => return Err(MongoErr::new(
                                     ~"conn::connect",
                                     ~"IP parse err",
@@ -65,29 +63,97 @@ impl Connection for NodeConnection {
 
         // set up the socket --- for now, just v4
         // XXX
-        let tmp_sock = match connect(tmp_ip, self.server_port, &self.iotask) {
+        let sock = match connect(ip, self.server_port, &self.iotask) {
             Err(GenericConnectErr(ename, emsg)) => return Err(MongoErr::new(~"conn::connect", ename, emsg)),
             Err(ConnectionRefused) => return Err(MongoErr::new(~"conn::connect", ~"EHOSTNOTFOUND", ~"Invalid IP or port")),
             Ok(sock) => @sock as @Socket
         };
 
         // start the read port
-        let tmp_port = match tmp_sock.read_start() {
+        let port = match sock.read_start() {
             Err(e) => return Err(MongoErr::new(
                                     ~"conn::connect",
                                     e.err_name.clone(),
                                     e.err_msg.clone())),
-            Ok(port) => port as @GenericPort<PortResult>,
+            Ok(p) => p as @GenericPort<PortResult>,
         };
-        self.port.put_back(tmp_port);
 
         // hand initialized fields to self
-        self.sock.put_back(tmp_sock);
-        self.server_ip.put_back(tmp_ip);
+        self.sock.put_back(sock);
+        self.port.put_back(port);
+        self.server_ip.put_back(ip);
 
         Ok(())
     }
 
+    /**
+     * "Fire and forget" asynchronous write to server of given data.
+     *
+     * # Arguments
+     * * `data` - bytes to send
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * uninitialized socket
+     * * network
+     */
+    pub fn send(&self, data : ~[u8], _ : bool) -> Result<(), MongoErr> {
+        if self.sock.is_empty() {
+            return Err(MongoErr::new(~"connection", ~"unknown send err", ~"cannot send on null socket"));
+        } else {
+            let sock = self.sock.take();
+            let result = match sock.write_future(data).get() {
+                Err(e) => Err(MongoErr::new(
+                                    ~"conn::send",
+                                    e.err_name.clone(),
+                                    e.err_msg.clone())),
+                Ok(_) => Ok(()),
+            };
+            self.sock.put_back(sock);
+            result
+        }
+    }
+
+    /**
+     * Pick up a response from the server.
+     *
+     * # Returns
+     * bytes received on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * uninitialized port
+     * * network
+     */
+    pub fn recv(&self) -> Result<~[u8], MongoErr> {
+         // sanity check and unwrap: should not send on an unconnected connection
+        if self.port.is_empty() {
+            return Err(MongoErr::new(
+                            ~"conn::recv",
+                            ~"unknown recv err",
+                            ~"cannot receive from null port"));
+        } else {
+            let port = self.port.take();
+            let result = match port.recv() {
+                Err(e) => Err(MongoErr::new(
+                                ~"conn::recv",
+                                e.err_name.clone(),
+                                e.err_msg.clone())),
+                Ok(msg) => Ok(msg),
+            };
+            self.port.put_back(port);
+            result
+        }
+    }
+
+    /**
+     * Disconnect from the server.
+     * Succeeds even if not originally connected.
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
     pub fn disconnect(&self) -> Result<(), MongoErr> {
         // NO sanity check: don't really care if disconnect unconnected connection
 
@@ -105,49 +171,6 @@ impl Connection for NodeConnection {
         }
 
         Ok(())
-    }
-
-    pub fn send(&self, data : ~[u8], _ : bool) -> Result<(), MongoErr> {
-        if self.sock.is_empty() {
-            return Err(MongoErr::new(
-                        ~"connection",
-                        ~"unknown send err",
-                        ~"cannot send on null socket"));
-        }
-
-        let sock = self.sock.take();
-        let result = match sock.write_future(data).get() {
-            Err(e) => Err(MongoErr::new(
-                                    ~"conn::send",
-                                    e.err_name.clone(),
-                                    e.err_msg.clone())),
-            Ok(_) => Ok(()),
-        };
-
-        self.sock.put_back(sock);
-        result
-    }
-
-    pub fn recv(&self) -> Result<~[u8], MongoErr> {
-         // sanity check and unwrap: should not send on an unconnected connection
-        if self.port.is_empty() {
-            return Err(MongoErr::new(
-                        ~"conn::recv",
-                        ~"unknown recv err",
-                        ~"cannot receive from null port"));
-        }
-
-        let port = self.port.take();
-        let result = match port.recv() {
-            Err(e) => Err(MongoErr::new(
-                            ~"conn::recv",
-                            e.err_name.clone(),
-                            e.err_msg.clone())),
-            Ok(msg) => Ok(msg),
-        };
-
-        self.port.put_back(port);
-        result
     }
 }
 
@@ -339,11 +362,12 @@ impl Ord for NodeConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use conn::*;
     use std::comm::GenericPort;
+    use std::cell::*;
     use extra::net::tcp::*;
     use extra::future;
     use mockable::*;
+    use conn::*;
 
     struct MockPort {
         state: int
@@ -384,7 +408,7 @@ mod tests {
     fn test_connect_preexisting_socket() {
         let s: @Socket = @MockSocket {state: 1} as @Socket;
         let mut conn = NodeConnection::new(~"foo", 42);
-        conn.sock = @mut Some(s);
+        conn.sock = Cell::new(s);
         assert!(conn.connect().is_err());
     }
 
@@ -397,23 +421,23 @@ mod tests {
     #[test]
     fn test_send_null_sock() {
         let conn = NodeConnection::new(~"foo", 42);
-        assert!(conn.send(~[0u8]).is_err());
+        assert!(conn.send(~[0u8], false).is_err());
     }
 
     #[test]
     fn test_send_write_future_err() {
         let mut conn = NodeConnection::new(~"foo", 42);
         let s: @Socket = @MockSocket {state: 1} as @Socket;
-        conn.sock = @mut Some(s);
-        assert!(conn.send(~[0u8]).is_err());
+        conn.sock = Cell::new(s);
+        assert!(conn.send(~[0u8], false).is_err());
     }
 
     #[test]
     fn test_send_write_future() {
         let mut conn = NodeConnection::new(~"foo", 42);
         let s: @Socket = @MockSocket {state: 0} as @Socket;
-        conn.sock = @mut Some(s);
-        assert!(conn.send(~[0u8]).is_ok());
+        conn.sock = Cell::new(s);
+        assert!(conn.send(~[0u8], false).is_ok());
     }
 
     #[test]
@@ -427,7 +451,7 @@ mod tests {
 
         let mut conn = NodeConnection::new(~"foo", 42);
         let p: @GenericPort<PortResult> = @MockPort {state: 1} as @GenericPort<PortResult>;
-        conn.port = @mut Some(p);
+        conn.port = Cell::new(p);
         assert!(conn.recv().is_err());
     }
 
@@ -435,7 +459,7 @@ mod tests {
     fn test_recv_read() {
         let mut conn = NodeConnection::new(~"foo", 42);
         let p: @GenericPort<PortResult> = @MockPort {state: 0} as @GenericPort<PortResult>;
-        conn.port = @mut Some(p);
+        conn.port = Cell::new(p);
         assert!(conn.recv().is_ok());
     }
 
@@ -443,7 +467,7 @@ mod tests {
     fn test_disconnect_no_socket() {
         let conn = NodeConnection::new(~"foo", 42);
         let e = conn.disconnect();
-        assert!(conn.sock.is_none());
+        assert!(conn.sock.is_empty());
         assert!(e.is_ok());
     }
 
@@ -451,9 +475,9 @@ mod tests {
     fn test_disconnect_read_stop_err() {
         let mut conn = NodeConnection::new(~"foo", 42);
         let s: @Socket = @MockSocket {state: 1} as @Socket;
-        conn.sock = @mut Some(s);
+        conn.sock = Cell::new(s);
         let e = conn.disconnect();
-        assert!(!(conn.sock.is_none()));
+        assert!(conn.sock.is_empty());
         assert!(e.is_err());
     }
 
@@ -461,9 +485,9 @@ mod tests {
     fn test_disconnect_read_stop() {
         let mut conn = NodeConnection::new(~"foo", 42);
         let s: @Socket = @MockSocket {state: 0} as @Socket;
-        conn.sock = @mut Some(s);
+        conn.sock = Cell::new(s);
         let e = conn.disconnect();
-        assert!(conn.sock.is_none());
+        assert!(conn.sock.is_empty());
         assert!(e.is_ok());
     }
 }
