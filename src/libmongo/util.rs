@@ -255,7 +255,7 @@ pub enum COLLECTION_OPTION {
  */
 pub static LITTLE_ENDIAN_TRUE : bool = true;
 pub static MONGO_DEFAULT_PORT : uint = 27017;
-pub static MONGO_RECONN_MSECS : uint = 1000*60*5;   // 5min
+pub static MONGO_RECONN_MSECS : uint = (1000*60*5); // 5min
 
 /// INTERNAL UTILITIES
 /**

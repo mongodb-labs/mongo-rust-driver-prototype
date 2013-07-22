@@ -33,7 +33,6 @@ pub struct NodeConnection {
     priv server_ip_str : ~str,
     priv server_port : uint,
     priv server_ip : Cell<IpAddr>,
-    priv iotask : iotask::IoTask,
     priv sock : Cell<@Socket>,
     //priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
     priv port : Cell<@GenericPort<PortResult>>,
@@ -63,7 +62,7 @@ impl Connection for NodeConnection {
 
         // set up the socket --- for now, just v4
         // XXX
-        let sock = match connect(ip, self.server_port, &self.iotask) {
+        let sock = match connect(ip, self.server_port, &global_loop::get()) {
             Err(GenericConnectErr(ename, emsg)) => return Err(MongoErr::new(~"conn::connect", ename, emsg)),
             Err(ConnectionRefused) => return Err(MongoErr::new(~"conn::connect", ~"EHOSTNOTFOUND", ~"Invalid IP or port")),
             Ok(sock) => @sock as @Socket
@@ -191,7 +190,6 @@ impl NodeConnection {
             server_ip_str : server_ip_str,
             server_port : server_port,
             server_ip : Cell::new_empty(),
-            iotask : global_loop::get().clone(),
             sock : Cell::new_empty(),
             port : Cell::new_empty(),
             ping : Cell::new_empty(),

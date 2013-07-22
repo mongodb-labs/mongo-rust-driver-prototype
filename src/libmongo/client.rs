@@ -33,7 +33,7 @@ use coll::Collection;
  * `Collection`, etc. all store their associated `Client`
  */
 pub struct Client {
-    conn : ~cell::Cell<@Connection>,
+    priv conn : ~cell::Cell<@Connection>,
     priv cur_requestId : ~cell::Cell<i32>,      // first unused requestId
     // XXX index cache?
 }
@@ -238,10 +238,15 @@ impl Client {
      * () on success, MongoErr on failure
      */
     // TODO uri parsing
-    pub fn connect_to_rs(&self, seed : ~[(~str, uint)]) -> Result<(), MongoErr> {
-        self._connect_to_conn(  ~"client::connect_to_rs",
-                                @ReplicaSetConnection::new(seed)
-                                    as @Connection)
+    pub fn connect_to_rs(&self, seed : ~[(~str, uint)]) -> Result<@ReplicaSetConnection, MongoErr> {
+        let tmp = @ReplicaSetConnection::new(seed);
+        match self._connect_to_conn(  ~"client::connect_to_rs",
+                                //@ReplicaSetConnection::new(seed)
+                                tmp
+                                    as @Connection) {
+            Ok(_) => Ok(tmp),
+            Err(e) => Err(e)
+        }
     }
 
     /**
