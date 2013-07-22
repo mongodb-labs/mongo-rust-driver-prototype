@@ -2,7 +2,8 @@ MongoDB Rust Driver Prototype
 =============================
 
 This is a prototype version of a MongoDB driver for the Rust programming language.
-This library has been built on Rust version 0.7. If you are using a more up-to-date version of Rust, the project may not build correctly.
+
+This library has been built on Rust version 0.7. If you are using a different version of Rust, it may not build correctly.
 
 ## Installation
 
@@ -10,6 +11,7 @@ This library has been built on Rust version 0.7. If you are using a more up-to-d
 - [Rust](http://rust-lang.org) 0.7 (WARNING: will likely not build on other versions)
 - [gcc](http://gcc.gnu.org)
 - [GNU Make](http://gnu.org/software/make)
+- [Pandoc](http://johnmcfarlane.net/pandoc) for generating docs
 
 #### Documentation
 Please find documentation in the docs folder; BSON library documentation can be found [here](https://github.com/10gen-interns/mongo-rust-driver-prototype/tree/master/docs/bson) and Mongo library documentation can be found [here](https://github.com/10gen-interns/mongo-rust-driver-prototype/tree/master/docs/mongo). Documentation is built using rustdoc (please run ```make doc```).

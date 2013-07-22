@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-#[link(name="bson", vers="0.1", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
+#[link(name="bson", vers="0.1.0", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
 #[crate_type="lib"];
 #[license="Apache 2.0"];
 
