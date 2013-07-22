@@ -117,7 +117,7 @@ impl DB {
         let mut names : ~[~str] = ~[];
 
         // query on namespace collection
-        let coll = @Collection::new(copy self.name, fmt!("%s", SYSTEM_NAMESPACE), self.client);
+        let coll = Collection::new(copy self.name, fmt!("%s", SYSTEM_NAMESPACE), self.client);
         let mut cur = match coll.find(None, None, None) {
             Ok(cursor) => cursor,
             Err(e) => return Err(e),

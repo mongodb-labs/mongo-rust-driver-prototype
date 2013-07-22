@@ -21,6 +21,7 @@ use bson::encode::*;
 use util::*;
 use msg::*;
 use conn::*;
+use conn_node::*;
 use db::DB;
 use coll::Collection;
 
@@ -251,10 +252,10 @@ impl Client {
     // TODO check_primary for replication purposes?
     pub fn _send_msg(@self, msg : ~[u8],
                             wc_pair : (&~str, Option<~[WRITE_CONCERN]>),
-                            auto_get_reply : bool)
+                            read : bool)
                 -> Result<Option<ServerMsg>, MongoErr> {
         // first send message, exiting if network error
-        match self.send(msg) {
+        match self.send(msg, read) {
             Ok(_) => (),
             Err(e) => return Err(MongoErr::new(
                                     ~"client::_send_msg",
@@ -263,7 +264,7 @@ impl Client {
         }
 
         // handle write concern or handle query as appropriate
-        if !auto_get_reply {
+        if !read {
             // requested write concern
             let (db_str, wc) = wc_pair;
             let db = DB::new(copy *db_str, self);
@@ -341,7 +342,7 @@ impl Client {
      * * not connected
      * * network
      */
-    pub fn send(&self, bytes : ~[u8]) -> Result<(), MongoErr> {
+    pub fn send(&self, bytes : ~[u8], read : bool) -> Result<(), MongoErr> {
         if self.conn.is_empty() {
             Err(MongoErr::new(
                     ~"client::send",
@@ -349,7 +350,7 @@ impl Client {
                     ~"attempted to send on nonexistent connection"))
         } else {
             let tmp = self.conn.take();
-            let result = tmp.send(bytes);
+            let result = tmp.send(bytes, read);
             self.conn.put_back(tmp);
             result
         }
