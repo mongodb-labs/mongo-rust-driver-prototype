@@ -126,7 +126,7 @@ impl Connection for NodeConnection {
      * * uninitialized port
      * * network
      */
-    pub fn recv(&self) -> Result<~[u8], MongoErr> {
+    pub fn recv(&self, _ : bool) -> Result<~[u8], MongoErr> {
          // sanity check and unwrap: should not send on an unconnected connection
         if self.port.is_empty() {
             return Err(MongoErr::new(

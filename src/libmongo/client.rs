@@ -305,7 +305,7 @@ impl Client {
             }
         } else {
             // requested query
-            match self._recv_msg() {
+            match self._recv_msg(read) {
                 Ok(m) => Ok(Some(m)),
                 Err(e) => Err(MongoErr::new(
                                     ~"client::_send_msg",
@@ -326,9 +326,9 @@ impl Client {
      * * server returned message with error flags
      * * network
      */
-    fn _recv_msg(&self) -> Result<ServerMsg, MongoErr> {
+    fn _recv_msg(&self, read : bool) -> Result<ServerMsg, MongoErr> {
         // receive message
-        let m = match self.recv() {
+        let m = match self.recv(read) {
             Ok(bytes) => match parse_reply(bytes) {
                 Ok(m_tmp) => m_tmp,
                 Err(e) => return Err(e),
@@ -393,7 +393,7 @@ impl Client {
      * * not connected
      * * network
      */
-    fn recv(&self) -> Result<~[u8], MongoErr> {
+    fn recv(&self, read : bool) -> Result<~[u8], MongoErr> {
         if self.conn.is_empty() {
             Err(MongoErr::new(
                     ~"client::recv",
@@ -401,7 +401,7 @@ impl Client {
                     ~"attempted to receive on nonexistent connection"))
         } else {
             let tmp = self.conn.take();
-            let result = tmp.recv();
+            let result = tmp.recv(read);
             self.conn.put_back(tmp);
             result
         }
