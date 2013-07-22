@@ -45,7 +45,7 @@ fn test_sharding() {
     }
 
     info!("pre-enabling status");
-    match mongos.status(false) {
+    match mongos.status() {
         Ok(s) => info!(fmt!("Sharding status: %s", s)),
         Err(e) => fail!("%s", e.to_str())
     }
@@ -61,8 +61,8 @@ fn test_sharding() {
     }
 
     info!("post-enabling status");
-    match mongos.status(false) {
-        Ok(s) => debug!(fmt!("Sharding status: %s", s)),
+    match mongos.status() {
+        Ok(s) => info!(fmt!("Sharding status: %s", s)),
         Err(e) => fail!("%s", e.to_str())
     }
 
