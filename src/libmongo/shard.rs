@@ -30,9 +30,11 @@ pub struct ShardController {
 
 impl ShardController {
 
-    ///Create a new ShardController.
-    ///Will fail if the given Client is not connected
-    ///to a mongos instance.
+    /**
+     * Create a new ShardController.
+     * Will fail if the given Client is not connected
+     * to a mongos instance.
+     */
     pub fn new(client: @Client) -> ShardController {
         //check that client points to a mongos; fail if it doesn't
         //since a new method should not return a result (I think?)
@@ -118,9 +120,7 @@ impl ShardController {
         db.run_command(SpecNotation(fmt!("{ 'removeShard': '%s' }", shardname)))
     }
 
-    /**
-     * Enable sharding on the specified collection.
-     */
+     ///Enable sharding on the specified collection.
      pub fn shard_collection(&self, db: ~str, coll: ~str, key: QuerySpec, unique: bool) -> Result<(), MongoErr> {
         let d = DB::new(copy db, copy self.mongos);
         match d.run_command(SpecNotation(
@@ -142,7 +142,12 @@ impl ShardController {
         };
      }
 
-     pub fn status(&self, verbose: bool) -> Result<~str, MongoErr> {
+     /**
+      * Display the status of the current cluster.
+      * Equivalent to running sh.status() in shell.
+      */
+     pub fn status(&self) -> Result<~str, MongoErr> {
+         //TODO verbose mode
         let mut out = ~"";
         let config = DB::new(~"config", self.mongos);
         let version = match config.get_collection(~"version").find_one(None, None, None) {
