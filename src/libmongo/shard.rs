@@ -65,8 +65,8 @@ impl ShardController {
             Err(e) => return Err(e)
         }
 
-        let d = DB::new(copy db, copy self.mongos);
-        match d.run_command(SpecNotation(fmt!("{ 'enableSharding': '%s' }", db))) {
+        let admin = self.mongos.get_admin();
+        match admin.run_command(SpecNotation(fmt!("{ 'enableSharding': '%s' }", db))) {
             Ok(doc) => match *doc.find(~"ok").unwrap() {
                 Double(1f64) => return Ok(()),
                 Int32(1i32) => return Ok(()),
