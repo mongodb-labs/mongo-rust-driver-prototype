@@ -27,6 +27,7 @@ SRC = ./src
 LIB = ./lib
 BSONDIR = ./src/libbson
 MONGODIR = ./src/libmongo
+GRIDDIR = ./src/libgridfs
 EXDIR = ./examples
 BIN = ./bin
 TEST = ./test
@@ -36,7 +37,7 @@ MONGOTEST = 0
 
 .PHONY: test
 
-all: bin libs bson mongo
+all: bin libs bson mongo gridfs
 
 bin:
 	$(MKDIR) bin
@@ -51,6 +52,9 @@ bson: $(BSONDIR)/*
 
 mongo: $(MONGODIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rc
+
+gridfs: $(GRIDDIR)/*
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(GRIDDIR)/gridfs.rc
 
 test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
