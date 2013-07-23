@@ -44,6 +44,20 @@ fn test_sharding() {
         fill_coll(db_str.clone(), name, mongod, n);
     }
 
+    match mongos.add_shard(~"127.0.0.1:27017") {
+        Ok(_) => (),
+        Err(e) => debug!("%s", e.to_str())
+    }
+    match mongos.add_shard(~"127.0.0.1:37017") {
+        Ok(_) => (),
+        Err(e) => debug!("%s", e.to_str())
+    }
+
+    match mongos.enable_sharding(db_str) {
+        Ok(_) => (),
+        Err(e) => fail!("%s", e.to_str())
+    }
+
     info!("pre-enabling status");
     match mongos.status() {
         Ok(s) => info!(fmt!("Sharding status: %s", s)),
@@ -52,7 +66,7 @@ fn test_sharding() {
 
     match mongos.add_shard(~"localhost:27017") {
         Ok(_) => (),
-        Err(e) => debug!("%s", e.to_str()) //debug because these may fail if shards exist
+        Err(e) => debug!("%s", e.to_str())
     }
 
     match mongos.add_shard(~"localhost:37017") {

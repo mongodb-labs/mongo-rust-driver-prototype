@@ -1,6 +1,6 @@
 import subprocess
 
-f = open('.shard.tmp', 'r').readlines()
+f = open('tools/.shard.tmp', 'r').readlines()
 
 for line in f:
     try:
