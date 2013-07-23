@@ -446,7 +446,7 @@ mod tests {
     #[test]
     fn test_recv_null_port() {
         let conn = NodeConnection::new(~"foo", 42);
-        assert!(conn.recv().is_err());
+        assert!(conn.recv(false).is_err());
     }
 
     #[test]
@@ -455,7 +455,7 @@ mod tests {
         let mut conn = NodeConnection::new(~"foo", 42);
         let p: @GenericPort<PortResult> = @MockPort {state: 1} as @GenericPort<PortResult>;
         conn.port = Cell::new(p);
-        assert!(conn.recv().is_err());
+        assert!(conn.recv(false).is_err());
     }
 
     #[test]
@@ -463,7 +463,7 @@ mod tests {
         let mut conn = NodeConnection::new(~"foo", 42);
         let p: @GenericPort<PortResult> = @MockPort {state: 0} as @GenericPort<PortResult>;
         conn.port = Cell::new(p);
-        assert!(conn.recv().is_ok());
+        assert!(conn.recv(false).is_ok());
     }
 
     #[test]
