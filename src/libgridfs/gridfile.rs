@@ -28,6 +28,7 @@ pub struct GridIn {
     chunk_size: uint,
     chunk_num: uint,
     file_id: Option<Document>,
+    position: uint,
 }
 
 pub struct GridOut {
@@ -45,6 +46,7 @@ impl GridIn {
             chunk_size: 256 * 1024,
             chunk_num: 0,
             file_id: None,
+            position: 0,
         }
     }
 
@@ -116,11 +118,12 @@ impl GridIn {
                         ~"could not find an oid for a chunk"))
             }
         }
+        self.position += data.len();
         self.chunk_num += 1;
         Ok(())
     }
 
-    fn close_buf(&self) {
+    fn close_buf(&self) -> Result<(), MongoErr> {
         self.buf.flush();
         let db = self.chunks.get_db();
 
@@ -130,7 +133,7 @@ impl GridIn {
                 for v.iter().advance |b| {
                     let mut byte = b.to_str();
                     if byte.len() == 1 {
-                        byte = "0".append(byte)
+                        byte = (~"0").append(byte)
                     }
                     oid.push_str(byte);
                 }
@@ -138,7 +141,23 @@ impl GridIn {
             _ => ()
         }
 
-        //TODO: generate metadata
         let md5 = match db.run_command(SpecNotation(
+            fmt!("{ 'filemd5': %s, 'root': 'fs' }", oid))) {
+            Ok(d) => match d.find(~"md5") {
+                Some(&UString(ref s)) => s.clone(),
+                _ => return Err(MongoErr::new(
+                    ~"gridfile::close",
+                    ~"could not get file md5",
+                    ~"the server returned an unexpected md5 hash"))
+            },
+            Err(e) => return Err(e)
+        };
+
+        let mut file = BsonDocument::new();
+        file.put(~"md5", UString(md5));
+        file.put(~"length", Int32(self.position as i32));
+        //TODO: needs an uploadDate field,
+        //assuming there is a reasonable date library
+        self.files.insert(file, None)
     }
 }

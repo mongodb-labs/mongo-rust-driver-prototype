@@ -13,10 +13,9 @@
  * limitations under the License.
  */
 
-use bson::encode::*;
-
 use mongo::db::*;
 use mongo::coll::*;
+use mongo::util::*;
 
 use gridfile::*;
 
@@ -44,7 +43,8 @@ impl GridFS {
         GridIn::new(self.chunks, self.files)
     }
 
-    pub fn put(&self, data: Document) /* -> */{
-        let file = self.new_file();
+    pub fn put(&self, data: ~[u8]) -> Result<(), MongoErr> {
+        let mut file = self.new_file();
+        file.write(data)
     }
 }
