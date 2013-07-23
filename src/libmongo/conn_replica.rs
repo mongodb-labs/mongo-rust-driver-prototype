@@ -37,12 +37,13 @@ pub enum ServerType {
 
 pub struct ReplicaSetConnection {
     seed : ~ARC<~[(~str, uint)]>,       // XXX for now, no adding seeds//RWARC appears to have bug and require impl *Clone* explicitly
-    state : ~Cell<ReplicaSetData>,      // XXX RWARC
-    write_to : ~Cell<NodeConnection>,
-    read_from : ~Cell<NodeConnection>,
-    port_state : ~Cell<Port<ReplicaSetData>>,
-    chan_reconn : ~Cell<Chan<bool>>,
-    read_pref : ~Cell<READ_PREFERENCE>,
+    state : Cell<ReplicaSetData>,      // XXX RWARC
+    write_to : Cell<NodeConnection>,
+    read_from : Cell<NodeConnection>,
+    port_state : Cell<Port<ReplicaSetData>>,
+    chan_reconn : Cell<Chan<bool>>,
+    read_pref : Cell<READ_PREFERENCE>,
+    read_pref_changed : Cell<bool>,
 }
 
 /**
@@ -98,8 +99,12 @@ impl Connection for ReplicaSetConnection {
                                     (port_port_reconn, chan_port_reconn));
 
             self.port_state.put_back(port);
-            sleep(&global_loop::get(), 100);    // XXX
-            self.reconnect()                    // XXX
+            //sleep(&global_loop::get(), 100);    // XXX
+            //self.reconnect()                    // XXX
+            match self.reconnect() {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            }
         }
     }
 
@@ -108,6 +113,7 @@ impl Connection for ReplicaSetConnection {
 
         // kill reconnect thread
         if !self.chan_reconn.is_empty() {
+println("sent disconnect ln 112");
             self.chan_reconn.take().send(false);
         } else {
             err_str.push_str(MongoErr::new(
@@ -143,17 +149,20 @@ impl Connection for ReplicaSetConnection {
             Ok(_) => (),
             Err(e) => return Err(e),
         }
+println("[send] reconnected");
 
         // choose correct server to which to send
         let server_cell = if read { &self.read_from } else { &self.write_to };
+println("[send] chose server_cell");
         if server_cell.is_empty() {
+println("[send] EMPTY SERVER");
             return Err(MongoErr::new(
                         ~"conn_replica::send",
                         ~"cannot send",
                         ~"no primary found"));
         }
         let server = server_cell.take();
-println(fmt!("send: using server %?\n", server));
+println(fmt!("[send] server: %?", server));
 
         // even if found server, if ping is empty, server down
         if server.ping.is_empty() {
@@ -163,8 +172,10 @@ println(fmt!("send: using server %?\n", server));
                         ~"server down"));
         }
 
+println("pre-send");
         // otherwise send and then put everything back
         let result = server.send(data, read);
+println("post-send");
         server_cell.put_back(server);
         result
     }
@@ -175,10 +186,13 @@ println(fmt!("send: using server %?\n", server));
             Ok(_) => (),
             Err(e) => return Err(e),
         }
+println("[recv] reconnected");
 
         // choose correct server from which to recv
         let server_cell = if read { &self.read_from } else { &self.write_to };
+println("[recv] chose server_cell");
         if server_cell.is_empty() {
+println("[recv] EMPTY SERVER");
             return Err(MongoErr::new(
                         ~"conn_replica::recv",
                         ~"cannot recv",
@@ -186,7 +200,7 @@ println(fmt!("send: using server %?\n", server));
                             if read { "read" } else { "write" })));
         }
         let server = server_cell.take();
-println(fmt!("recv: using server %?\n", server));
+println(fmt!("[recv] server: %?", server));
 
         // even if found server, if ping is empty, server down
         if server.ping.is_empty() {
@@ -196,9 +210,10 @@ println(fmt!("recv: using server %?\n", server));
                         ~"server down"));
         }
 
+println("pre-recv");
         // otherwise recv and then put everything back
         let result = server.recv(read);
-println(fmt!("result of recv: %?\n", result));
+println("post-recv");
         server_cell.put_back(server);
         result
     }
@@ -307,12 +322,13 @@ impl ReplicaSetConnection {
     pub fn new(seed : ~[(~str, uint)]) -> ReplicaSetConnection {
         ReplicaSetConnection {
             seed : ~ARC(seed),
-            state : ~Cell::new_empty(),
-            write_to : ~Cell::new_empty(),
-            read_from : ~Cell::new_empty(),
-            port_state : ~Cell::new_empty(),
-            chan_reconn : ~Cell::new_empty(),
-            read_pref : ~Cell::new(PRIMARY_ONLY),
+            state : Cell::new_empty(),
+            write_to : Cell::new_empty(),
+            read_from : Cell::new_empty(),
+            port_state : Cell::new_empty(),
+            chan_reconn : Cell::new_empty(),
+            read_pref : Cell::new(PRIMARY_ONLY),
+            read_pref_changed : Cell::new(true),
         }
     }
 
@@ -406,6 +422,7 @@ impl ReplicaSetConnection {
                         Ok(list) => {
                             if list.len() > 0 {
                                 chan_hosts_tmp.send(Ok(list));
+println("failing ln 408");
                                 fail!(); // take down whole thread
                             } else { chan_hosts_tmp.send(Ok(~[])); }
                         }
@@ -416,23 +433,18 @@ impl ReplicaSetConnection {
         }
 
         // try to recv a host list
-        let mut i = 0;
         let mut err_str = ~"";
-        loop {
+        for n.times {
             match port_hosts.recv() {
                 Ok(l) => if l.len() > 0 { return Ok(l); },
                 Err(e) => err_str.push_str(e.to_str()),
             }
-
-            i += 1;
-            if i >= n {
-                // received all acks from seeds; no host list
-                return Err(MongoErr::new(
-                            ~"conn_replica::reconnect_with_seed",
-                            ~"no host list found",
-                            err_str));
-            }
         }
+
+        Err(MongoErr::new(
+                    ~"conn_replica::reconnect_with_seed",
+                    ~"no host list found",
+                    err_str))
     }
 
     fn _get_replica_set_data(hosts : ~[(~str, uint)]) -> ReplicaSetData {
@@ -541,10 +553,11 @@ impl ReplicaSetConnection {
         }
 
         // properly insert now-typed hosts into respective locations
-        let mut i = 0;
         let mut err = None;
         let mut err_str = ~"";
-        loop {
+
+        // wait for acks from all hosts
+        for n.times {
             match port_server.recv() {
                 Ok(stats) => {
                     if stats.typ == PRIMARY {
@@ -564,20 +577,14 @@ impl ReplicaSetConnection {
                     err_str.push_str(e.to_str());
                 }
             }
-
-            i += 1;
-            if i >= n {
-                // received all acks from hosts; done
-                if err_str.len() > 0 {
-                    err = Some(MongoErr::new(
-                        ~"conn_replica::reconnect_with_seed",
-                        ~"error while connecting to host",
-                        err_str.clone()));
-                }
-                break;
-            }
         }
 
+        if err_str.len() > 0 {
+            err = Some(MongoErr::new(
+                ~"conn_replica::reconnect_with_seed",
+                ~"error while connecting to host",
+                err_str.clone()));
+        }
         ReplicaSetData::new(pri, sec, err)
     }
 
@@ -598,25 +605,34 @@ impl ReplicaSetConnection {
         do spawn_supervised {
             // pick up port for recving kill of reconnect thread
             let port_reconn = port_port_reconn.recv();
-            do spawn { if !port_reconn.recv() { fail!(); } }
+            do spawn {
+println("before fail ln 604");
+                if !port_reconn.recv() {
+println("\"after\" fail ln 606");
+                    fail!();
+                }
+            }
 
             let seed = port_seed.recv();
+println("received seedlist");
+            // XXX will change with new IO
             let iotask = global_loop::get();
             loop {
+println("looping ln 607");
                 // pick up seed and state
                 let state = ReplicaSetConnection::reconnect_with_seed(&seed);
+println(fmt!("sending state %?", state));
                 chan_state.send(state);
                 //sleep(iotask, 1000 * 60 * 5);
                 sleep(&iotask, 10)
             }
         }
 
-        // just get first
+        // send back port to pick up reconnection states
         port_state
     }
 
     pub fn reconnect(&self) -> Result<(), MongoErr> {
-println(fmt!("just before reconnected, self now : %?\n", self));
         if self.port_state.is_empty() {
             return Err(MongoErr::new(
                         ~"conn_replica::reconnect",
@@ -627,11 +643,17 @@ println(fmt!("just before reconnected, self now : %?\n", self));
         // fish out most up-to-date information
         let port_state = self.port_state.take();
         let mut tmp_state = None;
+if !self.state.is_empty() {
+println("updated before");
         while port_state.peek() {
-            tmp_state = port_state.try_recv();
+            tmp_state = Some(port_state.recv());
         }
+} else {
+println("first connect");
+    tmp_state = Some(port_state.recv());
+println("successfully picked up state");
+}
         self.port_state.put_back(port_state);
-println(fmt!("final state for this reconnect: %?\n", tmp_state));
         if tmp_state.is_none() { return Ok(()); }   // nothing to update
 
         let state = tmp_state.unwrap();
@@ -639,7 +661,9 @@ println(fmt!("final state for this reconnect: %?\n", tmp_state));
 
         // refresh write_to and read_from servers as needed
         let mut err_str = ~"";
-        if self.state.is_empty() || state != self.state.take() {
+        if         self.state.is_empty()
+                || state != self.state.take()
+                || self.read_pref_changed.take() {
             if !self.write_to.is_empty() { self.write_to.take().disconnect(); }
             if !self.read_from.is_empty() { self.read_from.take().disconnect(); }
 
@@ -661,8 +685,10 @@ println(fmt!("final state for this reconnect: %?\n", tmp_state));
             }
         }
 
+        if self.read_pref_changed.is_empty() {
+            self.read_pref_changed.put_back(false);
+        }
         self.state.put_back(new_state);
-println(fmt!("just reconnected, self now : %?\n", self));
 
         if err_str.len() == 0 { Ok(()) }
         else { Err(MongoErr::new(
@@ -675,7 +701,8 @@ println(fmt!("just reconnected, self now : %?\n", self));
                 -> Result<(), MongoErr> {
         let dat = state.pri.clone().unwrap();
         let pri = NodeConnection::new(dat.ip.clone(), dat.port);
-        // XXX also get and put in tags
+        pri.tags.take();
+        pri.tags.put_back(dat.tagset.clone());
         pri.ping.put_back(dat.ping.unwrap());
         let result = pri.connect();
         self.write_to.put_back(pri);

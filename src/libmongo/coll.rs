@@ -487,10 +487,14 @@ impl Collection {
                 cursor.cursor_limit(-1);
                 match cursor.next() {
                     Some(doc) => Ok(doc),
-                    None => Err(MongoErr::new(
+                    None => match cursor.iter_err.clone() {
+                        Some(e) => Err(e),
+                        None => Err(MongoErr::new(
                                         ~"coll::find_one",
                                         ~"empty collection",
                                         ~"no documents in collection")),
+
+                    },
                 }
             },
             Err(e) => return Err(MongoErr::new(

@@ -343,6 +343,7 @@ impl Client {
 
         // check if any errors in response and convert to MongoErr,
         //      else pass along
+//println(fmt!("received message : %?", m));
         match copy m {
             OpReply { header:_, flags:f, cursor_id:_, start:_, nret:_, docs:_ } => {
                 if (f & CUR_NOT_FOUND as i32) != 0i32 {
