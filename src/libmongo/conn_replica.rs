@@ -99,12 +99,7 @@ impl Connection for ReplicaSetConnection {
                                     (port_port_reconn, chan_port_reconn));
 
             self.port_state.put_back(port);
-            //sleep(&global_loop::get(), 100);    // XXX
-            //self.reconnect()                    // XXX
-            match self.reconnect() {
-                Ok(_) => Ok(()),
-                Err(e) => Err(e),
-            }
+            self.reconnect()
         }
     }
 
@@ -615,16 +610,16 @@ println("\"after\" fail ln 606");
 
             let seed = port_seed.recv();
 println("received seedlist");
-            // XXX will change with new IO
-            let iotask = global_loop::get();
+//let iotask = global_loop::get();
             loop {
 println("looping ln 607");
                 // pick up seed and state
                 let state = ReplicaSetConnection::reconnect_with_seed(&seed);
 println(fmt!("sending state %?", state));
                 chan_state.send(state);
-                //sleep(iotask, 1000 * 60 * 5);
-                sleep(&iotask, 10)
+                //sleep(&global_loop::get(), 1000 * 60 * 5);    // XXX new io
+                sleep(&global_loop::get(), 10);                 // XXX new io
+                //sleep(&iotask, 10);                 // XXX new io
             }
         }
 
@@ -632,6 +627,16 @@ println(fmt!("sending state %?", state));
         port_state
     }
 
+    /**
+     * Reconnects to replica set.
+     *
+     * Reconnects by fishing out latest state sent from reconnection task
+     * to main task, and checking if the write_to or read_from servers
+     * need to be updated (because primaries/secondaries, their tags,
+     * or read preference has changed).
+     *
+     * Called before every send or recv.
+     */
     pub fn reconnect(&self) -> Result<(), MongoErr> {
         if self.port_state.is_empty() {
             return Err(MongoErr::new(
@@ -640,30 +645,143 @@ println(fmt!("sending state %?", state));
                         ~"reconnect thread dead"));
         }
 
+println(fmt!("in reconnection; self %?", self));
+
         // fish out most up-to-date information
         let port_state = self.port_state.take();
         let mut tmp_state = None;
-if !self.state.is_empty() {
+        if !self.state.is_empty() {
 println("updated before");
-        while port_state.peek() {
+            // has been updated before; get latest in stream
+            while port_state.peek() {
+                tmp_state = Some(port_state.recv());
+            }
+        } else {
+println("first update");
+            // first update; wait if needed to pick up first state
             tmp_state = Some(port_state.recv());
         }
-} else {
-println("first connect");
-    tmp_state = Some(port_state.recv());
-println("successfully picked up state");
-}
         self.port_state.put_back(port_state);
-        if tmp_state.is_none() { return Ok(()); }   // nothing to update
+println(fmt!("tmp_state : %?", tmp_state));
+
+        // by end, read_pref will have been accounted for; note updated
+        let pref_changed = self.read_pref_changed.take();
+        self.read_pref_changed.put_back(false);
+
+        // only update read_from or write_to if:
+        //  0) no prior state (read_from and write_to)
+        //      old_state.is_none() && tmp_state.is_some()
+        //  1) state has changed (read_from and write_to)
+        //      old_state.is_some() && tmp_state.is_some() && old_state != tmp_state
+        //  2) read preference has changed (read_from)
+        //      a) tmp_state.is_none() => refresh according to old_state
+        //      b) tmp_state.is_some() => refresh according to tmp_state
+        let old_state = if self.state.is_empty() {
+            None
+        } else {
+            Some(self.state.take())
+        };  // self.state now certainly empty
+
+        let state = match (old_state, tmp_state) {
+            (None, None) => {
+                // no state to update but read_pref "changed"
+                // read_pref already marked updated; undo that mark
+                self.read_pref_changed.take();
+                self.read_pref_changed.put_back(true);
+                return Ok(());
+            }
+            (Some(os), None) => {
+                // no new state
+                if !pref_changed {
+                    // read_pref unchanged; no refresh needed
+                    return Ok(());
+                }
+                // refresh according to old state
+                os
+            }
+            (None, Some(ns)) => {
+                // first state;
+                // refresh according to new state
+                ns
+            }
+            (Some(os), Some(ns)) => {
+                // new state and state to update;
+                // check that *need* to refresh
+                if !pref_changed && os == ns {
+                    // read_pref unchanged, and no change to state;
+                    // no refresh needed
+                    return Ok(());
+                } else {
+                    // otherwise need to refresh according to new state
+                    ns
+                }
+            }
+        };
+
+        // do actual refresh
+        let mut err_str = ~"";
+        if !self.write_to.is_empty() { self.write_to.take().disconnect(); }
+        if !self.read_from.is_empty() { self.read_from.take().disconnect(); }
+        let maybe_err = state.clone().err;
+        if maybe_err.is_none() {
+            match self._refresh_write_to(state.clone()) {
+                Ok(_) => (),
+                Err(e) => err_str.push_str(e.to_str()),
+            }
+            match self._refresh_read_from(state.clone()) {
+                Ok(_) => (),
+                Err(e) => err_str.push_str(e.to_str()),
+            }
+        } else {
+            return Err(maybe_err.unwrap());
+        }
+
+        self.state.put_back(state);
+
+        if err_str.len() == 0 { Ok(()) }
+        else { Err(MongoErr::new(
+                    ~"conn_replica::reconnect",
+                    ~"error while reconnecting",
+                    err_str)) }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+        if tmp_state.is_none() {
+            // no new state; nothing to update
+            return Ok(());
+        }
 
         let state = tmp_state.unwrap();
         let new_state = state.clone();
+
+println(fmt!("post reconnection prelude; self %?", self));
 
         // refresh write_to and read_from servers as needed
         let mut err_str = ~"";
         if         self.state.is_empty()
                 || state != self.state.take()
                 || self.read_pref_changed.take() {
+println("updating...");
             if !self.write_to.is_empty() { self.write_to.take().disconnect(); }
             if !self.read_from.is_empty() { self.read_from.take().disconnect(); }
 
@@ -681,11 +799,14 @@ println("successfully picked up state");
                     Err(e) => err_str.push_str(e.to_str()),
                 };
             } else {
+println(fmt!("error?!?! %?", maybe_err.clone().unwrap()));
                 return Err(maybe_err.unwrap());
             }
         }
 
-        if self.read_pref_changed.is_empty() {
+        // update state and read_pref_changed
+        if !self.read_pref_changed.is_empty() {
+            self.read_pref_changed.take();
             self.read_pref_changed.put_back(false);
         }
         self.state.put_back(new_state);
@@ -695,6 +816,7 @@ println("successfully picked up state");
                     ~"conn_replica::reconnect",
                     ~"error while reconnecting",
                     err_str)) }
+*/
     }
 
     fn _refresh_write_to(&self, state : ReplicaSetData)
@@ -721,6 +843,7 @@ println("successfully picked up state");
         for state.sec.iter().advance |&s| {
             sec.push(s.clone());
         }
+println(fmt!("PRI:%?\nSEC:%?", pri, sec));
 
         let (pref_str, ts_list) = match read_pref {
             PRIMARY_ONLY => {
