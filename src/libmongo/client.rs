@@ -20,6 +20,7 @@ use bson::encode::*;
 use util::*;
 use msg::*;
 use conn::*;
+use conn_node::NodeConnection;
 use db::DB;
 use coll::Collection;
 
@@ -250,10 +251,10 @@ impl Client {
     // TODO check_primary for replication purposes?
     pub fn _send_msg(@self, msg : ~[u8],
                             wc_pair : (&~str, Option<~[WRITE_CONCERN]>),
-                            auto_get_reply : bool)
+                            read : bool)
                 -> Result<Option<ServerMsg>, MongoErr> {
         // first send message, exiting if network error
-        match self.send(msg) {
+        match self.send(msg, read) {
             Ok(_) => (),
             Err(e) => return Err(MongoErr::new(
                                     ~"client::_send_msg",
@@ -262,7 +263,7 @@ impl Client {
         }
 
         // handle write concern or handle query as appropriate
-        if !auto_get_reply {
+        if !read {
             // requested write concern
             let (db_str, wc) = wc_pair;
             let db = DB::new(copy *db_str, self);
@@ -276,7 +277,7 @@ impl Client {
             }
         } else {
             // requested query
-            match self._recv_msg() {
+            match self._recv_msg(read) {
                 Ok(m) => Ok(Some(m)),
                 Err(e) => Err(MongoErr::new(
                                     ~"client::_send_msg",
@@ -297,9 +298,9 @@ impl Client {
      * * server returned message with error flags
      * * network
      */
-    fn _recv_msg(&self) -> Result<ServerMsg, MongoErr> {
+    fn _recv_msg(&self, read : bool) -> Result<ServerMsg, MongoErr> {
         // receive message
-        let m = match self.recv() {
+        let m = match self.recv(read) {
             Ok(bytes) => match parse_reply(bytes) {
                 Ok(m_tmp) => m_tmp,
                 Err(e) => return Err(e),
@@ -340,7 +341,7 @@ impl Client {
      * * not connected
      * * network
      */
-    pub fn send(&self, bytes : ~[u8]) -> Result<(), MongoErr> {
+    fn send(&self, bytes : ~[u8], read : bool) -> Result<(), MongoErr> {
         if self.conn.is_empty() {
             Err(MongoErr::new(
                     ~"client::send",
@@ -348,7 +349,7 @@ impl Client {
                     ~"attempted to send on nonexistent connection"))
         } else {
             let tmp = self.conn.take();
-            let result = tmp.send(bytes);
+            let result = tmp.send(bytes, read);
             self.conn.put_back(tmp);
             result
         }
@@ -364,7 +365,7 @@ impl Client {
      * * not connected
      * * network
      */
-    pub fn recv(&self) -> Result<~[u8], MongoErr> {
+    fn recv(&self, read : bool) -> Result<~[u8], MongoErr> {
         if self.conn.is_empty() {
             Err(MongoErr::new(
                     ~"client::recv",
@@ -372,7 +373,7 @@ impl Client {
                     ~"attempted to receive on nonexistent connection"))
         } else {
             let tmp = self.conn.take();
-            let result = tmp.recv();
+            let result = tmp.recv(read);
             self.conn.put_back(tmp);
             result
         }

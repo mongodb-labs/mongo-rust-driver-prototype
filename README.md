@@ -1,9 +1,7 @@
 MongoDB Rust Driver Prototype
 =============================
 
-This is a prototype version of a MongoDB driver for the Rust programming language.
-
-This library has been built on Rust version 0.7. If you are using a different version of Rust, it may not build correctly.
+This is a prototype driver for MongoDB written in Rust. The API and implementation are currently subject to change at any time. You must not use this driver in production as it is still under development and is in no way supported by 10gen. We absolutely encourage you to experiment with it and provide us feedback on the API, design, and implementation. Bug reports and suggestions for improvements are welcomed, as are pull requests.
 
 ## Installation
 
