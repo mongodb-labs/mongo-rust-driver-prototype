@@ -26,7 +26,7 @@ static L_END: bool = true;
  * This can be converted back and forth from BsonDocument
  * by using the Embedded variant.
  */
-#[deriving(Eq,ToStr)]
+#[deriving(Eq,ToStr,Clone)]
 pub enum Document {
     Double(f64),                    //x01
     UString(~str),                    //x02
@@ -80,6 +80,19 @@ macro_rules! cstr(
         )
     }
 )
+
+impl Clone for BsonDocument {
+    pub fn clone(&self) -> BsonDocument {
+        let mut map = ~OrderedHashmap::new();
+        for self.fields.iter().advance |&(@k, @v)| {
+            map.insert(k, v);
+        }
+        BsonDocument {
+            size: self.size,
+            fields: map
+        }
+    }
+}
 
 ///serialize::Encoder implementation.
 impl Encoder for BsonDocEncoder {
