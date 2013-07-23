@@ -167,19 +167,13 @@ impl TagSet {
      * Usage: member.matches(tagset)
      */
     pub fn matches(&self, other : &TagSet) -> bool {
-        let mut my_iter = self.tags.iter();
-        let mut other_iter = other.tags.iter();
-
-        for other_iter.advance |(&f0, &v0)| {
-            let mut v1 = ~"";
-            for my_iter.advance |(&f, &v)| {
-                if f > f0 { return false; } // no such tag in other's TagSet
-                if f == f0 {
-                    v1 = copy v;
-                    break;
+        for other.tags.iter().advance |(f0, &v0)| {
+            match self.tags.find(f0) {
+                None => return false,
+                Some(v1) => {
+                    if v0 != *v1 { return false; }
                 }
             }
-            if v0 != v1 { return false; }
         }
 
         true

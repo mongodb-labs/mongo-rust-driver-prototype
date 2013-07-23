@@ -134,17 +134,12 @@ impl Connection for NodeConnection {
                             ~"cannot receive from null port"));
         } else {
             let port = self.port.take();
-println("before ind-server recv");
             let result = match port.recv() {
-                Err(e) => {
-println("after ind-server recv");
-Err(MongoErr::new(
+                Err(e) => Err(MongoErr::new(
                                 ~"conn::recv",
                                 e.err_name.clone(),
-                                e.err_msg.clone())) }
-                Ok(msg) => {
-println("after ind-server recv");
-Ok(msg) }
+                                e.err_msg.clone())),
+                Ok(msg) => Ok(msg),
             };
             self.port.put_back(port);
             result

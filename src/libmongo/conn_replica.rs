@@ -36,8 +36,10 @@ pub enum ServerType {
 }
 
 pub struct ReplicaSetConnection {
-    seed : ~ARC<~[(~str, uint)]>,       // XXX for now, no adding seeds//RWARC appears to have bug and require impl *Clone* explicitly
-    state : Cell<ReplicaSetData>,      // XXX RWARC
+    //seed : ~RWARC<~[(~str, uint)]>,       // once RWARC corrected
+    //seed : ~ARC<~[(~str, uint)]>,       // XXX for now, no adding seeds//RWARC appears to have bug and require impl *Clone* explicitly
+    seed : Cell<~ARC<~[(~str, uint)]>>,
+    state : Cell<ReplicaSetData>,      // XXX RWARC?
     write_to : Cell<NodeConnection>,
     read_from : Cell<NodeConnection>,
     port_state : Cell<Port<ReplicaSetData>>,
@@ -50,8 +52,8 @@ pub struct ReplicaSetConnection {
  * All `Send`able data associated with `ReplicaSetConnection`s.
  */
 struct ReplicaSetData {
-    pri : Option<NodeConnectionData>,
-    sec : ~PriorityQueue<NodeConnectionData>,
+    pri : Option<NodeData>,
+    sec : ~PriorityQueue<NodeData>,
     err : Option<MongoErr>,
 }
 // not actually needed for now but probably good to have anyway
@@ -69,8 +71,8 @@ impl Clone for ReplicaSetData {
     }
 }
 impl ReplicaSetData {
-    pub fn new( pri : Option<NodeConnectionData>,
-                sec : ~PriorityQueue<NodeConnectionData>,
+    pub fn new( pri : Option<NodeData>,
+                sec : ~PriorityQueue<NodeData>,
                 err : Option<MongoErr>) -> ReplicaSetData {
         ReplicaSetData {
             pri : pri,
@@ -90,16 +92,17 @@ impl Connection for ReplicaSetConnection {
         } else {
             // po/ch for kill of reconnect thread
             let (port_reconn, chan_reconn) = stream();
-            // po/ch for port for recving kill of reconnect thread
-            let (port_port_reconn, chan_port_reconn) = stream();
             self.chan_reconn.put_back(chan_reconn);
-            let port = ReplicaSetConnection::spawn_reconnect(
-                                    &self.seed,
-                                    port_reconn,
-                                    (port_port_reconn, chan_port_reconn));
-
+            let seed_arc = self.seed.take();
+            /*let port = ReplicaSetConnection::spawn_reconnect(
+                                    //&self.seed,
+                                    &seed_arc,
+                                    port_reconn);
             self.port_state.put_back(port);
-            self.reconnect()
+            self.reconnect()*/
+            let state = ReplicaSetConnection::reconnect_with_seed(&seed_arc);
+            self.seed.put_back(seed_arc);
+            self.refresh(Some(state))
         }
     }
 
@@ -108,7 +111,6 @@ impl Connection for ReplicaSetConnection {
 
         // kill reconnect thread
         if !self.chan_reconn.is_empty() {
-println("sent disconnect ln 112");
             self.chan_reconn.take().send(false);
         } else {
             err_str.push_str(MongoErr::new(
@@ -140,24 +142,27 @@ println("sent disconnect ln 112");
 
     pub fn send(&self, data : ~[u8], read : bool) -> Result<(), MongoErr> {
         // refresh server data via reconnect
-        match self.reconnect() {
+        /*match self.reconnect() {
+            Ok(_) => (),
+            Err(e) => return Err(e),
+        }*/
+        let seed_arc = self.seed.take();
+        let state = ReplicaSetConnection::reconnect_with_seed(&seed_arc);
+        self.seed.put_back(seed_arc);
+        match self.refresh(Some(state)) {
             Ok(_) => (),
             Err(e) => return Err(e),
         }
-println("[send] reconnected");
 
         // choose correct server to which to send
         let server_cell = if read { &self.read_from } else { &self.write_to };
-println("[send] chose server_cell");
         if server_cell.is_empty() {
-println("[send] EMPTY SERVER");
             return Err(MongoErr::new(
                         ~"conn_replica::send",
                         ~"cannot send",
                         ~"no primary found"));
         }
         let server = server_cell.take();
-println(fmt!("[send] server: %?", server));
 
         // even if found server, if ping is empty, server down
         if server.ping.is_empty() {
@@ -167,27 +172,17 @@ println(fmt!("[send] server: %?", server));
                         ~"server down"));
         }
 
-println("pre-send");
         // otherwise send and then put everything back
         let result = server.send(data, read);
-println("post-send");
         server_cell.put_back(server);
         result
     }
 
     pub fn recv(&self, read : bool) -> Result<~[u8], MongoErr> {
-        // refresh server data via reconnect
-        match self.reconnect() {
-            Ok(_) => (),
-            Err(e) => return Err(e),
-        }
-println("[recv] reconnected");
-
+        // should not recv without having issued send earlier
         // choose correct server from which to recv
         let server_cell = if read { &self.read_from } else { &self.write_to };
-println("[recv] chose server_cell");
         if server_cell.is_empty() {
-println("[recv] EMPTY SERVER");
             return Err(MongoErr::new(
                         ~"conn_replica::recv",
                         ~"cannot recv",
@@ -205,17 +200,15 @@ println(fmt!("[recv] server: %?", server));
                         ~"server down"));
         }
 
-println("pre-recv");
         // otherwise recv and then put everything back
         let result = server.recv(read);
-println("post-recv");
         server_cell.put_back(server);
         result
     }
 }
 
 #[deriving(Clone)]
-struct NodeConnectionData {
+struct NodeData {
     ip : ~str,
     port : uint,
     typ : ServerType,   // already separated before cmp; for convenience
@@ -223,29 +216,29 @@ struct NodeConnectionData {
     tagset : TagSet,
 }
 // Inequalities seem all backwards because max-heaps.
-impl Ord for NodeConnectionData {
-    pub fn lt(&self, other : &NodeConnectionData) -> bool {
+impl Ord for NodeData {
+    pub fn lt(&self, other : &NodeData) -> bool {
         match (self.ping, other.ping) {
             (None, _) => true,
             (Some(_), None) => false,
             (Some(t1), Some(t2)) => t1 >= t2,
         }
     }
-    pub fn le(&self, other : &NodeConnectionData) -> bool {
+    pub fn le(&self, other : &NodeData) -> bool {
         match (self.ping, other.ping) {
             (None, _) => true,
             (Some(_), None) => false,
             (Some(t1), Some(t2)) => t1 > t2,
         }
     }
-    pub fn gt(&self, other : &NodeConnectionData) -> bool {
+    pub fn gt(&self, other : &NodeData) -> bool {
         match (self.ping, other.ping) {
             (None, _) => false,
             (Some(_), None) => true,
             (Some(t1), Some(t2)) => t1 <= t2,
         }
     }
-    pub fn ge(&self, other : &NodeConnectionData) -> bool {
+    pub fn ge(&self, other : &NodeData) -> bool {
         match (self.ping, other.ping) {
             (None, _) => false,
             (Some(_), None) => true,
@@ -253,25 +246,25 @@ impl Ord for NodeConnectionData {
         }
     }
 }
-impl Eq for NodeConnectionData {
-    pub fn eq(&self, other : &NodeConnectionData) -> bool {
+impl Eq for NodeData {
+    pub fn eq(&self, other : &NodeData) -> bool {
             self.ip == other.ip
         &&  self.port == other.port
         &&  self.tagset == other.tagset
     }
-    pub fn ne(&self, other : &NodeConnectionData) -> bool {
+    pub fn ne(&self, other : &NodeData) -> bool {
             self.ip != other.ip
         ||  self.port != other.port
         ||  self.tagset != other.tagset
     }
 }
-impl NodeConnectionData {
+impl NodeData {
     pub fn new( ip : ~str,
                 port : uint,
                 typ : ServerType,
                 ping : Option<u64>,
-                tagset : Option<TagSet>) -> NodeConnectionData {
-        NodeConnectionData {
+                tagset : Option<TagSet>) -> NodeData {
+        NodeData {
             ip : ip,
             port : port,
             typ : typ,
@@ -316,7 +309,9 @@ impl Eq for ReplicaSetData {
 impl ReplicaSetConnection {
     pub fn new(seed : ~[(~str, uint)]) -> ReplicaSetConnection {
         ReplicaSetConnection {
-            seed : ~ARC(seed),
+            //seed : ~RWARC(seed),    // RWARC corrected
+            //seed : ~ARC(seed),
+            seed : Cell::new(~ARC(seed)),
             state : Cell::new_empty(),
             write_to : Cell::new_empty(),
             read_from : Cell::new_empty(),
@@ -327,6 +322,7 @@ impl ReplicaSetConnection {
         }
     }
 
+    //fn reconnect_with_seed(seed : &~RWARC<~[(~str, uint)]>) -> ReplicaSetData {   // RWARC corrected
     fn reconnect_with_seed(seed : &~ARC<~[(~str, uint)]>) -> ReplicaSetData {
         let hosts = match ReplicaSetConnection::_get_host_list(seed) {
             Ok(l) => l,
@@ -336,10 +332,12 @@ impl ReplicaSetConnection {
         ReplicaSetConnection::_get_replica_set_data(hosts)
     }
 
+    //fn _get_host_list(seed : &~RWARC<~[(~str, uint)]>)    // RWARC corrected
     fn _get_host_list(seed : &~ARC<~[(~str, uint)]>)
                 -> Result<~[(~str, uint)], MongoErr> {
         // remember number of expected responses
         let n = seed.get().len();
+        //let n = seed.read(|&list| -> uint { list.len() });    // RWARC corrected
 
         // po/ch for sending host list
         let (port_hosts, chan_hosts) = stream();
@@ -347,13 +345,14 @@ impl ReplicaSetConnection {
 
         // po/ch for sending seed list
         let (port_seed, chan_seed) = stream();
-        chan_seed.send(seed.clone());
+        chan_seed.send(seed.clone()); // ARC
 
         // check seeds
         do spawn_supervised {
             let seed_arc = port_seed.recv();
             let seed_list = seed_arc.get();
 
+//seed_arc.read( |&seed_list| -> () {   // RWARC corrected
             for seed_list.iter().advance |&seed| {
                 // po/ch for sending this seed
                 let (port_pair, chan_pair) = stream();
@@ -417,7 +416,6 @@ impl ReplicaSetConnection {
                         Ok(list) => {
                             if list.len() > 0 {
                                 chan_hosts_tmp.send(Ok(list));
-println("failing ln 408");
                                 fail!(); // take down whole thread
                             } else { chan_hosts_tmp.send(Ok(~[])); }
                         }
@@ -425,6 +423,7 @@ println("failing ln 408");
                     }
                 }
             }
+//});   // RWARC corrected
         }
 
         // try to recv a host list
@@ -444,12 +443,12 @@ println("failing ln 408");
 
     fn _get_replica_set_data(hosts : ~[(~str, uint)]) -> ReplicaSetData {
         let mut pri = None;
-        let mut sec = ~PriorityQueue::new::<NodeConnectionData>();
+        let mut sec = ~PriorityQueue::new::<NodeData>();
 
         // remember expected number of responses
         let n = hosts.len();
 
-        // po/ch for receiving NodeConnectionData
+        // po/ch for receiving NodeData
         let (port_server, chan_server) = stream();
         let chan_server = SharedChan::new(chan_server);
 
@@ -537,7 +536,7 @@ println("failing ln 408");
                     }
                 }) {
                     Ok((t, tags)) => {
-                        let stats = NodeConnectionData::new(
+                        let stats = NodeData::new(
                             ip, port, t, Some(server.ping.take()), Some(tags)
                         );
                         chan_server_tmp.send(Ok(stats));
@@ -583,13 +582,10 @@ println("failing ln 408");
         ReplicaSetData::new(pri, sec, err)
     }
 
+    //fn spawn_reconnect( seed : &~RWARC<~[(~str, uint)]>,  // RWARC corrected
     fn spawn_reconnect( seed : &~ARC<~[(~str, uint)]>,
-                        port_reconn : Port<bool>,
-                        (port_port_reconn, chan_port_reconn) : (Port<Port<bool>>, Chan<Port<bool>>))
+                        port_reconn : Port<bool>)
                 -> Port<ReplicaSetData> {
-        // send off port for recving kill of reconnect thread
-        chan_port_reconn.send(port_reconn);
-
         // po/ch for seed list
         let (port_seed, chan_seed) = stream();
         chan_seed.send(seed.clone());
@@ -598,28 +594,14 @@ println("failing ln 408");
 
         // actually spawn reconnection thread
         do spawn_supervised {
-            // pick up port for recving kill of reconnect thread
-            let port_reconn = port_port_reconn.recv();
-            do spawn {
-println("before fail ln 604");
-                if !port_reconn.recv() {
-println("\"after\" fail ln 606");
-                    fail!();
-                }
-            }
+            do spawn { if !port_reconn.recv() { fail!(); } }
 
             let seed = port_seed.recv();
-println("received seedlist");
-//let iotask = global_loop::get();
             loop {
-println("looping ln 607");
                 // pick up seed and state
                 let state = ReplicaSetConnection::reconnect_with_seed(&seed);
-println(fmt!("sending state %?", state));
                 chan_state.send(state);
-                //sleep(&global_loop::get(), 1000 * 60 * 5);    // XXX new io
-                sleep(&global_loop::get(), 10);                 // XXX new io
-                //sleep(&iotask, 10);                 // XXX new io
+                sleep(&global_loop::get(), 1000 * 60 * 5);    // XXX new io
             }
         }
 
@@ -627,43 +609,8 @@ println(fmt!("sending state %?", state));
         port_state
     }
 
-    /**
-     * Reconnects to replica set.
-     *
-     * Reconnects by fishing out latest state sent from reconnection task
-     * to main task, and checking if the write_to or read_from servers
-     * need to be updated (because primaries/secondaries, their tags,
-     * or read preference has changed).
-     *
-     * Called before every send or recv.
-     */
-    pub fn reconnect(&self) -> Result<(), MongoErr> {
-        if self.port_state.is_empty() {
-            return Err(MongoErr::new(
-                        ~"conn_replica::reconnect",
-                        ~"could not reconnect",
-                        ~"reconnect thread dead"));
-        }
-
-println(fmt!("in reconnection; self %?", self));
-
-        // fish out most up-to-date information
-        let port_state = self.port_state.take();
-        let mut tmp_state = None;
-        if !self.state.is_empty() {
-println("updated before");
-            // has been updated before; get latest in stream
-            while port_state.peek() {
-                tmp_state = Some(port_state.recv());
-            }
-        } else {
-println("first update");
-            // first update; wait if needed to pick up first state
-            tmp_state = Some(port_state.recv());
-        }
-        self.port_state.put_back(port_state);
-println(fmt!("tmp_state : %?", tmp_state));
-
+    fn refresh(&self, tmp_state : Option<ReplicaSetData>)
+                -> Result<(), MongoErr> {
         // by end, read_pref will have been accounted for; note updated
         let pref_changed = self.read_pref_changed.take();
         self.read_pref_changed.put_back(false);
@@ -684,16 +631,14 @@ println(fmt!("tmp_state : %?", tmp_state));
 
         let state = match (old_state, tmp_state) {
             (None, None) => {
-                // no state to update but read_pref "changed"
-                // read_pref already marked updated; undo that mark
-                self.read_pref_changed.take();
-                self.read_pref_changed.put_back(true);
-                return Ok(());
+                // should never reach here
+                fail!("reached unreachable state: empty old_ AND new_state");
             }
             (Some(os), None) => {
                 // no new state
                 if !pref_changed {
                     // read_pref unchanged; no refresh needed
+                    self.state.put_back(os);
                     return Ok(());
                 }
                 // refresh according to old state
@@ -710,6 +655,7 @@ println(fmt!("tmp_state : %?", tmp_state));
                 if !pref_changed && os == ns {
                     // read_pref unchanged, and no change to state;
                     // no refresh needed
+                    self.state.put_back(os);
                     return Ok(());
                 } else {
                     // otherwise need to refresh according to new state
@@ -717,6 +663,7 @@ println(fmt!("tmp_state : %?", tmp_state));
                 }
             }
         };
+
 
         // do actual refresh
         let mut err_str = ~"";
@@ -743,6 +690,42 @@ println(fmt!("tmp_state : %?", tmp_state));
                     ~"conn_replica::reconnect",
                     ~"error while reconnecting",
                     err_str)) }
+    }
+
+    /**
+     * Reconnects to replica set.
+     *
+     * Reconnects by fishing out latest state sent from reconnection task
+     * to main task, and checking if the write_to or read_from servers
+     * need to be updated (because primaries/secondaries, their tags,
+     * or read preference has changed).
+     *
+     * Called before every send or recv.
+     */
+    pub fn reconnect(&self) -> Result<(), MongoErr> {
+        if self.port_state.is_empty() {
+            return Err(MongoErr::new(
+                        ~"conn_replica::reconnect",
+                        ~"could not reconnect",
+                        ~"reconnect thread dead"));
+        }
+
+        // fish out most up-to-date information
+        let port_state = self.port_state.take();
+        let mut tmp_state = None;
+        if !self.state.is_empty() {
+            // has been updated before; get latest in stream
+            while port_state.peek() {
+                tmp_state = Some(port_state.recv());
+            }
+        } else {
+            // first update; wait if needed to pick up first state
+            tmp_state = Some(port_state.recv());
+        }
+        self.port_state.put_back(port_state);
+
+        self.refresh(tmp_state)
+
 
 
 
@@ -774,14 +757,14 @@ println(fmt!("tmp_state : %?", tmp_state));
         let state = tmp_state.unwrap();
         let new_state = state.clone();
 
-println(fmt!("post reconnection prelude; self %?", self));
+//println(fmt!("post reconnection prelude; self %?", self));
 
         // refresh write_to and read_from servers as needed
         let mut err_str = ~"";
         if         self.state.is_empty()
                 || state != self.state.take()
                 || self.read_pref_changed.take() {
-println("updating...");
+//println("updating...");
             if !self.write_to.is_empty() { self.write_to.take().disconnect(); }
             if !self.read_from.is_empty() { self.read_from.take().disconnect(); }
 
@@ -799,7 +782,7 @@ println("updating...");
                     Err(e) => err_str.push_str(e.to_str()),
                 };
             } else {
-println(fmt!("error?!?! %?", maybe_err.clone().unwrap()));
+//println(fmt!("error?!?! %?", maybe_err.clone().unwrap()));
                 return Err(maybe_err.unwrap());
             }
         }
@@ -807,8 +790,8 @@ println(fmt!("error?!?! %?", maybe_err.clone().unwrap()));
         // update state and read_pref_changed
         if !self.read_pref_changed.is_empty() {
             self.read_pref_changed.take();
-            self.read_pref_changed.put_back(false);
         }
+        self.read_pref_changed.put_back(false);
         self.state.put_back(new_state);
 
         if err_str.len() == 0 { Ok(()) }
@@ -833,7 +816,7 @@ println(fmt!("error?!?! %?", maybe_err.clone().unwrap()));
 
     fn _refresh_read_from(&self, state : ReplicaSetData)
                 -> Result<(), MongoErr> {
-        let read_pref = self.read_pref.take();
+        let read_pref = self.read_pref.clone().take();
 
         let mut servers = ~[];
 
@@ -843,12 +826,11 @@ println(fmt!("error?!?! %?", maybe_err.clone().unwrap()));
         for state.sec.iter().advance |&s| {
             sec.push(s.clone());
         }
-println(fmt!("PRI:%?\nSEC:%?", pri, sec));
 
         let (pref_str, ts_list) = match read_pref {
             PRIMARY_ONLY => {
                 servers.push(pri);
-                (~"PRIMARY_ONLY", &None)
+                (~"PRIMARY_ONLY", None)
             }
             PRIMARY_PREF(ref ts) => {
                 servers.push(pri);
@@ -856,14 +838,14 @@ println(fmt!("PRI:%?\nSEC:%?", pri, sec));
                 for ordered.rev_iter().advance |&s| {
                     servers.push(s);
                 }
-                (~"PRIMARY_PREF", ts)
+                (~"PRIMARY_PREF", (*ts).clone())
             }
             SECONDARY_ONLY(ref ts) => {
                 let ordered = sec.to_sorted_vec();
                 for ordered.rev_iter().advance |&s| {
                     servers.push(s);
                 }
-                (~"SECONDARY_ONLY", ts)
+                (~"SECONDARY_ONLY", (*ts).clone())
             }
             SECONDARY_PREF(ref ts) => {
                 let ordered = sec.to_sorted_vec();
@@ -871,7 +853,7 @@ println(fmt!("PRI:%?\nSEC:%?", pri, sec));
                     servers.push(s);
                 }
                 servers.push(pri);
-                (~"SECONDARY_PREF", ts)
+                (~"SECONDARY_PREF", (*ts).clone())
             }
             NEAREST(ref ts) => {
                 sec.push(pri);
@@ -879,10 +861,9 @@ println(fmt!("PRI:%?\nSEC:%?", pri, sec));
                 for ordered.rev_iter().advance |&s| {
                     servers.push(s);
                 }
-                (~"NEAREST", ts)
+                (~"NEAREST", (*ts).clone())
             }
         };
-        self.read_pref.put_back(read_pref);
 
         let server = match self._find_server(pref_str, servers, ts_list) {
             Ok(s) => s,
@@ -895,10 +876,11 @@ println(fmt!("PRI:%?\nSEC:%?", pri, sec));
     }
 
     fn _find_server(&self,  pref : ~str,
-                            servers : ~[NodeConnectionData],
-                            tagsets : &Option<~[TagSet]>)
+                            servers : ~[NodeData],
+                            tagsets : Option<~[TagSet]>)
                 -> Result<NodeConnection, MongoErr> {
-        let ts_list = match (*tagsets).clone() {
+        //let ts_list = match tagsets.clone() {
+        let ts_list = match tagsets {
             None => ~[TagSet::new(~[])],
             Some(l) => l,
         };
@@ -908,9 +890,11 @@ println(fmt!("PRI:%?\nSEC:%?", pri, sec));
         for servers.iter().advance |&server| {
             for ts_list.iter().advance |ts| {
                 if server.tagset.matches(ts) {
-                    let result = NodeConnection::new(server.ip.clone(), server.port);
+                    let result = NodeConnection::new(
+                                    server.ip.clone(),
+                                    server.port);
                     result.tags.take();
-                    result.tags.put_back(ts.clone());
+                    result.tags.put_back(server.tagset.clone());
                     result.ping.put_back(server.ping.clone().unwrap());
                     return Ok(result);
                 }
