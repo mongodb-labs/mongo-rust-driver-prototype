@@ -13,18 +13,21 @@
  * limitations under the License.
  */
 
-use std::io::{Writer,BytesWriter};
+use stdio = std::io;
+use rtio = std::rt::io;
+
+pub use std::rt::io::Writer;
 
 use bson::encode::*;
 
 use mongo::coll::*;
 use mongo::util::*;
 
-pub struct GridIn {
-    chunks: @Collection,
-    files: @Collection,
+pub struct GridIn<'self> {
+    chunks: &'self Collection,
+    files: &'self Collection,
     closed: bool,
-    buf: BytesWriter,
+    buf: stdio::BytesWriter,
     chunk_size: uint,
     chunk_num: uint,
     file_id: Option<Document>,
@@ -36,28 +39,16 @@ pub struct GridOut {
     files: @Collection
 }
 
-impl GridIn {
-    pub fn new(chunks: @Collection, files: @Collection) -> GridIn {
-        GridIn {
-            chunks: chunks,
-            files: files,
-            closed: false,
-            buf: BytesWriter::new(),
-            chunk_size: 256 * 1024,
-            chunk_num: 0,
-            file_id: None,
-            position: 0,
-        }
-    }
-
-    pub fn write(&mut self, d: ~[u8]) -> Result<(), MongoErr> {
+impl<'self> rtio::Writer for GridIn<'self> {
+    pub fn write(&mut self, d: &[u8]) {
         if self.closed {
-            return Err(MongoErr::new(
-                    ~"gridfile::write",
-                    ~"cannot write to a closed file",
-                    ~"closed files can no longer be written"))
+            rtio::io_error::cond.raise(rtio::IoError {
+                kind: rtio::Closed,
+                desc: "cannot write to a closed GridIn",
+                detail: None
+            })
         }
-        let mut data: ~[u8] = d;
+        let mut data: ~[u8] = d.to_owned();
         if self.buf.tell() > 0 {
             let space = self.chunk_size - self.buf.tell();
             let to_write = data.iter().transform(|x| *x).take_(space).collect::<~[u8]>();
@@ -66,29 +57,123 @@ impl GridIn {
             }
             match self.flush_data(to_write) {
                 Ok(_) => (),
-                Err(e) => return Err(e)
+                Err(e) => rtio::io_error::cond.raise(rtio::IoError {
+                    kind: rtio::OtherIoError,
+                    desc: "could not flush data to buffer",
+                    detail: Some(e.to_str())
+                })
             }
-            self.buf = BytesWriter::new();
+            self.buf = stdio::BytesWriter::new();
         }
         let mut to_write: ~[u8] = data.iter().transform(|x| *x).take_(self.chunk_size).collect();
         data = data.iter().skip(self.chunk_size).transform(|x| *x).collect();
         while to_write.len() == self.chunk_size {
             match self.flush_data(to_write) {
                 Ok(_) => (),
-                Err(e) => return Err(e)
+                Err(e) => rtio::io_error::cond.raise(rtio::IoError {
+                    kind: rtio::OtherIoError,
+                    desc: "could not flush data to buffer",
+                    detail: Some(e.to_str())
+                })
             }
             data = data.iter().skip(self.chunk_size).transform(|x| *x).collect();
             to_write = data.iter().take_(self.chunk_size).transform(|x| *x).collect();
         }
         self.buf.write(to_write);
-        Ok(())
     }
 
-    pub fn close(&mut self) {
-        if !self.closed {
-            self.close_buf();
-            self.closed = true;
+    pub fn flush(&mut self) {
+        self.buf.flush();
+        let db = self.chunks.get_db();
+
+        let mut oid = ~"";
+        match self.file_id {
+            Some(Binary(_, ref v)) => {
+                for v.iter().advance |b| {
+                    let mut byte = b.to_str();
+                    if byte.len() == 1 {
+                        byte = (~"0").append(byte)
+                    }
+                    oid.push_str(byte);
+                }
+            }
+            _ => ()
         }
+
+        let mut ioerr: Option<rtio::IoError> = None;
+
+        let md5 = match db.run_command(SpecNotation(
+            fmt!("{ 'filemd5': %s, 'root': 'fs' }", oid))) {
+            Ok(d) => match d.find(~"md5") {
+                Some(&UString(ref s)) => s.clone(),
+                _ => {
+                    ioerr = Some(rtio::IoError {
+                        kind: rtio::OtherIoError,
+                        desc: "could not get filemd5 from server",
+                        detail: None
+                    });
+                    ~""
+                }
+            },
+            Err(e) => {
+                ioerr = Some(rtio::IoError {
+                    kind: rtio::OtherIoError,
+                    desc: "could not get filemd5 from server",
+                    detail: Some(e.to_str())
+                });
+                ~""
+            }
+        };
+
+        if ioerr.is_some() {
+            rtio::io_error::cond.raise(ioerr.unwrap());
+        }
+
+        let mut file = BsonDocument::new();
+        file.put(~"md5", UString(md5));
+        file.put(~"length", Int32(self.position as i32));
+        //TODO: needs an uploadDate field,
+        //assuming there is a reasonable date library
+        match self.files.insert(file, None) {
+            Ok(_) => (),
+            Err(e) => rtio::io_error::cond.raise(rtio::IoError {
+                kind: rtio::OtherIoError,
+                desc: "could not store metadata",
+                detail: Some(e.to_str())
+            })
+        }
+    }
+}
+
+impl<'self> GridIn<'self> {
+    pub fn new(chunks: &'self Collection,
+        files: &'self Collection) -> GridIn<'self> {
+        GridIn {
+            chunks: chunks,
+            files: files,
+            closed: false,
+            buf: stdio::BytesWriter::new(),
+            chunk_size: 256 * 1024,
+            chunk_num: 0,
+            file_id: None,
+            position: 0,
+        }
+    }
+
+    pub fn close(&mut self) -> Result<(), MongoErr> {
+        let mut res = Ok(());
+        if !self.closed {
+            do rtio::io_error::cond.trap(|c| {
+                res = Err(MongoErr::new(
+                    ~"gridfile::close",
+                    ~"unable to flush buffer",
+                    c.desc.to_owned()));
+            }).in {
+                self.flush();
+                self.closed = true;
+            }
+        }
+        res
     }
 
     fn flush_data(&mut self, data: &[u8]) -> Result<(), MongoErr> {
@@ -121,43 +206,5 @@ impl GridIn {
         self.position += data.len();
         self.chunk_num += 1;
         Ok(())
-    }
-
-    fn close_buf(&self) -> Result<(), MongoErr> {
-        self.buf.flush();
-        let db = self.chunks.get_db();
-
-        let mut oid = ~"";
-        match self.file_id {
-            Some(Binary(_, ref v)) => {
-                for v.iter().advance |b| {
-                    let mut byte = b.to_str();
-                    if byte.len() == 1 {
-                        byte = (~"0").append(byte)
-                    }
-                    oid.push_str(byte);
-                }
-            }
-            _ => ()
-        }
-
-        let md5 = match db.run_command(SpecNotation(
-            fmt!("{ 'filemd5': %s, 'root': 'fs' }", oid))) {
-            Ok(d) => match d.find(~"md5") {
-                Some(&UString(ref s)) => s.clone(),
-                _ => return Err(MongoErr::new(
-                    ~"gridfile::close",
-                    ~"could not get file md5",
-                    ~"the server returned an unexpected md5 hash"))
-            },
-            Err(e) => return Err(e)
-        };
-
-        let mut file = BsonDocument::new();
-        file.put(~"md5", UString(md5));
-        file.put(~"length", Int32(self.position as i32));
-        //TODO: needs an uploadDate field,
-        //assuming there is a reasonable date library
-        self.files.insert(file, None)
     }
 }

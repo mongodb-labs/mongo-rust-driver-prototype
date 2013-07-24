@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+use bson::encode::*;
+
 use mongo::db::*;
 use mongo::coll::*;
 use mongo::util::*;
@@ -21,8 +23,8 @@ use gridfile::*;
 
 pub struct GridFS {
     db: @DB,
-    files: @Collection,
-    chunks: @Collection,
+    files: ~Collection,
+    chunks: ~Collection,
 }
 
 impl GridFS {
@@ -34,17 +36,51 @@ impl GridFS {
     pub fn new(db: @DB) -> GridFS {
         GridFS {
             db: db,
-            files: @(db.get_collection(~"fs.files")),
-            chunks: @(db.get_collection(~"fs.chunks"))
+            files: ~(db.get_collection(~"fs.files")),
+            chunks: ~(db.get_collection(~"fs.chunks"))
         }
     }
 
-    pub fn new_file(&self) -> GridIn {
-        GridIn::new(self.chunks, self.files)
+    pub fn new_file<'a>(&'a self) -> GridIn<'a> {
+        GridIn::new(&'a *self.chunks, &'a *self.files)
     }
 
     pub fn put(&self, data: ~[u8]) -> Result<(), MongoErr> {
+        use std::rt::io::io_error;
+
+        let mut res = Ok(());
         let mut file = self.new_file();
-        file.write(data)
+        do io_error::cond.trap(|c| {
+            res = Err(MongoErr::new(
+                ~"grid::put",
+                c.desc.to_owned(),
+                if c.detail.is_some() {c.detail.unwrap()}
+                else {~"method returned without error detail"}));
+        }).in {
+            file.write(data);
+            file.close();
+        }
+        res
+    }
+
+    pub fn delete(&self, id: Document) -> Result<(), MongoErr> {
+        let mut file_doc = BsonDocument::new();
+        let mut chunk_doc = BsonDocument::new();
+        file_doc.put(~"_id", id.clone());
+        chunk_doc.put(~"files_id", id);
+        result_and(
+            self.files.remove(Some(SpecObj(file_doc)), None, None, None),
+            self.chunks.remove(Some(SpecObj(chunk_doc)), None, None, None)
+        )
+    }
+}
+
+priv fn result_and<T,U>(r1: Result<T,U>, r2: Result<T,U>) -> Result<T,U> {
+    match r1 {
+        Ok(k) => match r2 {
+            Ok(_) => Ok(k),
+            Err(e) => return Err(e)
+        },
+        Err(e) => Err(e)
     }
 }
