@@ -116,10 +116,10 @@ impl MongoIndex {
     }
 }
 
-pub struct Collection {
+pub struct Collection<'self> {
     db : ~str,
     name : ~str,
-    priv client : @Client,
+    priv client : &'self Client,
 }
 
 // TODO: checking arguments for validity?
@@ -130,7 +130,7 @@ pub struct Collection {
  * collections by creating `Collection` handles to those
  * collections.
  */
-impl Collection {
+impl<'self> Collection<'self> {
     /**
      * Creates a new handle to the given collection.
      * Alternative to `client.get_collection(db, collection)`.
@@ -143,7 +143,7 @@ impl Collection {
      * # Returns
      * handle to given collection
      */
-    pub fn new(db : ~str, name : ~str, client : @Client) -> Collection {
+    pub fn new<'a>(db : ~str, name : ~str, client : &'a Client) -> Collection<'a> {
         Collection { db : db, name : name, client : client }
     }
 
@@ -153,8 +153,8 @@ impl Collection {
      * # Returns
      * handle to database containing this `Collection`
      */
-    pub fn get_db(&self) -> DB {
-        DB::new(copy self.db, self.client)
+    pub fn get_db<'a>(&'a self) -> DB<'a> {
+        DB::new(self.db.clone(), self.client)
     }
 
     /**
@@ -183,7 +183,7 @@ impl Collection {
             });
         }
 
-        let db = DB::new(copy self.db, self.client);
+        let db = DB::new(self.db.clone(), self.client);
         match db.run_command(SpecNotation(fmt!("{ %s }", cmd))) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -413,11 +413,11 @@ impl Collection {
      * # Returns
      * initialized (unqueried) Cursor on success, `MongoErr` on failure
      */
-    pub fn find(&self,  query : Option<QuerySpec>,
+    pub fn find(        &self,  query : Option<QuerySpec>,
                         proj : Option<QuerySpec>,
                         flag_array : Option<~[QUERY_FLAG]>/*,
                         option_array : Option<~[QUERY_OPTION]>*/)
-                -> Result<Cursor, MongoErr> {
+                -> Result<Cursor<'self>, MongoErr> {
         // construct query (wrapped as { $query : {...} }
         //      for ease of query modification)
         let q_field = match query {
@@ -580,7 +580,7 @@ impl Collection {
                                 flag_array : Option<~[INDEX_FLAG]>,
                                 option_array : Option<~[INDEX_OPTION]>)
                 -> Result<MongoIndex, MongoErr> {
-        let coll = Collection::new(copy self.db, fmt!("%s", SYSTEM_INDEX), self.client);
+        let coll = Collection::new(self.db.clone(), fmt!("%s", SYSTEM_INDEX), self.client);
 
         let flags = process_flags!(flag_array);
         let (x, y) = MongoIndex::process_index_opts(flags, option_array);
@@ -612,7 +612,7 @@ impl Collection {
         self.create_index(index_arr, flag_array, option_array)
     }
     pub fn get_indexes(&self) -> Result<~[~str], MongoErr> {
-        let coll = Collection::new(copy self.db, fmt!("%s", SYSTEM_INDEX), self.client);
+        let coll = Collection::new(self.db.clone(), fmt!("%s", SYSTEM_INDEX), self.client);
         let mut cursor = match coll.find(None, None, None) {
             Ok(c) => c,
             Err(e) => return Err(e),
@@ -634,7 +634,7 @@ impl Collection {
      * () on success, `MongoErr` on failure
      */
     pub fn drop_index(&self, index : MongoIndex) -> Result<(), MongoErr> {
-        let db = DB::new(copy self.db, self.client);
+        let db = DB::new(self.db.clone(), self.client);
         match db.run_command(SpecNotation(
                     fmt!("{ \"deleteIndexes\":\"%s\", \"index\":\"%s\" }",
                         self.name,

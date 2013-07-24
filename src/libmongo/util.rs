@@ -245,6 +245,24 @@ pub enum COLLECTION_OPTION {
 }
 
 /**
+ * Replica sets.
+ */
+#[deriving(Clone,Eq)]
+pub enum RS_OPTION {
+    CHAINING_ALLOWED,
+}
+#[deriving(Clone,Eq)]
+pub enum RS_MEMBER_OPTION {
+    ARB_ONLY,
+    BUILD_INDS,
+    HIDDEN,
+    PRIORITY(f64),
+    TAGS(TagSet),
+    SLAVE_DELAY(i32),
+    VOTES(i32),
+}
+
+/**
  * Misc
  */
 pub static LITTLE_ENDIAN_TRUE : bool = true;

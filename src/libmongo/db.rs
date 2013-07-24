@@ -27,9 +27,9 @@ use coll::Collection;
 
 static L_END: bool = true;
 
-pub struct DB {
+pub struct DB<'self> {
     name : ~str,
-    priv client : @Client,
+    priv client : &'self Client,
 }
 
 #[link_args = "-lmd5"]
@@ -80,7 +80,7 @@ impl MD5State {
  * to a server or cluster, users may interact with
  * databases by creating `DB` handles to those databases.
  */
-impl DB {
+impl<'self> DB<'self> {
     /**
      * Creates a new Mongo DB with given name and associated Client.
      *
@@ -91,7 +91,7 @@ impl DB {
      * # Returns
      * DB (handle to database)
      */
-    pub fn new(name : ~str, client : @Client) -> DB {
+    pub fn new<'a>(name : ~str, client : &'a Client) -> DB<'a> {
         DB {
             name : name,
             client : client
@@ -117,7 +117,7 @@ impl DB {
         let mut names : ~[~str] = ~[];
 
         // query on namespace collection
-        let coll = Collection::new(copy self.name, fmt!("%s", SYSTEM_NAMESPACE), self.client);
+        let coll = Collection::new(self.name.clone(), fmt!("%s", SYSTEM_NAMESPACE), self.client);
         let mut cur = match coll.find(None, None, None) {
             Ok(cursor) => cursor,
             Err(e) => return Err(e),
@@ -160,7 +160,7 @@ impl DB {
      * # Failure Types
      * * errors propagated from `get_collection_names`
      */
-    pub fn get_collections(&self) -> Result<~[Collection], MongoErr> {
+    pub fn get_collections<'a>(&'a self) -> Result<~[Collection<'a>], MongoErr> {
         let names = match self.get_collection_names() {
             Ok(n) => n,
             Err(e) => return Err(e),
@@ -168,7 +168,7 @@ impl DB {
 
         let mut coll : ~[Collection] = ~[];
         for names.iter().advance |&n| {
-            coll = coll + ~[Collection::new(copy self.name, n, self.client)];
+            coll = coll + ~[Collection::new(self.name.clone(), n, self.client)];
         }
 
         Ok(coll)
@@ -184,17 +184,17 @@ impl DB {
      * # Returns
      * handle to collection on success, `MongoErr` on failure
      */
-    pub fn create_collection(   &self,
+    pub fn create_collection<'a>(   &'a self,
                                 coll : ~str,
                                 flag_array : Option<~[COLLECTION_FLAG]>,
                                 option_array : Option<~[COLLECTION_OPTION]>)
-            -> Result<Collection, MongoErr> {
+            -> Result<Collection<'a>, MongoErr> {
         let flags = process_flags!(flag_array);
         let cmd = fmt!( "{ \"create\":\"%s\", %s }",
                         coll,
                         self.process_create_ops(flags, option_array));
         match self.run_command(SpecNotation(cmd)) {
-            Ok(_) => Ok(Collection::new(copy self.name, coll, self.client)),
+            Ok(_) => Ok(Collection::new(self.name.clone(), coll, self.client)),
             Err(e) => Err(e),
         }
     }
@@ -228,8 +228,8 @@ impl DB {
      * # Returns
      * handle to collection
      */
-    pub fn get_collection(&self, coll : ~str) -> Collection {
-        Collection::new(copy self.name, coll, self.client)
+    pub fn get_collection<'a>(&'a self, coll : ~str) -> Collection<'a> {
+        Collection::new(self.name.clone(), coll, self.client)
     }
     /**
      * Drops given collection from database associated with this `DB`.
@@ -261,7 +261,7 @@ impl DB {
      * appropriately by caller, `MongoErr` on failure
      */
     pub fn run_command(&self, cmd : QuerySpec) -> Result<~BsonDocument, MongoErr> {
-        let coll = Collection::new(copy self.name, fmt!("%s", SYSTEM_COMMAND), self.client);
+        let coll = Collection::new(self.name.clone(), fmt!("%s", SYSTEM_COMMAND), self.client);
 
         //let ret_msg = match coll.find_one(Some(cmd), None, None, None) {
         let ret_msg = match coll.find_one(Some(copy cmd), None, Some(~[NO_CUR_TIMEOUT])) {
@@ -387,7 +387,7 @@ impl DB {
             UString(s) => Err(MongoErr::new(
                             ~"db::get_last_error",
                             ~"getLastError error",
-                            copy s)),
+                            s.clone())),
             _ => Err(MongoErr::new(
                             ~"db::get_last_error",
                             ~"getLastError unexpected format",
@@ -404,7 +404,7 @@ impl DB {
                 Ok(u) => u,
                 Err(_) => {
                     let mut doc = BsonDocument::new();
-                    doc.put(~"user", UString(copy username));
+                    doc.put(~"user", UString(username.clone()));
                     ~doc
                 }
             };
@@ -417,7 +417,7 @@ impl DB {
     pub fn authenticate(&self, username: ~str, password: ~str) -> Result<(), MongoErr> {
         let nonce = match self.run_command(SpecNotation(~"{ \"getnonce\": 1 }")) {
             Ok(doc) => match *doc.find(~"nonce").unwrap() { //this unwrap should always succeed
-                UString(ref s) => copy *s,
+                UString(ref s) => (*s).clone(),
                 _ => return Err(MongoErr::new(
                     ~"db::authenticate",
                     ~"error while getting nonce",
