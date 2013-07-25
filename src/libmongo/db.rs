@@ -168,7 +168,7 @@ impl<'self> DB<'self> {
 
         let mut coll : ~[Collection] = ~[];
         for names.iter().advance |&n| {
-            coll = coll + ~[Collection::new(self.name.clone(), n, self.client)];
+            coll.push(Collection::new(self.name.clone(), n, self.client));
         }
 
         Ok(coll)
