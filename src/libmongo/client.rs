@@ -33,7 +33,7 @@ use coll::Collection;
  * `Collection`, etc. all store their associated `Client`
  */
 pub struct Client {
-    priv conn : ~cell::Cell<@Connection>,
+    conn : cell::Cell<@Connection>,
     priv cur_requestId : ~cell::Cell<i32>,      // first unused requestId
     // XXX index cache?
 }
@@ -50,7 +50,7 @@ impl Client {
      */
     pub fn new() -> Client {
         Client {
-            conn : ~cell::Cell::new_empty(),
+            conn : cell::Cell::new_empty(),
             cur_requestId : ~cell::Cell::new(0),
         }
     }
