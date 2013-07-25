@@ -143,8 +143,8 @@ impl<'self> Collection<'self> {
      * # Returns
      * handle to given collection
      */
-    pub fn new<'a>(db : ~str, name : ~str, client : &'a Client) -> Collection<'a> {
-        Collection { db : db, name : name, client : client }
+    pub fn new<'a>(db : &str, name : ~str, client : &'a Client) -> Collection<'a> {
+        Collection { db : db.to_owned(), name : name, client : client }
     }
 
     /**
