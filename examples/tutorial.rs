@@ -61,7 +61,7 @@ fn main() {
 
     // read one back (no specific query or query options/flags)
     match foo.find_one(None, None, None) {
-        Ok(ret_doc) => println(fmt!("%?", *ret_doc)),
+        Ok(ret_doc) => println(fmt!("%?\n", *ret_doc)),
         Err(e) => fail!("%s", e.to_str()), // should not happen
     }
 
@@ -77,7 +77,7 @@ fn main() {
     // ***error returned***
     match foo.insert_batch(ins_batch, None, None, None) {
         Ok(_) => fail!("bad insert succeeded"),          // should not happen
-        Err(e) => println(fmt!("%s", e.to_str())),
+        Err(e) => println(fmt!("%s\n", e.to_str())),
     }
     // ***no error returned since duplicated _ids skipped (CONT_ON_ERR specified)***
     /*match foo.insert_batch(ins_batch, Some(~[CONT_ON_ERR]), None, None) {
@@ -102,14 +102,14 @@ fn main() {
             cursor.hint(MongoIndexName(~"fubar"));
 
             // explain the cursor
-            println(fmt!("%?", cursor.explain()));
+            println(fmt!("%?\n", cursor.explain().unwrap().fields.to_str()));
 
             // sort on the cursor on the "a" field, ascending
             cursor.sort(NORMAL(~[(~"a", ASC)]));
 
             // iterate on the cursor---no query specified so over whole collection
             for cursor.advance |doc| {
-                println(fmt!("%?", *doc));
+                println(fmt!("%?\n", *doc));
             }
         }
         Err(e) => fail!("%s", e.to_str()),     // should not happen
@@ -150,22 +150,22 @@ fn main() {
             //      foo_coll
             for names.iter().advance |&n| { println(fmt!("%s", n)); }
         }
-        Err(e) => println(fmt!("%s", e.to_str())), // should not happen
+        Err(e) => println(fmt!("%s\n", e.to_str())), // should not happen
     }
 
     // perform a run_command, but the result (if successful, a ~BsonDocument)
     //      must be parsed appropriately
-    println(fmt!("%?", db.run_command(SpecNotation(~"{ \"count\":1 }"))));
+    println(fmt!("%?\n", db.run_command(SpecNotation(~"{ \"count\":1 }"))));
 
     // drop the database
     match client.drop_db(~"foo_db") {
         Ok(_) => (),
-        Err(e) => println(fmt!("%s", e.to_str())), // should not happen
+        Err(e) => println(fmt!("%s\n", e.to_str())), // should not happen
     }
 
     // Finally, we should disconnect the client. It can be reconnected to another server after disconnection.
     match client.disconnect() {
         Ok(_) => (),
-        Err(e) => println(fmt!("%s", e.to_str())), // should not happen
+        Err(e) => println(fmt!("%s\n", e.to_str())), // should not happen
     }
 }
