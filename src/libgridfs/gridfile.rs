@@ -16,7 +16,7 @@
 use stdio = std::io;
 use rtio = std::rt::io;
 
-pub use std::rt::io::Writer;
+pub use std::rt::io::{Reader,Writer};
 
 use bson::encode::*;
 
@@ -34,9 +34,12 @@ pub struct GridIn<'self> {
     position: uint,
 }
 
-pub struct GridOut {
-    chunks: @Collection,
-    files: @Collection
+pub struct GridOut<'self> {
+    chunks: &'self Collection,
+    files: &'self Collection,
+    length: uint,
+    position: uint,
+    file_id: Document,
 }
 
 impl<'self> rtio::Writer for GridIn<'self> {
@@ -90,7 +93,7 @@ impl<'self> rtio::Writer for GridIn<'self> {
         match self.file_id {
             Some(Binary(_, ref v)) => {
                 for v.iter().advance |b| {
-                    let mut byte = b.to_str();
+                    let mut byte = fmt!("%x", b);
                     if byte.len() == 1 {
                         byte = (~"0").append(byte)
                     }
@@ -206,5 +209,44 @@ impl<'self> GridIn<'self> {
         self.position += data.len();
         self.chunk_num += 1;
         Ok(())
+    }
+}
+
+impl<'self> rtio::Reader for GridOut<'self> {
+    pub fn read(&mut self, buf: &mut [u8]) -> Option<uint> {
+        if buf.len() == 0 { return None; }
+        let remainder = self.length - self.position;
+        //TODO
+        Some(0)
+    }
+
+    pub fn eof(&mut self) -> bool {
+        self.position >= self.length
+    }
+}
+
+impl<'self> GridOut<'self> {
+    pub fn new(chunks: &'self Collection,
+               files: &'self Collection,
+               file_id: Document)
+        -> GridOut<'self> {
+        let mut doc = BsonDocument::new();
+        doc.put(~"_id", file_id.clone());
+        let len = match files.find_one(Some(SpecObj(doc)), None, None) {
+            Ok(d) => match d.find(~"length") {
+                Some(&Int32(i)) => i as uint,
+                Some(&Double(f)) => f as uint,
+                Some(&Int64(i)) => i as uint,
+                _ => fail!("could not create new GridOut; length was invalid")
+            },
+            Err(e) => fail!(e.to_str())
+        };
+        GridOut {
+            chunks: chunks,
+            files: files,
+            file_id: file_id,
+            length: len,
+            position: 0,
+        }
     }
 }
