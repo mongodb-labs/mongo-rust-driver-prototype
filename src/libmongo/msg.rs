@@ -146,12 +146,12 @@ pub fn msg_to_bytes(msg : ClientMsg) -> ~[u8] {
             });
         }
         OpGetMore { header:h, RESERVED_BITS:r, full_collection_name:n, nret:nr, cursor_id:id } => {
-            bytes = bytes + _header_to_bytes(h)
-                        + r.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + n.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + ~[0u8]    // null-terminate name
-                        + nr.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + id.to_bytes(LITTLE_ENDIAN_TRUE);
+            bytes.push_all_move(_header_to_bytes(h));
+            bytes.push_all_move(r.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push_all_move(n.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push(0u8);    // null-terminate name
+            bytes.push_all_move(nr.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push_all_move(id.to_bytes(LITTLE_ENDIAN_TRUE));
         }
         OpDelete { header:h, RESERVED_BITS:r, full_collection_name:n, flags:f, selector:s } => {
             bytes.push_all_move(_header_to_bytes(h));

@@ -168,7 +168,7 @@ impl DB {
 
         let mut coll : ~[Collection] = ~[];
         for names.iter().advance |&n| {
-            coll = coll + ~[Collection::new(copy self.name, n, self.client)];
+            coll.push(Collection::new(self.name.clone(), n, self.client));
         }
 
         Ok(coll)
