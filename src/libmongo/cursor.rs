@@ -14,6 +14,7 @@
  */
 
 use std::num::*;
+use std::cell::*;
 
 use bson::encode::*;
 
@@ -39,7 +40,7 @@ pub struct Cursor {
     priv skip : i32,                        // number to skip, specify before first "next"
     priv limit : i32,                       // max to return, specify before first "next"
     priv data : ~[~BsonDocument],           // docs stored in cursor
-    priv i : i32,                           // i64? index within data currently held
+    priv done : Cell<bool>,                 // whether [just] finished popping
 }
 
 ///Iterator implementation, opens access to powerful functions like collect, advance, map, etc.
@@ -58,8 +59,7 @@ impl Iterator<~BsonDocument> for Cursor {
         if self.refresh() == 0 {
             return None;
         }
-        self.i = self.i + 1;
-        Some(copy self.data[self.i-1])
+        Some(self.data.pop())
     }
 }
 
@@ -90,8 +90,8 @@ impl Cursor {
                     flags : i32) -> Cursor {
         Cursor {
             id: None,
-            db: copy collection.db,
-            coll: copy collection.name,
+            db: collection.db.clone(),
+            coll: collection.name.clone(),
             client: client,
             flags: flags,
             batch_size: 0,
@@ -103,7 +103,7 @@ impl Cursor {
             skip: 0,
             limit: 0,
             data: ~[],
-            i: 0,
+            done: Cell::new(false),
         }
     }
 
@@ -136,8 +136,11 @@ impl Cursor {
                         OpReply { header:_, flags:_, cursor_id:id, start:_, nret:n, docs:d } => {
                             self.id = Some(id);
                             self.retrieved = n;
-                            self.data = d;
-                            self.i = 0;
+                            let mut d_tmp = d;
+                            d_tmp.reverse();
+                            self.data = d_tmp;
+                            if !self.done.is_empty() { self.done.take(); }
+                            self.done.put_back(false);
 
                             return n;
                         }
@@ -167,23 +170,23 @@ impl Cursor {
             let diff = self.limit - self.retrieved;
             if diff > 0 { return diff; }
         }
-        if self.i < self.data.len() as i32 {
+        if self.data.len() > 0 {
             // has_next *within* cursor, so don't get_more
-            return (self.data.len() as i32) - self.i;
+            return self.data.len() as i32;
         }
 
         // otherwise, no more within cursor, so see if can get_more
-        let cur_id = (copy self.id).unwrap();
+        let cur_id = self.id.clone().unwrap();
         if cur_id == 0 {
-
             // exhausted cursor; return
-            if self.i > self.data.len() as i32 {
+            if self.done.take() {
                 // only if cursor exhausted "abnormally", set iter_err
                 self.iter_err = Some(MongoErr::new(
                                         ~"cursor::refresh",
                                         ~"querying on closed cursor",
                                         ~"cannot query on closed cursor"));
             }
+            self.done.put_back(true);
             return 0;
         }
 
@@ -214,8 +217,11 @@ impl Cursor {
                         // also update this cursor's fields
                         self.id = Some(id);
                         self.retrieved = self.retrieved + n;
-                        self.data = d;
-                        self.i = 0;
+                        let mut d_tmp = d;
+                        d_tmp.reverse();
+                        self.data = d_tmp;
+                        if !self.done.is_empty() { self.done.take(); }
+                        self.done.put_back(false);
 
                         return n;
                     }
@@ -399,13 +405,10 @@ impl Cursor {
      * Considers the last element of a `Cursor` to be `None`, hence
      * returns `true` at edge case when `Cursor` exhausted naturally.
      */
-    pub fn has_next(&self) -> bool {
+    pub fn has_next(&mut self) -> bool {
         // return true even if right at end (normal exhaustion of cursor)
-        if self.limit != 0 {
-            let diff = self.limit - self.retrieved;
-            if diff >= 0 { return true; }
-        }
-        self.i <= self.data.len() as i32
+        if self.limit != 0 && self.limit >= self.retrieved { true }
+        else { self.refresh() != 0 }
     }
 
     /**

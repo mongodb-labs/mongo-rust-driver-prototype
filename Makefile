@@ -48,18 +48,18 @@ libs: $(LIB)/md5.c
 	$(AR) $(BIN)/libmd5.a $(BIN)/md5.o
 
 bson: $(BSONDIR)/*
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson.rc
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(BSONDIR)/bson.rs
 
 mongo: $(MONGODIR)/*
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rc
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rs
 
 gridfs: $(GRIDDIR)/*
-	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(GRIDDIR)/gridfs.rc
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(GRIDDIR)/gridfs.rs
 
-test: $(BSONDIR)/bson.rc $(MONGODIR)/mongo.rc
-	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
-	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
-	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rc
+test: $(BSONDIR)/bson.rs $(MONGODIR)/mongo.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rs
 
 check: test
 ifeq ($(MONGOTEST),1)
