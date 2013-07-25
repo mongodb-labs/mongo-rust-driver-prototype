@@ -91,9 +91,9 @@ impl DB {
      * # Returns
      * DB (handle to database)
      */
-    pub fn new(name : ~str, client : @Client) -> DB {
+    pub fn new(name : &str, client : @Client) -> DB {
         DB {
-            name : name,
+            name : name.to_owned(),
             client : client
         }
     }

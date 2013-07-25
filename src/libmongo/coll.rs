@@ -143,8 +143,8 @@ impl Collection {
      * # Returns
      * handle to given collection
      */
-    pub fn new(db : ~str, name : ~str, client : @Client) -> Collection {
-        Collection { db : db, name : name, client : client }
+    pub fn new(db : &str, name : &str, client : @Client) -> Collection {
+        Collection { db : db.to_owned(), name : name.to_owned(), client : client }
     }
 
     /**
