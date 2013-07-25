@@ -40,6 +40,7 @@ pub struct Cursor {
     priv limit : i32,                       // max to return, specify before first "next"
     priv data : ~[~BsonDocument],           // docs stored in cursor
     priv i : i32,                           // i64? index within data currently held
+    priv cur_batch_size: uint               // size of the current batch
 }
 
 ///Iterator implementation, opens access to powerful functions like collect, advance, map, etc.
@@ -58,8 +59,9 @@ impl Iterator<~BsonDocument> for Cursor {
         if self.refresh() == 0 {
             return None;
         }
-        self.i = self.i + 1;
-        Some(copy self.data[self.i-1])
+        self.i += 1;
+        //Some(copy self.data[self.i-1])
+        Some(self.data.pop())
     }
 }
 
@@ -104,6 +106,7 @@ impl Cursor {
             limit: 0,
             data: ~[],
             i: 0,
+            cur_batch_size: 0,
         }
     }
 
@@ -137,8 +140,9 @@ impl Cursor {
                             self.id = Some(id);
                             self.retrieved = n;
                             self.data = d;
+                            self.data.reverse();
                             self.i = 0;
-
+                            self.cur_batch_size = self.data.len();
                             return n;
                         }
                     },
@@ -167,9 +171,9 @@ impl Cursor {
             let diff = self.limit - self.retrieved;
             if diff > 0 { return diff; }
         }
-        if self.i < self.data.len() as i32 {
+        if self.i < self.cur_batch_size as i32 {
             // has_next *within* cursor, so don't get_more
-            return (self.data.len() as i32) - self.i;
+            return (self.cur_batch_size as i32) - self.i;
         }
 
         // otherwise, no more within cursor, so see if can get_more
@@ -177,7 +181,7 @@ impl Cursor {
         if cur_id == 0 {
 
             // exhausted cursor; return
-            if self.i > self.data.len() as i32 {
+            if self.i > self.cur_batch_size as i32 {
                 // only if cursor exhausted "abnormally", set iter_err
                 self.iter_err = Some(MongoErr::new(
                                         ~"cursor::refresh",
@@ -215,8 +219,9 @@ impl Cursor {
                         self.id = Some(id);
                         self.retrieved = self.retrieved + n;
                         self.data = d;
+                        self.data.reverse();
                         self.i = 0;
-
+                        self.cur_batch_size = self.data.len();
                         return n;
                     }
                 },
