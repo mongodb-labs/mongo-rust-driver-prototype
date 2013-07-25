@@ -16,6 +16,7 @@
 use extra::treemap::*;
 
 use bson::encode::*;
+use bson::formattable::*;
 
 /**
  * Utility module for use internal and external to crate.
@@ -131,6 +132,30 @@ impl Clone for TagSet {
         TagSet { tags : tags }
     }
 }
+impl BsonFormattable for TagSet {
+    pub fn to_bson_t(&self) -> Document {
+        let mut ts_doc = BsonDocument::new();
+        for self.tags.iter().advance |(&k,&v)| {
+            ts_doc.put(k, UString(v));
+        }
+        Embedded(~ts_doc)
+    }
+    pub fn from_bson_t(doc : Document) -> Result<TagSet, ~str> {
+        let mut ts = TagSet::new(~[]);
+        match doc {
+            Embedded(bson_doc) => {
+                for bson_doc.fields.iter().advance |&(@k,@v)| {
+                    match v {
+                        UString(s) => ts.set_tag((k,s)),
+                        _ => return Err(~"not TagSet struct (val not UString)"),
+                    }
+                }
+            }
+            _ => return Err(~"not TagSet struct (not Embedded BsonDocument)"),
+        }
+        Ok(ts)
+    }
+}
 impl TagSet {
     pub fn new(tag_list : ~[(~str, ~str)]) -> TagSet {
         let mut tags = TreeMap::new();
@@ -140,21 +165,25 @@ impl TagSet {
         TagSet { tags : tags }
     }
 
-    pub fn get_tag_val(&self, field : ~str) -> Option<~str> {
-        match self.tags.find(&field) {
+    pub fn get_tag_val<'a>(&'a self, field : ~str) -> Option<&'a ~str> {
+        self.tags.find(&field)
+        /*match self.tags.find(&field) {
             None => None,
-            Some(s) => Some(copy *s),
-        }
+            Some(s) => Some(s),
+        }*/
     }
 
+    /**
+     * Sets tag in TagSet, whether or not it existed previously.
+     */
     pub fn set_tag(&mut self, tag : (~str, ~str)) {
         let (field, val) = tag;
         if val.len() == 0 {
             self.tags.remove(&field);
         } else {
-            if self.tags.find_mut(&field).is_some() {
+            //if self.tags.find_mut(&field).is_some() {
                 self.tags.remove(&field);
-            }
+            //}
             self.tags.insert(field, val);
         }
     }
@@ -242,24 +271,6 @@ pub enum COLLECTION_OPTION {
     CAPPED(uint),   // max size of capped collection
     SIZE(uint),     // preallocated size of uncapped collection
     MAX_DOCS(uint), // max cap in number of documents
-}
-
-/**
- * Replica sets.
- */
-#[deriving(Clone,Eq)]
-pub enum RS_OPTION {
-    CHAINING_ALLOWED,
-}
-#[deriving(Clone,Eq)]
-pub enum RS_MEMBER_OPTION {
-    ARB_ONLY,
-    BUILD_INDS,
-    HIDDEN,
-    PRIORITY(f64),
-    TAGS(TagSet),
-    SLAVE_DELAY(i32),
-    VOTES(i32),
 }
 
 /**

@@ -25,11 +25,11 @@ use coll::Collection;
 use coll::MongoIndex;
 
 ///Structure representing a cursor
-pub struct Cursor<'self> {
+pub struct Cursor {
     priv id : Option<i64>,                  // id on server (None->not yet queried, 0->closed)
     priv db: ~str,                          // name of DB associated with Cursor
     priv coll: ~str,                        // name of Collection associated with Cursor
-    priv client: &'self Client,             // Client (+Connection) associated with Cursor
+    priv client: @Client,             // Client (+Connection) associated with Cursor
     flags : i32,                            // QUERY_FLAGs
     batch_size : i32,                       // size of batch in cursor fetch, may be modified
     query_spec : BsonDocument,              // query, may be modified
@@ -44,7 +44,7 @@ pub struct Cursor<'self> {
 }
 
 ///Iterator implementation, opens access to powerful functions like collect, advance, map, etc.
-impl<'self> Iterator<~BsonDocument> for Cursor<'self> {
+impl Iterator<~BsonDocument> for Cursor {
     /**
      * Returns pointer to next `BsonDocument`.
      *
@@ -64,7 +64,7 @@ impl<'self> Iterator<~BsonDocument> for Cursor<'self> {
 }
 
 ///Cursor API
-impl<'self> Cursor<'self> {
+impl Cursor {
     /**
      * Initialize cursor with query, projection, collection, flags,
      * and skip and limit, but don't query yet (i.e. constructed
@@ -83,11 +83,11 @@ impl<'self> Cursor<'self> {
      * # Returns
      * `Cursor`
      */
-    pub fn new<'a>( query : BsonDocument,
+    pub fn new(     query : BsonDocument,
                     proj : Option<BsonDocument>,
                     collection : &Collection,
-                    client : &'a Client,
-                    flags : i32) -> Cursor<'a> {
+                    client : @Client,
+                    flags : i32) -> Cursor {
         Cursor {
             id: None,
             db: collection.db.clone(),

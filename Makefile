@@ -52,10 +52,10 @@ bson: $(BSONDIR)/*
 mongo: $(MONGODIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rs
 
-test: $(BSONDIR)/bson.rs $(MONGODIR)/mongo.rs $(MONGODIR)/test/test.rc
-	#$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rc
-	#$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rc
-	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rc
+test: $(BSONDIR)/bson.rs $(MONGODIR)/mongo.rs $(MONGODIR)/test/test.rs
+	#$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
+	#$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rs
 
 check: test
 ifeq ($(MONGOTEST),1)

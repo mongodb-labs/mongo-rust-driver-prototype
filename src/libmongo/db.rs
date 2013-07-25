@@ -27,9 +27,9 @@ use coll::Collection;
 
 static L_END: bool = true;
 
-pub struct DB<'self> {
+pub struct DB {
     name : ~str,
-    priv client : &'self Client,
+    priv client : @Client,
 }
 
 #[link_args = "-lmd5"]
@@ -80,7 +80,7 @@ impl MD5State {
  * to a server or cluster, users may interact with
  * databases by creating `DB` handles to those databases.
  */
-impl<'self> DB<'self> {
+impl DB {
     /**
      * Creates a new Mongo DB with given name and associated Client.
      *
@@ -91,7 +91,7 @@ impl<'self> DB<'self> {
      * # Returns
      * DB (handle to database)
      */
-    pub fn new<'a>(name : &str, client : &'a Client) -> DB<'a> {
+    pub fn new(name : &str, client : @Client) -> DB {
         DB {
             name : name.to_owned(),
             client : client
@@ -160,7 +160,7 @@ impl<'self> DB<'self> {
      * # Failure Types
      * * errors propagated from `get_collection_names`
      */
-    pub fn get_collections<'a>(&'a self) -> Result<~[Collection<'a>], MongoErr> {
+    pub fn get_collections(&self) -> Result<~[Collection], MongoErr> {
         let names = match self.get_collection_names() {
             Ok(n) => n,
             Err(e) => return Err(e),
@@ -184,11 +184,11 @@ impl<'self> DB<'self> {
      * # Returns
      * handle to collection on success, `MongoErr` on failure
      */
-    pub fn create_collection<'a>(   &'a self,
+    pub fn create_collection(   &self,
                                 coll : ~str,
                                 flag_array : Option<~[COLLECTION_FLAG]>,
                                 option_array : Option<~[COLLECTION_OPTION]>)
-            -> Result<Collection<'a>, MongoErr> {
+            -> Result<Collection, MongoErr> {
         let flags = process_flags!(flag_array);
         let cmd = fmt!( "{ \"create\":\"%s\", %s }",
                         coll,
@@ -228,7 +228,7 @@ impl<'self> DB<'self> {
      * # Returns
      * handle to collection
      */
-    pub fn get_collection<'a>(&'a self, coll : ~str) -> Collection<'a> {
+    pub fn get_collection(&self, coll : ~str) -> Collection {
         Collection::new(self.name.clone(), coll, self.client)
     }
     /**

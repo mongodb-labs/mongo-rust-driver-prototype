@@ -116,10 +116,10 @@ impl MongoIndex {
     }
 }
 
-pub struct Collection<'self> {
+pub struct Collection {
     db : ~str,
     name : ~str,
-    priv client : &'self Client,
+    priv client : @Client,
 }
 
 // TODO: checking arguments for validity?
@@ -130,7 +130,7 @@ pub struct Collection<'self> {
  * collections by creating `Collection` handles to those
  * collections.
  */
-impl<'self> Collection<'self> {
+impl Collection {
     /**
      * Creates a new handle to the given collection.
      * Alternative to `client.get_collection(db, collection)`.
@@ -143,7 +143,7 @@ impl<'self> Collection<'self> {
      * # Returns
      * handle to given collection
      */
-    pub fn new<'a>(db : &str, name : ~str, client : &'a Client) -> Collection<'a> {
+    pub fn new(db : &str, name : ~str, client : @Client) -> Collection {
         Collection { db : db.to_owned(), name : name, client : client }
     }
 
@@ -153,7 +153,7 @@ impl<'self> Collection<'self> {
      * # Returns
      * handle to database containing this `Collection`
      */
-    pub fn get_db<'a>(&'a self) -> DB<'a> {
+    pub fn get_db(&self) -> DB {
         DB::new(self.db.clone(), self.client)
     }
 
@@ -417,7 +417,7 @@ impl<'self> Collection<'self> {
                         proj : Option<QuerySpec>,
                         flag_array : Option<~[QUERY_FLAG]>/*,
                         option_array : Option<~[QUERY_OPTION]>*/)
-                -> Result<Cursor<'self>, MongoErr> {
+                -> Result<Cursor, MongoErr> {
         // construct query (wrapped as { $query : {...} }
         //      for ease of query modification)
         let q_field = match query {

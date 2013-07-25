@@ -293,6 +293,21 @@ impl<'self> BsonDocument {
         self
     }
 
+    /**
+     * If the provided document is Embedded, puts all of its (key,val) pairs
+     * into self. Otherwise, does nothing.
+     */
+    pub fn union(&mut self, other : Document) {
+        match other {
+            Embedded(doc) => {
+                for doc.fields.iter().advance |&(@k,@v)| {
+                    self.put(k,v);
+                }
+            }
+            _ => (),
+        }
+    }
+
     ///Returns a new BsonDocument struct.
     ///The default size is 5: 4 for the size integer and 1 for the terminating 0x0.
     pub fn new() -> BsonDocument {

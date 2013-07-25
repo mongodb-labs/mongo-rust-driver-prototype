@@ -36,7 +36,7 @@ mod mockable;
 pub mod client;     // primary point-of-entry for driver system
 pub mod db;         // database-related functionality
 pub mod coll;       // collection-related functionality
-pub mod rs;
+pub mod rs;         // replicaset-related functionality
 
 // Connection components
 mod conn;       // medium for connecting to [a] server(s); general, should be hidden from user
