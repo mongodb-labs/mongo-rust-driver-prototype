@@ -106,39 +106,44 @@ pub enum ServerMsg {
  * Converts a message to bytes.
  */
 fn _header_to_bytes(header : MsgHeader) -> ~[u8] {
-    header.len.to_bytes(LITTLE_ENDIAN_TRUE)
-        + header.id.to_bytes(LITTLE_ENDIAN_TRUE)
-        + header.resp_to.to_bytes(LITTLE_ENDIAN_TRUE)
-        + header.opcode.to_bytes(LITTLE_ENDIAN_TRUE)
+    let mut bytes = ~[];
+    bytes.push_all_move(header.len.to_bytes(LITTLE_ENDIAN_TRUE));
+    bytes.push_all_move(header.id.to_bytes(LITTLE_ENDIAN_TRUE));
+    bytes.push_all_move(header.resp_to.to_bytes(LITTLE_ENDIAN_TRUE));
+    bytes.push_all_move(header.opcode.to_bytes(LITTLE_ENDIAN_TRUE));
+    bytes
 }
 pub fn msg_to_bytes(msg : ClientMsg) -> ~[u8] {
-    let mut bytes : ~[u8] = ~[];
+    let mut bytes = ~[];
     match msg {
         OpUpdate { header:h, RESERVED_BITS:r, full_collection_name:n, flags:f, selector:s, update_ops:u } => {
-            bytes = bytes + _header_to_bytes(h)
-                        + r.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + n.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + ~[0u8]    // null-terminate name
-                        + f.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + s.to_bson()
-                        + u.to_bson();
+            bytes.push_all_move(_header_to_bytes(h));
+            bytes.push_all_move(r.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push_all_move(n.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push(0u8);    // null-terminate name
+            bytes.push_all_move(f.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push_all_move(s.to_bson());
+            bytes.push_all_move(u.to_bson());
         }
         OpInsert { header:h, flags:f, full_collection_name:n, docs:d } => {
-            bytes = bytes + _header_to_bytes(h)
-                        + f.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + n.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + ~[0u8];   // null-terminate name
-            for d.iter().advance |doc| { bytes = bytes + doc.to_bson(); }
+            bytes.push_all_move(_header_to_bytes(h));
+            bytes.push_all_move(f.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push_all_move(n.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push(0u8);    // null-terminate name
+            for d.iter().advance |doc| { bytes.push_all_move(doc.to_bson()); }
         }
         OpQuery { header:h, flags:f, full_collection_name:n, nskip:ns, nret:nr, query:q, ret_field_selector:fi } => {
-            bytes = bytes + _header_to_bytes(h)
-                        + f.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + n.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + ~[0u8]    // null-terminate name
-                        + ns.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + nr.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + q.to_bson()
-                        + match fi { None => ~[], Some(f) => f.to_bson() };
+            bytes.push_all_move(_header_to_bytes(h));
+            bytes.push_all_move(f.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push_all_move(n.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push(0u8);    // null-terminate name
+            bytes.push_all_move(ns.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push_all_move(nr.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push_all_move(q.to_bson());
+            bytes.push_all_move(match fi {
+                None => ~[],
+                Some(f) => f.to_bson(),
+            });
         }
         OpGetMore { header:h, RESERVED_BITS:r, full_collection_name:n, nret:nr, cursor_id:id } => {
             bytes = bytes + _header_to_bytes(h)
@@ -149,18 +154,20 @@ pub fn msg_to_bytes(msg : ClientMsg) -> ~[u8] {
                         + id.to_bytes(LITTLE_ENDIAN_TRUE);
         }
         OpDelete { header:h, RESERVED_BITS:r, full_collection_name:n, flags:f, selector:s } => {
-            bytes = bytes + _header_to_bytes(h)
-                        + r.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + n.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + ~[0u8]    // null-terminate name
-                        + f.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + s.to_bson();
+            bytes.push_all_move(_header_to_bytes(h));
+            bytes.push_all_move(r.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push_all_move(n.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push(0u8);    // null-terminate name
+            bytes.push_all_move(f.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push_all_move(s.to_bson());
         }
         OpKillCursors { header:h, RESERVED_BITS:r, ncursor_ids:n, cursor_ids:ids } => {
-            bytes = bytes + _header_to_bytes(h)
-                        + r.to_bytes(LITTLE_ENDIAN_TRUE)
-                        + n.to_bytes(LITTLE_ENDIAN_TRUE);
-            for ids.iter().advance |&cur| { bytes = bytes + cur.to_bytes(LITTLE_ENDIAN_TRUE); }
+            bytes.push_all_move(_header_to_bytes(h));
+            bytes.push_all_move(r.to_bytes(LITTLE_ENDIAN_TRUE));
+            bytes.push_all_move(n.to_bytes(LITTLE_ENDIAN_TRUE));
+            for ids.iter().advance |&cur| {
+                bytes.push_all_move(cur.to_bytes(LITTLE_ENDIAN_TRUE));
+            }
         }
     }
     bytes
@@ -315,7 +322,7 @@ pub fn parse_reply(bytes : ~[u8]) -> Result<ServerMsg, MongoErr> {
                                         ~"error unpacking documents",
                                         fmt!("-->\n%s", e))),
             };
-            docs = docs + ~[~tmp];
+            docs.push(~tmp);
             head = head + size as uint;
         }
 
