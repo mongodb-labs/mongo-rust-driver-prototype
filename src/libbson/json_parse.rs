@@ -16,7 +16,7 @@
 use std::char::is_digit;
 use std::str::from_chars;
 use std::float::from_str;
-use stream::*;
+use tools::stream::*;
 use encode::*;
 
 ///This trait is for parsing non-BSON object notations such as JSON, XML, etc.

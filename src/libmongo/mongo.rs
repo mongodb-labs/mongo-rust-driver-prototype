@@ -25,6 +25,7 @@
 extern mod std;
 extern mod extra;
 extern mod bson;
+extern mod tools;
 
 // Misc: utility module
 #[macro_escape]

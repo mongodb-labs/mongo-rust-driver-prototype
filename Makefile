@@ -27,6 +27,7 @@ SRC = ./src
 LIB = ./lib
 BSONDIR = ./src/libbson
 MONGODIR = ./src/libmongo
+UTILDIR = ./src/tools
 EXDIR = ./examples
 BIN = ./bin
 TEST = ./test
@@ -36,12 +37,14 @@ MONGOTEST = 0
 
 .PHONY: test
 
-all: bin libs bson mongo
+all: bin libs util bson mongo
 
 bin:
 	$(MKDIR) bin
 	$(MKDIR) test
 
+util: $(UTILDIR)/*
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(UTILDIR)/tools.rs
 libs: $(LIB)/md5.c
 	$(CC) $(CFLAGS) -o $(BIN)/md5.o $(LIB)/md5.c
 	$(AR) $(BIN)/libmd5.a $(BIN)/md5.o
