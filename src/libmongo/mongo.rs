@@ -41,10 +41,10 @@ pub mod rs;         // replicaset-related functionality
 // Connection components
 mod conn;       // medium for connecting to [a] server(s); general, should be hidden from user
 pub mod conn_node;    // ...; node
-mod msg;        // message header and related; should be hidden from user
 pub mod conn_replica; // ...; replica set
 //pub mod conn_shard;   // ...; sharded cluster
+mod msg;        // message header and related; should be hidden from user
 
 // Cursor components
 pub mod cursor;     // mode of interaction with results
-//pub mod index;      // index for querying?
+//pub mod index;      // index for querying

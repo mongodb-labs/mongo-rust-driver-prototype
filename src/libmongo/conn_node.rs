@@ -200,7 +200,7 @@ impl NodeConnection {
     pub fn get_ip(&self) -> ~str { self.server_ip_str.clone() }
     pub fn get_port(&self) -> uint { self.server_port }
     pub fn is_master(&self) -> Result<bool, MongoErr> {
-        let tmp = NodeConnection::new(copy self.server_ip_str, self.server_port);
+        let tmp = NodeConnection::new(self.server_ip_str.clone(), self.server_port);
         (@tmp)._check_master_and_do(
                             |bson_doc : &~BsonDocument|
                                     -> Result<bool, MongoErr> {

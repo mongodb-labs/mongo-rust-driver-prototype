@@ -288,9 +288,10 @@ pub static MONGO_RECONN_MSECS : uint = (1000*60*5); // 5min
 pub static SYSTEM_NAMESPACE : &'static str = &'static "system.namespaces";
 pub static SYSTEM_INDEX : &'static str = &'static "system.indexes";
 pub static SYSTEM_PROFILE : &'static str = &'static "system.profile";
-pub static SYSTEM_USER : &'static str = &'static "system.users";
+pub static SYSTEM_USERS : &'static str = &'static "system.users";
 pub static SYSTEM_COMMAND : &'static str = &'static "$cmd";
 pub static SYSTEM_JS : &'static str = &'static "system.js";
+pub static SYSTEM_REPLSET : &'static str = &'static "system.replset";
 
 // macro for compressing options array into single i32 flag
 macro_rules! process_flags(

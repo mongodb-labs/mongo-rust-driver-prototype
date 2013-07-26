@@ -580,7 +580,7 @@ impl Collection {
                                 flag_array : Option<~[INDEX_FLAG]>,
                                 option_array : Option<~[INDEX_OPTION]>)
                 -> Result<MongoIndex, MongoErr> {
-        let coll = Collection::new(self.db.clone(), fmt!("%s", SYSTEM_INDEX), self.client);
+        let coll = Collection::new(self.db.clone(), SYSTEM_INDEX.to_owned(), self.client);
 
         let flags = process_flags!(flag_array);
         let (x, y) = MongoIndex::process_index_opts(flags, option_array);
@@ -612,7 +612,7 @@ impl Collection {
         self.create_index(index_arr, flag_array, option_array)
     }
     pub fn get_indexes(&self) -> Result<~[~str], MongoErr> {
-        let coll = Collection::new(self.db.clone(), fmt!("%s", SYSTEM_INDEX), self.client);
+        let coll = Collection::new(self.db.clone(), SYSTEM_INDEX.to_owned(), self.client);
         let mut cursor = match coll.find(None, None, None) {
             Ok(c) => c,
             Err(e) => return Err(e),
