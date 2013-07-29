@@ -18,6 +18,7 @@ use std::str::count_bytes;
 use std::rand::*;
 use extra::serialize::*;
 use tools::ord_hash::*;
+use std::vec::{VecIterator, VecRevIterator};
 
 static L_END: bool = true;
 
@@ -310,16 +311,30 @@ impl ToStr for BsonDocument {
 }
 
 impl<'self> BsonDocument {
+
+    ///Convert this document to its binary BSON representation.
     pub fn to_bson(&self) -> ~[u8] {
         let mut encoder = BsonDocEncoder::new();
         self.encode(&mut encoder);
         encoder.buf //the encoded value is contained here
     }
-    //Exposing underlying OrderedHashmap methods
+
+    ///Get a forwards iterator for this document.
+    pub fn iter(&'self self) -> VecIterator<'self, (@~str, @Document)> {
+        self.fields.iter()
+    }
+
+    ///Get a reverse iterator for this document.
+    pub fn rev_iter(&'self self) -> VecRevIterator<'self, (@~str, @Document)> {
+        self.fields.rev_iter()
+    }
+
+    ///Check if this document contains the given key.
     pub fn contains_key(&self, key: ~str) -> bool {
         self.fields.contains_key(&key)
     }
 
+    ///Find the value for the given key, if it exists.
     pub fn find<'a>(&'a self, key: ~str) -> Option<&'a Document> {
         self.fields.find(&key)
     }
