@@ -127,7 +127,6 @@ impl Clone for TagSet {
     pub fn clone(&self) -> TagSet {
         let mut tags = TreeMap::new();
         for self.tags.iter().advance |(&k,&v)| {
-            //tags.insert(k.clone(), v.clone());
             tags.insert(k, v);
         }
         TagSet { tags : tags }
@@ -168,30 +167,18 @@ impl TagSet {
 
     pub fn get_ref<'a>(&'a self, field : ~str) -> Option<&'a ~str> {
         self.tags.find(&field)
-        /*match self.tags.find(&field) {
-            None => None,
-            Some(s) => Some(s),
-        }*/
     }
 
     pub fn get_mut_ref<'a>(&'a mut self, field : ~str) -> Option<&'a mut ~str> {
         self.tags.find_mut(&field)
-        /*match self.tags.find(&field) {
-            None => None,
-            Some(s) => Some(s),
-        }*/
     }
 
     /**
      * Sets tag in TagSet, whether or not it existed previously.
      */
     pub fn set(&mut self, field : ~str, val : ~str) {
-        if val.len() == 0 {
-            self.tags.remove(&field);
-        } else {
-            //if self.tags.find_mut(&field).is_some() {
-                self.tags.remove(&field);
-            //}
+        self.tags.remove(&field);
+        if val.len() != 0 {
             self.tags.insert(field, val);
         }
     }

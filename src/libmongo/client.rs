@@ -14,6 +14,7 @@
  */
 
 use std::*;
+use std::from_str::FromStr;
 
 use bson::encode::*;
 
@@ -221,7 +222,6 @@ impl Client {
      * * already connected
      * * network
      */
-    // XXX possibly make take enum of args for node, rs, etc.
     pub fn connect(&self, server_ip_str : ~str, server_port : uint)
                 -> Result<(), MongoErr> {
         self._connect_to_conn(  ~"client::connect",
@@ -366,7 +366,6 @@ impl Client {
 
         // check if any errors in response and convert to MongoErr,
         //      else pass along
-//println(fmt!("received message : %?", m));
         match copy m {
             OpReply { header:_, flags:f, cursor_id:_, start:_, nret:_, docs:_ } => {
                 if (f & CUR_NOT_FOUND as i32) != 0i32 {
@@ -448,5 +447,35 @@ impl Client {
         let tmp = self.cur_requestId.take();
         self.cur_requestId.put_back(tmp+1);
         tmp
+    }
+
+    pub fn check_version(@self, ver: ~str) -> Result<(), MongoErr> {
+       let admin = self.get_admin();
+       match admin.run_command(SpecNotation(~"{ 'buildInfo': 1 }")) {
+           Ok(doc) => match doc.find(~"version") {
+               Some(&UString(ref s)) => {
+                   let mut it = s.split_iter('.').zip(ver.split_iter('.'));
+                   for it.advance |(vcur, varg)| {
+                       let ncur = FromStr::from_str::<uint>(vcur);
+                       let narg = FromStr::from_str::<uint>(varg);
+                       if ncur > narg {
+                           return Ok(());
+                       }
+                       else if ncur < narg {
+                           return Err(MongoErr::new(
+                                   ~"shard::check_version",
+                                   fmt!("version %s is too old", *s),
+                                   fmt!("please upgrade to at least version %s of MongoDB", ver)));
+                       }
+                   }
+                   return Ok(());
+               },
+               _ => return Err(MongoErr::new(
+                           ~"shard::check_version",
+                           ~"unknown error while checking version",
+                           ~"the database did not return a version field"))
+           },
+           Err(e) => return Err(e)
+       }
     }
 }

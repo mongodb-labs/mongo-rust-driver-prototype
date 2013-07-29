@@ -262,6 +262,8 @@ impl RSConfig {
  * Replica set options.
  */
 #[deriving(Clone,Eq)]
+// alternative would be to split off _FLAGs from _OPTIONs, but
+//      not all defaults being "false" makes such a split difficult
 pub enum RS_OPTION {
     CHAINING_ALLOWED(bool),
 }
@@ -292,6 +294,8 @@ impl BsonFormattable for RS_OPTION {
     }
 }
 #[deriving(Clone,Eq)]
+// alternative would be to split off _FLAGs from _OPTIONs, but
+//      not all defaults being "false" makes such a split difficult
 pub enum RS_MEMBER_OPTION {
     ARB_ONLY(bool),
     BUILD_INDS(bool),
@@ -378,6 +382,10 @@ impl BsonFormattable for RS_MEMBER_OPTION {
     }
 }
 
+/**
+ * Handle to replica set itself for functionality pertaining to
+ * replica set-related characteristics, e.g. configuration.
+ */
 impl RS {
     //pub fn new(seed : ~[(~str, uint)], client : @Client) -> RS {
     pub fn new(client : @Client) -> RS {
@@ -387,6 +395,12 @@ impl RS {
         }
     }
 
+    /**
+     * Gets configuration of replica set referred to by this handle.
+     *
+     * Returns
+     * RSConfig struct on success, MongoErr on failure
+     */
     pub fn get_config(&self) -> Result<RSConfig, MongoErr> {
         let coll = Collection::new(~"local", SYSTEM_REPLSET.to_owned(), self.client);
         let doc = match coll.find_one(None, None, None) {
@@ -402,6 +416,16 @@ impl RS {
         }
     }
 
+    /**
+     * Adds specified host to replica set; specify options directly
+     * within host struct.
+     *
+     * Arguments
+     * * `host` - host, with options, to add to replica set
+     *
+     * Returns
+     * () on success, MongoErr on failure
+     */
     pub fn add(&self, host : RSMember) -> Result<(), MongoErr> {
         let mut conf = match self.get_config() {
             Ok(c) => c,
@@ -411,6 +435,12 @@ impl RS {
         self.reconfig(conf, false)
     }
 
+    /**
+     * Gets status of replica set.
+     *
+     * Returns
+     * ~BsonDocument containing status information, MongoErr on failure
+     */
     pub fn get_status(&self) -> Result<~BsonDocument, MongoErr> {
         let db = self.client.get_admin();
         db.run_command(SpecNotation(~"{ 'replSetGetStatus':1 }"))

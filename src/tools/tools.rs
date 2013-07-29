@@ -13,15 +13,12 @@
  * limitations under the License.
  */
 
-#[link(name="bson", vers="0.1.0", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
+#[link(name="tools", vers="0.1.0", author="austin.estep@10gen.com, jaoke.chinlee@10gen.com")];
 #[crate_type="lib"];
 #[license="Apache 2.0"];
 
 extern mod std;
-extern mod extra;
-extern mod tools;
 
-pub mod json_parse;
-pub mod encode;
-pub mod decode;
-pub mod formattable;
+pub mod md5;
+pub mod stream;
+pub mod ord_hash;

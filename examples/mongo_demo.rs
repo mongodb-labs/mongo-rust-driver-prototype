@@ -25,6 +25,7 @@ use mongo::client::*;
 use mongo::util::*;
 use mongo::coll::*;
 use mongo::db::*;
+use mongo::index::*;
 
 use bson::encode::*;
 use bson::formattable::*;
@@ -81,7 +82,7 @@ fn main() {
         Ok(i) => i,
         Err(e) => fail!(e.to_str()),
     };
-    for inds.iter().advance |&i| { println(fmt!("%s\n", i)); }
+    for inds.iter().advance |&i| { println(fmt!("%?\n", i)); }
     println("");
 //
     println("creating, sorting on, and explaining cursor");

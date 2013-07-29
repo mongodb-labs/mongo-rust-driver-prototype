@@ -109,7 +109,7 @@ impl Cursor {
 
     /**
      * Actual function used to refresh `Cursor` and iterate.
-     * Any errors go into iter_eff field of `Cursor`.
+     * Any errors go into iter_err field of `Cursor`.
      *
      * # Returns
      * amount left in what's currently held by `Cursor`
@@ -325,10 +325,12 @@ impl Cursor {
      *
      * # Arguments
      * * `index` -  `MongoIndexName(name)` of index to use (if named),
-     *              `MongoIndexFields(~[INDEX_FIELD])` to fully specify
-     *                  index from scratch
+     *              `MongoIndexFields(~[INDEX_TYPE])` to specify index
+     *                  from fields
+     *              `MongoIndex(full index)` to specify index fully,
+     *                  e.g. as returned from database
      */
-    pub fn hint(&mut self, index : MongoIndex) {
+    pub fn hint(&mut self, index : MongoIndexSpec) {
         self.query_spec.append(~"$hint", UString(index.get_name()));
     }
 
@@ -345,7 +347,7 @@ impl Cursor {
      * # Failure Types
      * * invalid sorting specification (`orderby`)
      */
-    pub fn sort(&mut self, orderby : INDEX_FIELD) -> Result<(), MongoErr> {
+    pub fn sort(&mut self, orderby : INDEX_TYPE) -> Result<(), MongoErr> {
         let mut spec = BsonDocument::new();
         match orderby {
             NORMAL(fields) => {

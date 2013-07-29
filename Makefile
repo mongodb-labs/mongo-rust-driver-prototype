@@ -12,36 +12,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Rust compilation
 RC = rustc
 RDOC = rustdoc
 RDOCFLAGS = --output-style doc-per-mod --output-format markdown
+FLAGS = -Z debug-info -L ./bin -D unused-unsafe -A unnecessary-allocation $(TOOLFLAGS)
+
+# C compilation
 CC = gcc
 AR = ar rcs
-FLAGS = -Z debug-info -L ./bin -D unused-unsafe -A unnecessary-allocation $(TOOLFLAGS)
 CFLAGS = -c -g -Wall -Werror
+
+# Programs and utilities
 RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
 
+# Directories
 SRC = ./src
 LIB = ./lib
 BSONDIR = ./src/libbson
 MONGODIR = ./src/libmongo
+UTILDIR = ./src/tools
 EXDIR = ./examples
 BIN = ./bin
 TEST = ./test
 DOCS = ./docs
 
+# Variables
 MONGOTEST = 0
+TOOLFLAGS =
 
 .PHONY: test
 
-all: bin libs bson mongo
+all: bin libs util bson mongo
 
 bin:
 	$(MKDIR) bin
 	$(MKDIR) test
 
+util: $(UTILDIR)/*
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(UTILDIR)/tools.rs
 libs: $(LIB)/md5.c
 	$(CC) $(CFLAGS) -o $(BIN)/md5.o $(LIB)/md5.c
 	$(AR) $(BIN)/libmd5.a $(BIN)/md5.o

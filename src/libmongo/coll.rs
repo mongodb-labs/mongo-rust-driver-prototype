@@ -483,16 +483,16 @@ impl Collection {
      * name of index as `MongoIndexName` (in enum `MongoIndex`) on success,
      * `MongoErr` on failure
      */
-    pub fn create_index(&self,  index_arr : ~[INDEX_FIELD],
+    pub fn create_index(&self,  index_arr : ~[INDEX_TYPE],
                                 flag_array : Option<~[INDEX_FLAG]>,
                                 option_array : Option<~[INDEX_OPTION]>)
-                -> Result<MongoIndex, MongoErr> {
+                -> Result<MongoIndexSpec, MongoErr> {
         let coll = Collection::new(self.db.clone(), SYSTEM_INDEX.to_owned(), self.client);
 
         let flags = process_flags!(flag_array);
-        let (x, y) = MongoIndex::process_index_opts(flags, option_array);
+        let (x, y) = MongoIndexSpec::process_index_opts(flags, option_array);
         let mut maybe_name = x; let mut opts = y;
-        let (default_name, index) = MongoIndex::process_index_fields(
+        let (default_name, index) = MongoIndexSpec::process_index_fields(
                                         index_arr,
                                         &mut opts,
                                         maybe_name.is_none());
@@ -512,21 +512,32 @@ impl Collection {
         }
     }
     // TODO index cache? XXX presently just does a create_index...
-    pub fn ensure_index(&self,  index_arr : ~[INDEX_FIELD],
+    pub fn ensure_index(&self,  index_arr : ~[INDEX_TYPE],
                                 flag_array : Option<~[INDEX_FLAG]>,
                                 option_array : Option<~[INDEX_OPTION]>)
-                -> Result<MongoIndex, MongoErr> {
+                -> Result<MongoIndexSpec, MongoErr> {
         self.create_index(index_arr, flag_array, option_array)
     }
-    pub fn get_indexes(&self) -> Result<~[~str], MongoErr> {
+    //pub fn get_indexes(&self) -> Result<~[~str], MongoErr> {
+    pub fn get_indexes(&self) -> Result<~[MongoIndex], MongoErr> {
         let coll = Collection::new(self.db.clone(), SYSTEM_INDEX.to_owned(), self.client);
-        let mut cursor = match coll.find(None, None, None) {
+println(fmt!("{'ns':'%?.%?'}", self.db, self.name));
+        let mut cursor = match coll.find(
+                            Some(SpecNotation(fmt!("{'ns':'%s.%s'}", self.db, self.name))),
+                            None,
+                            None) {
             Ok(c) => c,
             Err(e) => return Err(e),
         };
         let mut indices = ~[];
         for cursor.advance |ind| {
-            indices.push(ind.to_str());
+            indices.push(match BsonFormattable::from_bson_t::<MongoIndex>(Embedded(ind)) {
+                Ok(i) => i,
+                Err(e) => return Err(MongoErr::new(
+                                        ~"coll::get_indexes",
+                                        ~"could not format into MongoIndexes",
+                                        e)),
+            });
         }
         Ok(indices)
     }
@@ -534,13 +545,13 @@ impl Collection {
      * Drops specified index.
      *
      * # Arguments
-     * * `index` - `MongoIndex` to drop specified either by explicit name
-     *              or fields
+     * * `index` - index to drop specified either by explicit name,
+     *              fields, or full specification
      *
      * # Returns
      * () on success, `MongoErr` on failure
      */
-    pub fn drop_index(&self, index : MongoIndex) -> Result<(), MongoErr> {
+    pub fn drop_index(&self, index : MongoIndexSpec) -> Result<(), MongoErr> {
         let db = DB::new(self.db.clone(), self.client);
         match db.run_command(SpecNotation(
                     fmt!("{ \"deleteIndexes\":\"%s\", \"index\":\"%s\" }",

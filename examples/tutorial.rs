@@ -21,6 +21,7 @@ use mongo::util::*;     // access to option flags and specifications, etc.
 use mongo::db::*;
 use mongo::coll::*;
 use mongo::cursor::*;
+use mongo::index::*;
 
 fn main() {
     let client = @Client::new();

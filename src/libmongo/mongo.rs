@@ -25,6 +25,7 @@
 extern mod std;
 extern mod extra;
 extern mod bson;
+extern mod tools;
 
 // Misc: utility module
 #[macro_escape]
@@ -45,6 +46,7 @@ pub mod conn_node;    // ...; node
 pub mod conn_replica; // ...; replica set
 //pub mod conn_shard;   // ...; sharded cluster
 mod msg;        // message header and related; should be hidden from user
+pub mod shard;   // ...; sharded cluster
 
 // Cursor components
 pub mod cursor;     // mode of interaction with results
