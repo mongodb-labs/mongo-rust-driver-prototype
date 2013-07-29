@@ -24,18 +24,18 @@ use bson::encode::*;
  * A shard controller. An instance of this
  * wraps a Client connection to a mongos instance.
  */
-pub struct ShardController {
+pub struct MongosClient {
     mongos: @Client
 }
 
-impl ShardController {
+impl MongosClient {
 
     /**
-     * Create a new ShardController.
+     * Create a new MongosClient.
      * Will fail if the given Client is not connected
      * to a mongos instance.
      */
-    pub fn new(client: @Client) -> ShardController {
+    pub fn new(client: @Client) -> MongosClient {
         //check that client points to a mongos; fail if it doesn't
         //since a new method should not return a result (I think?)
         let admin = client.get_admin();
@@ -43,11 +43,11 @@ impl ShardController {
             SpecNotation(~"{ 'ismaster': 1 }")) {
                 Ok(res) => match res.find(~"msg") {
                     Some(&UString(~"isdbgrid")) => (),
-                    _ => fail!("ShardController can only connect to a mongos instance")
+                    _ => fail!("MongosClient can only connect to a mongos instance")
                 },
-                _ => fail!("ShardController can only connect to a mongos instance")
+                _ => fail!("MongosClient can only connect to a mongos instance")
             };
-        ShardController { mongos: client }
+        MongosClient { mongos: client }
     }
 
     /**
