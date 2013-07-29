@@ -15,6 +15,7 @@
 
 use std::to_bytes::*;
 use std::str::count_bytes;
+use std::rand::*;
 use extra::serialize::*;
 use tools::ord_hash::*;
 
@@ -49,6 +50,55 @@ pub enum Document {
     MinKey,                        //xFF
     MaxKey                        //x7F
 
+}
+
+/**
+ * A factory for constructing ObjectIds.
+ *
+ * The first 4 bytes of an OID are the number
+ * of seconds since the Unix epoch.
+ * The next 3 bytes are based on the name of
+ * the host machine name.
+ * The next 2 bytes are based on the PID of
+ * the current process.
+ * The final 4 bytes are incrementally generated
+ * from a random value.
+ */
+struct ObjIdFactory {
+    rseed: u32
+}
+
+impl ObjIdFactory {
+
+    ///Get a new ObjIdFactory.
+    pub fn new() -> ObjIdFactory {
+        ObjIdFactory {
+            rseed: (&mut XorShiftRng::new()).next()
+        }
+    }
+
+    ///Generate an ObjectId.
+    pub fn oid(&mut self) -> Document {
+        use extra::time::get_time;
+        use tools::md5::md5;
+        use std::libc::getpid;
+
+        let mut bytes: ~[u8] = ~[];
+
+        let time = (get_time().sec as u32).to_bytes(L_END);
+        //TODO: need a gethostname function
+        let hostname = md5(~"localhost").to_bytes(L_END);
+        let pid = (unsafe { getpid() }).to_bytes(L_END);
+        let rand = self.rseed.to_bytes(L_END);
+
+        bytes.push_all(time);
+        bytes.push_all(hostname.slice(0,3));
+        bytes.push_all(pid.slice(0,2));
+        bytes.push_all(rand.slice(0,3));
+        self.rseed = (self.rseed + 1) % 0xFFFFFF;
+
+        ObjectId(bytes)
+    }
 }
 
 /**
