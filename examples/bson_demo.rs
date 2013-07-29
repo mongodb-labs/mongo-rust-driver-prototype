@@ -40,11 +40,11 @@ fn main() {
     let foo_bson_str = (FooStruct::new()).to_bson_t().to_bson();
     println(fmt!("Roundtripping representations: %? -> %s -> %?",
         foo_struct, foo_bson_repr.to_str(),
-        BsonFormattable::from_bson_t::<FooStruct>(foo_bson_repr)
+        BsonFormattable::from_bson_t::<FooStruct>(&foo_bson_repr)
         ));
     println(fmt!("Roundtripping strings: %? -> %s -> %?",
         FooStruct::new(), foo_bson_str.to_str(),
-        (BsonFormattable::from_bson_t::<FooStruct>(Embedded(~decode(foo_bson_str).unwrap()))).unwrap()
+        (BsonFormattable::from_bson_t::<FooStruct>(&Embedded(~decode(foo_bson_str).unwrap()))).unwrap()
         ));
 }
 
@@ -64,9 +64,9 @@ impl BsonFormattable for FooStruct {
         Embedded(~doc)
     }
 
-    fn from_bson_t(doc: Document) -> Result<FooStruct, ~str> {
-        match doc {
-            Embedded(d) => {
+    fn from_bson_t(doc: &Document) -> Result<FooStruct, ~str> {
+        match *doc {
+            Embedded(ref d) => {
                 let mut s = FooStruct::new();
                 if d.contains_key(~"flag") {
                     s.flag = match d.find(~"flag").unwrap() {

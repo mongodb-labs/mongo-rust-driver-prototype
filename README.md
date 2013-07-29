@@ -278,7 +278,7 @@ impl BsonFormattable for Foo {
         //the names of the fields in a Foo to their values
     }
 
-    fn from_bson_t(doc: Document) -> Foo {
+    fn from_bson_t(doc: &Document) -> Foo {
         //this method is the inverse of to_bson_t,
         //in general it makes sense for the two of them to roundtrip
     }
@@ -321,7 +321,7 @@ impl BsonFormattable for Foo {
 }
 
 let b: ~[u8] = /*get a bson document from somewhere*/
-let myfoo = BsonFormattable::from_bson_t::<Foo>(Embedded(~decode(b).unwrap()));
+let myfoo = BsonFormattable::from_bson_t::<Foo>(&Embedded(~decode(b).unwrap()));
 //here it is assumed b was decoded successfully, though a match could be done
 //the Embedded constructor is needed because decode returns a BsonDocument,
 //while from_bson_t expects a document
