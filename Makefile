@@ -27,15 +27,12 @@ CFLAGS = -c -g -Wall -Werror
 RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
-START_SHARDS = ./tools/start_testdb.py
-CLOSE_SHARDS = ./tools/close_testdb.py
 
 # Directories
 SRC = ./src
 LIB = ./lib
 BSONDIR = ./src/libbson
 MONGODIR = ./src/libmongo
-TOOLDIR = ./tools
 UTILDIR = ./src/tools
 EXDIR = ./examples
 BIN = ./bin
@@ -66,18 +63,16 @@ bson: $(BSONDIR)/*
 mongo: $(MONGODIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rs
 
-test: $(BSONDIR)/bson.rs $(MONGODIR)/mongo.rs
+test: $(BSONDIR)/bson.rs $(MONGODIR)/mongo.rs $(MONGODIR)/test/test.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rs
 
 check: test
 ifeq ($(MONGOTEST),1)
-	python $(START_SHARDS)
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 	$(TEST)/driver_test
-	python $(CLOSE_SHARDS)
 else
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
