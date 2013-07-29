@@ -17,7 +17,7 @@ use std::str::from_bytes;
 use std::int::range;
 use std::cast::transmute;
 use encode::*;
-use stream::*;
+use tools::stream::*;
 
 static L_END: bool = true;
 

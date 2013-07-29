@@ -16,7 +16,7 @@
 use std::to_bytes::*;
 use std::str::count_bytes;
 use extra::serialize::*;
-use ord_hash::*;
+use tools::ord_hash::*;
 
 static L_END: bool = true;
 

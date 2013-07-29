@@ -19,9 +19,8 @@
 
 extern mod std;
 extern mod extra;
+extern mod tools;
 
-mod ord_hash;
-mod stream;
 pub mod json_parse;
 pub mod encode;
 pub mod decode;

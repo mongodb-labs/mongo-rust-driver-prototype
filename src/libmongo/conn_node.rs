@@ -31,7 +31,6 @@ pub struct NodeConnection {
     priv server_ip_str : ~str,
     priv server_port : uint,
     priv server_ip : Cell<IpAddr>,
-    priv iotask : iotask::IoTask,
     priv sock : Cell<@Socket>,
     //priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
     priv port : Cell<@GenericPort<PortResult>>
@@ -63,7 +62,7 @@ impl Connection for NodeConnection {
         };
 
         // set up the socket --- for now, just v4
-        let sock = match connect(ip, self.server_port, &self.iotask) {
+        let sock = match connect(ip, self.server_port, &global_loop::get()) {
             Err(GenericConnectErr(ename, emsg)) => return Err(MongoErr::new(~"conn::connect", ename, emsg)),
             Err(ConnectionRefused) => return Err(MongoErr::new(~"conn::connect", ~"EHOSTNOTFOUND", ~"Invalid IP or port")),
             Ok(sock) => @sock as @Socket
@@ -126,7 +125,7 @@ impl Connection for NodeConnection {
      * * uninitialized port
      * * network
      */
-    pub fn recv(&self) -> Result<~[u8], MongoErr> {
+    pub fn recv(&self, _ : bool) -> Result<~[u8], MongoErr> {
          // sanity check and unwrap: should not send on an unconnected connection
         if self.port.is_empty() {
             return Err(MongoErr::new(
@@ -191,7 +190,6 @@ impl NodeConnection {
             server_ip_str : server_ip_str,
             server_port : server_port,
             server_ip : Cell::new_empty(),
-            iotask : global_loop::get(),
             sock : Cell::new_empty(),
             port : Cell::new_empty(),
         }
@@ -282,7 +280,7 @@ mod tests {
     #[test]
     fn test_recv_null_port() {
         let conn = NodeConnection::new(~"foo", 42);
-        assert!(conn.recv().is_err());
+        assert!(conn.recv(false).is_err());
     }
 
     #[test]
@@ -291,7 +289,7 @@ mod tests {
         let mut conn = NodeConnection::new(~"foo", 42);
         let p: @GenericPort<PortResult> = @MockPort {state: 1} as @GenericPort<PortResult>;
         conn.port = Cell::new(p);
-        assert!(conn.recv().is_err());
+        assert!(conn.recv(false).is_err());
     }
 
     #[test]
@@ -299,7 +297,7 @@ mod tests {
         let mut conn = NodeConnection::new(~"foo", 42);
         let p: @GenericPort<PortResult> = @MockPort {state: 0} as @GenericPort<PortResult>;
         conn.port = Cell::new(p);
-        assert!(conn.recv().is_ok());
+        assert!(conn.recv(false).is_ok());
     }
 
     #[test]
