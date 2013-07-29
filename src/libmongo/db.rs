@@ -117,7 +117,7 @@ impl DB {
         let mut names : ~[~str] = ~[];
 
         // query on namespace collection
-        let coll = Collection::new(self.name.clone(), fmt!("%s", SYSTEM_NAMESPACE), self.client);
+        let coll = Collection::new(self.name.clone(), SYSTEM_NAMESPACE.to_owned(), self.client);
         let mut cur = match coll.find(None, None, None) {
             Ok(cursor) => cursor,
             Err(e) => return Err(e),
@@ -261,7 +261,7 @@ impl DB {
      * appropriately by caller, `MongoErr` on failure
      */
     pub fn run_command(&self, cmd : QuerySpec) -> Result<~BsonDocument, MongoErr> {
-        let coll = Collection::new(self.name.clone(), fmt!("%s", SYSTEM_COMMAND), self.client);
+        let coll = Collection::new(self.name.clone(), SYSTEM_COMMAND.to_owned(), self.client);
 
         //let ret_msg = match coll.find_one(Some(cmd), None, None, None) {
         let ret_msg = match coll.find_one(Some(copy cmd), None, Some(~[NO_CUR_TIMEOUT])) {
@@ -387,7 +387,7 @@ impl DB {
             UString(s) => Err(MongoErr::new(
                             ~"db::get_last_error",
                             ~"getLastError error",
-                            s.clone())),
+                            s)),
             _ => Err(MongoErr::new(
                             ~"db::get_last_error",
                             ~"getLastError unexpected format",

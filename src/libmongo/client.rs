@@ -34,6 +34,7 @@ use coll::Collection;
  */
 pub struct Client {
     conn : cell::Cell<@Connection>,
+    priv rs_conn : cell::Cell<@ReplicaSetConnection>,
     priv cur_requestId : ~cell::Cell<i32>,      // first unused requestId
     // XXX index cache?
 }
@@ -51,6 +52,7 @@ impl Client {
     pub fn new() -> Client {
         Client {
             conn : cell::Cell::new_empty(),
+            rs_conn : cell::Cell::new_empty(),
             cur_requestId : ~cell::Cell::new(0),
         }
     }
@@ -241,12 +243,32 @@ impl Client {
     pub fn connect_to_rs(&self, seed : ~[(~str, uint)]) -> Result<@ReplicaSetConnection, MongoErr> {
         let tmp = @ReplicaSetConnection::new(seed);
         match self._connect_to_conn(  ~"client::connect_to_rs",
-                                //@ReplicaSetConnection::new(seed)
-                                tmp
-                                    as @Connection) {
-            Ok(_) => Ok(tmp),
-            Err(e) => Err(e)
+                                tmp as @Connection) {
+            Ok(_) => {
+                self.rs_conn.put_back(tmp);
+                Ok(tmp)
+            }
+            Err(e) => Err(e),
         }
+    }
+
+    pub fn set_read_pref(&self, np : READ_PREFERENCE) -> Result<(), MongoErr> {
+        if self.rs_conn.is_empty() {
+            return Err(MongoErr::new(
+                            ~"client::set_read_pref",
+                            ~"could not set read preference",
+                            ~"connection not to replica set"));
+        }
+        let rs = self.rs_conn.take();
+        // read_pref and read_pref_changed should never be empty
+        let op = rs.read_pref.take();
+        rs.read_pref_changed.take();
+        // might as well only note updated if actually changed
+        rs.read_pref_changed.put_back( if op == np { false } else { true });
+        rs.read_pref.put_back(np);
+        // put everything back
+        self.rs_conn.put_back(rs);
+        Ok(())
     }
 
     /**
@@ -260,6 +282,7 @@ impl Client {
      * * network
      */
     pub fn disconnect(&self) -> Result<(), MongoErr> {
+        if !self.rs_conn.is_empty() { self.rs_conn.take(); }
         if !self.conn.is_empty() { self.conn.take().disconnect() }
         // XXX currently succeeds even if not previously connected
         //      (may or may not be desired)

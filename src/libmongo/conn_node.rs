@@ -85,19 +85,25 @@ impl Connection for NodeConnection {
         Ok(())
     }
 
-    /**
-     * "Fire and forget" asynchronous write to server of given data.
-     *
-     * # Arguments
-     * * `data` - bytes to send
-     *
-     * # Returns
-     * () on success, MongoErr on failure
-     *
-     * # Failure Types
-     * * uninitialized socket
-     * * network
-     */
+    pub fn disconnect(&self) -> Result<(), MongoErr> {
+        // NO sanity check: don't really care if disconnect unconnected connection
+
+        // nuke port first (we can keep the ip)
+        if !self.port.is_empty() { self.port.take(); }
+
+        if !self.sock.is_empty() {
+            match self.sock.take().read_stop() {
+                Err(e) => return Err(MongoErr::new(
+                                        ~"conn::disconnect",
+                                        e.err_name.clone(),
+                                        e.err_msg.clone())),
+                Ok(_) => (),
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn send(&self, data : ~[u8], _ : bool) -> Result<(), MongoErr> {
         if self.sock.is_empty() {
             return Err(MongoErr::new(~"connection", ~"unknown send err", ~"cannot send on null socket"));
@@ -115,16 +121,6 @@ impl Connection for NodeConnection {
         }
     }
 
-    /**
-     * Pick up a response from the server.
-     *
-     * # Returns
-     * bytes received on success, MongoErr on failure
-     *
-     * # Failure Types
-     * * uninitialized port
-     * * network
-     */
     pub fn recv(&self, _ : bool) -> Result<~[u8], MongoErr> {
          // sanity check and unwrap: should not send on an unconnected connection
         if self.port.is_empty() {
@@ -144,32 +140,6 @@ impl Connection for NodeConnection {
             self.port.put_back(port);
             result
         }
-    }
-
-    /**
-     * Disconnect from the server.
-     * Succeeds even if not originally connected.
-     *
-     * # Returns
-     * () on success, MongoErr on failure
-     */
-    pub fn disconnect(&self) -> Result<(), MongoErr> {
-        // NO sanity check: don't really care if disconnect unconnected connection
-
-        // nuke port first (we can keep the ip)
-        if !self.port.is_empty() { self.port.take(); }
-
-        if !self.sock.is_empty() {
-            match self.sock.take().read_stop() {
-                Err(e) => return Err(MongoErr::new(
-                                        ~"conn::disconnect",
-                                        e.err_name.clone(),
-                                        e.err_msg.clone())),
-                Ok(_) => (),
-            }
-        }
-
-        Ok(())
     }
 }
 

@@ -20,9 +20,9 @@ use bson::encode::*;
 
 use util::*;
 use msg::*;
+use index::*;
 use client::Client;
 use coll::Collection;
-use coll::MongoIndex;
 
 ///Structure representing a cursor
 pub struct Cursor {

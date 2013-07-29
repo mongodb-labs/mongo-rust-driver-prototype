@@ -40,13 +40,53 @@ impl Socket for TcpSocket {
         self.write_future(raw_write_data)
     }
 }
+
 /**
  * Connection interface all connectors use (ReplicaSetConnection,
  * ShardedClusterConnection, NodeConnection).
  */
 pub trait Connection {
+    /**
+     * Connect from the server.
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
     fn connect(&self) -> Result<(), MongoErr>;
+
+    /**
+     * Disconnect from the server.
+     * Succeeds even if not originally connected.
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
     fn disconnect(&self) -> Result<(), MongoErr>;
+
+    /**
+     * "Fire and forget" asynchronous write to server of given data.
+     *
+     * # Arguments
+     * * `data` - bytes to send
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * uninitialized socket
+     * * network
+     */
     fn send(&self, data : ~[u8], read : bool) -> Result<(), MongoErr>;
+
+    /**
+     * Pick up a response from the server.
+     *
+     * # Returns
+     * bytes received on success, MongoErr on failure
+     *
+     * # Failure Types
+     * * uninitialized port
+     * * network
+     */
     fn recv(&self, read : bool) -> Result<~[u8], MongoErr>;
 }

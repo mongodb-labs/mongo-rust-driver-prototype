@@ -53,16 +53,17 @@ pub struct ReplicaSetConnection {
  */
 struct ReplicaSetData {
     pri : Option<NodeData>,
-    sec : ~PriorityQueue<NodeData>,
+    sec : PriorityQueue<NodeData>,
     err : Option<MongoErr>,
 }
 // not actually needed for now but probably good to have anyway
 impl Clone for ReplicaSetData {
     pub fn clone(&self) -> ReplicaSetData {
-        let mut sec = ~PriorityQueue::new();
+        let mut sec = PriorityQueue::new();
         for self.sec.iter().advance |&elem| {
-            sec.push(elem.clone());
+            sec.push(elem);
         }
+
         ReplicaSetData {
             pri : self.pri.clone(),
             sec : sec,
@@ -72,7 +73,7 @@ impl Clone for ReplicaSetData {
 }
 impl ReplicaSetData {
     pub fn new( pri : Option<NodeData>,
-                sec : ~PriorityQueue<NodeData>,
+                sec : PriorityQueue<NodeData>,
                 err : Option<MongoErr>) -> ReplicaSetData {
         ReplicaSetData {
             pri : pri,
@@ -326,7 +327,7 @@ impl ReplicaSetConnection {
     fn reconnect_with_seed(seed : &~ARC<~[(~str, uint)]>) -> ReplicaSetData {
         let hosts = match ReplicaSetConnection::_get_host_list(seed) {
             Ok(l) => l,
-            Err(e) => return ReplicaSetData::new(None, ~PriorityQueue::new(), Some(e)),
+            Err(e) => return ReplicaSetData::new(None, PriorityQueue::new(), Some(e)),
         };
 
         ReplicaSetConnection::_get_replica_set_data(hosts)
@@ -383,12 +384,12 @@ impl ReplicaSetConnection {
             fmt!("hosts field %?, expected encode::Array of hosts", *doc))),
                                 }
 
-                                if err.clone().is_none() {
-                                    let fields = copy list_doc.unwrap().fields;
+                                if err.is_none() {
+                                    let fields = list_doc.unwrap().fields;
                                     let mut host_str = ~"";
                                     for fields.iter().advance |&(_, @host_doc)| {
                                         match host_doc {
-                                            UString(s) => host_str = s.clone(),
+                                            UString(s) => host_str = s,
                                             _ => {
                                                 err = Some(MongoErr::new(
             ~"conn_replica::reconnect_with_seed",
@@ -398,7 +399,7 @@ impl ReplicaSetConnection {
                                             }
                                         }
 
-                                        match _parse_host(host_str.clone()) {
+                                        match _parse_host(&host_str) {
                                             Ok(p) => list.push(p),
                                             Err(e) => {
                                                 err = Some(e);
@@ -443,7 +444,7 @@ impl ReplicaSetConnection {
 
     fn _get_replica_set_data(hosts : ~[(~str, uint)]) -> ReplicaSetData {
         let mut pri = None;
-        let mut sec = ~PriorityQueue::new::<NodeData>();
+        let mut sec = PriorityQueue::new::<NodeData>();
 
         // remember expected number of responses
         let n = hosts.len();
@@ -514,7 +515,7 @@ impl ReplicaSetConnection {
                                     Embedded(val) => {
                                         for val.fields.iter().advance |&(@k,@v)| {
                                             match v {
-                                                UString(val) => tags.set_tag((k,val)),
+                                                UString(val) => tags.set(k,val),
                                                 _ => err = Some(MongoErr::new(
             ~"conn_replica::reconnect_with_seed",
             ~"ismaster response in unexpected format",
@@ -577,7 +578,7 @@ impl ReplicaSetConnection {
             err = Some(MongoErr::new(
                 ~"conn_replica::reconnect_with_seed",
                 ~"error while connecting to host",
-                err_str.clone()));
+                err_str));
         }
         ReplicaSetData::new(pri, sec, err)
     }
@@ -616,11 +617,11 @@ impl ReplicaSetConnection {
         self.read_pref_changed.put_back(false);
 
         // only update read_from or write_to if:
-        //  0) no prior state (read_from and write_to)
+        //  0) no prior state
         //      old_state.is_none() && tmp_state.is_some()
-        //  1) state has changed (read_from and write_to)
+        //  1) state has changed
         //      old_state.is_some() && tmp_state.is_some() && old_state != tmp_state
-        //  2) read preference has changed (read_from)
+        //  2) read preference has changed
         //      a) tmp_state.is_none() => refresh according to old_state
         //      b) tmp_state.is_some() => refresh according to tmp_state
         let old_state = if self.state.is_empty() {
@@ -671,11 +672,11 @@ impl ReplicaSetConnection {
         if !self.read_from.is_empty() { self.read_from.take().disconnect(); }
         let maybe_err = state.clone().err;
         if maybe_err.is_none() {
-            match self._refresh_write_to(state.clone()) {
+            match self._refresh_write_to(&state) {
                 Ok(_) => (),
                 Err(e) => err_str.push_str(e.to_str()),
             }
-            match self._refresh_read_from(state.clone()) {
+            match self._refresh_read_from(&state) {
                 Ok(_) => (),
                 Err(e) => err_str.push_str(e.to_str()),
             }
@@ -683,6 +684,7 @@ impl ReplicaSetConnection {
             return Err(maybe_err.unwrap());
         }
 
+        // store state
         self.state.put_back(state);
 
         if err_str.len() == 0 { Ok(()) }
@@ -724,86 +726,14 @@ impl ReplicaSetConnection {
         }
         self.port_state.put_back(port_state);
 
+        // refresh according to new state
         self.refresh(tmp_state)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-        if tmp_state.is_none() {
-            // no new state; nothing to update
-            return Ok(());
-        }
-
-        let state = tmp_state.unwrap();
-        let new_state = state.clone();
-
-//println(fmt!("post reconnection prelude; self %?", self));
-
-        // refresh write_to and read_from servers as needed
-        let mut err_str = ~"";
-        if         self.state.is_empty()
-                || state != self.state.take()
-                || self.read_pref_changed.take() {
-//println("updating...");
-            if !self.write_to.is_empty() { self.write_to.take().disconnect(); }
-            if !self.read_from.is_empty() { self.read_from.take().disconnect(); }
-
-            let maybe_err = state.err.clone();
-            if maybe_err.is_none() {
-                // update write_to
-                match self._refresh_write_to(state.clone()) {
-                    Ok(_) => (),
-                    Err(e) => err_str.push_str(e.to_str()),
-                };
-
-                // update read_from
-                match self._refresh_read_from(state.clone()) {
-                    Ok(_) => (),
-                    Err(e) => err_str.push_str(e.to_str()),
-                };
-            } else {
-//println(fmt!("error?!?! %?", maybe_err.clone().unwrap()));
-                return Err(maybe_err.unwrap());
-            }
-        }
-
-        // update state and read_pref_changed
-        if !self.read_pref_changed.is_empty() {
-            self.read_pref_changed.take();
-        }
-        self.read_pref_changed.put_back(false);
-        self.state.put_back(new_state);
-
-        if err_str.len() == 0 { Ok(()) }
-        else { Err(MongoErr::new(
-                    ~"conn_replica::reconnect",
-                    ~"error while reconnecting",
-                    err_str)) }
-*/
     }
 
-    fn _refresh_write_to(&self, state : ReplicaSetData)
+    fn _refresh_write_to(&self, state : &ReplicaSetData)
                 -> Result<(), MongoErr> {
+        // write_to is always primary, and flow cannot reach here
+        //      unless state is good (non-empty primary)
         let dat = state.pri.clone().unwrap();
         let pri = NodeConnection::new(dat.ip.clone(), dat.port);
         pri.tags.take();
@@ -814,23 +744,24 @@ impl ReplicaSetConnection {
         result
     }
 
-    fn _refresh_read_from(&self, state : ReplicaSetData)
+    fn _refresh_read_from(&self, state : &ReplicaSetData)
                 -> Result<(), MongoErr> {
-        let read_pref = self.read_pref.clone().take();
+        let read_pref = self.read_pref.take();
 
         let mut servers = ~[];
 
         let pri = state.clone().pri.unwrap();
-        let mut sec = ~PriorityQueue::new();
+        let mut sec = PriorityQueue::new();
 
         for state.sec.iter().advance |&s| {
-            sec.push(s.clone());
+            sec.push(s);
         }
 
+        // parse read_preference to determine server choices
         let (pref_str, ts_list) = match read_pref {
             PRIMARY_ONLY => {
                 servers.push(pri);
-                (~"PRIMARY_ONLY", None)
+                (~"PRIMARY_ONLY", &None)
             }
             PRIMARY_PREF(ref ts) => {
                 servers.push(pri);
@@ -838,14 +769,14 @@ impl ReplicaSetConnection {
                 for ordered.rev_iter().advance |&s| {
                     servers.push(s);
                 }
-                (~"PRIMARY_PREF", (*ts).clone())
+                (~"PRIMARY_PREF", ts)
             }
             SECONDARY_ONLY(ref ts) => {
                 let ordered = sec.to_sorted_vec();
                 for ordered.rev_iter().advance |&s| {
                     servers.push(s);
                 }
-                (~"SECONDARY_ONLY", (*ts).clone())
+                (~"SECONDARY_ONLY", ts)
             }
             SECONDARY_PREF(ref ts) => {
                 let ordered = sec.to_sorted_vec();
@@ -853,7 +784,7 @@ impl ReplicaSetConnection {
                     servers.push(s);
                 }
                 servers.push(pri);
-                (~"SECONDARY_PREF", (*ts).clone())
+                (~"SECONDARY_PREF", ts)
             }
             NEAREST(ref ts) => {
                 sec.push(pri);
@@ -861,9 +792,10 @@ impl ReplicaSetConnection {
                 for ordered.rev_iter().advance |&s| {
                     servers.push(s);
                 }
-                (~"NEAREST", (*ts).clone())
+                (~"NEAREST", ts)
             }
         };
+        self.read_pref.put_back(read_pref);
 
         let server = match self._find_server(pref_str, servers, ts_list) {
             Ok(s) => s,
@@ -877,12 +809,12 @@ impl ReplicaSetConnection {
 
     fn _find_server(&self,  pref : ~str,
                             servers : ~[NodeData],
-                            tagsets : Option<~[TagSet]>)
+                            tagsets : &Option<~[TagSet]>)
                 -> Result<NodeConnection, MongoErr> {
-        //let ts_list = match tagsets.clone() {
+        let tmp = ~[TagSet::new(~[])];
         let ts_list = match tagsets {
-            None => ~[TagSet::new(~[])],
-            Some(l) => l,
+            &None => &tmp,
+            &Some(ref l) => l,
         };
 
         // iterate through available servers, checking if they match
@@ -908,10 +840,10 @@ impl ReplicaSetConnection {
     }
 }
 
-fn _parse_host(host_str : ~str) -> Result<(~str, uint), MongoErr> {
+fn _parse_host(host_str : &~str) -> Result<(~str, uint), MongoErr> {
     let mut port_str = fmt!("%?", MONGO_DEFAULT_PORT);
     let mut ip_str = match host_str.find_str(":") {
-        None => host_str,
+        None => host_str.to_owned(),
         Some(i) => {
             port_str = host_str.slice_from(i+1).to_owned();
             host_str.slice_to(i).to_owned()

@@ -47,9 +47,9 @@ impl BsonFormattable for RSMember {
         }
         member_doc.put(~"host", UString(self.host.clone()));
 
-        match self.opts.clone() {
-            None => (),
-            Some(a) => {
+        match &self.opts {
+            &None => (),
+            &Some(ref a) => {
                 for a.iter().advance |&opt| {
                     member_doc.union(opt.to_bson_t());
                 }
@@ -108,12 +108,39 @@ impl RSMember {
             opts : opts,
         }
     }
+
+    // XXX inefficient
+    pub fn get_tags<'a>(&'a self) -> Option<&'a TagSet> {
+        match self.opts {
+            None => (),
+            Some(ref l) => for l.iter().advance |opt| {
+                match opt {
+                    &TAGS(ref ts) => return Some(ts),
+                    _ => (),
+                }
+            },
+        }
+        None
+    }
+    // XXX inefficient
+    pub fn get_mut_tags<'a>(&'a mut self) -> Option<&'a mut TagSet> {
+        match self.opts {
+            None => (),
+            Some(ref mut l) => for l.mut_iter().advance |opt| {
+                match opt {
+                    &TAGS(ref mut ts) => return Some(ts),
+                    _ => (),
+                }
+            },
+        }
+        None
+    }
 }
 
 #[deriving(Clone)]
 pub struct RSConfig {
     _id : Option<~str>,
-    version : Option<i32>,
+    priv version : Cell<i32>,
     members : ~[RSMember],
     settings : Option<~[RS_OPTION]>,
 }
@@ -126,9 +153,10 @@ impl BsonFormattable for RSConfig {
             conf_doc.put(~"_id", UString(s));
         }
 
-        if self.version.is_some() {
-            let v = self.version.clone().unwrap();
+        if !self.version.is_empty() {
+            let v = self.version.take();
             conf_doc.put(~"version", Int32(v));
+            self.version.put_back(v);
         }
 
         let mut i = 0;
@@ -142,9 +170,9 @@ impl BsonFormattable for RSConfig {
         conf_doc.put(~"members", Array(~tmp_doc));
 
         tmp_doc = BsonDocument::new();
-        match self.settings.clone() {
-            None => (),
-            Some(a) => {
+        match &self.settings {
+            &None => (),
+            &Some(ref a) => {
                 for a.iter().advance |&opt| {
                     tmp_doc.union(opt.to_bson_t());
                 }
@@ -169,9 +197,9 @@ impl BsonFormattable for RSConfig {
             },
         };
         let version = match bson_doc.find(~"version") {
-            None => None,
+            None => return Err(~"not RSConfig struct (no version field)"),
             Some(doc) => match copy *doc {
-                Int32(v) => Some(v),
+                Int32(v) => v,
                 _ => return Err(~"not RSConfig struct (version field not Int32)"),
             },
         };
@@ -204,19 +232,28 @@ impl BsonFormattable for RSConfig {
         }
 
         let settings = if s_arr.len() > 0 { Some(s_arr) } else { None };
-        Ok(RSConfig::new(_id, version, members, settings))
+        let member = RSConfig::new(_id, members, settings);
+        member.version.put_back(version);
+        Ok(member)
     }
 }
 impl RSConfig {
     pub fn new( _id : Option<~str>,
-                version : Option<i32>,
+                //version : Option<i32>,
                 members : ~[RSMember],
                 settings : Option<~[RS_OPTION]>) -> RSConfig {
         RSConfig {
             _id : _id,
-            version : version,
+            version : Cell::new_empty(),
             members : members,
             settings : settings,
+        }
+    }
+
+    pub fn get_version(&self) -> Option<i32> {
+        match self.version.is_empty() {
+            true => None,
+            false => Some(self.version.clone().take()),
         }
     }
 }
@@ -267,14 +304,14 @@ pub enum RS_MEMBER_OPTION {
 impl BsonFormattable for RS_MEMBER_OPTION {
     pub fn to_bson_t(&self) -> Document {
         let mut opt_doc = BsonDocument::new();
-        let (k, v) = match (*self).clone() {
-            ARB_ONLY(v) => (~"arbiterOnly", Bool(v)),
-            BUILD_INDS(v) => (~"buildIndexes", Bool(v)),
-            HIDDEN(v) => (~"hidden", Bool(v)),
-            PRIORITY(p) => (~"priority", Double(p)),
-            TAGS(ts) => (~"tags", ts.clone().to_bson_t()),
-            SLAVE_DELAY(d) => (~"slaveDelay", Int32(d)),
-            VOTES(n) => (~"votes", Int32(n)),
+        let (k, v) = match self {
+            &ARB_ONLY(v) => (~"arbiterOnly", Bool(v)),
+            &BUILD_INDS(v) => (~"buildIndexes", Bool(v)),
+            &HIDDEN(v) => (~"hidden", Bool(v)),
+            &PRIORITY(p) => (~"priority", Double(p)),
+            &TAGS(ref ts) => (~"tags", ts.clone().to_bson_t()),
+            &SLAVE_DELAY(d) => (~"slaveDelay", Int32(d)),
+            &VOTES(n) => (~"votes", Int32(n)),
         };
         opt_doc.put(k, v);
         Embedded(~opt_doc)
@@ -371,19 +408,7 @@ impl RS {
             Err(e) => return Err(e),
         };
         conf.members.push(host);
-        let conf_doc = conf.to_bson_t();
-        let db = self.client.get_admin();
-        let mut cmd_doc = BsonDocument::new();
-        cmd_doc.put(~"replSetReconfig", conf_doc);
-        match db.run_command(SpecObj(cmd_doc)) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        }
-    }
-
-    pub fn add_arbiter(&self, host_str : ~str) -> Result<(), MongoErr> {
-        let mut host = RSMember::new(host_str, Some(~[ARB_ONLY(true)]));
-        self.add(host)
+        self.reconfig(conf, false)
     }
 
     pub fn get_status(&self) -> Result<~BsonDocument, MongoErr> {
@@ -404,6 +429,16 @@ impl RS {
 
     pub fn reconfig(&self, conf : RSConfig, force : bool)
                 -> Result<(), MongoErr> {
+        let tmp_conf = match self.get_config() {
+            Ok(c) => c,
+            Err(e) => return Err(MongoErr::new(
+                                    ~"rs::reconfig",
+                                    ~"failure getting latest config version no",
+                                    e.to_str())),
+        };
+        if !conf.version.is_empty() { conf.version.take(); }
+        conf.version.put_back(tmp_conf.version.take()+1);
+
         let conf_doc = conf.to_bson_t();
         let db = self.client.get_admin();
         let mut cmd_doc = BsonDocument::new();

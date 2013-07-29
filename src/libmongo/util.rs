@@ -127,7 +127,8 @@ impl Clone for TagSet {
     pub fn clone(&self) -> TagSet {
         let mut tags = TreeMap::new();
         for self.tags.iter().advance |(&k,&v)| {
-            tags.insert(k.clone(), v.clone());
+            //tags.insert(k.clone(), v.clone());
+            tags.insert(k, v);
         }
         TagSet { tags : tags }
     }
@@ -146,7 +147,7 @@ impl BsonFormattable for TagSet {
             Embedded(bson_doc) => {
                 for bson_doc.fields.iter().advance |&(@k,@v)| {
                     match v {
-                        UString(s) => ts.set_tag((k,s)),
+                        UString(s) => ts.set(k,s),
                         _ => return Err(~"not TagSet struct (val not UString)"),
                     }
                 }
@@ -165,8 +166,16 @@ impl TagSet {
         TagSet { tags : tags }
     }
 
-    pub fn get_tag_val<'a>(&'a self, field : ~str) -> Option<&'a ~str> {
+    pub fn get_ref<'a>(&'a self, field : ~str) -> Option<&'a ~str> {
         self.tags.find(&field)
+        /*match self.tags.find(&field) {
+            None => None,
+            Some(s) => Some(s),
+        }*/
+    }
+
+    pub fn get_mut_ref<'a>(&'a mut self, field : ~str) -> Option<&'a mut ~str> {
+        self.tags.find_mut(&field)
         /*match self.tags.find(&field) {
             None => None,
             Some(s) => Some(s),
@@ -176,8 +185,7 @@ impl TagSet {
     /**
      * Sets tag in TagSet, whether or not it existed previously.
      */
-    pub fn set_tag(&mut self, tag : (~str, ~str)) {
-        let (field, val) = tag;
+    pub fn set(&mut self, field : ~str, val : ~str) {
         if val.len() == 0 {
             self.tags.remove(&field);
         } else {
@@ -225,39 +233,6 @@ pub enum READ_PREFERENCE {
     SECONDARY_ONLY(Option<~[TagSet]>),
     SECONDARY_PREF(Option<~[TagSet]>),
     NEAREST(Option<~[TagSet]>),
-}
-
-/**
- * Indexing.
- */
-pub enum INDEX_ORDER {
-    ASC = 1,
-    DESC = -1,
-}
-
-pub enum INDEX_FLAG {
-    BACKGROUND = 1 << 0,
-    UNIQUE = 1 << 1,
-    DROP_DUPS = 1 << 2,
-    SPARSE = 1 << 3,
-}
-
-pub enum INDEX_OPTION {
-    INDEX_NAME(~str),
-    EXPIRE_AFTER_SEC(int),
-    VERS(int),
-}
-
-pub enum INDEX_GEOTYPE {
-    SPHERICAL,                          // "2dsphere"
-    FLAT,                               // "2d"
-}
-
-pub enum INDEX_FIELD {
-    NORMAL(~[(~str, INDEX_ORDER)]),
-    HASHED(~str),
-    GEOSPATIAL(~str, INDEX_GEOTYPE),
-    GEOHAYSTACK(~str, ~str, uint),
 }
 
 /**
