@@ -332,6 +332,7 @@ mod tests {
 
     use super::*;
     use encode::*;
+    use extra::test::BenchHarness;
 
     #[test]
     fn test_string_fmt() {
@@ -541,5 +542,79 @@ mod tests {
         let stream = "{\"foo': 'bar\"}".iter().collect::<~[char]>();
         let mut parser = ExtendedJsonParser::new(stream);
         if parser.object().is_err() { fail!("test_mismatched_quotes") }
+    }
+
+    #[bench]
+    fn bench_string_parse(b: &mut BenchHarness) {
+        let stream = "'asdfasdf'".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream.clone());
+        do b.iter {
+            parser._string('\'');
+            parser = ExtendedJsonParser::new(stream.clone());
+        }
+    }
+
+    #[bench]
+    fn bench_num_parse(b: &mut BenchHarness) {
+        let stream = "25252525".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream.clone());
+        do b.iter {
+            parser._number();
+            parser = ExtendedJsonParser::new(stream.clone());
+        }
+    }
+
+    #[bench]
+    fn bench_bool_parse(b: &mut BenchHarness) {
+        let stream_true = "true".iter().collect::<~[char]>();
+        let stream_false = "false".iter().collect::<~[char]>();
+        let mut parse_true = ExtendedJsonParser::new(stream_true.clone());
+        let mut parse_false = ExtendedJsonParser::new(stream_false.clone());
+        do b.iter {
+            parse_true._bool();
+            parse_true = ExtendedJsonParser::new(stream_true.clone());
+            parse_false._bool();
+            parse_true = ExtendedJsonParser::new(stream_false.clone());
+        }
+    }
+
+    #[bench]
+    fn bench_list_parse(b: &mut BenchHarness) {
+        let stream = "[5.01, true, \'hello\']".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream.clone());
+        do b.iter {
+            parser._list();
+            parser = ExtendedJsonParser::new(stream.clone());
+        }
+    }
+
+    #[bench]
+    fn bench_basic_obj_parse(b: &mut BenchHarness) {
+        let stream = "{'foo': true, 'bar': 2}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream.clone());
+        do b.iter {
+            parser.object();
+            parser = ExtendedJsonParser::new(stream.clone());
+        }
+    }
+
+    #[bench]
+    fn bench_object_parse(b: &mut BenchHarness) {
+        let stream = "{\"foo\": true, \'bar\': 2, 'baz': [\"qux-dux\"]}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream.clone());
+        do b.iter {
+            parser.object();
+            parser = ExtendedJsonParser::new(stream.clone());
+        }
+    }
+
+    #[bench]
+    fn test_nested_obj_parse(b: &mut BenchHarness) {
+        let stream = "{\"qux\": {\"foo\": 5.0, 'bar': 'baz'}, \"fizzbuzz\": false}".iter().collect::<~[char]>();
+        let mut parser = ExtendedJsonParser::new(stream.clone());
+        do b.iter {
+            parser.object();
+            parser = ExtendedJsonParser::new(stream.clone());
+        }
     }
 }

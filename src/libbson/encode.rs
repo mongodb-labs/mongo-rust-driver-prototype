@@ -474,6 +474,9 @@ priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
 mod tests {
     use super::*;
     use json_parse::*;
+    use std::rand::Rng;
+    use std::rand;
+    use extra::test::BenchHarness;
 
     //testing size computation
     #[test]
@@ -621,4 +624,21 @@ mod tests {
         assert_eq!(doc.to_bson(), ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
     }
 
+    fn rand() -> rand::IsaacRng {
+        let seed = [1,2,3,4,5,6,7,8,9,0];
+        rand::IsaacRng::new_seeded(seed)
+    }
+
+    #[bench]
+    fn bench_val_encode(b: &mut BenchHarness) {
+        let mut rand = rand();
+        let mut doc = BsonDocument::new();
+        do b.iter {
+            doc.put(~"foo", Double(rand.next() as f64));
+            doc.put(~"bar", Double(rand.next() as f64));
+            doc.put(~"baz", Double(rand.next() as f64));
+            doc.to_bson();
+            doc = BsonDocument::new();
+        }
+    }
 }
