@@ -15,16 +15,15 @@
 
 use std::cell::*;
 
-use bson::decode::*;
 use bson::encode::*;
 use bson::formattable::*;
 
 use util::*;
 use client::Client;
 use coll::Collection;
+use conn_replica::*;    // XXX: for parse_host; to remove later
 
 pub struct RS {
-    //seed : ~[(~str, uint)], // uri?
     priv client : @Client,
 }
 
@@ -32,7 +31,7 @@ pub struct RS {
 pub struct RSMember {
     priv _id : Cell<uint>,
     host : ~str,
-    opts : Option<~[RS_MEMBER_OPTION]>,
+    opts : ~[RS_MEMBER_OPTION],
 }
 impl BsonFormattable for RSMember {
     // NB don't use this in normal usage, since intended for use
@@ -47,14 +46,17 @@ impl BsonFormattable for RSMember {
         }
         member_doc.put(~"host", UString(self.host.clone()));
 
-        match &self.opts {
+        for self.opts.iter().advance |&opt| {
+            member_doc.union(opt.to_bson_t());
+        }
+        /*match &self.opts {
             &None => (),
             &Some(ref a) => {
                 for a.iter().advance |&opt| {
                     member_doc.union(opt.to_bson_t());
                 }
             },
-        }
+        }*/
 
         Embedded(~member_doc)
     }
@@ -64,7 +66,7 @@ impl BsonFormattable for RSMember {
             _ => return Err(~"not RSMember struct (not Embedded BsonDocument)"),
         };
 
-        let mut member = RSMember::new(~"", None);
+        let mut member = RSMember::new(~"", ~[]);
         let mut opts = ~[];
 
         for bson_doc.fields.iter().advance |&(@k,@v)| {
@@ -95,13 +97,13 @@ impl BsonFormattable for RSMember {
         if member._id.is_empty() {
             return Err(~"not RSMember struct (_id field not Int32)");
         }
-        if opts.len() > 0 { member.opts = Some(opts); }
+        member.opts = opts;
         Ok(member)
     }
 }
 impl RSMember {
     pub fn new( host : ~str,
-                opts : Option<~[RS_MEMBER_OPTION]>) -> RSMember {
+                opts : ~[RS_MEMBER_OPTION]) -> RSMember {
         RSMember {
             _id : Cell::new_empty(),
             host : host,
@@ -111,7 +113,13 @@ impl RSMember {
 
     // XXX inefficient
     pub fn get_tags<'a>(&'a self) -> Option<&'a TagSet> {
-        match self.opts {
+        for self.opts.iter().advance |opt| {
+            match opt {
+                &TAGS(ref ts) => return Some(ts),
+                _ => (),
+            }
+        }
+        /*match self.opts {
             None => (),
             Some(ref l) => for l.iter().advance |opt| {
                 match opt {
@@ -119,12 +127,18 @@ impl RSMember {
                     _ => (),
                 }
             },
-        }
+        }*/
         None
     }
     // XXX inefficient
     pub fn get_mut_tags<'a>(&'a mut self) -> Option<&'a mut TagSet> {
-        match self.opts {
+        for self.opts.mut_iter().advance |opt| {
+            match opt {
+                &TAGS(ref mut ts) => return Some(ts),
+                _ => (),
+            }
+        }
+        /*match self.opts {
             None => (),
             Some(ref mut l) => for l.mut_iter().advance |opt| {
                 match opt {
@@ -132,7 +146,7 @@ impl RSMember {
                     _ => (),
                 }
             },
-        }
+        }*/
         None
     }
 }
@@ -161,8 +175,7 @@ impl BsonFormattable for RSConfig {
 
         let mut tmp_doc = BsonDocument::new();
         for self.members.iter().enumerate().advance |(i,&member)| {
-            if !member._id.is_empty() { member._id.take(); }
-            member._id.put_back(i);
+            if member._id.is_empty() { member._id.put_back(i); }
             tmp_doc.put(i.to_str(), member.to_bson_t());
         }
         conf_doc.put(~"members", Array(~tmp_doc));
@@ -383,12 +396,13 @@ impl BsonFormattable for RS_MEMBER_OPTION {
 /**
  * Handle to replica set itself for functionality pertaining to
  * replica set-related characteristics, e.g. configuration.
+ *
+ * For functionality handling how the replica set is to be interacted
+ * with, e.g. setting read preference, etc. go through the client.
  */
 impl RS {
-    //pub fn new(seed : ~[(~str, uint)], client : @Client) -> RS {
     pub fn new(client : @Client) -> RS {
         RS {
-            //seed : seed,
             client : client,
         }
     }
@@ -431,6 +445,62 @@ impl RS {
         };
         conf.members.push(host);
         self.reconfig(conf, false)
+    }
+
+    /**
+     * Removes specified host from replica set.
+     *
+     * # Arguments
+     * * `host` - host (as string) to remove
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
+    pub fn remove(&self, host : ~str) -> Result<(), MongoErr> {
+        let op = match self.client.set_read_pref(PRIMARY_ONLY) {
+            Ok(pref) => pref,
+            Err(e) => return Err(MongoErr::new(
+                                    ~"rs::step_down",
+                                    ~"could not reset preference to primary",
+                                    e.to_str())),
+        };
+
+        let mut conf = match self.get_config() {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let mut ind = None;
+        for conf.members.iter().enumerate().advance |(i,&m)| {
+            if m.host == host {
+                ind = Some(i);
+            }
+        }
+        let reset = self.client.set_read_pref(op.clone());
+        let result = match ind {
+            None => Err(MongoErr::new(
+                            ~"rs::remove",
+                            fmt!("could not remove nonexistent host %s", host),
+                            ~"")),
+            Some(i) => {
+                conf.members.remove(i);
+                self.reconfig(conf, false)
+            }
+        };
+        match (result.is_ok(), reset.is_ok()) {
+            (true, true) => Ok(()),
+            (true, false) => Err(MongoErr::new(
+                                    ~"rs::remove",
+                                    fmt!("could not reset preference to %?", op),
+                                    reset.unwrap_err().to_str())),
+            (false, true) => Err(MongoErr::new(
+                                    ~"rs::remove",
+                                    fmt!("error removing host %s", host),
+                                    result.unwrap_err().to_str())),
+            (false, false) => Err(MongoErr::new(
+                                    ~"rs::remove",
+                                    fmt!("error removing host %s AND could not reset preference to %?", host, op),
+                                    fmt!("%s; %s", result.unwrap_err().to_str(), reset.unwrap_err().to_str()))),
+        }
     }
 
     /**
@@ -494,10 +564,13 @@ impl RS {
         let mut cmd_doc = BsonDocument::new();
         cmd_doc.put(~"replSetReconfig", conf_doc);
         cmd_doc.put(~"force", Bool(force));
-        match db.run_command(SpecObj(cmd_doc)) {
+        let result = match db.run_command(SpecObj(cmd_doc)) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
-        }
+        };
+        // force reconnect to give conn change to update
+        self.client.reconnect();
+        result
     }
 
     /**
@@ -505,9 +578,13 @@ impl RS {
      * specified number of seconds.
      */
     // XXX require &RSMember to be passed? check that node actually in RS?
-    pub fn freeze_node(&self, ip : ~str, port : uint, sec : uint)
+    pub fn node_freeze(&self, host : ~str, sec : uint)
                 -> Result<(), MongoErr> {
         let client = @Client::new();
+        let (ip, port) = match parse_host(&host) {
+            Ok(p) => p,
+            Err(e) => return Err(e),
+        };
         match client.connect(ip, port) {
             Ok(_) => (),
             Err(e) => return Err(e),
@@ -518,9 +595,14 @@ impl RS {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
         };
-
         client.disconnect();
+
         result
+    }
+
+    // convenience function
+    pub fn node_unfreeze(&self, host : ~str) -> Result<(), MongoErr> {
+        self.node_freeze(host, 0)
     }
 
     /**
@@ -532,7 +614,8 @@ impl RS {
      * # Returns
      * () on success, MongoErr on failure
      */
-    // XXX better way to do this...?
+    // XXX look for better way to do this without breaking down
+    //      RS/ReplicaSetConnection barrier
     pub fn step_down(&self, sec : uint) -> Result<(), MongoErr> {
         let op = match self.client.set_read_pref(PRIMARY_ONLY) {
             Ok(pref) => pref,
@@ -548,6 +631,8 @@ impl RS {
             Err(e) => Err(e),
         };
 
+        self.client.reconnect();
+
         let reset = self.client.set_read_pref(op.clone());
         match (result.is_ok(), reset.is_ok()) {
             (true, true) => Ok(()),
@@ -561,8 +646,31 @@ impl RS {
                                     result.unwrap_err().to_str())),
             (false, false) => Err(MongoErr::new(
                                     ~"rs::step_down",
-                                    fmt!("error stepping down AND could not reset preference to %?; priority to former", op),
-                                    result.unwrap_err().to_str())),
+                                    fmt!("error stepping down AND could not reset preference to %?", op),
+                                    fmt!("%s; %s", result.unwrap_err().to_str(), reset.unwrap_err().to_str()))),
         }
+    }
+
+    // TODO: input args (format, check, etc.)
+    pub fn node_sync_from(&self, node : ~str, from : ~str)
+                -> Result<(), MongoErr> {
+        let client = @Client::new();
+        let (ip, port) = match parse_host(&node) {
+            Ok(p) => p,
+            Err(e) => return Err(e),
+        };
+        match client.connect(ip, port) {
+            Ok(_) => (),
+            Err(e) => return Err(e),
+        }
+
+        let admin = client.get_admin();
+        let result = match admin.run_command(SpecNotation(fmt!("{ 'replSetSyncFrom':'%s' }", from ))) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        };
+
+        client.disconnect();
+        result
     }
 }

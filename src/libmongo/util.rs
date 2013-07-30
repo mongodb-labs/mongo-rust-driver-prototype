@@ -22,12 +22,16 @@ use bson::formattable::*;
  * Utility module for use internal and external to crate.
  * Users must access functionality for proper use of options, etc.
  */
+
 #[deriving(Clone)]
 pub struct MongoErr {
     //err_code : int,
     err_type : ~str,
     err_name : ~str,
     err_msg : ~str,
+    // TODO: error codes for finer granularity of error provenance (than
+    //      just a bunch of strings, e.g. connection error, run_command
+    //      error, BSON parsing error, etc.)
 }
 
 /**
@@ -240,7 +244,8 @@ pub enum COLLECTION_OPTION {
  */
 pub static LITTLE_ENDIAN_TRUE : bool = true;
 pub static MONGO_DEFAULT_PORT : uint = 27017;
-pub static MONGO_RECONN_MSECS : uint = (1000*60*5); // 5min
+pub static MONGO_RECONN_MSECS : u64 = (1000*3);
+pub static MONGO_CONN_WAIT : u64 = (1000*2);   // XXX better name
 pub static LOCALHOST : &'static str = &'static "127.0.0.1"; // XXX tmp
 
 /// INTERNAL UTILITIES

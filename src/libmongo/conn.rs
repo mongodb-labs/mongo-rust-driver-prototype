@@ -64,6 +64,16 @@ pub trait Connection {
     fn disconnect(&self) -> Result<(), MongoErr>;
 
     /**
+     * Convenience function that wraps disconnection and connection.
+     *
+     * Really should have same implementation across connections.
+     *
+     * # Returns
+     * () on success, MongoErr on failure (of connection)
+     */
+    fn reconnect(&self) -> Result<(), MongoErr>;
+
+    /**
      * "Fire and forget" asynchronous write to server of given data.
      *
      * # Arguments

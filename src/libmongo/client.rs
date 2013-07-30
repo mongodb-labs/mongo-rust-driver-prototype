@@ -303,6 +303,18 @@ impl Client {
         else { Ok(()) }
     }
 
+    pub fn reconnect(&self) -> Result<(), MongoErr> {
+        if !self.conn.is_empty() {
+            let tmp = self.conn.take();
+            let result = tmp.reconnect();
+            self.conn.put_back(tmp);
+            result
+        }
+        // XXX currently succeeds even if not previously connected
+        //      (may or may not be desired)
+        else { Ok(()) }
+    }
+
     /**
      * Sends message on connection; if write, checks write concern,
      * and if query, picks up OP_REPLY.

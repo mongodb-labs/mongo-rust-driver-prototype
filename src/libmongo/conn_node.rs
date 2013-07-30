@@ -104,6 +104,11 @@ impl Connection for NodeConnection {
         Ok(())
     }
 
+    pub fn reconnect(&self) -> Result<(), MongoErr> {
+        self.disconnect();
+        self.connect()
+    }
+
     pub fn send(&self, data : ~[u8], _ : bool) -> Result<(), MongoErr> {
         if self.sock.is_empty() {
             return Err(MongoErr::new(~"connection", ~"unknown send err", ~"cannot send on null socket"));
