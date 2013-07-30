@@ -303,7 +303,7 @@ impl Cursor {
      */
     pub fn explain(&mut self) -> Result<~BsonDocument, MongoErr> {
         let mut query = copy self.query_spec;
-        query.append(~"$explain", Double(1f64));
+        query.put(~"$explain", Double(1f64));
         let mut tmp_cur = Cursor::new(  query, copy self.proj_spec,
                                         &Collection::new(   copy self.db,
                                                             copy self.coll,
@@ -329,7 +329,7 @@ impl Cursor {
      *                  index from scratch
      */
     pub fn hint(&mut self, index : MongoIndex) {
-        self.query_spec.append(~"$hint", UString(index.get_name()));
+        self.query_spec.put(~"$hint", UString(index.get_name()));
     }
 
     /**
@@ -350,7 +350,7 @@ impl Cursor {
         match orderby {
             NORMAL(fields) => {
                 for fields.iter().advance |&(k,v)| {
-                    spec.append(k, Int32(v as i32));
+                    spec.put(k, Int32(v as i32));
                 }
             },
             _ => return Err(MongoErr::new(
@@ -358,7 +358,7 @@ impl Cursor {
                                 ~"invalid orderby specification",
                                 ~"only fields and their orders allowed")),
         }
-        self.query_spec.append(~"$orderby", Embedded(~spec));
+        self.query_spec.put(~"$orderby", Embedded(~spec));
         Ok(())
     }
 

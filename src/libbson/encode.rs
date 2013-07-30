@@ -353,32 +353,10 @@ impl<'self> BsonDocument {
         self.size = map_size(self.fields);
     }
 
-    /**
-    * Adds a key/value pair and updates size appropriately. Returns a mutable self reference with a fixed lifetime, allowing calls to be chained.
-    * Ex: let a = BsonDocument::inst().append(~"flag", Bool(true)).append(~"msg", UString(~"hello")).append(...);
-    * This may cause borrowing errors if used to make embedded objects.
-    */
-    pub fn append(&'self mut self, key: ~str, val: Document) -> &'self mut BsonDocument {
-        self.fields.insert(key, val);
-        self.size = map_size(self.fields);
-        self
-    }
-
     ///Returns a new BsonDocument struct.
     ///The default size is 5: 4 for the size integer and 1 for the terminating 0x0.
     pub fn new() -> BsonDocument {
         BsonDocument { size: 5, fields: ~OrderedHashmap::new() }
-    }
-
-    /**
-    * Returns a managed pointer to a new BsonDocument. Use this if you plan on chaining calls to append() directly on your call to inst.
-    * Example: let a = BsonDocument::inst().append(...).append(...); //compiles
-    * let b = BsonDocument::new().append(...); //error
-    * let c = BsonDocument::new();
-    * c.append(...).append(...).append(...); //compiles
-    */
-    pub fn inst() -> @mut BsonDocument {
-        @mut BsonDocument::new()
     }
 
     /**
@@ -509,24 +487,28 @@ mod tests {
 
     #[test]
     fn test_double_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Double(3.14159f64));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Double(3.14159f64));
         assert_eq!(doc.to_bson(), ~[18,0,0,0,1,102,111,111,0,110,134,27,240,249,33,9,64,0]);
     }
     #[test]
     fn test_string_encode() {
-        let doc = BsonDocument::inst().append(~"foo", UString(~"bar"));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", UString(~"bar"));
         assert_eq!(doc.to_bson(), ~[18,0,0,0,2,102,111,111,0,4,0,0,0,98,97,114,0,0]);
     }
 
     #[test]
     fn test_bool_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Bool(true));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Bool(true));
         assert_eq!(doc.to_bson(), ~[11,0,0,0,8,102,111,111,0,1,0] );
     }
 
     #[test]
     fn test_32bit_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Int32(56 as i32));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Int32(56 as i32));
         assert_eq!(doc.to_bson(), ~[14,0,0,0,16,102,111,111,0,56,0,0,0,0]);
     }
 
@@ -555,43 +537,51 @@ mod tests {
 
     #[test]
     fn test_binary_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Binary(2u8, ~[0u8,1,2,3]));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Binary(2u8, ~[0u8,1,2,3]));
         assert_eq!(doc.to_bson(), ~[19,0,0,0,5,102,111,111,0,4,0,0,0,2,0,1,2,3,0]);
     }
     #[test]
     fn test_64bit_encode() {
-        let doc1 = BsonDocument::inst().append(~"foo", UTCDate(4040404 as i64));
+        let mut doc1 = BsonDocument::new();
+        doc1.put(~"foo", UTCDate(4040404 as i64));
         assert_eq!(doc1.to_bson(), ~[18,0,0,0,9,102,111,111,0,212,166,61,0,0,0,0,0,0] );
 
-        let doc2 = BsonDocument::inst().append(~"foo", Int64(4040404 as i64));
+        let mut doc2 = BsonDocument::new();
+        doc2.put(~"foo", Int64(4040404 as i64));
         assert_eq!(doc2.to_bson(), ~[18,0,0,0,18,102,111,111,0,212,166,61,0,0,0,0,0,0] );
 
-        let doc3 = BsonDocument::inst().append(~"foo", Timestamp(4040404, 0));
+        let mut doc3 = BsonDocument::new();
+        doc3.put(~"foo", Timestamp(4040404, 0));
         assert_eq!(doc3.to_bson(), ~[18,0,0,0,17,102,111,111,0,212,166,61,0,0,0,0,0,0] );
     }
 
     #[test]
     fn test_null_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Null);
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Null);
 
         assert_eq!(doc.to_bson(), ~[10,0,0,0,10,102,111,111,0,0]);
     }
 
     #[test]
     fn test_regex_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Regex(~"bar", ~"baz"));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Regex(~"bar", ~"baz"));
 
         assert_eq!(doc.to_bson(), ~[18,0,0,0,11,102,111,111,0,98,97,114,0,98,97,122,0,0]);
     }
 
     #[test]
     fn test_jscript_encode() {
-        let doc = BsonDocument::inst().append(~"foo", JScript(~"return 1;"));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", JScript(~"return 1;"));
         assert_eq!(doc.to_bson(), ~[24,0,0,0,13,102,111,111,0,10,0,0,0,114,101,116,117,114,110,32,49,59,0,0]);
     }
     #[test]
     fn test_valid_objid_encode() {
-        let doc = BsonDocument::inst().append(~"foo", ObjectId(~[0,1,2,3,4,5,6,7,8,9,10,11]));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", ObjectId(~[0,1,2,3,4,5,6,7,8,9,10,11]));
 
         assert_eq!(doc.to_bson(), ~[22,0,0,0,7,102,111,111,0,0,1,2,3,4,5,6,7,8,9,10,11,0]);
     }
@@ -599,17 +589,17 @@ mod tests {
     #[test]
     #[should_fail]
     fn test_invalid_objid_encode() {
-        let doc = BsonDocument::inst().append(~"foo", ObjectId(~[1,2,3]));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", ObjectId(~[1,2,3]));
         doc.to_bson();
     }
 
     #[test]
     fn test_multi_encode() {
-
-        let doc = BsonDocument::inst()
-            .append(~"foo", Bool(true))
-            .append(~"bar", UString(~"baz"))
-            .append(~"qux", Int32(404));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Bool(true));
+        doc.put(~"bar", UString(~"baz"));
+        doc.put(~"qux", Int32(404));
 
         let enc = doc.to_bson();
 
