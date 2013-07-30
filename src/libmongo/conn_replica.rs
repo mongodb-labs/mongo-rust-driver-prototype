@@ -164,6 +164,7 @@ impl Connection for ReplicaSetConnection {
                         ~"no primary found"));
         }
         let server = server_cell.take();
+println(fmt!("[send] server: %?", server));
 
         // even if found server, if ping is empty, server down
         if server.ping.is_empty() {
@@ -399,7 +400,7 @@ impl ReplicaSetConnection {
                                             }
                                         }
 
-                                        match _parse_host(&host_str) {
+                                        match parse_host(&host_str) {
                                             Ok(p) => list.push(p),
                                             Err(e) => {
                                                 err = Some(e);
@@ -671,7 +672,7 @@ impl ReplicaSetConnection {
         if !self.write_to.is_empty() { self.write_to.take().disconnect(); }
         if !self.read_from.is_empty() { self.read_from.take().disconnect(); }
         let maybe_err = state.clone().err;
-        if maybe_err.is_none() {
+        /*if maybe_err.is_none() {
             match self._refresh_write_to(&state) {
                 Ok(_) => (),
                 Err(e) => err_str.push_str(e.to_str()),
@@ -682,6 +683,21 @@ impl ReplicaSetConnection {
             }
         } else {
             return Err(maybe_err.unwrap());
+        }*/
+        if state.pri.is_some() {
+            match self._refresh_write_to(&state) {
+                Ok(_) => (),
+                Err(e) => err_str.push_str(e.to_str()),
+            }
+        } else {
+            return Err(MongoErr::new(
+                        ~"conn_replica::refresh",
+                        ~"no primary; see state error",
+                        maybe_err.unwrap().to_str()));
+        }
+        match self._refresh_read_from(&state) {
+            Ok(_) => (),
+            Err(e) => err_str.push_str(e.to_str()),
         }
 
         // store state
@@ -734,6 +750,7 @@ impl ReplicaSetConnection {
                 -> Result<(), MongoErr> {
         // write_to is always primary, and flow cannot reach here
         //      unless state is good (non-empty primary)
+        //      unless non-empty primary
         let dat = state.pri.clone().unwrap();
         let pri = NodeConnection::new(dat.ip.clone(), dat.port);
         pri.tags.take();
@@ -840,7 +857,7 @@ impl ReplicaSetConnection {
     }
 }
 
-fn _parse_host(host_str : &~str) -> Result<(~str, uint), MongoErr> {
+pub fn parse_host(host_str : &~str) -> Result<(~str, uint), MongoErr> {
     let mut port_str = fmt!("%?", MONGO_DEFAULT_PORT);
     let mut ip_str = match host_str.find_str(":") {
         None => host_str.to_owned(),
@@ -850,11 +867,11 @@ fn _parse_host(host_str : &~str) -> Result<(~str, uint), MongoErr> {
         }
     };
 
-    if ip_str == ~"localhost" { ip_str = ~"127.0.0.1"; }    // XXX must exist better soln
+    if ip_str == ~"localhost" { ip_str = LOCALHOST.to_owned(); }    // XXX must exist better soln
 
     match from_str(port_str) {
         None => Err(MongoErr::new(
-                        ~"conn_replica::_parse_host",
+                        ~"conn_replica::parse_host",
                         ~"unexpected host string format",
                         fmt!("host string should be \"[IP ~str]:[uint]\",
                                     found %s:%s", ip_str, port_str))),

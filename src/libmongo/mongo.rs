@@ -33,6 +33,7 @@ pub mod util;
 #[macro_escape]
 mod mockable;
 pub mod index;      // index for querying
+pub mod uri_parser;
 
 // Client-side components
 pub mod client;     // primary point-of-entry for driver system

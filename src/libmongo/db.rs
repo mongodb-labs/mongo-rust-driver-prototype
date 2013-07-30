@@ -285,24 +285,27 @@ impl DB {
             None => ~[W_N(1), FSYNC(false)],
             Some(w) => w,
         };
+
+        let mut concern_doc = BsonDocument::new();
+        concern_doc.put(~"getLastError", Bool(true));
+
         // parse write concern, early exiting if set to <= 0
-        let mut concern_str = ~"{ \"getLastError\":1";
         for concern.iter().advance |&opt| {
-            concern_str.push_str(match opt {
-                JOURNAL(j) => fmt!(", \"j\":%?", j),
+            match opt {
+                JOURNAL(j) => concern_doc.put(~"j", Bool(j)),
                 W_N(w) => {
                     if w <= 0 { return Ok(()); }
-                    else { fmt!(", \"w\":%d", w) }
+                    else { concern_doc.put(~"w", Int32(w as i32)) }
                 }
-                W_STR(w) => fmt!(", \"w\":\"%s\"", w),
-                WTIMEOUT(t) => fmt!(", \"wtimeout\":%d", t),
-                FSYNC(s) => fmt!(", \"fsync\":%?", s),
-            });
+                W_STR(w) => concern_doc.put(~"w", UString(w)),
+                W_TAGSET(ts) => concern_doc.union(ts.to_bson_t()),
+                WTIMEOUT(t) => concern_doc.put(~"wtimeout", Int32(t as i32)),
+                FSYNC(s) => concern_doc.put(~"fsync", Bool(s)),
+            }
         }
-        concern_str.push_str(~" }");
 
         // run_command and get entire doc
-        let err_doc_tmp = match self.run_command(SpecNotation(concern_str)) {
+        let err_doc_tmp = match self.run_command(SpecObj(concern_doc)) {
             Ok(doc) => doc,
             Err(e) => return Err(MongoErr::new(
                                     ~"db::get_last_error",

@@ -201,7 +201,9 @@ impl NodeConnection {
         let client = @Client::new();
 
         let server = @NodeConnection::new(self.get_ip(), self.get_port());
-        match client._connect_to_conn(~"client::connect", server as @Connection) {
+        match client._connect_to_conn(
+                fmt!("client::connect[%s:%?]", self.server_ip_str, self.server_port),
+                server as @Connection) {
             Ok(_) => (),
             Err(e) => return Err(e),
         }

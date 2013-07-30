@@ -159,13 +159,11 @@ impl BsonFormattable for RSConfig {
             self.version.put_back(v);
         }
 
-        let mut i = 0;
         let mut tmp_doc = BsonDocument::new();
-        for self.members.iter().advance |&member| {
+        for self.members.iter().enumerate().advance |(i,&member)| {
             if !member._id.is_empty() { member._id.take(); }
             member._id.put_back(i);
             tmp_doc.put(i.to_str(), member.to_bson_t());
-            i += 1;
         }
         conf_doc.put(~"members", Array(~tmp_doc));
 
@@ -398,7 +396,7 @@ impl RS {
     /**
      * Gets configuration of replica set referred to by this handle.
      *
-     * Returns
+     * # Returns
      * RSConfig struct on success, MongoErr on failure
      */
     pub fn get_config(&self) -> Result<RSConfig, MongoErr> {
@@ -420,10 +418,10 @@ impl RS {
      * Adds specified host to replica set; specify options directly
      * within host struct.
      *
-     * Arguments
+     * # Arguments
      * * `host` - host, with options, to add to replica set
      *
-     * Returns
+     * # Returns
      * () on success, MongoErr on failure
      */
     pub fn add(&self, host : RSMember) -> Result<(), MongoErr> {
@@ -438,7 +436,7 @@ impl RS {
     /**
      * Gets status of replica set.
      *
-     * Returns
+     * # Returns
      * ~BsonDocument containing status information, MongoErr on failure
      */
     pub fn get_status(&self) -> Result<~BsonDocument, MongoErr> {
@@ -446,6 +444,15 @@ impl RS {
         db.run_command(SpecNotation(~"{ 'replSetGetStatus':1 }"))
     }
 
+    /**
+     * Initiates given configuration specified as `RSConfig`.
+     *
+     * # Arguments
+     * * `conf` - configuration to initiate
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
     pub fn initiate(&self, conf : RSConfig) -> Result<(), MongoErr> {
         let conf_doc = conf.to_bson_t();
         let db = self.client.get_admin();
@@ -457,8 +464,21 @@ impl RS {
         }
     }
 
+    /**
+     * Reconfigure replica set to have given configuration.
+     *
+     * # Arguments
+     * * `conf` - new configuration for replica set
+     * * `force` - whether or not to force the reconfiguration
+     *              WARNING: use with caution; may lead to rollback and
+     *              other difficult-to-recover-from situations
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
     pub fn reconfig(&self, conf : RSConfig, force : bool)
                 -> Result<(), MongoErr> {
+        // be sure to increment version number
         let tmp_conf = match self.get_config() {
             Ok(c) => c,
             Err(e) => return Err(MongoErr::new(
@@ -477,6 +497,72 @@ impl RS {
         match db.run_command(SpecObj(cmd_doc)) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
+        }
+    }
+
+    /**
+     * Prevent specified node from seeking election for
+     * specified number of seconds.
+     */
+    // XXX require &RSMember to be passed? check that node actually in RS?
+    pub fn freeze_node(&self, ip : ~str, port : uint, sec : uint)
+                -> Result<(), MongoErr> {
+        let client = @Client::new();
+        match client.connect(ip, port) {
+            Ok(_) => (),
+            Err(e) => return Err(e),
+        }
+
+        let admin = client.get_admin();
+        let result = match admin.run_command(SpecNotation(fmt!("{ 'replSetFreeze':%? }", sec))) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        };
+
+        client.disconnect();
+        result
+    }
+
+    /**
+     * Forces current primary to step down for specified number of seconds.
+     *
+     * # Arguments
+     * * `sec` - number of seconds for current primary to step down
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
+    // XXX better way to do this...?
+    pub fn step_down(&self, sec : uint) -> Result<(), MongoErr> {
+        let op = match self.client.set_read_pref(PRIMARY_ONLY) {
+            Ok(pref) => pref,
+            Err(e) => return Err(MongoErr::new(
+                                    ~"rs::step_down",
+                                    ~"could not reset preference to primary",
+                                    e.to_str())),
+        };
+
+        let admin = self.client.get_admin();
+        let result = match admin.run_command(SpecNotation(fmt!(" { 'replSetStepDown':%? } ", sec))) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        };
+
+        let reset = self.client.set_read_pref(op.clone());
+        match (result.is_ok(), reset.is_ok()) {
+            (true, true) => Ok(()),
+            (true, false) => Err(MongoErr::new(
+                                    ~"rs::step_down",
+                                    fmt!("could not reset preference to %?", op),
+                                    reset.unwrap_err().to_str())),
+            (false, true) => Err(MongoErr::new(
+                                    ~"rs::step_down",
+                                    ~"error stepping down",
+                                    result.unwrap_err().to_str())),
+            (false, false) => Err(MongoErr::new(
+                                    ~"rs::step_down",
+                                    fmt!("error stepping down AND could not reset preference to %?; priority to former", op),
+                                    result.unwrap_err().to_str())),
         }
     }
 }

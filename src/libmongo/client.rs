@@ -36,7 +36,7 @@ use coll::Collection;
 pub struct Client {
     conn : cell::Cell<@Connection>,
     priv rs_conn : cell::Cell<@ReplicaSetConnection>,
-    priv cur_requestId : ~cell::Cell<i32>,      // first unused requestId
+    priv cur_requestId : cell::Cell<i32>,       // first unused requestId
     // XXX index cache?
 }
 
@@ -54,8 +54,12 @@ impl Client {
         Client {
             conn : cell::Cell::new_empty(),
             rs_conn : cell::Cell::new_empty(),
-            cur_requestId : ~cell::Cell::new(0),
+            cur_requestId : cell::Cell::new(0),
         }
+    }
+
+    pub fn parse_uri(uri : ~str) {
+        // XXX
     }
 
     pub fn get_admin(@self) -> DB {
@@ -224,7 +228,7 @@ impl Client {
      */
     pub fn connect(&self, server_ip_str : ~str, server_port : uint)
                 -> Result<(), MongoErr> {
-        self._connect_to_conn(  ~"client::connect",
+        self._connect_to_conn(  fmt!("client::connect[%s:%?]", server_ip_str, server_port),
                                 @NodeConnection::new(server_ip_str,
                                                         server_port)
                                     as @Connection)
@@ -241,9 +245,9 @@ impl Client {
      */
     // TODO uri parsing
     pub fn connect_to_rs(&self, seed : ~[(~str, uint)]) -> Result<@ReplicaSetConnection, MongoErr> {
-        let tmp = @ReplicaSetConnection::new(seed);
-        match self._connect_to_conn(  ~"client::connect_to_rs",
-                                tmp as @Connection) {
+        let tmp = @ReplicaSetConnection::new(seed.clone());
+        match self._connect_to_conn(    fmt!("client::connect_to_rs[%?]", seed),
+                                        tmp as @Connection) {
             Ok(_) => {
                 self.rs_conn.put_back(tmp);
                 Ok(tmp)
@@ -252,7 +256,17 @@ impl Client {
         }
     }
 
-    pub fn set_read_pref(&self, np : READ_PREFERENCE) -> Result<(), MongoErr> {
+    /**
+     * Sets read preference as specified, returning former preference.
+     *
+     * # Arguments
+     * * `np` - new read preference
+     *
+     * # Returns
+     * old read preference on success, MongoErr on failure
+     */
+    pub fn set_read_pref(&self, np : READ_PREFERENCE)
+                -> Result<READ_PREFERENCE, MongoErr> {
         if self.rs_conn.is_empty() {
             return Err(MongoErr::new(
                             ~"client::set_read_pref",
@@ -268,7 +282,7 @@ impl Client {
         rs.read_pref.put_back(np);
         // put everything back
         self.rs_conn.put_back(rs);
-        Ok(())
+        Ok(op)
     }
 
     /**
@@ -322,7 +336,7 @@ impl Client {
         if !read {
             // requested write concern
             let (db_str, wc) = wc_pair;
-            let db = DB::new(copy *db_str, self);
+            let db = DB::new(db_str.as_slice(), self);
 
             match db.get_last_error(wc) {
                 Ok(_) => Ok(None),

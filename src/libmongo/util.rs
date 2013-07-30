@@ -208,7 +208,7 @@ pub enum WRITE_CONCERN {
     JOURNAL(bool),      // wait for next journal commit?
     W_N(int),           // replicate to how many? (number)
     W_STR(~str),        // replicate to how many? (string, e.g. "majority")
-    //W_TAGSET(TagSet),   // replicate to what tagset?
+    W_TAGSET(TagSet),   // replicate to what tagset?
     WTIMEOUT(int),      // timeout after how many ms?
     FSYNC(bool),        // wait for write to disk?
 }
@@ -241,6 +241,7 @@ pub enum COLLECTION_OPTION {
 pub static LITTLE_ENDIAN_TRUE : bool = true;
 pub static MONGO_DEFAULT_PORT : uint = 27017;
 pub static MONGO_RECONN_MSECS : uint = (1000*60*5); // 5min
+pub static LOCALHOST : &'static str = &'static "127.0.0.1"; // XXX tmp
 
 /// INTERNAL UTILITIES
 /**
