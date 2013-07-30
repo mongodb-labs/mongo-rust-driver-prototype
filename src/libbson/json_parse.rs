@@ -118,7 +118,7 @@ impl<T:Stream<char>> ExtendedJsonParser<T> {
                     self.stream.pass_while(&[' ', '\n', '\r', '\t']);
                     return Ok(Embedded(~ret));
                 }
-                _ => return Err(~"invalid end to object: expecting , or }")
+                _ => return Err(fmt!("invalid end to object: expecting , or }, found %?", self.stream.first()))
             }
             if !self.stream.has_next() { break; }
         }
@@ -545,7 +545,6 @@ mod tests {
         if parser.object().is_err() { fail!("test_mismatched_quotes") }
     }
 
-    //these benchmarks are for little girls
     #[bench]
     fn bench_string_parse(b: &mut BenchHarness) {
         let stream = "'asdfasdf'".iter().collect::<~[char]>();
@@ -620,47 +619,30 @@ mod tests {
         }
     }
 
-    //these benchmarks are for lumberjacks
     #[bench]
     fn bench_advanced_object(b: &mut BenchHarness) {
         let stream = "{
             'fullName' : 'John Doe',
-            'age' : 47,
+            'age' : 42,
             'state' : 'Massachusetts',
             'city' : 'Boston',
             'zip' : 02201,
             'married' : false,
             'dozen' : 12,
-            'dozenOrBakersDozen' : 13,
-            'favoriteEvenNumber' : 14,
             'topThreeFavoriteColors' : [ 'red', 'magenta', 'cyan' ],
             'favoriteSingleDigitWholeNumbers' : [ 7 ],
-            'favoriteFiveLetterWord' : 'coder',
-            'emailAddresses' :
+            'favoriteFiveLetterWord' : 'fadsy',
+            'strings' :
             [
-            'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ@letters-in-local.org',
-            '01234567890@numbers-in-local.net',
-            'mixed-1234-in-{+^}-local@sld.net',
-            'a@single-character-in-local.org',
-            '\"quoted\"@sld.com',
-            '\"\\e\\s\\c\\a\\p\\e\\d\"@sld.com',
-            '\"quoted-at-sign@sld.org\"@sld.com',
-            '\"escaped\\\"quote\"@sld.com',
-            '\"back\\slash\"@sld.com',
-            'one-character-third-level@a.example.com',
-            'single-character-in-sld@x.org',
-            'local@dash-in-sld.com',
-            'letters-in-sld@123.com',
-            'one-letter-sld@x.org',
-            'uncommon-tld@sld.museum',
-            'uncommon-tld@sld.travel',
-            'uncommon-tld@sld.mobi',
-            'country-code-tld@sld.uk',
-            'country-code-tld@sld.rw',
-            'local@sld.newTLD',
-            'the-total-length@of-an-entire-address.cannot-be-longer-than-two-hundred-and-fifty-four-characters.and-this-address-is-254-characters-exactly.so-it-should-be-valid.and-im-going-to-add-some-more-words-here.to-increase-the-lenght-blah-blah-blah-blah-bla.org',
-            'the-character-limit@for-each-part.of-the-domain.is-sixty-three-characters.this-is-exactly-sixty-three-characters-so-it-is-valid-blah-blah.com',
-            'local@sub.domains.com'
+            'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',
+            '01234567890',
+            'mixed-1234-in-{+^}',
+            '\"quoted\"',
+            '\"\\e\\s\\c\\a\\p\\e\\d\"',
+            '\"quoted-at-sign@sld.org\"',
+            '\"escaped\\\"quote\"',
+            '\"back\\slash\"',
+            'email@address.com'
             ],
             'ipAddresses' : [ '127.0.0.1', '24.48.64.2', '192.168.1.1', '209.68.44.3', '2.2.2.2' ]
         }".iter().collect::<~[char]>();
@@ -676,30 +658,18 @@ mod tests {
     }
 
     #[bench]
-    fn bench_advanced_schema(b: &mut BenchHarness) {
+    fn bench_extended_object(b: &mut BenchHarness) {
         let stream = "{
-         'me' : 'test',
-         'type' : 'object',
-         'additionalProperties' : false,
-         'properties' :
-             {
-                 'fullName' : { 'type' : 'string' },
-                 'age' : { 'type' : 'integer' },
-                 'optionalItem' : { 'type' : 'string', 'optional' : true },
-                 'state' : { 'type' : 'string', 'optional' : true },
-                 'city' : { 'type' : 'string', 'optional' : true },
-                 'zip' : { 'type' : 'integer', 'format' : 'postal-code' },
-                 'married' : { 'type' : 'boolean' },
-                 'dozen' : { 'type' : 'integer', 'minimum' : 12, 'maximum' : 12 },
-                 'dozenOrBakersDozen' : { 'type' : 'integer', 'minimum' : 12, 'maximum' : 13 },
-                 'favoriteEvenNumber' : { 'type' : 'integer', 'divisibleBy' : 2 },
-                 'topThreeFavoriteColors' : { 'type' : 'array', 'minItems' : 3, 'maxItems' : 3, 'uniqueItems' : true, 'items' : { 'type' : 'string', 'format' : 'color' }},
-                 'favoriteSingleDigitWholeNumbers' : { 'type' : 'array', 'minItems' : 1, 'maxItems' : 10, 'uniqueItems' : true, 'items' : { 'type' : 'integer', 'minimum' : 0, 'maximum' : 9 }},
-                 'favoriteFiveLetterWord' : { 'type' : 'string', 'minLength' : 5, 'maxLength' : 5 },
-                 'emailAddresses' : { 'type' : 'array', 'minItems' : 1, 'uniqueItems' : true, 'items' : { 'type' : 'string', 'format' : 'email' }},
-                 'ipAddresses' : { 'type' : 'array', 'uniqueItems' : true, 'items' : { 'type' : 'string', 'format' : 'ip-address' }}
-             }
-         }".iter().collect::<~[char]>();
+            'name': 'foo',
+            'baz': 'qux',
+            'binary': { '$binary': 012345432, '$type': 0 },
+            'dates': [ { '$date': 987654 }, {'$date': 123456}, {'$date': 748392} ],
+            'timestamp': { 'timestamp': { 'timestamp': { '$timestamp': { 't': 1234, 'i': 5678 } } } },
+            'regex': { '$regex': '^.*/012345/.*(foo|bar)+.*$', '$options': '-j -g -i' },
+            'oid': { '$oid': 43214321 },
+            'minkey': { 'maxkey': { 'that-was-a-fakeout': { '$minKey': 1 } } },
+            'maxkey': { 'minkey': { 'haha-that-too': { '$maxKey': 1 } } }
+        }".iter().collect::<~[char]>();
 
         let mut parser = ExtendedJsonParser::new(stream.clone());
         do b.iter {
