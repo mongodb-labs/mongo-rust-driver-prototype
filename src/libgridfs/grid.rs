@@ -23,8 +23,8 @@ use gridfile::*;
 
 pub struct GridFS {
     db: @DB,
-    files: ~Collection,
-    chunks: ~Collection,
+    files: Collection,
+    chunks: Collection,
 }
 
 impl GridFS {
@@ -36,13 +36,13 @@ impl GridFS {
     pub fn new(db: @DB) -> GridFS {
         GridFS {
             db: db,
-            files: ~(db.get_collection(~"fs.files")),
-            chunks: ~(db.get_collection(~"fs.chunks"))
+            files: db.get_collection(~"fs.files"),
+            chunks: db.get_collection(~"fs.chunks"),
         }
     }
 
-    pub fn new_file<'a>(&'a self) -> GridIn<'a> {
-        GridIn::new(&'a *self.chunks, &'a *self.files)
+    pub fn new_file(&self) -> GridIn {
+        GridIn::new(self.db)
     }
 
     pub fn put(&self, data: ~[u8]) -> Result<(), MongoErr> {
@@ -72,6 +72,10 @@ impl GridFS {
             self.files.remove(Some(SpecObj(file_doc)), None, None, None),
             self.chunks.remove(Some(SpecObj(chunk_doc)), None, None, None)
         )
+    }
+
+    pub fn get(&self, id: Document) -> GridOut {
+        GridOut::new(self.db, id)
     }
 }
 

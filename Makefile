@@ -33,11 +33,8 @@ SRC = ./src
 LIB = ./lib
 BSONDIR = ./src/libbson
 MONGODIR = ./src/libmongo
-<<<<<<< HEAD
 GRIDDIR = ./src/libgridfs
-=======
 UTILDIR = ./src/tools
->>>>>>> 56b5c37aedf2a02fea0dbe93064e0fd7463ee467
 EXDIR = ./examples
 BIN = ./bin
 TEST = ./test

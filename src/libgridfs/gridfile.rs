@@ -21,11 +21,12 @@ pub use std::rt::io::{Reader,Writer};
 use bson::encode::*;
 
 use mongo::coll::*;
+use mongo::db::*;
 use mongo::util::*;
 
-pub struct GridIn<'self> {
-    chunks: &'self Collection,
-    files: &'self Collection,
+pub struct GridIn {
+    chunks: Collection,
+    files: Collection,
     closed: bool,
     buf: stdio::BytesWriter,
     chunk_size: uint,
@@ -34,15 +35,16 @@ pub struct GridIn<'self> {
     position: uint,
 }
 
-pub struct GridOut<'self> {
-    chunks: &'self Collection,
-    files: &'self Collection,
+pub struct GridOut {
+    chunks: Collection,
+    files: Collection,
     length: uint,
     position: uint,
     file_id: Document,
+    buf: ~[u8],
 }
 
-impl<'self> rtio::Writer for GridIn<'self> {
+impl rtio::Writer for GridIn {
     pub fn write(&mut self, d: &[u8]) {
         if self.closed {
             rtio::io_error::cond.raise(rtio::IoError {
@@ -92,8 +94,8 @@ impl<'self> rtio::Writer for GridIn<'self> {
         let mut oid = ~"";
         match self.file_id {
             Some(Binary(_, ref v)) => {
-                for v.iter().advance |b| {
-                    let mut byte = fmt!("%x", b);
+                for v.iter().advance |&b| {
+                    let mut byte = fmt!("%x", b as uint);
                     if byte.len() == 1 {
                         byte = (~"0").append(byte)
                     }
@@ -148,9 +150,10 @@ impl<'self> rtio::Writer for GridIn<'self> {
     }
 }
 
-impl<'self> GridIn<'self> {
-    pub fn new(chunks: &'self Collection,
-        files: &'self Collection) -> GridIn<'self> {
+impl GridIn {
+    pub fn new(db: &DB) -> GridIn {
+        let chunks = db.get_collection(~"fs.chunks");
+        let files = db.get_collection(~"fs.files");
         GridIn {
             chunks: chunks,
             files: files,
@@ -212,12 +215,38 @@ impl<'self> GridIn<'self> {
     }
 }
 
-impl<'self> rtio::Reader for GridOut<'self> {
+impl rtio::Reader for GridOut {
     pub fn read(&mut self, buf: &mut [u8]) -> Option<uint> {
-        if buf.len() == 0 { return None; }
+        let mut size = buf.len();
+        if size == 0 { return None; }
         let remainder = self.length - self.position;
-        //TODO
-        Some(0)
+        if size < 0 || size > remainder {
+            size = remainder;
+        }
+
+        let mut received = self.buf.len();
+
+        while received < size {
+            let mut find = BsonDocument::new();
+            find.put(~"files_id", self.file_id.clone());
+            let chunk = match self.chunks.find_one(Some(SpecObj(find)),
+                None, None) {
+                Ok(d) => d,
+                Err(_) => return None
+            };
+
+            let data = match chunk.find(~"data") {
+                Some(&Binary(_, ref v)) => v.clone(),
+                _ => return None
+            };
+
+            received += data.len();
+            for data.iter().advance |&elt| {
+                buf[self.position] = elt;
+                self.position += 1;
+            }
+        }
+        Some(received)
     }
 
     pub fn eof(&mut self) -> bool {
@@ -225,11 +254,12 @@ impl<'self> rtio::Reader for GridOut<'self> {
     }
 }
 
-impl<'self> GridOut<'self> {
-    pub fn new(chunks: &'self Collection,
-               files: &'self Collection,
+impl GridOut {
+    pub fn new(db: &DB,
                file_id: Document)
-        -> GridOut<'self> {
+        -> GridOut {
+        let chunks = db.get_collection(~"fs.chunks");
+        let files = db.get_collection(~"fs.files");
         let mut doc = BsonDocument::new();
         doc.put(~"_id", file_id.clone());
         let len = match files.find_one(Some(SpecObj(doc)), None, None) {
@@ -247,6 +277,7 @@ impl<'self> GridOut<'self> {
             file_id: file_id,
             length: len,
             position: 0,
+            buf: ~[],
         }
     }
 }
