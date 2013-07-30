@@ -12,36 +12,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Rust compilation
 RC = rustc
 RDOC = rustdoc
 RDOCFLAGS = --output-style doc-per-mod --output-format markdown
+FLAGS = -Z debug-info -L ./bin -D unused-unsafe -A unnecessary-allocation $(TOOLFLAGS)
+
+# C compilation
 CC = gcc
 AR = ar rcs
-FLAGS = -Z debug-info -L ./bin -D unused-unsafe -A unnecessary-allocation $(TOOLFLAGS)
 CFLAGS = -c -g -Wall -Werror
+
+# Programs and utilities
 RM = rm
 RMDIR = rmdir -p
 MKDIR = mkdir -p
 
+# Directories
 SRC = ./src
 LIB = ./lib
 BSONDIR = ./src/libbson
 MONGODIR = ./src/libmongo
+<<<<<<< HEAD
 GRIDDIR = ./src/libgridfs
+=======
+UTILDIR = ./src/tools
+>>>>>>> 56b5c37aedf2a02fea0dbe93064e0fd7463ee467
 EXDIR = ./examples
 BIN = ./bin
 TEST = ./test
 DOCS = ./docs
 
+# Variables
 MONGOTEST = 0
+TOOLFLAGS =
 
 .PHONY: test
 
-all: bin libs bson mongo gridfs
+all: bin libs util bson mongo gridfs
 
 bin:
 	$(MKDIR) bin
 	$(MKDIR) test
+
+util: $(UTILDIR)/*
+	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(UTILDIR)/tools.rs
 
 libs: $(LIB)/md5.c
 	$(CC) $(CFLAGS) -o $(BIN)/md5.o $(LIB)/md5.c
@@ -56,19 +71,32 @@ mongo: $(MONGODIR)/*
 gridfs: $(GRIDDIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(GRIDDIR)/gridfs.rs
 
-test: $(BSONDIR)/bson.rs $(MONGODIR)/mongo.rs
+test: $(BSONDIR)/bson.rs $(MONGODIR)/mongo.rs $(MONGODIR)/test/test.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/tool_test $(UTILDIR)/tools.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rs
 
 check: test
 ifeq ($(MONGOTEST),1)
+	$(TEST)/tool_test
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 	$(TEST)/driver_test
 else
+	$(TEST)/tool_test
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
+endif
+
+bench: test
+ifeq ($(MONGOTEST),1)
+	$(TEST)/bson_test --bench
+	$(TEST)/mongo_test --bench
+	$(TEST)/driver_test --bench
+else
+	$(TEST)/bson_test --bench
+	$(TEST)/mongo_test --bench
 endif
 
 ex: $(EXDIR)/*

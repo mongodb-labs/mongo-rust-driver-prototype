@@ -25,6 +25,19 @@ pub struct OrderedHashmap<K,V> {
     priv order: ~[(@K,@V)]
 }
 
+impl<K:Clone + Hash + Eq + Copy, V:Clone + Copy> Clone for OrderedHashmap<K,V> {
+    pub fn clone(&self) -> OrderedHashmap<K,V> {
+        let mut m: HashMap<K,V> = HashMap::new();
+        for self.iter().advance |&(@k, @v)| {
+            m.insert(k.clone(), v.clone());
+        }
+        OrderedHashmap {
+            map: m,
+            order: self.order.clone()
+        }
+    }
+}
+
 impl<K: Hash + Eq,V> Container for OrderedHashmap<K,V> {
     pub fn len(&self) -> uint { self.map.len() }
     pub fn is_empty(&self) -> bool { self.map.is_empty() }
@@ -77,12 +90,9 @@ impl<K:Hash + Eq + ToStr + Copy,V:ToStr + Copy> ToStr for OrderedHashmap<K,V> {
     pub fn to_str(&self) -> ~str {
         let mut s = ~"{";
         for self.iter().advance |&(@k, @v)| {
-            s.push_str(" (");
-            s.push_str(k.to_str());
-            s.push_str(", ");
-            s.push_str(v.to_str());
-            s.push_str(") ");
+            s.push_str(fmt!(" %s: %s, ", k.to_str(), v.to_str()));
         }
+        s = s.slice(0, s.len()-2).to_owned();
         s.push_str("}");
         s
     }

@@ -249,7 +249,7 @@ Example:
 ```rust
 use bson::json_parse::*;
 
-let json_string = ~"{\"foo\": \"bar\", \"baz\", 5}";
+let json_string = ~"{\"foo\": \"bar\", \"baz\": 5}";
 let parsed_doc = ObjParser::from_string<Document, ExtendedJsonParser<~[char]>>(json_string);
 match parsed_doc {
     Ok(ref d) => //the string was parsed successfully; d is a Document
@@ -278,7 +278,7 @@ impl BsonFormattable for Foo {
         //the names of the fields in a Foo to their values
     }
 
-    fn from_bson_t(doc: Document) -> Foo {
+    fn from_bson_t(doc: &Document) -> Foo {
         //this method is the inverse of to_bson_t,
         //in general it makes sense for the two of them to roundtrip
     }
@@ -320,8 +320,8 @@ impl BsonFormattable for Foo {
     ...
 }
 
-let b: ~[u8] = /*get a bson document from somewhere*/
-let myfoo = BsonFormattable::from_bson_t::<Foo>(Embedded(~decode(b).unwrap()));
+let b: ~[u8] = /*get a bson string from somewhere*/
+let myfoo = BsonFormattable::from_bson_t::<Foo>(&Embedded(~decode(b).unwrap()));
 //here it is assumed b was decoded successfully, though a match could be done
 //the Embedded constructor is needed because decode returns a BsonDocument,
 //while from_bson_t expects a document
@@ -334,5 +334,6 @@ let myfoo = BsonFormattable::from_bson_t::<Foo>(Embedded(~decode(b).unwrap()));
 - Implement read preferences
 - Documentation to the [API site](http://api.mongodb.org)
 - Thorough test suite for CRUD functionality
+- GridFS implementation
 
 To be continued...
