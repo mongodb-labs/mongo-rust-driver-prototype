@@ -37,7 +37,7 @@ pub trait BsonFormattable {
      * Logically this method is the inverse of to_bson_t
      * and usually the two functions should roundtrip.
      */
-    fn from_bson_t(doc: Document) -> Result<Self,~str>;
+    fn from_bson_t(doc: &Document) -> Result<Self,~str>;
 }
 
 macro_rules! float_fmt {
@@ -47,7 +47,7 @@ macro_rules! float_fmt {
                 (*self as f64).to_bson_t()
             }
 
-            fn from_bson_t(doc: Document) -> Result<$t, ~str> {
+            fn from_bson_t(doc: &Document) -> Result<$t, ~str> {
                 match BsonFormattable::from_bson_t::<f64>(doc) {
                     Ok(i) => Ok(i as $t),
                     Err(e) => Err(e)
@@ -64,7 +64,7 @@ macro_rules! i32_fmt {
                 (*self as i32).to_bson_t()
             }
 
-            fn from_bson_t(doc: Document) -> Result<$t, ~str> {
+            fn from_bson_t(doc: &Document) -> Result<$t, ~str> {
                 match BsonFormattable::from_bson_t::<i32>(doc) {
                     Ok(i) => Ok(i as $t),
                     Err(e) => Err(e)
@@ -88,8 +88,8 @@ i32_fmt!{impl char}
 impl BsonFormattable for f64 {
     fn to_bson_t(&self) -> Document { Double(*self) }
 
-    fn from_bson_t(doc: Document) -> Result<f64,~str> {
-        match doc {
+    fn from_bson_t(doc: &Document) -> Result<f64,~str> {
+        match *doc {
             Double(f) => Ok(f),
             _ => Err(~"can only cast Double to f64")
         }
@@ -99,8 +99,8 @@ impl BsonFormattable for f64 {
 impl BsonFormattable for i32 {
     fn to_bson_t(&self) -> Document { Int32(*self) }
 
-    fn from_bson_t(doc: Document) -> Result<i32,~str> {
-        match doc {
+    fn from_bson_t(doc: &Document) -> Result<i32,~str> {
+        match *doc {
             Int32(i) => Ok(i),
             _ => Err(~"can only cast Int32 to i32")
         }
@@ -110,8 +110,8 @@ impl BsonFormattable for i32 {
 impl BsonFormattable for i64 {
     fn to_bson_t(&self) -> Document { Int64(*self) }
 
-    fn from_bson_t(doc: Document) -> Result<i64,~str> {
-        match doc {
+    fn from_bson_t(doc: &Document) -> Result<i64,~str> {
+        match *doc {
             Int64(i) => Ok(i),
             UTCDate(i) => Ok(i),
             Timestamp(u1, u2) => Ok((u1 | (u2 << 32)) as i64),
@@ -124,13 +124,13 @@ impl BsonFormattable for ~str {
     fn to_bson_t(&self) -> Document {
         match ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(*self) {
             Ok(doc) => doc,
-            Err(_) => UString(copy *self),
+            Err(_) => UString(self.clone()),
         }
     }
 
-    fn from_bson_t(doc: Document) -> Result<~str,~str> {
-        match doc {
-            UString(s) => Ok(copy s),
+    fn from_bson_t(doc: &Document) -> Result<~str,~str> {
+        match *doc {
+            UString(ref s) => Ok(s.clone()),
             _ => Err(fmt!("could not convert %? to string", doc))
         }
     }
@@ -141,7 +141,7 @@ impl<T:BsonFormattable> BsonFormattable for ~T {
         (**self).to_bson_t()
     }
 
-    fn from_bson_t(doc: Document) -> Result<~T, ~str> {
+    fn from_bson_t(doc: &Document) -> Result<~T, ~str> {
         match BsonFormattable::from_bson_t(doc) {
             Ok(c) => Ok(~c),
             Err(e) => Err(e)
@@ -154,7 +154,7 @@ impl<T:BsonFormattable> BsonFormattable for @T {
         (**self).to_bson_t()
     }
 
-    fn from_bson_t(doc: Document) -> Result<@T, ~str> {
+    fn from_bson_t(doc: &Document) -> Result<@T, ~str> {
         match BsonFormattable::from_bson_t(doc) {
             Ok(c) => Ok(@c),
             Err(e) => Err(e)
@@ -174,17 +174,17 @@ impl BsonFormattable for json::Json {
         }
     }
 
-    fn from_bson_t(doc: Document) -> Result<json::Json, ~str> {
-        match doc {
+    fn from_bson_t(doc: &Document) -> Result<json::Json, ~str> {
+        match *doc {
             Double(f) => Ok(json::Number(f as float)),
-            UString(s) => Ok(json::String(copy s)),
-            Embedded(a) => Ok(json::Object(~match
-                BsonFormattable::from_bson_t::<HashMap<~str, json::Json>>(Embedded(a)) {
+            UString(ref s) => Ok(json::String(s.clone())),
+            Embedded(ref a) => Ok(json::Object(~match
+                BsonFormattable::from_bson_t::<HashMap<~str, json::Json>>(&Embedded(a.clone())) {
                     Ok(d) => d,
                     Err(e) => return Err(e)
                 })),
-            Array(a) => Ok(json::List(match
-                BsonFormattable::from_bson_t::<~[json::Json]>(Embedded(a)) {
+            Array(ref a) => Ok(json::List(match
+                BsonFormattable::from_bson_t::<~[json::Json]>(&Embedded(a.clone())) {
                     Ok(d) => d,
                     Err(e) => return Err(e)
                 })),
@@ -194,7 +194,7 @@ impl BsonFormattable for json::Json {
             UTCDate(i) => Ok(json::Number(i as float)),
             Null => Ok(json::Null),
             Regex(_,_) => Err(~"regex cannot be translated to Json"),
-            JScript(s) => Ok(json::String(copy s)),
+            JScript(ref s) => Ok(json::String(s.clone())),
             JScriptWithScope(_,_) => Err(~"jscope cannot be translated to Json"),
             Int32(i) => Ok(json::Number(i as float)),
             Timestamp(u1, u2) => Ok(json::Number((u1 | (u2 << 32)) as float)),
@@ -215,12 +215,12 @@ impl<T:BsonFormattable + Copy> BsonFormattable for ~[T] {
         return Array(~doc);
     }
 
-    fn from_bson_t(doc: Document) -> Result<~[T], ~str> {
-        match doc {
-            Array(d) => {
+    fn from_bson_t(doc: &Document) -> Result<~[T], ~str> {
+        match *doc {
+            Array(ref d) => {
                 let mut ret = ~[];
                 for d.fields.iter().advance |&(_,@v)| {
-                     match BsonFormattable::from_bson_t::<T>(v) {
+                     match BsonFormattable::from_bson_t::<T>(&v) {
                         Ok(elt) => ret.push(elt),
                         Err(e) => return Err(e)
                      }
@@ -241,22 +241,22 @@ impl<V:BsonFormattable> BsonFormattable for HashMap<~str,V> {
         return Embedded(~doc);
     }
 
-    fn from_bson_t(doc: Document) -> Result<HashMap<~str,V>, ~str> {
-        match doc {
-            Embedded(d) => {
+    fn from_bson_t(doc: &Document) -> Result<HashMap<~str,V>, ~str> {
+        match *doc {
+            Embedded(ref d) => {
                 let mut m = HashMap::new();
                 for d.fields.iter().advance |&(@k, @v)| {
-                    match BsonFormattable::from_bson_t::<V>(v) {
+                    match BsonFormattable::from_bson_t::<V>(&v) {
                         Ok(elt) => m.insert(k, elt),
                         Err(e) => return Err(e)
                     };
                 }
                 return Ok(m);
             }
-            Array(d) => {
+            Array(ref d) => {
                 let mut m = HashMap::new();
                 for d.fields.iter().advance |&(@k, @v)| {
-                    match BsonFormattable::from_bson_t::<V>(v) {
+                    match BsonFormattable::from_bson_t::<V>(&v) {
                         Ok(elt) => m.insert(k, elt),
                         Err(e) => return Err(e)
                     };
@@ -273,10 +273,10 @@ impl BsonFormattable for BsonDocument {
         Embedded(~(copy *self))
     }
 
-    fn from_bson_t(doc: Document) -> Result<BsonDocument,~str> {
-        match doc {
-           Embedded(d) => Ok(copy *d),
-           Array(d) => Ok(copy *d),
+    fn from_bson_t(doc: &Document) -> Result<BsonDocument,~str> {
+        match *doc {
+           Embedded(ref d) => Ok(*d.clone()),
+           Array(ref d) => Ok(*d.clone()),
            _ => Err(~"can only convert Embedded and Array to BsonDocument")
         }
     }
@@ -307,20 +307,20 @@ mod tests {
 
     #[test]
     fn test_bson_to_json() {
-        assert!(BsonFormattable::from_bson_t::<json::Json>(Double(5.01)).is_ok());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(UString(~"foo")).is_ok());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(Binary(0u8, ~[0u8])).is_err());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(ObjectId(~[0u8])).is_err());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(Bool(true)).is_ok());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(UTCDate(150)).is_ok());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(Null).is_ok());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(Regex(~"A", ~"B")).is_err());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(JScript(~"foo")).is_ok());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(Int32(1i32)).is_ok());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(Timestamp(1, 0)).is_ok());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(Int64(1i64)).is_ok());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(MinKey).is_err());
-        assert!(BsonFormattable::from_bson_t::<json::Json>(MaxKey).is_err());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&Double(5.01)).is_ok());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&UString(~"foo")).is_ok());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&Binary(0u8, ~[0u8])).is_err());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&ObjectId(~[0u8])).is_err());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&Bool(true)).is_ok());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&UTCDate(150)).is_ok());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&Null).is_ok());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&Regex(~"A", ~"B")).is_err());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&JScript(~"foo")).is_ok());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&Int32(1i32)).is_ok());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&Timestamp(1, 0)).is_ok());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&Int64(1i64)).is_ok());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&MinKey).is_err());
+        assert!(BsonFormattable::from_bson_t::<json::Json>(&MaxKey).is_err());
     }
 
     #[test]
@@ -340,6 +340,6 @@ mod tests {
        doc.put(~"0", Int32(1i32));
        doc.put(~"1", Int32(2i32));
        doc.put(~"2", Int32(3i32));
-       assert_eq!(Ok(l), BsonFormattable::from_bson_t::<~[i32]>(Array(~doc)));
+       assert_eq!(Ok(l), BsonFormattable::from_bson_t::<~[i32]>(&Array(~doc)));
     }
 }

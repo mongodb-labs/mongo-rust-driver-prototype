@@ -53,6 +53,7 @@ bin:
 
 util: $(UTILDIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(UTILDIR)/tools.rs
+
 libs: $(LIB)/md5.c
 	$(CC) $(CFLAGS) -o $(BIN)/md5.o $(LIB)/md5.c
 	$(AR) $(BIN)/libmd5.a $(BIN)/md5.o
@@ -64,16 +65,19 @@ mongo: $(MONGODIR)/*
 	$(RC) $(FLAGS) --lib --out-dir $(BIN) $(MONGODIR)/mongo.rs
 
 test: $(BSONDIR)/bson.rs $(MONGODIR)/mongo.rs $(MONGODIR)/test/test.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/tool_test $(UTILDIR)/tools.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rs
 
 check: test
 ifeq ($(MONGOTEST),1)
+	$(TEST)/tool_test
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 	$(TEST)/driver_test
 else
+	$(TEST)/tool_test
 	$(TEST)/bson_test
 	$(TEST)/mongo_test
 endif
