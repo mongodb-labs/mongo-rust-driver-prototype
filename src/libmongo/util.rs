@@ -140,10 +140,10 @@ impl BsonFormattable for TagSet {
         }
         Embedded(~ts_doc)
     }
-    pub fn from_bson_t(doc : Document) -> Result<TagSet, ~str> {
+    pub fn from_bson_t(doc : &Document) -> Result<TagSet, ~str> {
         let mut ts = TagSet::new(~[]);
         match doc {
-            Embedded(bson_doc) => {
+            &Embedded(ref bson_doc) => {
                 for bson_doc.fields.iter().advance |&(@k,@v)| {
                     match v {
                         UString(s) => ts.set(k,s),

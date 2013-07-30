@@ -58,9 +58,9 @@ impl BsonFormattable for RSMember {
 
         Embedded(~member_doc)
     }
-    pub fn from_bson_t(doc : Document) -> Result<RSMember, ~str> {
+    pub fn from_bson_t(doc : &Document) -> Result<RSMember, ~str> {
         let bson_doc = match doc {
-            Embedded(bson) => *bson,
+            &Embedded(ref bson) => bson,
             _ => return Err(~"not RSMember struct (not Embedded BsonDocument)"),
         };
 
@@ -84,7 +84,7 @@ impl BsonFormattable for RSMember {
                 _ => {
                     let mut tmp = BsonDocument::new();
                     tmp.put(k,v);
-                    match BsonFormattable::from_bson_t::<RS_MEMBER_OPTION>(Embedded(~tmp)) {
+                    match BsonFormattable::from_bson_t::<RS_MEMBER_OPTION>(&Embedded(~tmp)) {
                         Ok(opt) => opts.push(opt),
                         Err(e) => return Err(fmt!("not RSMember struct (err parsing options: %s)", e)),
                     }
@@ -181,9 +181,9 @@ impl BsonFormattable for RSConfig {
         Embedded(~conf_doc)
     }
 
-    pub fn from_bson_t(doc : Document) -> Result<RSConfig, ~str> {
+    pub fn from_bson_t(doc : &Document) -> Result<RSConfig, ~str> {
         let bson_doc = match doc {
-            Embedded(bson) => *bson,
+            &Embedded(ref bson) => bson,
             _ => return Err(~"not RSConfig struct (not Embedded BsonDocument)"),
         };
 
@@ -204,7 +204,7 @@ impl BsonFormattable for RSConfig {
         let members = match bson_doc.find(~"members") {
             None => return Err(~"not RSConfig struct (no members field)"),
             Some(doc) => match copy *doc {
-                Array(a) => match BsonFormattable::from_bson_t::<~[RSMember]>(Array(a)) {
+                Array(a) => match BsonFormattable::from_bson_t::<~[RSMember]>(&Array(a)) {
                     Ok(arr) => arr,
                     Err(e) => return Err(fmt!("not RSConfig struct (members field: %s)", e)),
                 },
@@ -219,7 +219,7 @@ impl BsonFormattable for RSConfig {
                     for sub.fields.iter().advance |&(@k,@v)| {
                         let mut tmp = BsonDocument::new();
                         tmp.put(k,v);
-                        match BsonFormattable::from_bson_t::<RS_OPTION>(Embedded(~tmp)) {
+                        match BsonFormattable::from_bson_t::<RS_OPTION>(&Embedded(~tmp)) {
                             Ok(s) => s_arr.push(s),
                             Err(e) => return Err(fmt!("not RSConfig struct (error formatting settings: %s)", e)),
                         }
@@ -274,9 +274,9 @@ impl BsonFormattable for RS_OPTION {
         opt_doc.put(k, v);
         Embedded(~opt_doc)
     }
-    pub fn from_bson_t(doc : Document) -> Result<RS_OPTION, ~str> {
+    pub fn from_bson_t(doc : &Document) -> Result<RS_OPTION, ~str> {
         let bson_doc = match doc {
-            Embedded(bson) => *bson,
+            &Embedded(ref bson) => bson,
             _ => return Err(~"not RS_OPTION (not Embedded BsonDocument)"),
         };
 
@@ -320,9 +320,9 @@ impl BsonFormattable for RS_MEMBER_OPTION {
     }
     // NB don't use this in normal usage, since intended for use
     // with *single* RS_MEMBER_OPTION, and doc might contain more
-    pub fn from_bson_t(doc : Document) -> Result<RS_MEMBER_OPTION, ~str> {
+    pub fn from_bson_t(doc : &Document) -> Result<RS_MEMBER_OPTION, ~str> {
         let bson_doc = match doc {
-            Embedded(bson) => *bson,
+            &Embedded(ref bson) => bson,
             _ => return Err(~"not RS_OPTION (not Embedded BsonDocument)"),
         };
 
@@ -356,7 +356,7 @@ impl BsonFormattable for RS_MEMBER_OPTION {
         }
         match bson_doc.find(~"tags") {
             None => (),
-            Some(s) => match BsonFormattable::from_bson_t::<TagSet>(copy *s) {
+            Some(s) => match BsonFormattable::from_bson_t::<TagSet>(s) {
                 Ok(ts) => return Ok(TAGS(ts)),
                 Err(e) => return Err(e),
             },
@@ -405,7 +405,7 @@ impl RS {
             Ok(d) => d,
             Err(e) => return Err(e),
         };
-        match BsonFormattable::from_bson_t::<RSConfig>(Embedded(doc)) {
+        match BsonFormattable::from_bson_t::<RSConfig>(&Embedded(doc)) {
             Ok(conf) => Ok(conf),
             Err(e) => Err(MongoErr::new(
                             ~"rs::get_config",

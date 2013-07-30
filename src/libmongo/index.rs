@@ -94,7 +94,7 @@ impl BsonFormattable for INDEX_TYPE {
         }
         Embedded(~bson_doc)
     }
-    pub fn from_bson_t(doc : Document) -> Result<INDEX_TYPE, ~str> {
+    pub fn from_bson_t(_ : &Document) -> Result<INDEX_TYPE, ~str> {
         Err(~"do not call from_bson_t to INDEX_TYPE")
     }
 }
@@ -107,9 +107,9 @@ impl BsonFormattable for MongoIndex {
         }
         Embedded(~bson_doc)
     }
-    pub fn from_bson_t(doc : Document) -> Result<MongoIndex, ~str> {
+    pub fn from_bson_t(doc : &Document) -> Result<MongoIndex, ~str> {
         let bson_doc = match doc {
-            Embedded(b) => *b,
+            &Embedded(ref b) => b,
             _ => return Err(~"not MongoIndex struct (not Embedded BsonDocument)"),
         };
 

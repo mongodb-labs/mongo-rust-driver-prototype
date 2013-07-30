@@ -210,12 +210,12 @@ impl Collection {
                                 ~"unknown BsonDocument/Document error",
                                 ~"BsonFormattable not actually BSON formattable")),
         };
-        match (copy bson_doc.find(~"id")) {
+        match (bson_doc.find(~"id").clone()) {
             None => self.insert(doc, wc),
             Some(id) => {
                 let mut query = BsonDocument::new();
-                query.append(~"_id", copy *id);
-                self.update(SpecObj(query), SpecObj(copy bson_doc), Some(~[UPSERT]), None, wc)
+                query.put(~"_id", id.clone());
+                self.update(SpecObj(query), SpecObj(bson_doc.clone()), Some(~[UPSERT]), None, wc)
             },
         }
     }
@@ -531,7 +531,7 @@ println(fmt!("{'ns':'%?.%?'}", self.db, self.name));
         };
         let mut indices = ~[];
         for cursor.advance |ind| {
-            indices.push(match BsonFormattable::from_bson_t::<MongoIndex>(Embedded(ind)) {
+            indices.push(match BsonFormattable::from_bson_t::<MongoIndex>(&Embedded(ind)) {
                 Ok(i) => i,
                 Err(e) => return Err(MongoErr::new(
                                         ~"coll::get_indexes",

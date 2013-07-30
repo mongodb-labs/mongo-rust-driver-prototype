@@ -196,7 +196,7 @@ impl<T:Stream<u8>> BsonParser<T> {
         self.stream.pass(4);
         let s = self.cstring();
         let doc = self.document();
-        return doc.chain(|d| Ok(JScriptWithScope(copy s,~d)));
+        return doc.chain(|d| Ok(JScriptWithScope(s.clone(),~d)));
     }
 
     ///Create a new parser with a given stream.

@@ -15,8 +15,10 @@
 
 use std::to_bytes::*;
 use std::str::count_bytes;
+use std::rand::*;
 use extra::serialize::*;
 use tools::ord_hash::*;
+use std::vec::{VecIterator, VecRevIterator};
 
 static L_END: bool = true;
 
@@ -26,7 +28,7 @@ static L_END: bool = true;
  * This can be converted back and forth from BsonDocument
  * by using the Embedded variant.
  */
-#[deriving(Eq)]
+#[deriving(Eq,Clone)]
 pub enum Document {
     Double(f64),                    //x01
     UString(~str),                    //x02
@@ -52,10 +54,59 @@ pub enum Document {
 }
 
 /**
+ * A factory for constructing ObjectIds.
+ *
+ * The first 4 bytes of an OID are the number
+ * of seconds since the Unix epoch.
+ * The next 3 bytes are based on the name of
+ * the host machine name.
+ * The next 2 bytes are based on the PID of
+ * the current process.
+ * The final 4 bytes are incrementally generated
+ * from a random value.
+ */
+struct ObjIdFactory {
+    rseed: u32
+}
+
+impl ObjIdFactory {
+
+    ///Get a new ObjIdFactory.
+    pub fn new() -> ObjIdFactory {
+        ObjIdFactory {
+            rseed: (&mut XorShiftRng::new()).next()
+        }
+    }
+
+    ///Generate an ObjectId.
+    pub fn oid(&mut self) -> Document {
+        use extra::time::get_time;
+        use tools::md5::md5;
+        use std::libc::getpid;
+
+        let mut bytes: ~[u8] = ~[];
+
+        let time = (get_time().sec as u32).to_bytes(L_END);
+        //TODO: need a gethostname function
+        let hostname = md5(~"localhost").to_bytes(L_END);
+        let pid = (unsafe { getpid() }).to_bytes(L_END);
+        let rand = self.rseed.to_bytes(L_END);
+
+        bytes.push_all(time);
+        bytes.push_all(hostname.slice(0,3));
+        bytes.push_all(pid.slice(0,2));
+        bytes.push_all(rand.slice(0,3));
+        self.rseed = (self.rseed + 1) % 0xFFFFFF;
+
+        ObjectId(bytes)
+    }
+}
+
+/**
 * The type of a complete BSON document.
 * Contains an ordered map of fields and values and the size of the document as i32.
 */
-#[deriving(Eq)]
+#[deriving(Eq,Clone)]
 pub struct BsonDocument {
     size: i32,
     fields: ~OrderedHashmap<~str, Document>
@@ -260,16 +311,30 @@ impl ToStr for BsonDocument {
 }
 
 impl<'self> BsonDocument {
+
+    ///Convert this document to its binary BSON representation.
     pub fn to_bson(&self) -> ~[u8] {
         let mut encoder = BsonDocEncoder::new();
         self.encode(&mut encoder);
         encoder.buf //the encoded value is contained here
     }
-    //Exposing underlying OrderedHashmap methods
+
+    ///Get a forwards iterator for this document.
+    pub fn iter(&'self self) -> VecIterator<'self, (@~str, @Document)> {
+        self.fields.iter()
+    }
+
+    ///Get a reverse iterator for this document.
+    pub fn rev_iter(&'self self) -> VecRevIterator<'self, (@~str, @Document)> {
+        self.fields.rev_iter()
+    }
+
+    ///Check if this document contains the given key.
     pub fn contains_key(&self, key: ~str) -> bool {
         self.fields.contains_key(&key)
     }
 
+    ///Find the value for the given key, if it exists.
     pub fn find<'a>(&'a self, key: ~str) -> Option<&'a Document> {
         self.fields.find(&key)
     }
@@ -286,17 +351,6 @@ impl<'self> BsonDocument {
             self.fields.insert(k, v);
         }
         self.size = map_size(self.fields);
-    }
-
-    /**
-    * Adds a key/value pair and updates size appropriately. Returns a mutable self reference with a fixed lifetime, allowing calls to be chained.
-    * Ex: let a = BsonDocument::inst().append(~"flag", Bool(true)).append(~"msg", UString(~"hello")).append(...);
-    * This may cause borrowing errors if used to make embedded objects.
-    */
-    pub fn append(&'self mut self, key: ~str, val: Document) -> &'self mut BsonDocument {
-        self.fields.insert(key, val);
-        self.size = map_size(self.fields);
-        self
     }
 
     /**
@@ -318,17 +372,6 @@ impl<'self> BsonDocument {
     ///The default size is 5: 4 for the size integer and 1 for the terminating 0x0.
     pub fn new() -> BsonDocument {
         BsonDocument { size: 5, fields: ~OrderedHashmap::new() }
-    }
-
-    /**
-    * Returns a managed pointer to a new BsonDocument. Use this if you plan on chaining calls to append() directly on your call to inst.
-    * Example: let a = BsonDocument::inst().append(...).append(...); //compiles
-    * let b = BsonDocument::new().append(...); //error
-    * let c = BsonDocument::new();
-    * c.append(...).append(...).append(...); //compiles
-    */
-    pub fn inst() -> @mut BsonDocument {
-        @mut BsonDocument::new()
     }
 
     /**
@@ -439,6 +482,9 @@ priv fn map_size(m: &OrderedHashmap<~str, Document>)  -> i32{
 mod tests {
     use super::*;
     use json_parse::*;
+    use std::rand::Rng;
+    use std::rand;
+    use extra::test::BenchHarness;
 
     //testing size computation
     #[test]
@@ -459,24 +505,28 @@ mod tests {
 
     #[test]
     fn test_double_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Double(3.14159f64));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Double(3.14159f64));
         assert_eq!(doc.to_bson(), ~[18,0,0,0,1,102,111,111,0,110,134,27,240,249,33,9,64,0]);
     }
     #[test]
     fn test_string_encode() {
-        let doc = BsonDocument::inst().append(~"foo", UString(~"bar"));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", UString(~"bar"));
         assert_eq!(doc.to_bson(), ~[18,0,0,0,2,102,111,111,0,4,0,0,0,98,97,114,0,0]);
     }
 
     #[test]
     fn test_bool_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Bool(true));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Bool(true));
         assert_eq!(doc.to_bson(), ~[11,0,0,0,8,102,111,111,0,1,0] );
     }
 
     #[test]
     fn test_32bit_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Int32(56 as i32));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Int32(56 as i32));
         assert_eq!(doc.to_bson(), ~[14,0,0,0,16,102,111,111,0,56,0,0,0,0]);
     }
 
@@ -505,43 +555,51 @@ mod tests {
 
     #[test]
     fn test_binary_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Binary(2u8, ~[0u8,1,2,3]));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Binary(2u8, ~[0u8,1,2,3]));
         assert_eq!(doc.to_bson(), ~[19,0,0,0,5,102,111,111,0,4,0,0,0,2,0,1,2,3,0]);
     }
     #[test]
     fn test_64bit_encode() {
-        let doc1 = BsonDocument::inst().append(~"foo", UTCDate(4040404 as i64));
+        let mut doc1 = BsonDocument::new();
+        doc1.put(~"foo", UTCDate(4040404 as i64));
         assert_eq!(doc1.to_bson(), ~[18,0,0,0,9,102,111,111,0,212,166,61,0,0,0,0,0,0] );
 
-        let doc2 = BsonDocument::inst().append(~"foo", Int64(4040404 as i64));
+        let mut doc2 = BsonDocument::new();
+        doc2.put(~"foo", Int64(4040404 as i64));
         assert_eq!(doc2.to_bson(), ~[18,0,0,0,18,102,111,111,0,212,166,61,0,0,0,0,0,0] );
 
-        let doc3 = BsonDocument::inst().append(~"foo", Timestamp(4040404, 0));
+        let mut doc3 = BsonDocument::new();
+        doc3.put(~"foo", Timestamp(4040404, 0));
         assert_eq!(doc3.to_bson(), ~[18,0,0,0,17,102,111,111,0,212,166,61,0,0,0,0,0,0] );
     }
 
     #[test]
     fn test_null_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Null);
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Null);
 
         assert_eq!(doc.to_bson(), ~[10,0,0,0,10,102,111,111,0,0]);
     }
 
     #[test]
     fn test_regex_encode() {
-        let doc = BsonDocument::inst().append(~"foo", Regex(~"bar", ~"baz"));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Regex(~"bar", ~"baz"));
 
         assert_eq!(doc.to_bson(), ~[18,0,0,0,11,102,111,111,0,98,97,114,0,98,97,122,0,0]);
     }
 
     #[test]
     fn test_jscript_encode() {
-        let doc = BsonDocument::inst().append(~"foo", JScript(~"return 1;"));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", JScript(~"return 1;"));
         assert_eq!(doc.to_bson(), ~[24,0,0,0,13,102,111,111,0,10,0,0,0,114,101,116,117,114,110,32,49,59,0,0]);
     }
     #[test]
     fn test_valid_objid_encode() {
-        let doc = BsonDocument::inst().append(~"foo", ObjectId(~[0,1,2,3,4,5,6,7,8,9,10,11]));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", ObjectId(~[0,1,2,3,4,5,6,7,8,9,10,11]));
 
         assert_eq!(doc.to_bson(), ~[22,0,0,0,7,102,111,111,0,0,1,2,3,4,5,6,7,8,9,10,11,0]);
     }
@@ -549,17 +607,17 @@ mod tests {
     #[test]
     #[should_fail]
     fn test_invalid_objid_encode() {
-        let doc = BsonDocument::inst().append(~"foo", ObjectId(~[1,2,3]));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", ObjectId(~[1,2,3]));
         doc.to_bson();
     }
 
     #[test]
     fn test_multi_encode() {
-
-        let doc = BsonDocument::inst()
-            .append(~"foo", Bool(true))
-            .append(~"bar", UString(~"baz"))
-            .append(~"qux", Int32(404));
+        let mut doc = BsonDocument::new();
+        doc.put(~"foo", Bool(true));
+        doc.put(~"bar", UString(~"baz"));
+        doc.put(~"qux", Int32(404));
 
         let enc = doc.to_bson();
 
@@ -586,4 +644,79 @@ mod tests {
         assert_eq!(doc.to_bson(), ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
     }
 
+    #[bench]
+    fn bench_val_encode(b: &mut BenchHarness) {
+        let seed = [1,2,3,4,5,6,7,8,9,0];
+        let mut rand = rand::IsaacRng::new_seeded(seed);
+        let mut doc = BsonDocument::new();
+        do b.iter {
+            doc.put(~"foo", Double(rand.next() as f64));
+            doc.put(~"bar", Double(rand.next() as f64));
+            doc.put(~"baz", Double(rand.next() as f64));
+            doc.to_bson();
+            doc = BsonDocument::new();
+        }
+    }
+
+    #[bench]
+    fn bench_advanced_object(b: &mut BenchHarness) {
+        let stream = "{
+            'fullName' : 'John Doe',
+            'age' : 42,
+            'state' : 'Massachusetts',
+            'city' : 'Boston',
+            'zip' : 02201,
+            'married' : false,
+            'dozen' : 12,
+            'topThreeFavoriteColors' : [ 'red', 'magenta', 'cyan' ],
+            'favoriteSingleDigitWholeNumbers' : [ 7 ],
+            'favoriteFiveLetterWord' : 'fadsy',
+            'strings' :
+            [
+            'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',
+            '01234567890',
+            'mixed-1234-in-{+^}',
+            '\"quoted\"',
+            '\"\\e\\s\\c\\a\\p\\e\\d\"',
+            '\"quoted-at-sign@sld.org\"',
+            '\"escaped\\\"quote\"',
+            '\"back\\slash\"',
+            'email@address.com'
+            ],
+            'ipAddresses' : [ '127.0.0.1', '24.48.64.2', '192.168.1.1', '209.68.44.3', '2.2.2.2' ]
+        }".iter().collect::<~[char]>();
+
+        let mut parser = ExtendedJsonParser::new(stream.clone());
+        let doc = match parser.object() {
+            Ok(d) => d,
+            Err(e) => fail!(e.to_str())
+        };
+        do b.iter {
+            doc.to_bson();
+        }
+    }
+
+    #[bench]
+    fn bench_extended_object(b: &mut BenchHarness) {
+        let stream = "{
+            'name': 'foo',
+            'baz': 'qux',
+            'binary': { '$binary': 012345432, '$type': 0 },
+            'dates': [ { '$date': 987654 }, {'$date': 123456}, {'$date': 748392} ],
+            'timestamp': { 'timestamp': { 'timestamp': { '$timestamp': { 't': 1234, 'i': 5678 } } } },
+            'regex': { '$regex': '^.*/012345/.*(foo|bar)+.*$', '$options': '-j -g -i' },
+            'oid': { '$oid': 43214321 },
+            'minkey': { 'maxkey': { 'that-was-a-fakeout': { '$minKey': 1 } } },
+            'maxkey': { 'minkey': { 'haha-that-too': { '$maxKey': 1 } } }
+        }".iter().collect::<~[char]>();
+
+        let mut parser = ExtendedJsonParser::new(stream.clone());
+        let doc = match parser.object() {
+            Ok(d) => d,
+            Err(e) => fail!(e.to_str())
+        };
+        do b.iter {
+            doc.to_bson();
+        }
+    }
 }

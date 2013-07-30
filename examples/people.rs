@@ -62,9 +62,9 @@ impl BsonFormattable for Person {
         Embedded(~bson_doc)
     }
 
-    pub fn from_bson_t(doc : Document) -> Result<Person, ~str> {
-        let bson_doc = match doc {
-            Embedded(bson) => *bson,
+    pub fn from_bson_t(doc : &Document) -> Result<Person, ~str> {
+        let bson_doc = match *doc {
+            Embedded(ref bson) => bson.clone(),
             _ => return Err(~"not Person struct (not Embedded BsonDocument)"),
         };
 
