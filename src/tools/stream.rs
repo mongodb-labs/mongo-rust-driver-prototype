@@ -22,15 +22,17 @@ pub trait Stream<T:Eq> {
     fn pass(&mut self, count: int);
     ///Apply a function to the first count units and return the results in a vector.
     fn process<V: Copy>(&mut self, count: int, f: &fn(&T) -> V) -> ~[V];
-    /**Collect the first count elements and return them in a vector.
+    /**
+     * Collect the first count elements and return them in a vector.
     *This is logically equivalent to self.process(count, id), modulo pointer types.
     */
     fn aggregate(&mut self, count: int) -> ~[T];
     ///Aggregate elements of the stream until the head of the stream meets the predicate.
     fn until(&mut self, f: &fn(&T) -> bool) -> ~[T];
-    /**Look for the elements of search in the first element of the stream.
-    *If the first element of the stream matches any element, return the first match.
-    */
+    /**
+     * Look for the elements of search in the first element of the stream.
+     * If the first element of the stream matches any element, return the first match.
+     */
     fn expect(&self, search: &[T]) -> Option<T>;
     ///Skip values which match the listed values until a different one is found.
     fn pass_while(&mut self, to_skip: &[T]);
