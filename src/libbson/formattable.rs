@@ -40,6 +40,42 @@ pub trait BsonFormattable {
     fn from_bson_t(doc: &Document) -> Result<Self,~str>;
 }
 
+macro_rules! formattable {
+    ($t:ident { $($field:ident: $ftype:ty),* }) => {
+        impl BsonFormattable for $t {
+            fn to_bson_t(&self) -> Document {
+                let mut o = ~BsonDocument::new();
+                $(
+                o.put(stringify!($field).to_owned(), self.$field.to_bson_t());
+                )*
+                Embedded(o)
+            }
+
+            fn from_bson_t(doc: &Document) -> Result<$t, ~str> {
+                let mut ret = $t::new();
+                match *doc {
+                    Embedded(ref o) => {
+                        $(
+                            match o.find(stringify!($field).to_owned()) {
+                                Some(v) => {
+                                    match BsonFormattable::from_bson_t::<$ftype>(v) {
+                                        Ok(v1) => ret.$field = v1,
+                                        Err(e) => return Err(e)
+                                    }
+                                }
+                                _ => return Err(fmt!("Default impl:
+                                    Could not format Document: field %s was missing", stringify!($field)))
+                            }
+                        )*
+                        Ok(ret)
+                    },
+                    _ => return Err(fmt!("Default impl: Only Embedded can be cast to %s", stringify!($t)))
+                }
+            }
+        }
+    }
+}
+
 macro_rules! float_fmt {
     (impl $t:ty) => {
         impl BsonFormattable for $t {
@@ -116,6 +152,17 @@ impl BsonFormattable for i64 {
             UTCDate(i) => Ok(i),
             Timestamp(u1, u2) => Ok((u1 | (u2 << 32)) as i64),
             _ => Err(~"can only cast Int64, Date, and Timestamp to i64")
+        }
+    }
+}
+
+impl BsonFormattable for bool {
+    fn to_bson_t(&self) -> Document { Bool(*self) }
+
+    fn from_bson_t(doc: &Document) -> Result<bool,~str> {
+        match *doc {
+            Bool(b) => Ok(b),
+            _ => Err(~"can only cast Bool to bool")
         }
     }
 }
@@ -288,6 +335,39 @@ mod tests {
     use encode::*;
     use extra::json;
 
+    struct AutoImplStruct{
+        field: int,
+        flag: bool,
+        fads: ~str
+    }
+
+    impl AutoImplStruct {
+        fn new() -> AutoImplStruct {
+            AutoImplStruct {
+                field: 0,
+                flag: false,
+                fads: ~"sdaf"
+            }
+        }
+    }
+
+    formattable! {
+        AutoImplStruct {
+            field: int,
+            flag: bool,
+            fads: ~str
+        }
+    }
+
+    #[test]
+    fn test_auto_implementation() {
+        let mut doc = BsonDocument::new();
+        doc.put(~"field", Int32(0));
+        doc.put(~"flag", Bool(false));
+        doc.put(~"fads", UString(~"sdaf"));
+        assert_eq!(AutoImplStruct::new().to_bson_t(), Embedded(~doc));
+    }
+
     #[test]
     fn test_str_to_bson() {
         assert_eq!((~"foo").to_bson_t(), UString(~"foo"));
@@ -296,7 +376,8 @@ mod tests {
 
     #[test]
     fn test_json_to_bson() {
-        let json = json::List(~[json::Null, json::Number(5f), json::String(~"foo"), json::Boolean(false)]);
+        let json = json::List(~[json::Null, json::Number(5f),
+            json::String(~"foo"), json::Boolean(false)]);
         let mut doc = BsonDocument::new();
         doc.put(~"0", Null);
         doc.put(~"1", Double(5f64));
