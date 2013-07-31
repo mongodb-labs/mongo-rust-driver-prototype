@@ -14,6 +14,7 @@
  */
 
 use std::cell::*;
+use std::rt::io::net::*;
 use extra::net::ip::*;
 use extra::net::tcp::*;
 use extra::uv::*;
@@ -44,11 +45,10 @@ impl Connection for NodeConnection {
     pub fn connect(&self) -> Result<(), MongoErr> {
         // sanity check: should not connect if already connected (?)
         if !(self.sock.is_empty() && self.port.is_empty()) {
-            /*return Err(MongoErr::new(
+            return Err(MongoErr::new(
                             ~"conn::connect",
                             ~"pre-existing socket",
-                            ~"cannot override existing socket"));*/
-            return Ok(());
+                            ~"cannot override existing socket"));
         }
 
         // parse IP addr
