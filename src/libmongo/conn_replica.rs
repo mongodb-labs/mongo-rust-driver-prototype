@@ -153,39 +153,12 @@ impl Connection for ReplicaSetConnection {
 
     pub fn send(&self, data : ~[u8], read : bool) -> Result<(), MongoErr> {
         // refresh server data: first try via refresh, then try via reconnect
-        /*let (po_timer, ch_timer) = stream();
-        do spawn_supervised {
-            // spawn timer that, until it finishes, tells the main task to continue trying to refresh
-            do spawn{
-                let mut lp = Loop::new();
-                let mut timer = TimerWatcher::new(&mut lp);
-                do timer.start(MONGO_CONN_WAIT, 0) |_,_| { }
-                lp.run();
-                lp.close();
-                ch_timer.send(false);
-                fail!();
-            }
-            loop { ch_timer.send(true); }
-        }
-
-        let mut success = false;
-        while po_timer.recv() {
-            match self.refresh() {
-                Ok(_) => { success = true; break; }
-                Err(e) => (),
-            }
-        }
-        if !success {
-            match self.reconnect() {
-                Ok(_) => (),
-                Err(e) => return Err(e),
-            }
-        }*/
+        // TODO time out
         loop {
             println("TRYING TO SEND");
             match self.try_send(data.clone(), read) {
                 Ok(_) => return Ok(()),
-                Err(e) => println(fmt!("ughhhhhhhh %s", e.to_str())),
+                Err(e) => println(e.to_str()),
             }
         }
         //Err(MongoErr::new(~"ughhhhhhhh", ~"", ~""))

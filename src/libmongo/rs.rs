@@ -14,6 +14,8 @@
  */
 
 use std::cell::*;
+use extra::uv::*;       // XXX remove once global_loop leaves NodeConn
+use extra::timer::*;    // XXX remove once global_loop leaves NodeConn
 
 use bson::encode::*;
 use bson::formattable::*;
@@ -34,9 +36,9 @@ pub struct RSMember {
     opts : ~[RS_MEMBER_OPTION],
 }
 impl BsonFormattable for RSMember {
-    // NB don't use this in normal usage, since intended for use
+    // not intended for normal usage, since intended for use
     // as part of *array* of RSMembers (to have correct _id)
-    pub fn to_bson_t(&self) -> Document {
+    fn to_bson_t(&self) -> Document {
         let mut member_doc = BsonDocument::new();
 
         if !self._id.is_empty() {
@@ -60,7 +62,7 @@ impl BsonFormattable for RSMember {
 
         Embedded(~member_doc)
     }
-    pub fn from_bson_t(doc : &Document) -> Result<RSMember, ~str> {
+    fn from_bson_t(doc : &Document) -> Result<RSMember, ~str> {
         let bson_doc = match doc {
             &Embedded(ref bson) => bson,
             _ => return Err(~"not RSMember struct (not Embedded BsonDocument)"),
@@ -331,9 +333,9 @@ impl BsonFormattable for RS_MEMBER_OPTION {
         opt_doc.put(k, v);
         Embedded(~opt_doc)
     }
-    // NB don't use this in normal usage, since intended for use
+    // not intended for normal usage, since intended for use
     // with *single* RS_MEMBER_OPTION, and doc might contain more
-    pub fn from_bson_t(doc : &Document) -> Result<RS_MEMBER_OPTION, ~str> {
+    fn from_bson_t(doc : &Document) -> Result<RS_MEMBER_OPTION, ~str> {
         let bson_doc = match doc {
             &Embedded(ref bson) => bson,
             _ => return Err(~"not RS_OPTION (not Embedded BsonDocument)"),
@@ -568,7 +570,7 @@ impl RS {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
         };
-        // force reconnect to give conn change to update
+        // force reconnect to give conn chance to update
         self.client.reconnect();
         result
     }
@@ -614,7 +616,7 @@ impl RS {
      * # Returns
      * () on success, MongoErr on failure
      */
-    // XXX look for better way to do this without breaking down
+    // XXX look for better way to do this while maintaining
     //      RS/ReplicaSetConnection barrier
     pub fn step_down(&self, sec : uint) -> Result<(), MongoErr> {
         let op = match self.client.set_read_pref(PRIMARY_ONLY) {
