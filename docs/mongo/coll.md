@@ -53,7 +53,7 @@ collections.
 ### Method `new`
 
 ~~~ {.rust}
-fn new(db: ~str, name: ~str, client: @Client) -> Collection
+fn new(db: &str, name: &str, client: @Client) -> Collection
 ~~~
 
 Creates a new handle to the given collection.

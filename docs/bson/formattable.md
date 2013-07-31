@@ -47,7 +47,7 @@ map field names to values.
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<Self, ~str>
+fn from_bson_t(doc: &Document) -> Result<Self, ~str>
 ~~~
 
 Converts a Document into an object of the given type.
@@ -65,7 +65,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<f32, ~str>
+fn from_bson_t(doc: &Document) -> Result<f32, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `float`
@@ -79,7 +79,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<float, ~str>
+fn from_bson_t(doc: &Document) -> Result<float, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `i8`
@@ -93,7 +93,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<i8, ~str>
+fn from_bson_t(doc: &Document) -> Result<i8, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `i16`
@@ -107,7 +107,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<i16, ~str>
+fn from_bson_t(doc: &Document) -> Result<i16, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `int`
@@ -121,7 +121,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<int, ~str>
+fn from_bson_t(doc: &Document) -> Result<int, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `u8`
@@ -135,7 +135,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<u8, ~str>
+fn from_bson_t(doc: &Document) -> Result<u8, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `u16`
@@ -149,7 +149,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<u16, ~str>
+fn from_bson_t(doc: &Document) -> Result<u16, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `u32`
@@ -163,7 +163,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<u32, ~str>
+fn from_bson_t(doc: &Document) -> Result<u32, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `uint`
@@ -177,7 +177,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<uint, ~str>
+fn from_bson_t(doc: &Document) -> Result<uint, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `char`
@@ -191,7 +191,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<char, ~str>
+fn from_bson_t(doc: &Document) -> Result<char, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `f64`
@@ -205,7 +205,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<f64, ~str>
+fn from_bson_t(doc: &Document) -> Result<f64, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `i32`
@@ -219,7 +219,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<i32, ~str>
+fn from_bson_t(doc: &Document) -> Result<i32, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `i64`
@@ -233,7 +233,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<i64, ~str>
+fn from_bson_t(doc: &Document) -> Result<i64, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `~str`
@@ -247,7 +247,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<~str, ~str>
+fn from_bson_t(doc: &Document) -> Result<~str, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `~T` where `<T: BsonFormattable>`
@@ -261,7 +261,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<~T, ~str>
+fn from_bson_t(doc: &Document) -> Result<~T, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `@T` where `<T: BsonFormattable>`
@@ -275,7 +275,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<@T, ~str>
+fn from_bson_t(doc: &Document) -> Result<@T, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `json::Json`
@@ -289,7 +289,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<json::Json, ~str>
+fn from_bson_t(doc: &Document) -> Result<json::Json, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `~[T]` where `<T: BsonFormattable + Copy>`
@@ -303,7 +303,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<~[T], ~str>
+fn from_bson_t(doc: &Document) -> Result<~[T], ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `HashMap<~str, V>` where `<V: BsonFormattable>`
@@ -317,7 +317,7 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<HashMap<~str, V>, ~str>
+fn from_bson_t(doc: &Document) -> Result<HashMap<~str, V>, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `BsonDocument`
@@ -331,6 +331,6 @@ fn to_bson_t(&self) -> Document
 ### Method `from_bson_t`
 
 ~~~ {.rust}
-fn from_bson_t(doc: Document) -> Result<BsonDocument, ~str>
+fn from_bson_t(doc: &Document) -> Result<BsonDocument, ~str>
 ~~~
 
