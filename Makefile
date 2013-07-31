@@ -101,8 +101,8 @@ doc: $(BSONDIR)/*.rs $(MONGODIR)/*
 	$(MKDIR) docs
 	$(MKDIR) docs/bson
 	$(MKDIR) docs/mongo
-	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/bson $(BSONDIR)/bson.rc
-	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/mongo $(MONGODIR)/mongo.rc
+	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/bson $(BSONDIR)/bson.rs
+	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/mongo $(MONGODIR)/mongo.rs
 
 clean:
 	$(RM) -rf $(TEST)
