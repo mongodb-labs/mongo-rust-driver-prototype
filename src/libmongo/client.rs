@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-use std::*;
+use std::cell::*;
 use std::from_str::FromStr;
 
 use bson::encode::*;
@@ -34,9 +34,10 @@ use coll::Collection;
  * `Collection`, etc. all store their associated `Client`
  */
 pub struct Client {
-    conn : cell::Cell<@Connection>,
-    priv rs_conn : cell::Cell<@ReplicaSetConnection>,
-    priv cur_requestId : cell::Cell<i32>,       // first unused requestId
+    conn : Cell<@Connection>,
+    timeout : u64,
+    priv rs_conn : Cell<@ReplicaSetConnection>,
+    priv cur_requestId : Cell<i32>,     // first unused requestId
     // XXX index cache?
 }
 
@@ -52,9 +53,10 @@ impl Client {
      */
     pub fn new() -> Client {
         Client {
-            conn : cell::Cell::new_empty(),
-            rs_conn : cell::Cell::new_empty(),
-            cur_requestId : cell::Cell::new(0),
+            conn : Cell::new_empty(),
+            timeout : MONGO_TIMEOUT_SECS,
+            rs_conn : Cell::new_empty(),
+            cur_requestId : Cell::new(0),
         }
     }
 
@@ -146,7 +148,7 @@ impl Client {
      * # Returns
      * handle to specified database
      */
-    pub fn get_db(@self, db : ~str) -> DB {
+    pub fn get_db(@self, db : &str) -> DB {
         DB::new(db, self)
     }
 
@@ -162,7 +164,7 @@ impl Client {
      * # Failure Types
      * * anything propagated from run_command
      */
-    pub fn drop_db(@self, db : ~str) -> Result<(), MongoErr> {
+    pub fn drop_db(@self, db : &str) -> Result<(), MongoErr> {
         let db = DB::new(db, self);
         match db.run_command(SpecNotation(~"{ \"dropDatabase\":1 }")) {
             Ok(_) => Ok(()),
@@ -182,19 +184,19 @@ impl Client {
      * # Returns
      * handle to specified collection
      */
-    pub fn get_collection(@self, db : ~str, coll : ~str) -> Collection {
+    pub fn get_collection(@self, db : &str, coll : &str) -> Collection {
         Collection::new(db, coll, self)
     }
 
     /*
      * Helper function for connections.
      */
-    pub fn _connect_to_conn(&self, call : ~str, conn : @Connection)
+    pub fn _connect_to_conn(&self, call : &str, conn : @Connection)
                 -> Result<(), MongoErr> {
         // check if already connected
         if !self.conn.is_empty() {
             return Err(MongoErr::new(
-                            call,
+                            call.to_owned(),
                             ~"already connected",
                             ~"cannot connect if already connected; please first disconnect"));
         }
@@ -206,7 +208,7 @@ impl Client {
                 Ok(())
             }
             Err(e) => return Err(MongoErr::new(
-                                    call,
+                                    call.to_owned(),
                                     ~"connecting",
                                     fmt!("-->\n%s", e.to_str()))),
         }
@@ -226,12 +228,12 @@ impl Client {
      * * already connected
      * * network
      */
-    pub fn connect(&self, server_ip_str : ~str, server_port : uint)
+    pub fn connect(&self, server_ip_str : &str, server_port : uint)
                 -> Result<(), MongoErr> {
+        let tmp = @NodeConnection::new(server_ip_str, server_port);
+        tmp.set_timeout(self.timeout);
         self._connect_to_conn(  fmt!("client::connect[%s:%?]", server_ip_str, server_port),
-                                @NodeConnection::new(server_ip_str,
-                                                        server_port)
-                                    as @Connection)
+                                tmp as @Connection)
     }
 
     /**
@@ -243,9 +245,10 @@ impl Client {
      * # Returns
      * () on success, MongoErr on failure
      */
-    // TODO uri parsing
-    pub fn connect_to_rs(&self, seed : ~[(~str, uint)]) -> Result<@ReplicaSetConnection, MongoErr> {
-        let tmp = @ReplicaSetConnection::new(seed.clone());
+    pub fn connect_to_rs(&self, seed : &[(&str, uint)])
+                -> Result<@ReplicaSetConnection, MongoErr> {
+        let tmp = @ReplicaSetConnection::new(seed);
+        tmp.set_timeout(self.timeout);
         match self._connect_to_conn(    fmt!("client::connect_to_rs[%?]", seed),
                                         tmp as @Connection) {
             Ok(_) => {

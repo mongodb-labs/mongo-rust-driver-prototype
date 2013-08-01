@@ -262,7 +262,7 @@ impl DB {
         Err(MongoErr::new(
                 ~"db::run_command",
                 fmt!("run_command %? failed", cmd),
-                copy *errmsg))
+                errmsg.clone()))
     }
 
     /**

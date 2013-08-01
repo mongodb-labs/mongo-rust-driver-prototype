@@ -38,7 +38,8 @@ pub struct NodeConnection {
     //priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
     priv port : Cell<@GenericPort<PortResult>>,
     ping : Cell<u64>,
-    tags : ~Cell<TagSet>,
+    tags : Cell<TagSet>,
+    timeout : Cell<u64>,
 }
 
 impl Connection for NodeConnection {
@@ -146,6 +147,16 @@ impl Connection for NodeConnection {
             result
         }
     }
+
+    pub fn set_timeout(&self, timeout : u64) -> u64 {
+        let prev = self.timeout.take();
+        self.timeout.put_back(timeout);
+        prev
+    }
+
+    pub fn get_timeout(&self) -> u64 {
+        self.timeout.clone().take()
+    }
 }
 
 impl NodeConnection {
@@ -160,15 +171,16 @@ impl NodeConnection {
      * NodeConnection that can be connected to server node
      * indicated.
      */
-    pub fn new(server_ip_str : ~str, server_port : uint) -> NodeConnection {
+    pub fn new(server_ip_str : &str, server_port : uint) -> NodeConnection {
         NodeConnection {
-            server_ip_str : server_ip_str,
+            server_ip_str : server_ip_str.to_owned(),
             server_port : server_port,
             server_ip : Cell::new_empty(),
             sock : Cell::new_empty(),
             port : Cell::new_empty(),
             ping : Cell::new_empty(),
-            tags : ~Cell::new(TagSet::new(~[])),
+            tags : Cell::new(TagSet::new(~[])),
+            timeout : Cell::new(MONGO_TIMEOUT_SECS),
         }
     }
 

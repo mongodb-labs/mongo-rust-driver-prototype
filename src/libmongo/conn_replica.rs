@@ -21,6 +21,7 @@ use std::rt::uv::*;
 use extra::priority_queue::*;
 use extra::arc::*;
 use extra::uv::*;
+use extra::time::*;
 use extra::timer::*;
 
 use util::*;
@@ -43,10 +44,11 @@ pub struct ReplicaSetConnection {
     state : Cell<ReplicaSetData>,      // XXX RWARC?
     write_to : Cell<NodeConnection>,
     read_from : Cell<NodeConnection>,
-    port_state : Cell<Port<ReplicaSetData>>,
-    chan_reconn : Cell<Chan<bool>>,
+    priv port_state : Cell<Port<ReplicaSetData>>,
+    priv chan_reconn : Cell<Chan<bool>>,
     read_pref : Cell<READ_PREFERENCE>,
     read_pref_changed : Cell<bool>,
+    timeout : Cell<u64>,
 }
 
 /**
@@ -153,33 +155,22 @@ impl Connection for ReplicaSetConnection {
 
     pub fn send(&self, data : ~[u8], read : bool) -> Result<(), MongoErr> {
         // refresh server data: first try via refresh, then try via reconnect
-        // TODO time out
+        let mut err = None;
+        let t = precise_time_ns();
         loop {
-            println("TRYING TO SEND");
+            if precise_time_ns() - t >= self.get_timeout()*1000000000 {
+                break;
+            }
+
             match self.try_send(data.clone(), read) {
                 Ok(_) => return Ok(()),
-                Err(e) => println(e.to_str()),
+                Err(e) => err = Some(e),
             }
         }
-        //Err(MongoErr::new(~"ughhhhhhhh", ~"", ~""))
-        /*match self.try_send(data, read) {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                println(fmt!("attempting hard reconnect due to error %s", e.to_str()));
-                match self.reconnect() {
-                    Ok(_) => self.try_send(data_cpy, read),
-                    Err(e) => Err(e),
-                }
-            }
-        }*/
-        /*let seed_arc = self.seed.take();
-        let state = ReplicaSetConnection::reconnect_with_seed(&seed_arc);
-        self.seed.put_back(seed_arc);
-        match self.refresh_with_state(Some(state)) {
-            Ok(_) => (),
-            Err(e) => return Err(e),
-        }*/
-
+        Err(MongoErr::new(
+                ~"conn_replica::send",
+                ~"timed out trying to send",
+                fmt!("last error: %s", err.unwrap().to_str())))
     }
 
     pub fn recv(&self, read : bool) -> Result<~[u8], MongoErr> {
@@ -194,7 +185,7 @@ impl Connection for ReplicaSetConnection {
                             if read { "read" } else { "write" })));
         }
         let server = server_cell.take();
-println(fmt!("[recv] server: %?", server));
+        debug!("[recv] server: %?", server);
 
         // even if found server, if ping is empty, server down
         if server.ping.is_empty() {
@@ -208,6 +199,16 @@ println(fmt!("[recv] server: %?", server));
         let result = server.recv(read);
         server_cell.put_back(server);
         result
+    }
+
+    pub fn set_timeout(&self, timeout : u64) -> u64 {
+        let prev = self.timeout.take();
+        self.timeout.put_back(timeout);
+        prev
+    }
+
+    pub fn get_timeout(&self) -> u64 {
+        self.timeout.clone().take()
     }
 }
 
@@ -311,11 +312,15 @@ impl Eq for ReplicaSetData {
 }
 
 impl ReplicaSetConnection {
-    pub fn new(seed : ~[(~str, uint)]) -> ReplicaSetConnection {
+    pub fn new(seed : &[(&str, uint)]) -> ReplicaSetConnection {
+        let mut seed_arc = ~[];
+        for seed.iter().advance |&(ip,port)| {
+            seed_arc.push((ip.to_owned(), port));
+        }
         ReplicaSetConnection {
             //seed : ~RWARC(seed),    // RWARC corrected
             //seed : ~ARC(seed),
-            seed : Cell::new(~ARC(seed)),
+            seed : Cell::new(~ARC(seed_arc)),
             state : Cell::new_empty(),
             write_to : Cell::new_empty(),
             read_from : Cell::new_empty(),
@@ -323,6 +328,7 @@ impl ReplicaSetConnection {
             chan_reconn : Cell::new_empty(),
             read_pref : Cell::new(PRIMARY_ONLY),
             read_pref_changed : Cell::new(true),
+            timeout : Cell::new(MONGO_TIMEOUT_SECS),
         }
     }
 
@@ -613,7 +619,7 @@ impl ReplicaSetConnection {
                 let mut timer = TimerWatcher::new(&mut lp);
                 // pick up seed and state
                 let state = ReplicaSetConnection::reconnect_with_seed(&seed);
-println(fmt!("~~~sending state~~~\n%?\n~~~~~~~~~~~~~~~~~~~", state));
+                debug!("~~~sending state~~~\n%?\n~~~~~~~~~~~~~~~~~~~", state);
                 chan_state.send(state);
                 //sleep(&global_loop::get(), MONGO_RECONN_MSECS as uint);
                 do timer.start(MONGO_RECONN_MSECS, 0) |_,_| { }
@@ -691,7 +697,6 @@ println(fmt!("~~~sending state~~~\n%?\n~~~~~~~~~~~~~~~~~~~", state));
                 Err(e) => err_str.push_str(e.to_str()),
             }
         } else {
-println("blaah");
             return Err(MongoErr::new(
                         ~"conn_replica::refresh",
                         ~"no primary; see state error",
@@ -715,7 +720,6 @@ println("blaah");
     fn _refresh_write_to(&self, state : &ReplicaSetData)
                 -> Result<(), MongoErr> {
         // write_to is always primary, and flow cannot reach here
-        //      unless state is good (non-empty primary)
         //      unless non-empty primary
         let dat = state.pri.clone().unwrap();
         let pri = NodeConnection::new(dat.ip.clone(), dat.port);
@@ -839,14 +843,13 @@ println("blaah");
      */
     pub fn refresh(&self) -> Result<(), MongoErr> {
         if self.port_state.is_empty() {
-println("no port state");
             return Err(MongoErr::new(
                         ~"conn_replica::refresh",
                         ~"could not refresh",
                         ~"reconnect thread dead"));
         }
 
-println("===starting refresh===");
+        debug!("===starting refresh===");
         // fish out most up-to-date information
         let port_state = self.port_state.take();
         let mut tmp_state = None;
@@ -861,7 +864,7 @@ println("===starting refresh===");
         }
         self.port_state.put_back(port_state);
 
-println(fmt!("===found below state===\n%?\n=======================", tmp_state));
+        debug!("===found below state===\n%?\n=======================", tmp_state);
 
         // refresh according to new state
         self.refresh_with_state(tmp_state)
@@ -879,7 +882,7 @@ println(fmt!("===found below state===\n%?\n=======================", tmp_state))
                         ~"no primary found"));
         }
         let server = server_cell.take();
-println(fmt!("[send] server: %?", server));
+        debug!("[send] server: %?", server);
 
         // even if found server, if ping is empty, server down
         if server.ping.is_empty() {
@@ -892,7 +895,6 @@ println(fmt!("[send] server: %?", server));
         // otherwise send and then put everything back
         let result = server.send(data, read);
         server_cell.put_back(server);
-println(fmt!("result of send: %?", result));
         result
     }
 }

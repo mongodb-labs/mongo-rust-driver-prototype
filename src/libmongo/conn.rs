@@ -99,4 +99,22 @@ pub trait Connection {
      * * network
      */
     fn recv(&self, read : bool) -> Result<~[u8], MongoErr>;
+
+    /**
+     * Sets timeout in seconds, returning former value.
+     *
+     * # Arguments
+     * `timeout` - amount of time before a send command times out; default
+     *              is MONGO_TIMEOUT_SECS
+     */
+    // XXX units
+    fn set_timeout(&self, timeout : u64) -> u64;
+
+    /**
+     * Gets timeout in seconds.
+     *
+     * # Returns
+     * timeout of connection send commands, in seconds
+     */
+    fn get_timeout(&self) -> u64;
 }

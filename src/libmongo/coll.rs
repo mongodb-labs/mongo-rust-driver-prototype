@@ -50,8 +50,12 @@ impl Collection {
      * # Returns
      * handle to given collection
      */
-    pub fn new(db : &str, name : ~str, client : @Client) -> Collection {
-        Collection { db : db.to_owned(), name : name, client : client }
+    pub fn new(db : &str, name : &str, client : @Client) -> Collection {
+        Collection {
+            db : db.to_owned(),
+            name : name.to_owned(),
+            client : client
+        }
     }
 
     /**
@@ -61,7 +65,7 @@ impl Collection {
      * handle to database containing this `Collection`
      */
     pub fn get_db(&self) -> DB {
-        DB::new(self.db.clone(), self.client)
+        DB::new(self.db, self.client)
     }
 
     /**
@@ -90,7 +94,7 @@ impl Collection {
             });
         }
 
-        let db = DB::new(self.db.clone(), self.client);
+        let db = DB::new(self.db, self.client);
         match db.run_command(SpecNotation(fmt!("{ %s }", cmd))) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -487,7 +491,7 @@ impl Collection {
                                 flag_array : Option<~[INDEX_FLAG]>,
                                 option_array : Option<~[INDEX_OPTION]>)
                 -> Result<MongoIndexSpec, MongoErr> {
-        let coll = Collection::new(self.db.clone(), SYSTEM_INDEX.to_owned(), self.client);
+        let coll = Collection::new(self.db, SYSTEM_INDEX, self.client);
 
         let flags = process_flags!(flag_array);
         let (x, y) = MongoIndexSpec::process_index_opts(flags, option_array);
@@ -520,8 +524,7 @@ impl Collection {
     }
     //pub fn get_indexes(&self) -> Result<~[~str], MongoErr> {
     pub fn get_indexes(&self) -> Result<~[MongoIndex], MongoErr> {
-        let coll = Collection::new(self.db.clone(), SYSTEM_INDEX.to_owned(), self.client);
-println(fmt!("{'ns':'%?.%?'}", self.db, self.name));
+        let coll = Collection::new(self.db, SYSTEM_INDEX, self.client);
         let mut cursor = match coll.find(
                             Some(SpecNotation(fmt!("{'ns':'%s.%s'}", self.db, self.name))),
                             None,
@@ -552,7 +555,7 @@ println(fmt!("{'ns':'%?.%?'}", self.db, self.name));
      * () on success, `MongoErr` on failure
      */
     pub fn drop_index(&self, index : MongoIndexSpec) -> Result<(), MongoErr> {
-        let db = DB::new(self.db.clone(), self.client);
+        let db = DB::new(self.db, self.client);
         match db.run_command(SpecNotation(
                     fmt!("{ \"deleteIndexes\":\"%s\", \"index\":\"%s\" }",
                         self.name,

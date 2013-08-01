@@ -416,7 +416,7 @@ impl RS {
      * RSConfig struct on success, MongoErr on failure
      */
     pub fn get_config(&self) -> Result<RSConfig, MongoErr> {
-        let coll = Collection::new(~"local", SYSTEM_REPLSET.to_owned(), self.client);
+        let coll = Collection::new("local", SYSTEM_REPLSET, self.client);
         let doc = match coll.find_one(None, None, None) {
             Ok(d) => d,
             Err(e) => return Err(e),
