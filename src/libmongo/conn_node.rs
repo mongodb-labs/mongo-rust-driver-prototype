@@ -159,6 +159,20 @@ impl Connection for NodeConnection {
     }
 }
 
+impl Eq for NodeConnection {
+    pub fn eq(&self, other : &NodeConnection) -> bool {
+           self.server_ip_str == other.server_ip_str
+        && self.server_port == other.server_port
+        && self.tags == other.tags
+    }
+
+    pub fn ne(&self, other : &NodeConnection) -> bool {
+        !( self.server_ip_str == other.server_ip_str
+        && self.server_port == other.server_port
+        && self.tags == other.tags)
+    }
+}
+
 impl NodeConnection {
     /**
      * Create a new NodeConnection with given IP and port.

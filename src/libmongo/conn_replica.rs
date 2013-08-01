@@ -30,6 +30,8 @@ use conn_node::NodeConnection;
 
 use bson::encode::*;
 
+// TODO go through error handling more meticulously
+
 #[deriving(Clone, Eq)]
 pub enum ServerType {
     PRIMARY = 0,
@@ -190,7 +192,7 @@ impl Connection for ReplicaSetConnection {
         // even if found server, if ping is empty, server down
         if server.ping.is_empty() {
             return Err(MongoErr::new(
-                        ~"conn_replica::send",
+                        ~"conn_replica::recv",
                         ~"cannot receive",
                         ~"server down"));
         }
@@ -285,7 +287,8 @@ impl NodeData {
 impl Eq for ReplicaSetData {
     pub fn eq(&self, other : &ReplicaSetData) -> bool {
         if         self.pri != other.pri
-                || self.sec.len() != other.sec.len() {
+                || self.sec.len() != other.sec.len()
+                || self.err != other.err {
             return false;
         }
 
@@ -298,7 +301,8 @@ impl Eq for ReplicaSetData {
     }
     pub fn ne(&self, other : &ReplicaSetData) -> bool {
         if         self.pri != other.pri
-                || self.sec.len() != other.sec.len() {
+                || self.sec.len() != other.sec.len()
+                || self.err != self.err {
             return true;
         }
 
@@ -342,6 +346,16 @@ impl ReplicaSetConnection {
         ReplicaSetConnection::_get_replica_set_data(hosts)
     }
 
+    /**
+     * Gets host list given a seed list (ARC).
+     *
+     * # Arguments
+     * `seed` - seed list to use for node discovery
+     *
+     * # Returns
+     * a list of hosts if it is found from any seed, MongoErr otherwise
+     * errors that may have occurred during node discovery
+     */
     //fn _get_host_list(seed : &~RWARC<~[(~str, uint)]>)    // RWARC corrected
     fn _get_host_list(seed : &~ARC<~[(~str, uint)]>)
                 -> Result<~[(~str, uint)], MongoErr> {
@@ -425,6 +439,7 @@ impl ReplicaSetConnection {
                     }) {
                         Ok(list) => {
                             if list.len() > 0 {
+println(fmt!("found list %?", list));
                                 chan_hosts_tmp.send(Ok(list));
                                 fail!(); // take down whole thread
                             } else { chan_hosts_tmp.send(Ok(~[])); }
@@ -451,6 +466,16 @@ impl ReplicaSetConnection {
                     err_str))
     }
 
+    /**
+     * Gets data pertaining to replica set connection, given a host list.
+     *
+     * # Arguments
+     * `hosts` - list of hosts
+     *
+     * # Returns
+     * ReplicaSetData struct with discovered primary,
+     * discovered secondaries, and any errors that may have come up
+     */
     fn _get_replica_set_data(hosts : ~[(~str, uint)]) -> ReplicaSetData {
         let mut pri = None;
         let mut sec = PriorityQueue::new::<NodeData>();
@@ -619,10 +644,12 @@ impl ReplicaSetConnection {
                 let mut timer = TimerWatcher::new(&mut lp);
                 // pick up seed and state
                 let state = ReplicaSetConnection::reconnect_with_seed(&seed);
-                debug!("~~~sending state~~~\n%?\n~~~~~~~~~~~~~~~~~~~", state);
+                println(fmt!("~~~sending state~~~\n%?\n~~~~~~~~~~~~~~~~~~~", state));
                 chan_state.send(state);
                 //sleep(&global_loop::get(), MONGO_RECONN_MSECS as uint);
-                do timer.start(MONGO_RECONN_MSECS, 0) |_,_| { }
+                do timer.start(MONGO_RECONN_MSECS, 0) |timer,_| {
+                    timer.close(||());
+                }
                 lp.run();
                 lp.close();
             }
@@ -651,6 +678,8 @@ impl ReplicaSetConnection {
         } else {
             Some(self.state.take())
         };  // self.state now certainly empty
+
+//println(fmt!("refreshing:\nold state:\n===\n%?\n===\nnew state:\n===\n%?\n===", old_state, tmp_state));
 
         let state = match (old_state, tmp_state) {
             (None, None) => {
@@ -707,13 +736,13 @@ impl ReplicaSetConnection {
             Err(e) => err_str.push_str(e.to_str()),
         }
 
-        // store state
+        // replace state
         self.state.put_back(state);
 
         if err_str.len() == 0 { Ok(()) }
         else { Err(MongoErr::new(
-                    ~"conn_replica::reconnect",
-                    ~"error while reconnecting",
+                    ~"conn_replica::refresh",
+                    ~"error while refreshing",
                     err_str)) }
     }
 
@@ -737,7 +766,7 @@ impl ReplicaSetConnection {
 
         let mut servers = ~[];
 
-        let pri = state.clone().pri.unwrap();
+        let pri = match state.clone().pri { None => ~[], Some(s) => ~[s] };
         let mut sec = PriorityQueue::new();
 
         for state.sec.iter().advance |&s| {
@@ -747,11 +776,11 @@ impl ReplicaSetConnection {
         // parse read_preference to determine server choices
         let (pref_str, ts_list) = match read_pref {
             PRIMARY_ONLY => {
-                servers.push(pri);
+                servers.push_all_move(pri);
                 (~"PRIMARY_ONLY", &None)
             }
             PRIMARY_PREF(ref ts) => {
-                servers.push(pri);
+                servers.push_all_move(pri);
                 let ordered = sec.to_sorted_vec();
                 for ordered.rev_iter().advance |&s| {
                     servers.push(s);
@@ -770,11 +799,11 @@ impl ReplicaSetConnection {
                 for ordered.rev_iter().advance |&s| {
                     servers.push(s);
                 }
-                servers.push(pri);
+                servers.push_all_move(pri);
                 (~"SECONDARY_PREF", ts)
             }
             NEAREST(ref ts) => {
-                sec.push(pri);
+                for pri.iter().advance |&s| { sec.push(s); }
                 let ordered = sec.to_sorted_vec();
                 for ordered.rev_iter().advance |&s| {
                     servers.push(s);

@@ -23,7 +23,7 @@ use bson::formattable::*;
  * Users must access functionality for proper use of options, etc.
  */
 
-#[deriving(Clone)]
+#[deriving(Clone,Eq)]
 pub struct MongoErr {
     //err_code : int,
     err_type : ~str,
@@ -35,22 +35,28 @@ pub struct MongoErr {
 }
 
 /**
- * MongoErr to propagate errors; would be called Err except that's
- * taken by Rust...
+ * MongoErr to propagate errors.
  */
 impl MongoErr {
     /**
-     * Create a new MongoErr of given type (e.g. "connection", "query"),
+     * Creates a new MongoErr of given type (e.g. "connection", "query"),
      * name (more specific error), and msg (description of error).
      */
     pub fn new(typ : ~str, name : ~str, msg : ~str) -> MongoErr {
         MongoErr { err_type : typ, err_name : name, err_msg : msg }
     }
+
+    /**
+     * Like to_str, but omits staring "ERR | ".
+     */
+    pub fn tail(&self) -> ~str {
+        fmt!("%s | %s => %s", self.err_type, self.err_name, self.err_msg)
+    }
 }
 
 impl ToStr for MongoErr {
     /**
-     * Print a MongoErr to string in a standard format.
+     * Prints a MongoErr to string in a standard format.
      */
     pub fn to_str(&self) -> ~str {
         fmt!("ERR | %s | %s => %s", self.err_type, self.err_name, self.err_msg)
@@ -245,7 +251,7 @@ pub enum COLLECTION_OPTION {
 pub static LITTLE_ENDIAN_TRUE : bool = true;
 pub static MONGO_DEFAULT_PORT : uint = 27017;
 pub static MONGO_RECONN_MSECS : u64 = (1000*3);
-pub static MONGO_TIMEOUT_SECS : u64 = 15; // XXX units...
+pub static MONGO_TIMEOUT_SECS : u64 = 5; // XXX units...
 pub static LOCALHOST : &'static str = &'static "127.0.0.1"; // XXX tmp
 
 /// INTERNAL UTILITIES
