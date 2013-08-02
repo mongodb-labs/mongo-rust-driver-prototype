@@ -103,25 +103,69 @@ impl RSMember {
         }
     }
 
+    // TODO macros
     // XXX inefficient
     pub fn get_tags<'a>(&'a self) -> Option<&'a TagSet> {
         for self.opts.iter().advance |opt| {
             match opt {
-                &TAGS(ref ts) => return Some(ts),
+                &TAGS(ref x) => return Some(x),
                 _ => (),
             }
         }
         None
     }
     // XXX inefficient
-    pub fn get_mut_tags<'a>(&'a mut self) -> Option<&'a mut TagSet> {
-        for self.opts.mut_iter().advance |opt| {
+    pub fn get_mut_tags<'a>(&'a mut self) -> &'a mut TagSet {
+        let mut ptr = None;
+        {
+            if self.get_tags().is_none() {
+                self.opts.push(TAGS(TagSet::new(~[])));
+            }
+        }
+        {
+            for self.opts.mut_iter().advance |opt| {
+                match opt {
+                    &TAGS(ref mut x) => {
+                        ptr = Some(x);
+                        break;
+                    }
+                    _ => (),
+                }
+            }
+        }
+        ptr.unwrap()
+    }
+
+    // XXX inefficient
+    pub fn get_priority<'a>(&'a self) -> Option<&'a f64> {
+        for self.opts.iter().advance |opt| {
             match opt {
-                &TAGS(ref mut ts) => return Some(ts),
+                &PRIORITY(ref x) => return Some(x),
                 _ => (),
             }
         }
         None
+    }
+    // XXX inefficient
+    pub fn get_mut_priority<'a>(&'a mut self) -> &'a mut f64 {
+        let mut ptr = None;
+        {
+            if self.get_priority().is_none() {
+                self.opts.push(PRIORITY(1f64));
+            }
+        }
+        {
+            for self.opts.mut_iter().advance |opt| {
+                match opt {
+                    &PRIORITY(ref mut x) => {
+                        ptr = Some(x);
+                        break;
+                    }
+                    _ => (),
+                }
+            }
+        }
+        ptr.unwrap()
     }
 }
 
