@@ -19,6 +19,7 @@ use rtio = std::rt::io;
 pub use std::rt::io::{Reader,Writer};
 
 use bson::encode::*;
+use bson::formattable::*;
 
 use mongo::coll::*;
 use mongo::db::*;
@@ -28,7 +29,6 @@ pub struct GridIn {
     chunks: Collection,
     files: Collection,
     closed: bool,
-    buf: stdio::BytesWriter,
     chunk_size: uint,
     chunk_num: uint,
     file_id: Option<Document>,
@@ -54,12 +54,12 @@ impl rtio::Writer for GridIn {
             })
         }
         let mut data: ~[u8] = d.to_owned();
-        if self.buf.tell() > 0 {
-            let space = self.chunk_size - self.buf.tell();
+        if self.position > 0 {
+            let space = self.chunk_size - self.position;
             let to_write = data.iter().transform(|x| *x).take_(space).collect::<~[u8]>();
-            if space > 0 {
+    /*        if space > 0 {
                 self.buf.write(to_write);
-            }
+            }*/
             match self.flush_data(to_write) {
                 Ok(_) => (),
                 Err(e) => rtio::io_error::cond.raise(rtio::IoError {
@@ -68,11 +68,14 @@ impl rtio::Writer for GridIn {
                     detail: Some(e.to_str())
                 })
             }
-            self.buf = stdio::BytesWriter::new();
+            //self.buf = stdio::BytesWriter::new();
         }
+        //to_write copies out the first chunk_size elts of data
         let mut to_write: ~[u8] = data.iter().transform(|x| *x).take_(self.chunk_size).collect();
+        //data consumes those elts by skipping them
         data = data.iter().skip(self.chunk_size).transform(|x| *x).collect();
-        while to_write.len() == self.chunk_size {
+        //if we filled up the chunk, flush the chunk
+        while to_write.len() != 0 && to_write.len() == self.chunk_size {
             match self.flush_data(to_write) {
                 Ok(_) => (),
                 Err(e) => rtio::io_error::cond.raise(rtio::IoError {
@@ -81,19 +84,30 @@ impl rtio::Writer for GridIn {
                     detail: Some(e.to_str())
                 })
             }
-            data = data.iter().skip(self.chunk_size).transform(|x| *x).collect();
             to_write = data.iter().take_(self.chunk_size).transform(|x| *x).collect();
+            data = data.iter().skip(self.chunk_size).transform(|x| *x).collect();
         }
-        self.buf.write(to_write);
+        if to_write.len() == 0 {
+            return;
+        }
+        match self.flush_data(to_write) {
+            Ok(_) => (),
+            Err(e) => rtio::io_error::cond.raise(rtio::IoError {
+                kind: rtio::OtherIoError,
+                desc: "could not flush data to buffer",
+                detail: Some(e.to_str())
+            })
+        }
+        //self.buf.write(to_write);
     }
 
     pub fn flush(&mut self) {
-        self.buf.flush();
+        //self.buf.flush();
         let db = self.chunks.get_db();
 
         let mut oid = ~"";
         match self.file_id {
-            Some(Binary(_, ref v)) => {
+            Some(ObjectId(ref v)) => {
                 for v.iter().advance |&b| {
                     let mut byte = fmt!("%x", b as uint);
                     if byte.len() == 1 {
@@ -108,7 +122,7 @@ impl rtio::Writer for GridIn {
         let mut ioerr: Option<rtio::IoError> = None;
 
         let md5 = match db.run_command(SpecNotation(
-            fmt!("{ 'filemd5': %s, 'root': 'fs' }", oid))) {
+            fmt!("{ 'filemd5': '%s', 'root': 'fs' }", oid))) {
             Ok(d) => match d.find(~"md5") {
                 Some(&UString(ref s)) => s.clone(),
                 _ => {
@@ -137,6 +151,12 @@ impl rtio::Writer for GridIn {
         let mut file = BsonDocument::new();
         file.put(~"md5", UString(md5));
         file.put(~"length", Int32(self.position as i32));
+        file.put(~"_id", self.file_id.clone().unwrap());
+        file.put(~"chunkSize", self.chunk_size.to_bson_t());
+        file.put(~"filename", UString(~""));
+        file.put(~"contentType", UString(~""));
+        file.put(~"aliases", UString(~""));
+        file.put(~"metadata", UString(~""));
         //TODO: needs an uploadDate field,
         //assuming there is a reasonable date library
         match self.files.insert(file, None) {
@@ -154,11 +174,15 @@ impl GridIn {
     pub fn new(db: &DB) -> GridIn {
         let chunks = db.get_collection(~"fs.chunks");
         let files = db.get_collection(~"fs.files");
+        match chunks.ensure_index(~[NORMAL(~[(~"files_id", ASC), (~"n", ASC)])], None, None) {
+            Ok(_) => (),
+            Err(e) => fail!(e.to_str())
+        }
         GridIn {
             chunks: chunks,
             files: files,
             closed: false,
-            buf: stdio::BytesWriter::new(),
+            //buf: stdio::BytesWriter::new(),
             chunk_size: 256 * 1024,
             chunk_num: 0,
             file_id: None,
@@ -186,28 +210,19 @@ impl GridIn {
         let mut chunk = BsonDocument::new();
         chunk.put(~"n", Int32(self.chunk_num as i32));
         chunk.put(~"data", Binary(0u8, data.clone().to_owned()));
-        match self.file_id {
-            Some(ObjectId(ref v)) => chunk.put(~"_id", ObjectId(v.clone())),
-            _ => ()
+        if self.file_id.is_none() {
+            match self.chunks.find_one(Some(SpecObj(chunk.clone())), None, None) {
+                Ok(d) => match d.find(~"files_id") {
+                    Some(id) =>  self.file_id = Some(id.clone()),
+                    _ => self.file_id = Some(ObjIdFactory::new().oid())
+                },
+                _ => self.file_id = Some(ObjIdFactory::new().oid())
+            }
         }
+        chunk.put(~"files_id", self.file_id.clone().unwrap());
         match self.chunks.insert(chunk.clone(), None) {
             Ok(_) => (),
             Err(e) => return Err(e)
-        }
-        if self.file_id.is_none() {
-            match self.chunks.find_one(Some(SpecObj(chunk)), None, None) {
-                Ok(d) => match d.find(~"_id") {
-                    Some(id) => self.file_id = Some(id.clone()),
-                    _ => return Err(MongoErr::new(
-                            ~"gridfile::flush_data",
-                            ~"error creating _id for chunk",
-                            ~"could not find an oid for a chunk"))
-                },
-                _ => return Err(MongoErr::new(
-                        ~"gridfile::flush_data",
-                        ~"error creating _id for chunk",
-                        ~"could not find an oid for a chunk"))
-            }
         }
         self.position += data.len();
         self.chunk_num += 1;
