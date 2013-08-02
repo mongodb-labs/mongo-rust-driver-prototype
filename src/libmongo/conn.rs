@@ -86,19 +86,23 @@ pub trait Connection {
      * * uninitialized socket
      * * network
      */
-    fn send(&self, data : ~[u8], read : bool) -> Result<(), MongoErr>;
+    fn send(&self, data : &[u8], read : bool) -> Result<(), MongoErr>;
 
     /**
      * Pick up a response from the server.
      *
+     * # Arguments
+     * `buf` - buffer into which to place response
+     * `read` - whether the operation was a read [or a write]
+     *
      * # Returns
-     * bytes received on success, MongoErr on failure
+     * number of bytes received on success, MongoErr on failure
      *
      * # Failure Types
      * * uninitialized port
      * * network
      */
-    fn recv(&self, read : bool) -> Result<~[u8], MongoErr>;
+    fn recv(&self, buf : &mut ~[u8], read : bool) -> Result<uint, MongoErr>;
 
     /**
      * Sets timeout in seconds, returning former value.

@@ -14,7 +14,8 @@
  */
 
 use std::cell::*;
-use std::rt::io::net::*;
+//use std::rt::io::net::*;
+//use std::rt::io::net::tcp::*;
 use extra::net::ip::*;
 use extra::net::tcp::*;
 use extra::uv::*;
@@ -34,9 +35,11 @@ pub struct NodeConnection {
     priv server_ip_str : ~str,
     priv server_port : uint,
     priv server_ip : Cell<IpAddr>,
+    /* BEGIN BLOCK to remove with new io */
     priv sock : Cell<@Socket>,
-    //priv port : @mut Option<@Port<Result<~[u8], TcpErrData>>>,
     priv port : Cell<@GenericPort<PortResult>>,
+    /* END BLOCK to remove with new io */
+    //priv stream : Cell<TcpStream>, /* BLOCK to include with new io */
     ping : Cell<u64>,
     tags : Cell<TagSet>,
     timeout : Cell<u64>,
@@ -46,10 +49,11 @@ impl Connection for NodeConnection {
     pub fn connect(&self) -> Result<(), MongoErr> {
         // sanity check: should not connect if already connected (?)
         if !(self.sock.is_empty() && self.port.is_empty()) {
+        //if !self.stream.is_empty() {
             return Err(MongoErr::new(
                             ~"conn::connect",
-                            ~"pre-existing socket",
-                            ~"cannot override existing socket"));
+                            ~"pre-existing stream",
+                            ~"cannot override existing stream"));
         }
 
         // parse IP addr
@@ -61,6 +65,18 @@ impl Connection for NodeConnection {
             Ok(addr) => addr,
         };
 
+        /* BEGIN BLOCK to include with new io */
+        /*let stream = match TcpStream::connect(copy ip) {
+            None => return Err(MongoErr::new(
+                                    ~"conn::connect",
+                                    ~"could not connect to TcpStream",
+                                    fmt!("%?", ip.clone()))),
+            Some(s) => s,
+        };
+        self.stream.put_back(stream);*/
+        /* END BLOCK to include with new io */
+
+        /* BEGIN BLOCK to remove with new io */
         // set up the socket --- for now, just v4
         // XXX
         let sock = match connect(ip, self.server_port, &global_loop::get()) {
@@ -81,6 +97,8 @@ impl Connection for NodeConnection {
         // hand initialized fields to self
         self.sock.put_back(sock);
         self.port.put_back(port);
+        /* END BLOCK to remove with new io */
+
         self.server_ip.put_back(ip);
 
         Ok(())
@@ -101,6 +119,8 @@ impl Connection for NodeConnection {
                 Ok(_) => (),
             }
         }
+        //if !self.stream.is_empty() { self.stream.take(); }
+        if !self.ping.is_empty() { self.ping.take(); }
 
         Ok(())
     }
@@ -110,24 +130,44 @@ impl Connection for NodeConnection {
         self.connect()
     }
 
-    pub fn send(&self, data : ~[u8], _ : bool) -> Result<(), MongoErr> {
+    pub fn send(&self, data : &[u8], _ : bool) -> Result<(), MongoErr> {
+        /* BEGIN BLOCK to remove with new io */
         if self.sock.is_empty() {
-            return Err(MongoErr::new(~"connection", ~"unknown send err", ~"cannot send on null socket"));
+            return Err(MongoErr::new(
+                            ~"node_conn::send",
+                            ~"unknown send err",
+                            ~"cannot send on null socket"));
         } else {
             let sock = self.sock.take();
-            let result = match sock.write_future(data).get() {
+            let result = match sock.write_future(data.to_owned()).get() {
                 Err(e) => Err(MongoErr::new(
-                                    ~"conn::send",
-                                    e.err_name.clone(),
-                                    e.err_msg.clone())),
+                            ~"node_conn::send",
+                            e.err_name.clone(),
+                            e.err_msg.clone())),
                 Ok(_) => Ok(()),
             };
             self.sock.put_back(sock);
             result
         }
+        /* END BLOCK to remove with new io */
+
+        /* BEGIN BLOCK to include with new io */
+        /*if self.stream.is_empty() {
+            return Err(MongoErr::new(
+                            ~"conn::send",
+                            ~"no stream",
+                            ~"cannot write to null stream"));
+        } else {
+            let stream = self.stream.take();
+            stream.write(data);
+            self.stream.put_back(stream);
+            Ok(())
+        }*/
+        /* END BLOCK to include with new io */
     }
 
-    pub fn recv(&self, _ : bool) -> Result<~[u8], MongoErr> {
+    /* BEGIN BLOCK to remove with new io */
+    pub fn recv(&self, buf : &mut ~[u8], _ : bool) -> Result<uint, MongoErr> {
          // sanity check and unwrap: should not send on an unconnected connection
         if self.port.is_empty() {
             return Err(MongoErr::new(
@@ -141,12 +181,39 @@ impl Connection for NodeConnection {
                                 ~"conn::recv",
                                 e.err_name.clone(),
                                 e.err_msg.clone())),
-                Ok(msg) => Ok(msg),
+                Ok(msg) => {
+                    for msg.iter().advance |&b| {
+                        buf.push(b);
+                    }
+                    Ok(buf.len())
+                }
             };
             self.port.put_back(port);
             result
         }
     }
+    /* END BLOCK to remove with new io */
+    /* BEGIN BLOCK to include with new io */
+    /*pub fn recv(&self, buf : &mut [u8], _ : bool) -> Result<uint, MongoErr> {
+        if self.stream.is_empty() {
+            return Err(MongoErr::new(
+                            ~"conn::recv",
+                            ~"no stream",
+                            ~"cannot receive from null stream"));
+        } else {
+            let stream = self.stream.take();
+            let result = match stream.read(buf) {
+                Some(n) => Ok(n),
+                None => return Err(MongoErr::new(
+                            ~"conn::recv",
+                            ~"no bytes read",
+                            ~"")),
+            };
+            self.stream.put_back(stream);
+            result
+        }
+    }*/
+    /* BEGIN BLOCK to include with new io */
 
     pub fn set_timeout(&self, timeout : u64) -> u64 {
         let prev = self.timeout.take();
@@ -190,8 +257,11 @@ impl NodeConnection {
             server_ip_str : server_ip_str.to_owned(),
             server_port : server_port,
             server_ip : Cell::new_empty(),
+            /* BEGIN BLOCK to remove with new io */
             sock : Cell::new_empty(),
             port : Cell::new_empty(),
+            /* END BLOCK to remove with new io */
+            //stream : Cell::new_empty(), /* BLOCK to include with new io */
             ping : Cell::new_empty(),
             tags : Cell::new(TagSet::new(~[])),
             timeout : Cell::new(MONGO_TIMEOUT_SECS),
@@ -273,8 +343,8 @@ impl NodeConnection {
                                     ~"isMaster runcommand response in unexpected format",
                                     ~"no \"ismaster\" field")),
                 Some(doc) => {
-                    match copy *doc {
-                        Bool(val) => is_master = val,
+                    match doc {
+                        &Bool(ref val) => is_master = *val,
                         _ => err = Some(MongoErr::new(
                                         ~"conn_node::is_master",
                                         ~"isMaster runcommand response in unexpected format",

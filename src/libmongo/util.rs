@@ -251,7 +251,7 @@ pub enum COLLECTION_OPTION {
 pub static LITTLE_ENDIAN_TRUE : bool = true;
 pub static MONGO_DEFAULT_PORT : uint = 27017;
 pub static MONGO_RECONN_MSECS : u64 = (1000*3);
-pub static MONGO_TIMEOUT_SECS : u64 = 5; // XXX units...
+pub static MONGO_TIMEOUT_SECS : u64 = 20; // XXX units...
 pub static LOCALHOST : &'static str = &'static "127.0.0.1"; // XXX tmp
 
 /// INTERNAL UTILITIES

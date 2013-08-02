@@ -14,6 +14,7 @@
  */
 
 use std::cell::*;
+use sys = std::sys;
 use std::from_str::FromStr;
 
 use bson::encode::*;
@@ -384,14 +385,57 @@ impl Client {
      * * network
      */
     fn _recv_msg(&self, read : bool) -> Result<ServerMsg, MongoErr> {
+        /* BEGIN BLOCK to remove with new io */
+        let mut bytes = ~[];
+        let header_sz = 4*sys::size_of::<i32>();
         // receive message
-        let m = match self.recv(read) {
-            Ok(bytes) => match parse_reply(bytes) {
-                Ok(m_tmp) => m_tmp,
-                Err(e) => return Err(e),
-            },
+        let m = match self.recv(&mut bytes, read) {
+            Ok(_) => {
+                if bytes.len() < header_sz {
+                    return Err(MongoErr::new(
+                                ~"client::_recv_msg",
+                                ~"too few bytes in resp",
+                                fmt!("expected %?, received %?",
+                                        header_sz,
+                                        bytes.len())));
+                }
+                // first get header
+                let header_bytes = bytes.slice(0, header_sz);
+                let h = match parse_header(header_bytes) {
+                    Ok(head) => head,
+                    Err(e) => return Err(e),
+                };
+                // now get rest of message
+                let body_bytes = bytes.slice(header_sz, bytes.len());
+                match parse_reply(h, body_bytes) {
+                    Ok(m_tmp) => m_tmp,
+                    Err(e) => return Err(e),
+                }
+            }
             Err(e) => return Err(e),
         };
+        /* BEGIN BLOCK to remove with new io */
+
+        /* BEGIN BLOCK to add with new io */
+        /*// receive header
+        let header_sz = 4*sys::size_of::<i32>();
+        let mut buf : ~[u8] = ~[];
+        for header_sz.times { buf.push(0); }
+        self.recv(buf, read);
+        let header = match parse_header(buf) {
+            Ok(h) => h,
+            Err(e) => return Err(e),
+        };
+
+        // receive rest of message
+        buf = ~[];
+        for (header.len as uint-header_sz).times { buf.push(0); }
+        self.recv(buf, read);
+        let m = match parse_reply(header, buf) {
+            Ok(m_tmp) => m_tmp,
+            Err(e) => return Err(e),
+        };*/
+        /* END BLOCK to add with new io */
 
         // check if any errors in response and convert to MongoErr,
         //      else pass along
@@ -450,7 +494,8 @@ impl Client {
      * * not connected
      * * network
      */
-    fn recv(&self, read : bool) -> Result<~[u8], MongoErr> {
+    //fn recv(&self, read : bool) -> Result<~[u8], MongoErr> {
+    fn recv(&self, buf : &mut ~[u8], read : bool) -> Result<uint, MongoErr> {
         if self.conn.is_empty() {
             Err(MongoErr::new(
                     ~"client::recv",
@@ -458,7 +503,8 @@ impl Client {
                     ~"attempted to receive on nonexistent connection"))
         } else {
             let tmp = self.conn.take();
-            let result = tmp.recv(read);
+            //let result = tmp.recv(read);
+            let result = tmp.recv(buf, read);
             self.conn.put_back(tmp);
             result
         }

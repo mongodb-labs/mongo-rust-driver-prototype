@@ -25,6 +25,7 @@ use util::*;
 // XXX ideally, this could be used in all the len computations
 //static header_sz : uint = 4*sys::size_of::<i32>();
 
+#[deriving(Clone,Eq)]
 enum OpCode {
     OP_REPLY = 1i32 as int,
     OP_MSG = 1000i32 as int,        // deprecated; no need to implement
@@ -37,6 +38,7 @@ enum OpCode {
     OP_KILL_CURSORS = 2007i32 as int,
 }
 
+#[deriving(Clone,Eq)]
 struct MsgHeader {
     len : i32,      // total message size in bytes
     id : i32,       // client- or db-generated identifier for message
@@ -44,6 +46,7 @@ struct MsgHeader {
     opcode : i32,
 }
 
+#[deriving(Clone,Eq)]
 pub enum ClientMsg {
     // Client request messages
     OpUpdate {                              // gets no response
@@ -90,6 +93,7 @@ pub enum ClientMsg {
         cursor_ids : ~[i64]
     },
 }
+#[deriving(Clone,Eq)]
 pub enum ServerMsg {
     // DB response messages
     OpReply {
@@ -292,16 +296,49 @@ pub fn mk_kill_cursor(id : i32, ncursor_ids : i32, cursor_ids : ~[i64]) -> Clien
 }
 
 /**
- * Parses bytes into msg, for reply op.
- * Assumes machine little-endian; messages are.
+ * Parses bytes into header, for reply op.
  */
-pub fn parse_reply(bytes : ~[u8]) -> Result<ServerMsg, MongoErr> {
-    // prepare to pull out non-document fields with pointer arithmetic
+pub fn parse_header(bytes : &[u8]) -> Result<MsgHeader, MongoErr> {
+    let header_sz = 4*sys::size_of::<i32>();
+    if bytes.len() != header_sz {
+        return Err(MongoErr::new(
+                    ~"msg::parse_header",
+                    ~"buffer wrong number of bytes",
+                    fmt!("expected %?, found %?", header_sz, bytes.len())));
+    }
+
+    // prepare to pull out header fields with pointer arithmetic
     let len_addr = to_ptr::<u8>(bytes) as uint;
     let id_addr = len_addr + sys::size_of::<i32>();
     let resp_to_addr = id_addr + sys::size_of::<i32>();
     let opcode_addr = resp_to_addr + sys::size_of::<i32>();
-    let flags_addr = opcode_addr + sys::size_of::<i32>();
+
+    unsafe {
+        Ok(MsgHeader {  len : *(len_addr as *i32),
+                        id : *(id_addr as *i32),
+                        resp_to : *(resp_to_addr as *i32),
+                        opcode : *(opcode_addr as *i32) })
+    }
+}
+
+/**
+ * Parses bytes into msg, for reply op.
+ * Assumes machine little-endian; messages are.
+ */
+pub fn parse_reply(header : MsgHeader, bytes : &[u8])
+            -> Result<ServerMsg, MongoErr> {
+    let header_sz = 4*sys::size_of::<i32>();
+    if bytes.len() != header.len as uint - header_sz {
+        return Err(MongoErr::new(
+                    ~"msg::parse_reply",
+                    ~"buffer wrong number of bytes",
+                    fmt!("expected %?, found %?",
+                            header.len as uint - header_sz,
+                            bytes.len())));
+    }
+
+    // prepare to pull out non-document fields with pointer arithmetic
+    let flags_addr = to_ptr::<u8>(bytes) as uint;
     let cursor_id_addr = flags_addr + sys::size_of::<i32>();
     let start_addr = cursor_id_addr + sys::size_of::<i64>();
     let nret_addr = start_addr + sys::size_of::<i32>();
@@ -309,10 +346,10 @@ pub fn parse_reply(bytes : ~[u8]) -> Result<ServerMsg, MongoErr> {
     unsafe {
         // pull out documents one-by-one
         let mut docs : ~[~BsonDocument] = ~[];
-        let mut head = nret_addr + sys::size_of::<i32>() - len_addr;
+        let mut head = nret_addr + sys::size_of::<i32>() - flags_addr;
 
         for (*(nret_addr as *i32) as uint).times {
-            let size = *((head+len_addr) as *i32);
+            let size = *((head+flags_addr) as *i32);
 
             let doc_bytes = bytes.slice(head, head+(size as uint)).to_owned();
             let tmp = match decode(doc_bytes) {
@@ -328,10 +365,7 @@ pub fn parse_reply(bytes : ~[u8]) -> Result<ServerMsg, MongoErr> {
 
         // construct reply
         Ok(OpReply {
-            header : MsgHeader {    len : *(len_addr as *i32),
-                                    id : *(id_addr as *i32),
-                                    resp_to : *(resp_to_addr as *i32),
-                                    opcode : *(opcode_addr as *i32) },
+            header : header,
             flags : *(flags_addr as *i32),
             cursor_id : *(cursor_id_addr as *i64),
             start : *(start_addr as *i32),

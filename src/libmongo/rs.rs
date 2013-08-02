@@ -14,8 +14,6 @@
  */
 
 use std::cell::*;
-use extra::uv::*;       // XXX remove once global_loop leaves NodeConn
-use extra::timer::*;    // XXX remove once global_loop leaves NodeConn
 
 use bson::encode::*;
 use bson::formattable::*;
@@ -51,14 +49,6 @@ impl BsonFormattable for RSMember {
         for self.opts.iter().advance |&opt| {
             member_doc.union(opt.to_bson_t());
         }
-        /*match &self.opts {
-            &None => (),
-            &Some(ref a) => {
-                for a.iter().advance |&opt| {
-                    member_doc.union(opt.to_bson_t());
-                }
-            },
-        }*/
 
         Embedded(~member_doc)
     }
@@ -121,15 +111,6 @@ impl RSMember {
                 _ => (),
             }
         }
-        /*match self.opts {
-            None => (),
-            Some(ref l) => for l.iter().advance |opt| {
-                match opt {
-                    &TAGS(ref ts) => return Some(ts),
-                    _ => (),
-                }
-            },
-        }*/
         None
     }
     // XXX inefficient
@@ -140,15 +121,6 @@ impl RSMember {
                 _ => (),
             }
         }
-        /*match self.opts {
-            None => (),
-            Some(ref mut l) => for l.mut_iter().advance |opt| {
-                match opt {
-                    &TAGS(ref mut ts) => return Some(ts),
-                    _ => (),
-                }
-            },
-        }*/
         None
     }
 }
@@ -252,7 +224,6 @@ impl BsonFormattable for RSConfig {
 }
 impl RSConfig {
     pub fn new( _id : Option<~str>,
-                //version : Option<i32>,
                 members : ~[RSMember],
                 settings : Option<~[RS_OPTION]>) -> RSConfig {
         RSConfig {
@@ -467,16 +438,20 @@ impl RS {
                                     e.to_str())),
         };
 
+        // get present configuration
         let mut conf = match self.get_config() {
             Ok(c) => c,
             Err(e) => return Err(e),
         };
+
+        // figure out which node to remove
         let mut ind = None;
         for conf.members.iter().enumerate().advance |(i,&m)| {
             if m.host == host {
                 ind = Some(i);
             }
         }
+
         let reset = self.client.set_read_pref(op.clone());
         let result = match ind {
             None => Err(MongoErr::new(
@@ -512,8 +487,17 @@ impl RS {
      * ~BsonDocument containing status information, MongoErr on failure
      */
     pub fn get_status(&self) -> Result<~BsonDocument, MongoErr> {
+        let op = match self.client.set_read_pref(PRIMARY_PREF(None)) {
+            Ok(pref) => pref,
+            Err(e) => return Err(MongoErr::new(
+                                    ~"rs::get_status",
+                                    ~"could not reset preference to primary preferred",
+                                    e.to_str())),
+        };
         let db = self.client.get_admin();
-        db.run_command(SpecNotation(~"{ 'replSetGetStatus':1 }"))
+        let result = db.run_command(SpecNotation(~"{ 'replSetGetStatus':1 }"));
+        self.client.set_read_pref(op);
+        result
     }
 
     /**
@@ -616,8 +600,8 @@ impl RS {
      * # Returns
      * () on success, MongoErr on failure
      */
-    // XXX look for better way to do this while maintaining
-    //      RS/ReplicaSetConnection barrier
+    // XXX better way to do this while maintaining
+    //      RS/ReplicaSetConnection barrier?
     pub fn step_down(&self, sec : uint) -> Result<(), MongoErr> {
         let op = match self.client.set_read_pref(PRIMARY_ONLY) {
             Ok(pref) => pref,

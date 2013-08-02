@@ -428,20 +428,34 @@ impl DB {
     }
 
     ///Get the profiling level of the database.
-    pub fn get_profiling_level(&self) -> Result<int, MongoErr> {
+    // XXX return type; potential for change
+    pub fn get_profiling_level(&self) -> Result<(int, Option<int>), MongoErr> {
         match self.run_command(SpecNotation(~"{ \"profile\": -1 }")) {
-            Ok(d) => match d.find(~"was") {
-                Some(&Double(f)) => Ok(f as int),
-                _ => return Err(MongoErr::new(
-                    ~"db::get_profiling_level",
-                    ~"could not get profiling level",
-                    ~"an invalid profiling level was returned"))
-            },
+            Ok(d) => {
+                let level = match d.find(~"was") {
+                    Some(&Double(f)) => f as int,
+                    _ => return Err(MongoErr::new(
+                        ~"db::get_profiling_level",
+                        ~"could not get profiling level",
+                        ~"an invalid profiling level was returned"))
+                };
+                let thresh = match d.find(~"slowms") {
+                    None => None,
+                    Some(&Double(ms)) => Some(ms as int),
+                    _ => return Err(MongoErr::new(
+                        ~"db::get_profiling_level",
+                        ~"could not get profiling threshold",
+                        ~"an invalid profiling threshold was returned"))
+                };
+
+                Ok((level, thresh))
+            }
             Err(e) => return Err(e)
         }
     }
 
     ///Set the profiling level of the database.
+    // XXX argument types; potential for change
     pub fn set_profiling_level(&self, level: int) -> Result<~BsonDocument, MongoErr> {
         self.run_command(SpecNotation(fmt!("{ \"profile\": %d }", level)))
     }
