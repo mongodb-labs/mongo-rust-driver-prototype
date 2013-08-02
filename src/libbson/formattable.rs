@@ -41,7 +41,7 @@ pub trait BsonFormattable {
 }
 
 macro_rules! formattable {
-    ($t:ident { $($field:ident: $ftype:ty),* }) => {
+    ($t:ident { $($field:ident: $ftype:ty),+ }) => {
         impl BsonFormattable for $t {
             fn to_bson_t(&self) -> Document {
                 let mut o = ~BsonDocument::new();
