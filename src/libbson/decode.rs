@@ -165,7 +165,7 @@ impl<T:Stream<u8>> BsonParser<T> {
         let count = bytesum(self.stream.aggregate(4));
         let subtype = *(self.stream.first());
         self.stream.pass(1);
-        let data = self.stream.aggregate(count as int);
+        let data = self.stream.aggregate(count as uint);
         Binary(subtype, data)
     }
     ///Parse a boolean.
@@ -214,6 +214,7 @@ pub fn decode(b: ~[u8]) -> Result<BsonDocument,~str> {
 mod tests {
     use super::*;
     use encode::*;
+    use extra::test::BenchHarness;
 
     #[test]
     fn test_decode_size() {
@@ -264,6 +265,18 @@ mod tests {
         let stream: ~[u8] = ~[6,0,0,0,0,1,2,3,4,5,6];
         let mut parser = BsonParser::new(stream);
         assert_eq!(parser._binary(), Binary(0, ~[1,2,3,4,5,6]));
+    }
+
+    //TODO: get bson strings of torture-test objects
+    #[bench]
+    fn bench_basic_obj_decode(b: &mut BenchHarness) {
+         do b.iter {
+             let stream: ~[u8] = ~[45,0,0,0,4,102,111,
+             111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,
+             108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,
+             113,117,120,0,0];
+            decode(stream);
+         }
     }
 
 }

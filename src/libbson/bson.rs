@@ -20,8 +20,10 @@
 extern mod std;
 extern mod extra;
 extern mod tools;
+extern mod syntax;
 
 pub mod json_parse;
 pub mod encode;
 pub mod decode;
+#[macro_escape]
 pub mod formattable;

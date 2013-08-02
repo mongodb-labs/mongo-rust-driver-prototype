@@ -25,7 +25,7 @@ databases by creating `DB` handles to those databases.
 ### Method `new`
 
 ~~~ {.rust}
-fn new(name: ~str, client: @Client) -> DB
+fn new(name: &str, client: @Client) -> DB
 ~~~
 
 Creates a new Mongo DB with given name and associated Client.
@@ -168,6 +168,14 @@ Parses write concern into bytes and sends to server.
 * invalid write concern specification (should never happen)
 * network
 * getLastError error, e.g. duplicate ```_id```s
+
+### Method `enable_sharding`
+
+~~~ {.rust}
+fn enable_sharding(&self) -> Result<(), MongoErr>
+~~~
+
+Enable sharding on this database.
 
 ### Method `add_user`
 
