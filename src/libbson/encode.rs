@@ -76,7 +76,7 @@ impl ObjIdFactory {
     pub fn new() -> ObjIdFactory {
         use extra::time::get_time;
         ObjIdFactory {
-            rseed: (&mut XorShiftRng::new()).next(),
+            rseed: (&mut XorShiftRng::new()).next() % (get_time().nsec as u32),
             time: get_time().sec as u32
         }
     }
