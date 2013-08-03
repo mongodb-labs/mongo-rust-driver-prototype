@@ -320,10 +320,10 @@ impl Eq for ReplicaSetData {
 }
 
 impl ReplicaSetConnection {
-    pub fn new(seed : &[(&str, uint)]) -> ReplicaSetConnection {
+    pub fn new(seed : &[(~str, uint)]) -> ReplicaSetConnection {
         let mut seed_arc = ~[];
         for seed.iter().advance |&(ip,port)| {
-            seed_arc.push((ip.to_owned(), port));
+            seed_arc.push((ip, port));
         }
         ReplicaSetConnection {
             //seed : ~RWARC(seed),    // RWARC corrected
@@ -1130,27 +1130,5 @@ impl ReplicaSetConnection {
         let result = server.send(data, read);
         server_cell.put_back(server);
         result
-    }
-}
-
-pub fn parse_host(host_str : &~str) -> Result<(~str, uint), MongoErr> {
-    let mut port_str = fmt!("%?", MONGO_DEFAULT_PORT);
-    let mut ip_str = match host_str.find_str(":") {
-        None => host_str.to_owned(),
-        Some(i) => {
-            port_str = host_str.slice_from(i+1).to_owned();
-            host_str.slice_to(i).to_owned()
-        }
-    };
-
-    if ip_str == ~"localhost" { ip_str = LOCALHOST.to_owned(); }    // XXX must exist better soln
-
-    match from_str(port_str) {
-        None => Err(MongoErr::new(
-                        ~"conn_replica::parse_host",
-                        ~"unexpected host string format",
-                        fmt!("host string should be \"[IP ~str]:[uint]\",
-                                    found %s:%s", ip_str, port_str))),
-        Some(k) => Ok((ip_str, k as uint)),
     }
 }

@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+use std::int::*;
 use extra::treemap::*;
 
 use bson::encode::*;
@@ -167,10 +168,10 @@ impl BsonFormattable for TagSet {
     }
 }
 impl TagSet {
-    pub fn new(tag_list : ~[(~str, ~str)]) -> TagSet {
+    pub fn new(tag_list : &[(&str, &str)]) -> TagSet {
         let mut tags = TreeMap::new();
         for tag_list.iter().advance |&(field, val)| {
-            tags.insert(field, val);
+            tags.insert(field.to_owned(), val.to_owned());
         }
         TagSet { tags : tags }
     }
@@ -251,7 +252,7 @@ pub enum COLLECTION_OPTION {
 pub static LITTLE_ENDIAN_TRUE : bool = true;
 pub static MONGO_DEFAULT_PORT : uint = 27017;
 pub static MONGO_RECONN_MSECS : u64 = (1000*3);
-pub static MONGO_TIMEOUT_SECS : u64 = 20; // XXX units...
+pub static MONGO_TIMEOUT_SECS : u64 = 15; // XXX units...
 pub static LOCALHOST : &'static str = &'static "127.0.0.1"; // XXX tmp
 
 /// INTERNAL UTILITIES
@@ -280,3 +281,25 @@ macro_rules! process_flags(
         }
     );
 )
+
+pub fn parse_host(host_str : &~str) -> Result<(~str, uint), MongoErr> {
+    let mut port_str = fmt!("%?", MONGO_DEFAULT_PORT);
+    let mut ip_str = match host_str.find_str(":") {
+        None => host_str.to_owned(),
+        Some(i) => {
+            port_str = host_str.slice_from(i+1).to_owned();
+            host_str.slice_to(i).to_owned()
+        }
+    };
+
+    if ip_str == ~"localhost" { ip_str = LOCALHOST.to_owned(); }    // XXX must exist better soln
+
+    match from_str(port_str) {
+        None => Err(MongoErr::new(
+                        ~"conn_replica::parse_host",
+                        ~"unexpected host string format",
+                        fmt!("host string should be \"[IP ~str]:[uint]\",
+                                    found %s:%s", ip_str, port_str))),
+        Some(k) => Ok((ip_str, k as uint)),
+    }
+}

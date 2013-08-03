@@ -18,6 +18,7 @@ use sys = std::sys;
 use std::from_str::FromStr;
 
 use bson::encode::*;
+use bson::formattable::*;
 
 use util::*;
 use msg::*;
@@ -26,6 +27,7 @@ use conn_node::NodeConnection;
 use conn_replica::ReplicaSetConnection;
 use db::DB;
 use coll::Collection;
+use rs::RSConfig;
 
 /**
  * User interfaces with `Client`, which processes user requests
@@ -246,16 +248,54 @@ impl Client {
      * # Returns
      * () on success, MongoErr on failure
      */
-    pub fn connect_to_rs(&self, seed : &[(&str, uint)])
-                -> Result<@ReplicaSetConnection, MongoErr> {
+    pub fn connect_to_rs(&self, seed : &[(~str, uint)])
+                -> Result<(), MongoErr> {
         let tmp = @ReplicaSetConnection::new(seed);
         tmp.set_timeout(self.timeout);
-        match self._connect_to_conn(    fmt!("client::connect_to_rs[%?]", seed),
-                                        tmp as @Connection) {
-            Ok(_) => {
-                self.rs_conn.put_back(tmp);
-                Ok(tmp)
+        self._connect_to_conn(  fmt!("client::connect_to_rs[%?]", seed),
+                                tmp as @Connection)
+    }
+
+    /**
+     * Initiates given configuration specified as `RSConfig`, and connects
+     * to the replica set.
+     *
+     * # Arguments
+     * * `via` - host to connect to in order to initiate the set
+     * * `conf` - configuration to initiate
+     *
+     * # Returns
+     * () on success, MongoErr on failure
+     */
+    pub fn initiate_rs(@self, via : (&str, uint), conf : RSConfig)
+                -> Result<(), MongoErr> {
+        let (ip, port) = via;
+        match self.connect(ip, port) {
+            Ok(_) => (),
+            Err(e) => return Err(e),
+        }
+
+        let conf_doc = conf.to_bson_t();
+        let db = self.get_admin();
+        let mut cmd_doc = BsonDocument::new();
+        cmd_doc.put(~"replSetInitiate", conf_doc);
+        match db.run_command(SpecObj(cmd_doc)) {
+            Ok(_) => (),
+            Err(e) => return Err(e),
+        }
+
+        self.disconnect();
+
+        let mut seed = ~[];
+        for conf.members.iter().advance |&member| {
+            match parse_host(&member.host) {
+                Ok(p) => seed.push(p),
+                Err(e) => return Err(e),
             }
+        }
+
+        match self.connect_to_rs(seed) {
+            Ok(_) => Ok(()),
             Err(e) => Err(e),
         }
     }

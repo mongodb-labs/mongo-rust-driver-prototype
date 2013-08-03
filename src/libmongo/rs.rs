@@ -34,9 +34,9 @@ pub struct RSMember {
     opts : ~[RS_MEMBER_OPTION],
 }
 impl BsonFormattable for RSMember {
-    // not intended for normal usage, since intended for use
+    // NB: not intended for normal usage, since intended for use
     // as part of *array* of RSMembers (to have correct _id)
-    fn to_bson_t(&self) -> Document {
+    pub fn to_bson_t(&self) -> Document {
         let mut member_doc = BsonDocument::new();
 
         if !self._id.is_empty() {
@@ -52,7 +52,7 @@ impl BsonFormattable for RSMember {
 
         Embedded(~member_doc)
     }
-    fn from_bson_t(doc : &Document) -> Result<RSMember, ~str> {
+    pub fn from_bson_t(doc : &Document) -> Result<RSMember, ~str> {
         let bson_doc = match doc {
             &Embedded(ref bson) => bson,
             _ => return Err(~"not RSMember struct (not Embedded BsonDocument)"),
@@ -137,7 +137,7 @@ impl RSMember {
     }
 
     // XXX inefficient
-    pub fn get_priority<'a>(&'a self) -> Option<&'a f64> {
+    pub fn get_priority<'a>(&'a self) -> Option<&'a float> {
         for self.opts.iter().advance |opt| {
             match opt {
                 &PRIORITY(ref x) => return Some(x),
@@ -147,11 +147,11 @@ impl RSMember {
         None
     }
     // XXX inefficient
-    pub fn get_mut_priority<'a>(&'a mut self) -> &'a mut f64 {
+    pub fn get_mut_priority<'a>(&'a mut self) -> &'a mut float {
         let mut ptr = None;
         {
             if self.get_priority().is_none() {
-                self.opts.push(PRIORITY(1f64));
+                self.opts.push(PRIORITY(1f));
             }
         }
         {
@@ -328,10 +328,10 @@ pub enum RS_MEMBER_OPTION {
     ARB_ONLY(bool),
     BUILD_INDS(bool),
     HIDDEN(bool),
-    PRIORITY(f64),
+    PRIORITY(float),
     TAGS(TagSet),
-    SLAVE_DELAY(i32),
-    VOTES(i32),
+    SLAVE_DELAY(int),
+    VOTES(int),
 }
 impl BsonFormattable for RS_MEMBER_OPTION {
     pub fn to_bson_t(&self) -> Document {
@@ -340,17 +340,17 @@ impl BsonFormattable for RS_MEMBER_OPTION {
             &ARB_ONLY(v) => (~"arbiterOnly", Bool(v)),
             &BUILD_INDS(v) => (~"buildIndexes", Bool(v)),
             &HIDDEN(v) => (~"hidden", Bool(v)),
-            &PRIORITY(p) => (~"priority", Double(p)),
+            &PRIORITY(p) => (~"priority", Double(p as f64)),
             &TAGS(ref ts) => (~"tags", ts.clone().to_bson_t()),
-            &SLAVE_DELAY(d) => (~"slaveDelay", Int32(d)),
-            &VOTES(n) => (~"votes", Int32(n)),
+            &SLAVE_DELAY(d) => (~"slaveDelay", Int32(d as i32)),
+            &VOTES(n) => (~"votes", Int32(n as i32)),
         };
         opt_doc.put(k, v);
         Embedded(~opt_doc)
     }
     // not intended for normal usage, since intended for use
     // with *single* RS_MEMBER_OPTION, and doc might contain more
-    fn from_bson_t(doc : &Document) -> Result<RS_MEMBER_OPTION, ~str> {
+    pub fn from_bson_t(doc : &Document) -> Result<RS_MEMBER_OPTION, ~str> {
         let bson_doc = match doc {
             &Embedded(ref bson) => bson,
             _ => return Err(~"not RS_OPTION (not Embedded BsonDocument)"),
@@ -372,15 +372,15 @@ impl BsonFormattable for RS_MEMBER_OPTION {
         }
         match bson_doc.find(~"hidden") {
             None => (),
-            Some(s) => match copy *s {
-                Bool(v) => return Ok(HIDDEN(v)),
+            Some(s) => match s {
+                &Bool(ref v) => return Ok(HIDDEN(*v)),
                 _ => return Err(~"not RS_MEMBER_OPTION (hidden field not Bool)"),
             },
         }
         match bson_doc.find(~"priority") {
             None => (),
-            Some(s) => match copy *s {
-                Double(v) => return Ok(PRIORITY(v)),
+            Some(s) => match s {
+                &Double(ref v) => return Ok(PRIORITY(*v as float)),
                 _ => return Err(~"not RS_MEMBER_OPTION (priority field not Double)"),
             },
         }
@@ -393,15 +393,15 @@ impl BsonFormattable for RS_MEMBER_OPTION {
         }
         match bson_doc.find(~"slaveDelay") {
             None => (),
-            Some(s) => match copy *s {
-                Int32(v) => return Ok(SLAVE_DELAY(v)),
+            Some(s) => match s {
+                &Int32(ref v) => return Ok(SLAVE_DELAY(*v as int)),
                 _ => return Err(~"not RS_MEMBER_OPTION (slaveDelay field not Int32)"),
             },
         }
         match bson_doc.find(~"votes") {
             None => (),
-            Some(s) => match copy *s {
-                Int32(v) => return Ok(VOTES(v)),
+            Some(s) => match s {
+                &Int32(ref v) => return Ok(VOTES(*v as int)),
                 _ => return Err(~"not RS_MEMBER_OPTION (votes field not Int32)"),
             },
         }
@@ -542,26 +542,6 @@ impl RS {
         let result = db.run_command(SpecNotation(~"{ 'replSetGetStatus':1 }"));
         self.client.set_read_pref(op);
         result
-    }
-
-    /**
-     * Initiates given configuration specified as `RSConfig`.
-     *
-     * # Arguments
-     * * `conf` - configuration to initiate
-     *
-     * # Returns
-     * () on success, MongoErr on failure
-     */
-    pub fn initiate(&self, conf : RSConfig) -> Result<(), MongoErr> {
-        let conf_doc = conf.to_bson_t();
-        let db = self.client.get_admin();
-        let mut cmd_doc = BsonDocument::new();
-        cmd_doc.put(~"replSetInitiate", conf_doc);
-        match db.run_command(SpecObj(cmd_doc)) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        }
     }
 
     /**
