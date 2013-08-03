@@ -285,7 +285,7 @@ impl Cursor {
         self.limit = limit;
 
         // also fix batch_size if needed
-        if self.batch_size == 0 || self.batch_size > abs(limit) {
+        if self.batch_size == 0 || self.batch_size > abs(limit as int) as i32 {
             self.batch_size = limit;
         }
         Ok(())
