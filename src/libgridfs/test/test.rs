@@ -18,4 +18,4 @@ extern mod bson;
 extern mod mongo;
 extern mod std;
 
-mod grid_ins;
+mod grid_files;

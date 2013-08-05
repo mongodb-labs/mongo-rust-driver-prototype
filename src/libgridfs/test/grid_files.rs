@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-use gridfs::grid::*;
 use gridfs::gridfile::*;
+use gridfs::*;
 
 use mongo::db::*;
 use mongo::client::*;
