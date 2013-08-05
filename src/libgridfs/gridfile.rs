@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 
-use stdio = std::io;
 use rtio = std::rt::io;
 
 pub use std::rt::io::{Reader,Writer};
@@ -25,7 +24,7 @@ use mongo::coll::*;
 use mongo::db::*;
 use mongo::util::*;
 
-pub struct GridIn {
+pub struct GridWriter {
     chunks: Collection,
     files: Collection,
     closed: bool,
@@ -35,7 +34,7 @@ pub struct GridIn {
     position: uint,
 }
 
-pub struct GridOut {
+pub struct GridReader {
     chunks: Collection,
     files: Collection,
     length: uint,
@@ -44,12 +43,12 @@ pub struct GridOut {
     buf: ~[u8],
 }
 
-impl rtio::Writer for GridIn {
+impl rtio::Writer for GridWriter {
     pub fn write(&mut self, d: &[u8]) {
         if self.closed {
             rtio::io_error::cond.raise(rtio::IoError {
                 kind: rtio::Closed,
-                desc: "cannot write to a closed GridIn",
+                desc: "cannot write to a closed GridWriter",
                 detail: None
             })
         }
@@ -170,15 +169,15 @@ impl rtio::Writer for GridIn {
     }
 }
 
-impl GridIn {
-    pub fn new(db: &DB) -> GridIn {
+impl GridWriter {
+    pub fn new(db: &DB) -> GridWriter {
         let chunks = db.get_collection(~"fs.chunks");
         let files = db.get_collection(~"fs.files");
         match chunks.ensure_index(~[NORMAL(~[(~"files_id", ASC), (~"n", ASC)])], None, None) {
             Ok(_) => (),
             Err(e) => fail!(e.to_str())
         }
-        GridIn {
+        GridWriter {
             chunks: chunks,
             files: files,
             closed: false,
@@ -230,7 +229,7 @@ impl GridIn {
     }
 }
 
-impl rtio::Reader for GridOut {
+impl rtio::Reader for GridReader {
     pub fn read(&mut self, buf: &mut [u8]) -> Option<uint> {
         let mut size = buf.len();
         if size == 0 { return None; }
@@ -269,10 +268,10 @@ impl rtio::Reader for GridOut {
     }
 }
 
-impl GridOut {
+impl GridReader {
     pub fn new(db: &DB,
                file_id: Document)
-        -> GridOut {
+        -> GridReader {
         let chunks = db.get_collection(~"fs.chunks");
         let files = db.get_collection(~"fs.files");
         let mut doc = BsonDocument::new();
@@ -282,11 +281,11 @@ impl GridOut {
                 Some(&Int32(i)) => i as uint,
                 Some(&Double(f)) => f as uint,
                 Some(&Int64(i)) => i as uint,
-                _ => fail!("could not create new GridOut; length was invalid")
+                _ => fail!("could not create new GridReader; length was invalid")
             },
             Err(e) => fail!(e.to_str())
         };
-        GridOut {
+        GridReader {
             chunks: chunks,
             files: files,
             file_id: file_id,
