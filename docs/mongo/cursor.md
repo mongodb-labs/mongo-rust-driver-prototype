@@ -26,7 +26,7 @@ pub struct Cursor {
     priv skip: i32,
     priv limit: i32,
     priv data: ~[~BsonDocument],
-    priv i: i32,
+    priv done: Cell<bool>,
 }
 ~~~
 
@@ -216,7 +216,7 @@ Modifies size of next batch to fetch on `Cursor` refresh.
 ### Method `has_next`
 
 ~~~ {.rust}
-fn has_next(&self) -> bool
+fn has_next(&mut self) -> bool
 ~~~
 
 OTHER USEFUL FUNCTIONS

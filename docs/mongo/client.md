@@ -11,7 +11,7 @@
 
 ~~~ {.rust}
 pub struct Client {
-    conn: ~cell::Cell<NodeConnection>,
+    conn: cell::Cell<NodeConnection>,
     priv cur_requestId: ~cell::Cell<i32>,
 }
 ~~~
@@ -165,7 +165,7 @@ Simultaneously empties connection cell.
 
 ~~~ {.rust}
 fn _send_msg(@self, msg: ~[u8], wc_pair: (&~str, Option<~[WRITE_CONCERN]>),
-             auto_get_reply: bool) -> Result<Option<ServerMsg>, MongoErr>
+             read: bool) -> Result<Option<ServerMsg>, MongoErr>
 ~~~
 
 Sends message on connection; if write, checks write concern,
@@ -184,44 +184,6 @@ if read operation, `OP_REPLY` on success, `MongoErr` on failure;
 if write operation, `None` on no last error, `MongoErr` on last error
      or network error
 
-### Method `send`
-
-~~~ {.rust}
-fn send(&self, bytes: ~[u8]) -> Result<(), MongoErr>
-~~~
-
-Sends on `Connection` affiliated with this `Client`.
-
-#### Arguments
-
-* `bytes` - bytes to send
-
-#### Returns
-
-() on success, `MongoErr` on failure
-
-#### Failure Types
-
-* not connected
-* network
-
-### Method `recv`
-
-~~~ {.rust}
-fn recv(&self) -> Result<~[u8], MongoErr>
-~~~
-
-Receives on `Connection` affiliated with this `Client`.
-
-#### Returns
-
-bytes received over connection on success, `MongoErr` on failure
-
-#### Failure Types
-
-* not connected
-* network
-
 ### Method `get_requestId`
 
 ~~~ {.rust}
@@ -237,4 +199,10 @@ fn inc_requestId(&self) -> i32
 ~~~
 
 Increments first unused requestId and returns former value.
+
+### Method `check_version`
+
+~~~ {.rust}
+fn check_version(@self, ver: ~str) -> Result<(), MongoErr>
+~~~
 

@@ -6,14 +6,17 @@
 * [Struct `BsonDocEncoder`](#struct-bsondocencoder) - serialize::Encoder object for Bson
 * [Struct `BsonDocument`](#struct-bsondocument) - The type of a complete BSON document
 * [Implementation ` of ::std::cmp::Eq for Document`](#implementation-of-stdcmpeq-for-document) - Automatically derived.
-* [Implementation ` of ::std::to_str::ToStr for Document`](#implementation-of-stdto_strtostr-for-document) - Automatically derived.
+* [Implementation ` of ::std::clone::Clone for Document`](#implementation-of-stdcloneclone-for-document) - Automatically derived.
+* [Implementation ` for ObjIdFactory`](#implementation-for-objidfactory)
 * [Implementation ` of ::std::cmp::Eq for BsonDocument`](#implementation-of-stdcmpeq-for-bsondocument) - Automatically derived.
-* [Implementation ` of ::std::to_str::ToStr for BsonDocument`](#implementation-of-stdto_strtostr-for-bsondocument) - Automatically derived.
+* [Implementation ` of Clone for BsonDocument`](#implementation-of-clone-for-bsondocument)
 * [Implementation ` of Encoder for BsonDocEncoder`](#implementation-of-encoder-for-bsondocencoder) - serialize::Encoder implementation.
 * [Implementation ` of Encodable<E> for BsonDocument where <E: Encoder>`](#implementation-of-encodablee-for-bsondocument-where-e-encoder) - Light wrapper around a typical Map implementation.
 * [Implementation ` of Encodable<E> for Document where <E: Encoder>`](#implementation-of-encodablee-for-document-where-e-encoder) - Encodable implementation for Document.
+* [Implementation ` of ToStr for BsonDocument`](#implementation-of-tostr-for-bsondocument)
 * [Implementation ` for BsonDocument where <'self>`](#implementation-for-bsondocument-where-self)
 * [Implementation ` for Document`](#implementation-for-document) - Methods on documents.
+* [Implementation ` of ToStr for Document`](#implementation-of-tostr-for-document)
 
 </div>
 
@@ -101,15 +104,33 @@ fn eq(&self, __arg_0: &Document) -> ::bool
 fn ne(&self, __arg_0: &Document) -> ::bool
 ~~~
 
-## Implementation of `::std::to_str::ToStr` for `Document`
+## Implementation of `::std::clone::Clone` for `Document`
 
 Automatically derived.
 
-### Method `to_str`
+### Method `clone`
 
 ~~~ {.rust}
-fn to_str(&self) -> ~str
+fn clone(&self) -> Document
 ~~~
+
+## Implementation for `ObjIdFactory`
+
+### Method `new`
+
+~~~ {.rust}
+fn new() -> ObjIdFactory
+~~~
+
+Get a new ObjIdFactory.
+
+### Method `oid`
+
+~~~ {.rust}
+fn oid(&mut self) -> Document
+~~~
+
+Generate an ObjectId.
 
 ## Implementation of `::std::cmp::Eq` for `BsonDocument`
 
@@ -127,14 +148,12 @@ fn eq(&self, __arg_0: &BsonDocument) -> ::bool
 fn ne(&self, __arg_0: &BsonDocument) -> ::bool
 ~~~
 
-## Implementation of `::std::to_str::ToStr` for `BsonDocument`
+## Implementation of `Clone` for `BsonDocument`
 
-Automatically derived.
-
-### Method `to_str`
+### Method `clone`
 
 ~~~ {.rust}
-fn to_str(&self) -> ~str
+fn clone(&self) -> BsonDocument
 ~~~
 
 ## Implementation of `Encoder` for `BsonDocEncoder`
@@ -383,6 +402,14 @@ fn encode(&self, encoder: &mut E)
 After encode is run, the field 'buf' in the Encoder object will contain the encoded value.
 See bson_types.rs:203
 
+## Implementation of `ToStr` for `BsonDocument`
+
+### Method `to_str`
+
+~~~ {.rust}
+fn to_str(&self) -> ~str
+~~~
+
 ## Implementation for `BsonDocument` where `<'self>`
 
 ### Method `to_bson`
@@ -391,17 +418,39 @@ See bson_types.rs:203
 fn to_bson(&self) -> ~[u8]
 ~~~
 
+Convert this document to its binary BSON representation.
+
+### Method `iter`
+
+~~~ {.rust}
+fn iter(&'self self) -> VecIterator<'self, (@~str, @Document)>
+~~~
+
+Get a forwards iterator for this document.
+
+### Method `rev_iter`
+
+~~~ {.rust}
+fn rev_iter(&'self self) -> VecRevIterator<'self, (@~str, @Document)>
+~~~
+
+Get a reverse iterator for this document.
+
 ### Method `contains_key`
 
 ~~~ {.rust}
 fn contains_key(&self, key: ~str) -> bool
 ~~~
 
+Check if this document contains the given key.
+
 ### Method `find`
 
 ~~~ {.rust}
 fn find<'a>(&'a self, key: ~str) -> Option<&'a Document>
 ~~~
+
+Find the value for the given key, if it exists.
 
 ### Method `put`
 
@@ -419,17 +468,6 @@ fn put_all(&mut self, pairs: ~[(~str, Document)])
 
 Adds a list of key/value pairs and updates size. Returns nothing.
 
-### Method `append`
-
-~~~ {.rust}
-fn append(&'self mut self, key: ~str, val: Document) ->
- &'self mut BsonDocument
-~~~
-
-Adds a key/value pair and updates size appropriately. Returns a mutable self reference with a fixed lifetime, allowing calls to be chained.
-Ex: let a = BsonDocument::inst().append(~"flag", Bool(true)).append(~"msg", UString(~"hello")).append(...);
-This may cause borrowing errors if used to make embedded objects.
-
 ### Method `new`
 
 ~~~ {.rust}
@@ -438,18 +476,6 @@ fn new() -> BsonDocument
 
 Returns a new BsonDocument struct.
 The default size is 5: 4 for the size integer and 1 for the terminating 0x0.
-
-### Method `inst`
-
-~~~ {.rust}
-fn inst() -> @mut BsonDocument
-~~~
-
-Returns a managed pointer to a new BsonDocument. Use this if you plan on chaining calls to append() directly on your call to inst.
-Example: let a = BsonDocument::inst().append(...).append(...); //compiles
-let b = BsonDocument::new().append(...); //error
-let c = BsonDocument::new();
-c.append(...).append(...).append(...); //compiles
 
 ### Method `fields_match`
 
@@ -474,4 +500,12 @@ fn to_bson(&self) -> ~[u8]
 ~~~
 
 Allows any document to be converted to its BSON-serialized representation.
+
+## Implementation of `ToStr` for `Document`
+
+### Method `to_str`
+
+~~~ {.rust}
+fn to_str(&self) -> ~str
+~~~
 
