@@ -265,7 +265,7 @@ pub static LOCALHOST : &'static str = &'static "127.0.0.1"; // XXX tmp
 
 /// INTERNAL UTILITIES
 /**
- * Special collections for database operations, but users should not
+ * Special collections for database operations, but generally, users should not
  * access directly.
  */
 pub static SYSTEM_NAMESPACE : &'static str = &'static "system.namespaces";

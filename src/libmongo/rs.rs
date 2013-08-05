@@ -104,6 +104,12 @@ impl RSMember {
 
     // TODO macros
     // XXX inefficient
+    /**
+     * Gets read-only reference to tags.
+     *
+     * # Returns
+     * None if there are no tags set, Some(ptr) to the tags if there are
+     */
     pub fn get_tags<'a>(&'a self) -> Option<&'a TagSet> {
         for self.opts.iter().advance |opt| {
             match opt {
@@ -114,6 +120,14 @@ impl RSMember {
         None
     }
     // XXX inefficient
+    /**
+     * Gets writeable reference to tags, initializing with default
+     * (empty) if there were previously none set. Intended for user
+     * manipulation.
+     *
+     * # Returns
+     * reference to tags, possibly initializing them within the `RSMember`
+     */
     pub fn get_mut_tags<'a>(&'a mut self) -> &'a mut TagSet {
         let mut ptr = None;
         {
@@ -136,6 +150,12 @@ impl RSMember {
     }
 
     // XXX inefficient
+    /**
+     * Gets read-only reference to priority.
+     *
+     * # Returns
+     * None if there is no priority set, Some(ptr) to the priority if there is
+     */
     pub fn get_priority<'a>(&'a self) -> Option<&'a float> {
         for self.opts.iter().advance |opt| {
             match opt {
@@ -146,6 +166,14 @@ impl RSMember {
         None
     }
     // XXX inefficient
+    /**
+     * Gets writeable reference to priority, initializing with default
+     * (1) if there was previously none set. Intended for user
+     * manipulation.
+     *
+     * # Returns
+     * reference to priority, possibly initializing them within the `RSMember`
+     */
     pub fn get_mut_priority<'a>(&'a mut self) -> &'a mut float {
         let mut ptr = None;
         {
@@ -660,6 +688,16 @@ impl RS {
         }
     }
 
+    /**
+     * Sync given node from another node.
+     *
+     * # Arguments
+     * `node` - node to sync
+     * `from` - node from which to sync
+     *
+     * # Return
+     * () on success, MongoErr on failure
+     */
     // TODO: input args (format, check, etc.)
     pub fn node_sync_from(&self, node : ~str, from : ~str)
                 -> Result<(), MongoErr> {

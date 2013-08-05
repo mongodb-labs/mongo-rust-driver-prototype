@@ -49,7 +49,9 @@ impl Client {
      * Creates a new Mongo client.
      *
      * Currently can connect to single unreplicated, unsharded
-     * server via `connect`.
+     * server via `connect`, or to a replica set via `connect_to_rs`
+     * (given a seed, if already initiated), or via `initiate_rs`
+     * (given a configuration and single host, if not yet initiated).
      *
      * # Returns
      * empty `Client`

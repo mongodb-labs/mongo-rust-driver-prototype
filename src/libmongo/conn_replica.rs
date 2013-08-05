@@ -817,6 +817,13 @@ impl ReplicaSetConnection {
         ReplicaSetData::new(pri, sec, err)
     }
 
+    /*
+     * Given a seed list, spawns a reconnect thread that periodically
+     * sends a ReplicaSetState to the refresh stream; this stream is what
+     * gets pulled from when actual refreshes happen. Presently, due to
+     * IO bugginess, instead of maintaining a thread, refreshes happen
+     * synchronously, when needed (before a write).
+     */
     // XXX do not call until new io
     //fn spawn_reconnect( seed : &~RWARC<~[(~str, uint)]>,  // RWARC corrected
     fn spawn_reconnect( seed : &~ARC<~[(~str, uint)]>,
@@ -846,9 +853,14 @@ impl ReplicaSetConnection {
         port_state
     }
 
+    /*
+     * Given a state (which may be none), refresh the replica set.
+     * This may be necessary if the state changes or if the read
+     * preference changes.
+     */
     fn refresh_with_state(&self, tmp_state : Option<ReplicaSetData>)
                 -> Result<(), MongoErr> {
-//println(fmt!("self before refresh:\n%?", self));
+        debug!("self before refresh:\n%?", self);
 
         // by end, read_pref will have been accounted for; note updated
         let pref_changed = self.read_pref_changed.take();
@@ -868,7 +880,8 @@ impl ReplicaSetConnection {
             Some(self.state.take())
         };  // self.state now certainly empty
 
-//println(fmt!("refreshing:\nold state:\n===\n%?\n===\nnew state:\n===\n%?\n===", old_state, tmp_state));
+        debug!("refreshing:\nold state:\n===\n%?\n===\nnew state:\n===\n%?\n===",
+            old_state, tmp_state);
 
         // get state according which to update
         let state = match (old_state, tmp_state) {
@@ -902,8 +915,7 @@ impl ReplicaSetConnection {
                 } else {
                     // otherwise need to refresh according to new state
                     ns
-                }
-            }
+                } }
         };
 
         // update write_to if it would change
@@ -943,11 +955,17 @@ impl ReplicaSetConnection {
         // replace state
         self.state.put_back(state);
 
-//println(fmt!("self after refresh:\n%?", self));
+        debug!("self after refresh:\n%?", self);
 
         Ok(())
     }
 
+    /*
+     * Refreshes server to which to write, given a ReplicaSetData.
+     * Essentially, initializes a NodeConnection that then (if
+     * necessary) will be connected to and replace the former
+     * write_to.
+     */
     fn _refresh_write_to(&self, state : &ReplicaSetData)
                 -> Option<NodeConnection> {
         // write_to is always primary
@@ -960,6 +978,13 @@ impl ReplicaSetConnection {
         Some(pri)
     }
 
+    /*
+     * Refreshes server from which to read, given a ReplicaSetData.
+     * Similarly to _refresh_write_to, initializes a NodeConnection
+     * based on read preference and available servers that then (if
+     * necessary) will be connected to and replace the former
+     * read_from.
+     */
     fn _refresh_read_from(&self, state : &ReplicaSetData)
                 -> Option<NodeConnection> {
         let read_pref = self.read_pref.take();
@@ -1022,6 +1047,10 @@ impl ReplicaSetConnection {
         result
     }
 
+    /*
+     * Creates a NodeConnection based on a list of candidate servers,
+     * satisfying the provided tags.
+     */
     fn _find_server(&self,  servers : ~[NodeData],
                             tagsets : &Option<~[TagSet]>)
                 -> Option<NodeConnection> {
@@ -1094,6 +1123,9 @@ impl ReplicaSetConnection {
         self.refresh_with_state(tmp_state)
     }
 
+    /*
+     * Body of send, wrapped by timeout mechanism.
+     */
     fn try_send(&self, data : &[u8], read : bool) -> Result<(), MongoErr> {
         //self.refresh();   // uncomment with new io
         /* BEGIN BLOCK to remove with new io */
