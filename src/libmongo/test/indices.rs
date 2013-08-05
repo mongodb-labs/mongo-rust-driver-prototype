@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 use mongo::client::*;
-use mongo::coll::*;
 use mongo::util::*;
+use mongo::index::*;
 
 use fill_coll::*;
 

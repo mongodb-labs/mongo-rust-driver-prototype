@@ -17,6 +17,7 @@ use mongo::db::*;
 use mongo::client::*;
 use mongo::util::*;
 use mongo::coll::*;
+use mongo::index::*;
 
 use fill_coll::*;
 
