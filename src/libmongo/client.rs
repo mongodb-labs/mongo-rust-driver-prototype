@@ -63,9 +63,9 @@ impl Client {
         }
     }
 
-    pub fn parse_uri(uri : ~str) {
+    /*pub fn parse_uri(uri : ~str) {
         // XXX
-    }
+    }*/
 
     pub fn get_admin(@self) -> DB {
         DB::new(~"admin", self)
@@ -151,7 +151,7 @@ impl Client {
      * # Returns
      * handle to specified database
      */
-    pub fn get_db(@self, db : &str) -> DB {
+    pub fn get_db(@self, db : ~str) -> DB {
         DB::new(db, self)
     }
 
@@ -168,7 +168,7 @@ impl Client {
      * * anything propagated from run_command
      */
     pub fn drop_db(@self, db : &str) -> Result<(), MongoErr> {
-        let db = DB::new(db, self);
+        let db = DB::new(db.to_owned(), self);
         match db.run_command(SpecNotation(~"{ \"dropDatabase\":1 }")) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -187,7 +187,7 @@ impl Client {
      * # Returns
      * handle to specified collection
      */
-    pub fn get_collection(@self, db : &str, coll : &str) -> Collection {
+    pub fn get_collection(@self, db : ~str, coll : ~str) -> Collection {
         Collection::new(db, coll, self)
     }
 
@@ -376,7 +376,7 @@ impl Client {
      */
     // TODO check_primary for replication purposes?
     pub fn _send_msg(@self, msg : ~[u8],
-                            wc_pair : (&~str, Option<~[WRITE_CONCERN]>),
+                            wc_pair : (~str, Option<~[WRITE_CONCERN]>),
                             read : bool)
                 -> Result<Option<ServerMsg>, MongoErr> {
         // first send message, exiting if network error
@@ -392,7 +392,7 @@ impl Client {
         if !read {
             // requested write concern
             let (db_str, wc) = wc_pair;
-            let db = DB::new(db_str.as_slice(), self);
+            let db = DB::new(db_str, self);
 
             match db.get_last_error(wc) {
                 Ok(_) => Ok(None),

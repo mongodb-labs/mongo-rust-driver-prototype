@@ -16,7 +16,6 @@
 use std::cell::*;
 //use std::comm::*;
 use std::task::*;
-use std::int::*;
 //use std::rt::uv::*;
 use extra::priority_queue::*;
 use extra::arc::*;

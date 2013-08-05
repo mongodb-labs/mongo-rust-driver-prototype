@@ -50,11 +50,11 @@ impl Collection {
      * # Returns
      * handle to given collection
      */
-    pub fn new(db : &str, name : &str, client : @Client) -> Collection {
+    pub fn new(db : ~str, name : ~str, client : @Client) -> Collection {
         Collection {
-            db : db.to_owned(),
-            name : name.to_owned(),
-            client : client
+            db : db,
+            name : name,
+            client : client,
         }
     }
 
@@ -65,7 +65,7 @@ impl Collection {
      * handle to database containing this `Collection`
      */
     pub fn get_db(&self) -> DB {
-        DB::new(self.db, self.client)
+        DB::new(self.db.clone(), self.client)
     }
 
     /**
@@ -94,7 +94,7 @@ impl Collection {
             });
         }
 
-        let db = DB::new(self.db, self.client);
+        let db = DB::new(self.db.clone(), self.client);
         match db.run_command(SpecNotation(fmt!("{ %s }", cmd))) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -140,12 +140,12 @@ impl Collection {
             }];
         let msg = mk_insert(
                         self.client.inc_requestId(),
-                        &self.db,
-                        &self.name,
+                        self.db.as_slice(),
+                        self.name.as_slice(),
                         0i32,
                         bson_doc);
 
-        match self.client._send_msg(msg_to_bytes(msg), (&self.db, wc), false) {
+        match self.client._send_msg(msg_to_bytes(&msg), (self.db.clone(), wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::insert",
@@ -191,12 +191,12 @@ impl Collection {
         let _ = option_array;
         let msg = mk_insert(
                         self.client.inc_requestId(),
-                        &self.db,
-                        &self.name,
+                        self.db.as_slice(),
+                        self.name.as_slice(),
                         flags,
                         bson_docs);
 
-        match self.client._send_msg(msg_to_bytes(msg), (&self.db, wc), false) {
+        match self.client._send_msg(msg_to_bytes(&msg), (self.db.clone(), wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::insert_batch",
@@ -276,13 +276,13 @@ impl Collection {
         };
         let msg = mk_update(
                         self.client.inc_requestId(),
-                        &self.db,
-                        &self.name,
+                        self.db.as_slice(),
+                        self.name.as_slice(),
                         flags,
                         q,
                         up);
 
-        match self.client._send_msg(msg_to_bytes(msg), (&self.db, wc), false) {
+        match self.client._send_msg(msg_to_bytes(&msg), (self.db.clone(), wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::update",
@@ -450,9 +450,9 @@ impl Collection {
         };
         let flags = process_flags!(flag_array);
         let _ = self.process_delete_opts(option_array);
-        let msg = mk_delete(self.client.inc_requestId(), &self.db, &self.name, flags, q);
+        let msg = mk_delete(self.client.inc_requestId(), self.db.as_slice(), self.name.as_slice(), flags, q);
 
-        match self.client._send_msg(msg_to_bytes(msg), (&self.db, wc), false) {
+        match self.client._send_msg(msg_to_bytes(&msg), (self.db.clone(), wc), false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::remove",
@@ -491,7 +491,7 @@ impl Collection {
                                 flag_array : Option<~[INDEX_FLAG]>,
                                 option_array : Option<~[INDEX_OPTION]>)
                 -> Result<MongoIndexSpec, MongoErr> {
-        let coll = Collection::new(self.db, SYSTEM_INDEX, self.client);
+        let coll = Collection::new(self.db.clone(), SYSTEM_INDEX.to_owned(), self.client);
 
         let flags = process_flags!(flag_array);
         let (x, y) = MongoIndexSpec::process_index_opts(flags, option_array);
@@ -524,7 +524,7 @@ impl Collection {
     }
     //pub fn get_indexes(&self) -> Result<~[~str], MongoErr> {
     pub fn get_indexes(&self) -> Result<~[MongoIndex], MongoErr> {
-        let coll = Collection::new(self.db, SYSTEM_INDEX, self.client);
+        let coll = Collection::new(self.db.clone(), SYSTEM_INDEX.to_owned(), self.client);
         let mut cursor = match coll.find(
                             Some(SpecNotation(fmt!("{'ns':'%s.%s'}", self.db, self.name))),
                             None,
@@ -555,7 +555,7 @@ impl Collection {
      * () on success, `MongoErr` on failure
      */
     pub fn drop_index(&self, index : MongoIndexSpec) -> Result<(), MongoErr> {
-        let db = DB::new(self.db, self.client);
+        let db = DB::new(self.db.clone(), self.client);
         match db.run_command(SpecNotation(
                     fmt!("{ \"deleteIndexes\":\"%s\", \"index\":\"%s\" }",
                         self.name,

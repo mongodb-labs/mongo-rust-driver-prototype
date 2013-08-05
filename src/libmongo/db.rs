@@ -44,9 +44,9 @@ impl DB {
      * # Returns
      * DB (handle to database)
      */
-    pub fn new(name : &str, client : @Client) -> DB {
+    pub fn new(name : ~str, client : @Client) -> DB {
         DB {
-            name : name.to_owned(),
+            name : name,
             client : client
         }
     }
@@ -193,7 +193,7 @@ impl DB {
      * # Returns
      * () on success, `MongoErr` on failure
      */
-    pub fn drop_collection(&self, coll : ~str) -> Result<(), MongoErr> {
+    pub fn drop_collection(&self, coll : &str) -> Result<(), MongoErr> {
         match self.run_command(SpecNotation(fmt!("{ \"drop\":\"%s\" }", coll))) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),

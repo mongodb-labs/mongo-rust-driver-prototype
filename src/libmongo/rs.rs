@@ -21,7 +21,6 @@ use bson::formattable::*;
 use util::*;
 use client::Client;
 use coll::Collection;
-use conn_replica::*;    // XXX: for parse_host; to remove later
 
 pub struct RS {
     priv client : @Client,
@@ -431,7 +430,7 @@ impl RS {
      * RSConfig struct on success, MongoErr on failure
      */
     pub fn get_config(&self) -> Result<RSConfig, MongoErr> {
-        let coll = Collection::new("local", SYSTEM_REPLSET, self.client);
+        let coll = Collection::new(~"local", SYSTEM_REPLSET.to_owned(), self.client);
         let doc = match coll.find_one(None, None, None) {
             Ok(d) => d,
             Err(e) => return Err(e),
