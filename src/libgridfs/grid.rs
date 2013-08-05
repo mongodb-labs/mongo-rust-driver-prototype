@@ -25,6 +25,7 @@ pub struct GridFS {
     db: @DB,
     files: Collection,
     chunks: Collection,
+    last_id: Option<Document>,
 }
 
 impl GridFS {
@@ -38,18 +39,19 @@ impl GridFS {
             db: db,
             files: db.get_collection(~"fs.files"),
             chunks: db.get_collection(~"fs.chunks"),
+            last_id: None,
         }
     }
 
-    pub fn new_file(&self) -> GridIn {
+    pub fn file_write(&self) -> GridIn {
         GridIn::new(self.db)
     }
 
-    pub fn put(&self, data: ~[u8]) -> Result<(), MongoErr> {
+    pub fn put(&mut self, data: ~[u8]) -> Result<(), MongoErr> {
         use std::rt::io::io_error;
 
         let mut res = Ok(());
-        let mut file = self.new_file();
+        let mut file = self.file_write();
         do io_error::cond.trap(|c| {
             res = Err(MongoErr::new(
                 ~"grid::put",
@@ -59,6 +61,7 @@ impl GridFS {
         }).in {
             file.write(data);
             file.close();
+            self.last_id = file.file_id.clone();
         }
         res
     }
@@ -74,9 +77,10 @@ impl GridFS {
         )
     }
 
-    pub fn get(&self, id: Document) -> GridOut {
+    pub fn file_read(&self, id: Document) -> GridOut {
         GridOut::new(self.db, id)
     }
+
 }
 
 priv fn result_and<T,U>(r1: Result<T,U>, r2: Result<T,U>) -> Result<T,U> {
