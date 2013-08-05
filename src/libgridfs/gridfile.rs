@@ -23,6 +23,7 @@ use bson::formattable::*;
 use mongo::coll::*;
 use mongo::db::*;
 use mongo::util::*;
+use mongo::index::*;
 
 /**
  * Struct for writing to GridFS. Currently
