@@ -129,6 +129,14 @@ pub enum QuerySpec {
     SpecObj(BsonDocument),
     SpecNotation(~str)
 }
+impl ToStr for QuerySpec {
+    pub fn to_str(&self) -> ~str {
+        match self {
+            &SpecObj(ref bson) => bson.fields.to_str(),
+            &SpecNotation(ref s) => s.clone(),
+        }
+    }
+}
 
 #[deriving(Eq)]
 pub struct TagSet {
@@ -252,7 +260,7 @@ pub enum COLLECTION_OPTION {
 pub static LITTLE_ENDIAN_TRUE : bool = true;
 pub static MONGO_DEFAULT_PORT : uint = 27017;
 pub static MONGO_RECONN_MSECS : u64 = (1000*3);
-pub static MONGO_TIMEOUT_SECS : u64 = 15; // XXX units...
+pub static MONGO_TIMEOUT_SECS : u64 = 30; // XXX units...
 pub static LOCALHOST : &'static str = &'static "127.0.0.1"; // XXX tmp
 
 /// INTERNAL UTILITIES

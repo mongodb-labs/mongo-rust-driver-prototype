@@ -221,7 +221,7 @@ impl DB {
             Ok(msg) => msg,
             Err(e) => return Err(MongoErr::new(
                                     ~"db::run_command",
-                                    fmt!("error getting return value from run_command %?", cmd),
+                                    fmt!("error getting return value from run_command %?", cmd.to_str()),
                                     fmt!("-->\n%s", e.to_str()))),
         };
 
@@ -231,12 +231,12 @@ impl DB {
                 Double(v) => v,
                 _ => return Err(MongoErr::new(
                                     ~"db::run_command",
-                                    fmt!("error in returned value from run_command %?", cmd),
+                                    fmt!("error in returned value from run_command %?", cmd.to_str()),
                                     fmt!("\"ok\" field contains %?", *x))),
             },
             None => return Err(MongoErr::new(
                                     ~"db::run_command",
-                                    fmt!("error in returned value from run_command %?", cmd),
+                                    fmt!("error in returned value from run_command %?", cmd.to_str()),
                                     ~"no \"ok\" field in return message!")),
         };
         match ok {
@@ -250,18 +250,18 @@ impl DB {
                 UString(ref s) => s,
                 _ => return Err(MongoErr::new(
                                     ~"db::run_command",
-                                    fmt!("error in returned value from run_command %?", cmd),
+                                    fmt!("error in returned value from run_command %?", cmd.to_str()),
                                     fmt!("\"errmsg\" field contains %?", *x))),
             },
             None => return Err(MongoErr::new(
                                     ~"db::run_command",
-                                    fmt!("error in returned value from run_comand %?", cmd),
+                                    fmt!("error in returned value from run_comand %?", cmd.to_str()),
                                     ~"run_command failed without msg!")),
         };
 
         Err(MongoErr::new(
                 ~"db::run_command",
-                fmt!("run_command %? failed", cmd),
+                fmt!("run_command %? failed", cmd.to_str()),
                 errmsg.clone()))
     }
 

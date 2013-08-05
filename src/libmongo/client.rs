@@ -252,6 +252,7 @@ impl Client {
                 -> Result<(), MongoErr> {
         let tmp = @ReplicaSetConnection::new(seed);
         tmp.set_timeout(self.timeout);
+        self.rs_conn.put_back(tmp);
         self._connect_to_conn(  fmt!("client::connect_to_rs[%?]", seed),
                                 tmp as @Connection)
     }
