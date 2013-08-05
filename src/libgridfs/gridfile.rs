@@ -56,9 +56,6 @@ impl rtio::Writer for GridWriter {
         if self.position > 0 {
             let space = self.chunk_size - self.position;
             let to_write = data.iter().transform(|x| *x).take_(space).collect::<~[u8]>();
-    /*        if space > 0 {
-                self.buf.write(to_write);
-            }*/
             match self.flush_data(to_write) {
                 Ok(_) => (),
                 Err(e) => rtio::io_error::cond.raise(rtio::IoError {
@@ -67,12 +64,13 @@ impl rtio::Writer for GridWriter {
                     detail: Some(e.to_str())
                 })
             }
-            //self.buf = stdio::BytesWriter::new();
         }
         //to_write copies out the first chunk_size elts of data
         let mut to_write: ~[u8] = data.iter().transform(|x| *x).take_(self.chunk_size).collect();
+
         //data consumes those elts by skipping them
         data = data.iter().skip(self.chunk_size).transform(|x| *x).collect();
+
         //if we filled up the chunk, flush the chunk
         while to_write.len() != 0 && to_write.len() == self.chunk_size {
             match self.flush_data(to_write) {
@@ -97,11 +95,9 @@ impl rtio::Writer for GridWriter {
                 detail: Some(e.to_str())
             })
         }
-        //self.buf.write(to_write);
     }
 
     pub fn flush(&mut self) {
-        //self.buf.flush();
         let db = self.chunks.get_db();
 
         let mut oid = ~"";
@@ -181,7 +177,6 @@ impl GridWriter {
             chunks: chunks,
             files: files,
             closed: false,
-            //buf: stdio::BytesWriter::new(),
             chunk_size: 256 * 1024,
             chunk_num: 0,
             file_id: None,
