@@ -16,6 +16,7 @@
 * [Implementation ` of BsonFormattable for f64`](#implementation-of-bsonformattable-for-f64)
 * [Implementation ` of BsonFormattable for i32`](#implementation-of-bsonformattable-for-i32)
 * [Implementation ` of BsonFormattable for i64`](#implementation-of-bsonformattable-for-i64)
+* [Implementation ` of BsonFormattable for bool`](#implementation-of-bsonformattable-for-bool)
 * [Implementation ` of BsonFormattable for ~str`](#implementation-of-bsonformattable-for-str)
 * [Implementation ` of BsonFormattable for ~T where <T: BsonFormattable>`](#implementation-of-bsonformattable-for-t-where-t-bsonformattable)
 * [Implementation ` of BsonFormattable for @T where <T: BsonFormattable>`](#implementation-of-bsonformattable-for-@t-where-t-bsonformattable)
@@ -234,6 +235,20 @@ fn to_bson_t(&self) -> Document
 
 ~~~ {.rust}
 fn from_bson_t(doc: &Document) -> Result<i64, ~str>
+~~~
+
+## Implementation of `BsonFormattable` for `bool`
+
+### Method `to_bson_t`
+
+~~~ {.rust}
+fn to_bson_t(&self) -> Document
+~~~
+
+### Method `from_bson_t`
+
+~~~ {.rust}
+fn from_bson_t(doc: &Document) -> Result<bool, ~str>
 ~~~
 
 ## Implementation of `BsonFormattable` for `~str`

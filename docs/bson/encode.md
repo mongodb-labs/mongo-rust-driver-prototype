@@ -9,7 +9,7 @@
 * [Implementation ` of ::std::clone::Clone for Document`](#implementation-of-stdcloneclone-for-document) - Automatically derived.
 * [Implementation ` for ObjIdFactory`](#implementation-for-objidfactory)
 * [Implementation ` of ::std::cmp::Eq for BsonDocument`](#implementation-of-stdcmpeq-for-bsondocument) - Automatically derived.
-* [Implementation ` of ::std::clone::Clone for BsonDocument`](#implementation-of-stdcloneclone-for-bsondocument) - Automatically derived.
+* [Implementation ` of Clone for BsonDocument`](#implementation-of-clone-for-bsondocument)
 * [Implementation ` of Encoder for BsonDocEncoder`](#implementation-of-encoder-for-bsondocencoder) - serialize::Encoder implementation.
 * [Implementation ` of Encodable<E> for BsonDocument where <E: Encoder>`](#implementation-of-encodablee-for-bsondocument-where-e-encoder) - Light wrapper around a typical Map implementation.
 * [Implementation ` of Encodable<E> for Document where <E: Encoder>`](#implementation-of-encodablee-for-document-where-e-encoder) - Encodable implementation for Document.
@@ -148,9 +148,7 @@ fn eq(&self, __arg_0: &BsonDocument) -> ::bool
 fn ne(&self, __arg_0: &BsonDocument) -> ::bool
 ~~~
 
-## Implementation of `::std::clone::Clone` for `BsonDocument`
-
-Automatically derived.
+## Implementation of `Clone` for `BsonDocument`
 
 ### Method `clone`
 
