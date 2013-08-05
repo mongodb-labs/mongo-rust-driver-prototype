@@ -24,6 +24,10 @@ use mongo::coll::*;
 use mongo::db::*;
 use mongo::util::*;
 
+/**
+ * Struct for writing to GridFS. Currently
+ * it always uses a base collection called "fs".
+ */
 pub struct GridWriter {
     chunks: Collection,
     files: Collection,
@@ -34,6 +38,10 @@ pub struct GridWriter {
     position: uint,
 }
 
+/**
+ * Struct for reading from GridFS. Currently
+ * it always uses a base collection called "fs".
+ */
 pub struct GridReader {
     chunks: Collection,
     files: Collection,
@@ -44,6 +52,7 @@ pub struct GridReader {
 }
 
 impl rtio::Writer for GridWriter {
+    ///Write the given data to the fs.chunks collection.
     pub fn write(&mut self, d: &[u8]) {
         if self.closed {
             rtio::io_error::cond.raise(rtio::IoError {
@@ -97,6 +106,11 @@ impl rtio::Writer for GridWriter {
         }
     }
 
+    /**
+     * Complete a write of a document.
+     * Calling this causes document metadata
+     * to be written to the fs.files collection.
+     */
     pub fn flush(&mut self) {
         let db = self.chunks.get_db();
 
@@ -166,9 +180,11 @@ impl rtio::Writer for GridWriter {
 }
 
 impl GridWriter {
+    ///Create a new GridWriter for the given database.
     pub fn new(db: &DB) -> GridWriter {
         let chunks = db.get_collection(~"fs.chunks");
         let files = db.get_collection(~"fs.files");
+        //need to do this or file_id collection may fail
         match chunks.ensure_index(~[NORMAL(~[(~"files_id", ASC), (~"n", ASC)])], None, None) {
             Ok(_) => (),
             Err(e) => fail!(e.to_str())
@@ -184,6 +200,11 @@ impl GridWriter {
         }
     }
 
+    /**
+     * Close this GridWriter.
+     * Closing a GridWriter causes it to flush,
+     * and a closed writer cannot be written to.
+     */
     pub fn close(&mut self) -> Result<(), MongoErr> {
         let mut res = Ok(());
         if !self.closed {
@@ -225,6 +246,15 @@ impl GridWriter {
 }
 
 impl rtio::Reader for GridReader {
+    /**
+     * Read data into buf.
+     *
+     * The data is collected based on the query
+     * `db.fs.chunks.find({file_id: self.file_id})`
+     * (in rough notation).
+     *
+     * Returns the number of bytes read.
+     */
     pub fn read(&mut self, buf: &mut [u8]) -> Option<uint> {
         let mut size = buf.len();
         if size == 0 { return None; }
@@ -258,12 +288,18 @@ impl rtio::Reader for GridReader {
         Some(received)
     }
 
+    ///Return true if there is more data that can be read.
     pub fn eof(&mut self) -> bool {
         self.position >= self.length
     }
 }
 
 impl GridReader {
+    /**
+     * Builds a new GridReader.
+     * Fails if the id given does not match
+     * any _id field in the fs.files collection.
+     */
     pub fn new(db: &DB,
                file_id: Document)
         -> GridReader {

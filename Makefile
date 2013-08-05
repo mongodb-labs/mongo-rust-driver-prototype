@@ -107,8 +107,10 @@ doc: $(BSONDIR)/*.rs $(MONGODIR)/*
 	$(MKDIR) docs
 	$(MKDIR) docs/bson
 	$(MKDIR) docs/mongo
+	$(MKDIR) docs/gridfs
 	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/bson $(BSONDIR)/bson.rs
 	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/mongo $(MONGODIR)/mongo.rs
+	$(RDOC) $(RDOCFLAGS) --output-dir $(DOCS)/gridfs $(GRIDDIR)/gridfs.rs
 
 clean:
 	$(RM) -rf $(TEST)
