@@ -76,6 +76,28 @@ impl GridFS {
         res
     }
 
+    pub fn get(&mut self, size: uint) -> Result<~[u8], MongoErr> {
+        use std::rt::io::io_error;
+
+        let mut file = self.file_read(self.last_id);
+        let mut data: ~[u8] = ~[];
+        let mut res = Ok(data.clone());
+        do io_error::cond.trap(|c| {
+            res = Err(MongoErr::new(
+                ~"grid::get",
+                c.desc.to_owned(),
+                if c.detail.is_some() {c.detail.unwrap()}
+                else {~"method returned without error detail"}));
+        }).in {
+            for size.times {
+                data.push(0u8);
+            }
+            file.read(data);
+            res = Ok(data.clone());
+        }
+        res
+    }
+
     pub fn delete(&self, id: Document) -> Result<(), MongoErr> {
         let mut file_doc = BsonDocument::new();
         let mut chunk_doc = BsonDocument::new();

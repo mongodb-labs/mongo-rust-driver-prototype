@@ -53,4 +53,8 @@ fn grid_files() {
     assert_eq!(buf,
         ~[0u8,1,2,3,4,5,6,7,8,9]);
     assert!(ofile.eof());
+    match grid.get(10) {
+        Ok(dat) => assert_eq!(dat, buf),
+        Err(e) => fail!(e.to_str())
+    }
 }
