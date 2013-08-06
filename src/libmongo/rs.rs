@@ -615,7 +615,7 @@ impl RS {
      * specified number of seconds.
      */
     // XXX require &RSMember to be passed? check that node actually in RS?
-    pub fn node_freeze(&self, host : ~str, sec : uint)
+    pub fn node_freeze(&self, host : ~str, sec : u64)
                 -> Result<(), MongoErr> {
         let client = @Client::new();
         let (ip, port) = match parse_host(&host) {
@@ -653,7 +653,7 @@ impl RS {
      */
     // XXX better way to do this while maintaining
     //      RS/ReplicaSetConnection barrier?
-    pub fn step_down(&self, sec : uint) -> Result<(), MongoErr> {
+    pub fn step_down(&self, sec : u64) -> Result<(), MongoErr> {
         let op = match self.client.set_read_pref(PRIMARY_ONLY) {
             Ok(pref) => pref,
             Err(e) => return Err(MongoErr::new(
