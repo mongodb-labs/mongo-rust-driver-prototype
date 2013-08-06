@@ -40,14 +40,20 @@ mod validate;
 #[cfg(shard)]
 mod shard_dbs;
 
-#[cfg(rs)]
 // run in isolation unless there are 7 replica sets already set up
 //      (or ready to be set up for rs_initiate), and the code
 //      has been altered appropriately
+#[cfg(rs)]
 mod rs_stepdown;            // 27018-27020 seed
+#[cfg(rs)]
 mod rs_reconfig_tags;       // 37018 seed
+#[cfg(rs)]
 mod rs_reconfig_priorities; // 37018 seed
+#[cfg(rs)]
 mod rs_manual;              // 27018-27022 seed
+#[cfg(rs)]
 mod rs_initiate;            // 37018-37022 hosts (uninitiated)
+#[cfg(rs)]
 mod rs_members;             // 37018-37022 seed
+#[cfg(rs)]
 mod rs_read_pref;           // 27018 seed
