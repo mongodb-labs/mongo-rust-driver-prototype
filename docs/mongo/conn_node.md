@@ -4,7 +4,9 @@
 
 * [Struct `NodeConnection`](#struct-nodeconnection) - Connection between Client and Server
 * [Implementation ` of Connection for NodeConnection`](#implementation-of-connection-for-nodeconnection)
+* [Implementation ` of Eq for NodeConnection`](#implementation-of-eq-for-nodeconnection)
 * [Implementation ` for NodeConnection`](#implementation-for-nodeconnection)
+* [Implementation ` of Ord for NodeConnection`](#implementation-of-ord-for-nodeconnection) - Comparison of `NodeConnection`s based on their ping times.
 
 </div>
 
@@ -17,6 +19,9 @@ pub struct NodeConnection {
     priv server_ip: Cell<IpAddr>,
     priv sock: Cell<@Socket>,
     priv port: Cell<@GenericPort<PortResult>>,
+    ping: Cell<u64>,
+    tags: Cell<TagSet>,
+    timeout: Cell<u64>,
 }
 ~~~
 
@@ -31,69 +36,62 @@ server and hands back wrapped result for Client to parse.
 fn connect(&self) -> Result<(), MongoErr>
 ~~~
 
-Actually connect to the server with the initialized fields.
-
-#### Returns
-
-() on success, MongoErr on failure
-
-### Method `send`
-
-~~~ {.rust}
-fn send(&self, data: ~[u8], _: bool) -> Result<(), MongoErr>
-~~~
-
-"Fire and forget" asynchronous write to server of given data.
-
-#### Arguments
-
-* `data` - bytes to send
-
-#### Returns
-
-() on success, MongoErr on failure
-
-#### Failure Types
-
-* uninitialized socket
-* network
-
-### Method `recv`
-
-~~~ {.rust}
-fn recv(&self, _: bool) -> Result<~[u8], MongoErr>
-~~~
-
-Pick up a response from the server.
-
-#### Returns
-
-bytes received on success, MongoErr on failure
-
-#### Failure Types
-
-* uninitialized port
-* network
-
 ### Method `disconnect`
 
 ~~~ {.rust}
 fn disconnect(&self) -> Result<(), MongoErr>
 ~~~
 
-Disconnect from the server.
-Succeeds even if not originally connected.
+### Method `reconnect`
 
-#### Returns
+~~~ {.rust}
+fn reconnect(&self) -> Result<(), MongoErr>
+~~~
 
-() on success, MongoErr on failure
+### Method `send`
+
+~~~ {.rust}
+fn send(&self, data: &[u8], _: bool) -> Result<(), MongoErr>
+~~~
+
+### Method `recv`
+
+~~~ {.rust}
+fn recv(&self, buf: &mut ~[u8], _: bool) -> Result<uint, MongoErr>
+~~~
+
+### Method `set_timeout`
+
+~~~ {.rust}
+fn set_timeout(&self, timeout: u64) -> u64
+~~~
+
+### Method `get_timeout`
+
+~~~ {.rust}
+fn get_timeout(&self) -> u64
+~~~
+
+## Implementation of `Eq` for `NodeConnection`
+
+### Method `eq`
+
+~~~ {.rust}
+fn eq(&self, other: &NodeConnection) -> bool
+~~~
+
+### Method `ne`
+
+~~~ {.rust}
+fn ne(&self, other: &NodeConnection) -> bool
+~~~
 
 ## Implementation for `NodeConnection`
 
 ### Method `new`
 
 ~~~ {.rust}
-fn new(server_ip_str: ~str, server_port: uint) -> NodeConnection
+fn new(server_ip_str: &str, server_port: uint) -> NodeConnection
 ~~~
 
 Create a new NodeConnection with given IP and port.
@@ -107,4 +105,63 @@ Create a new NodeConnection with given IP and port.
 
 NodeConnection that can be connected to server node
 indicated.
+
+### Method `get_ip`
+
+~~~ {.rust}
+fn get_ip(&self) -> ~str
+~~~
+
+### Method `get_port`
+
+~~~ {.rust}
+fn get_port(&self) -> uint
+~~~
+
+### Method `is_master`
+
+~~~ {.rust}
+fn is_master(&self) -> Result<bool, MongoErr>
+~~~
+
+### Method `_check_master_and_do`
+
+~~~ {.rust}
+fn _check_master_and_do<T>(&self,
+                           cb:
+                               &fn(bson: &~BsonDocument)
+                                   -> Result<T, MongoErr>) ->
+ Result<T, MongoErr>
+~~~
+
+Run admin isMaster command and pass document into callback to process.
+Helper function.
+
+## Implementation of `Ord` for `NodeConnection`
+
+Comparison of `NodeConnection`s based on their ping times.
+
+### Method `lt`
+
+~~~ {.rust}
+fn lt(&self, other: &NodeConnection) -> bool
+~~~
+
+### Method `le`
+
+~~~ {.rust}
+fn le(&self, other: &NodeConnection) -> bool
+~~~
+
+### Method `gt`
+
+~~~ {.rust}
+fn gt(&self, other: &NodeConnection) -> bool
+~~~
+
+### Method `ge`
+
+~~~ {.rust}
+fn ge(&self, other: &NodeConnection) -> bool
+~~~
 

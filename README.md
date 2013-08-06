@@ -76,7 +76,7 @@ let foo = client.get_collection(~"foo_db", ~"foo_coll");
 We input JSON as strings formatted for JSON and manipulate them (in fact, we can insert anything implementing the ```BsonFormattable``` trait [see BSON section below] as long as its ```to_bson_t``` conversion returns an ```Embedded(~BsonDocument)```, i.e. it is represented as a BSON):
 ```rust
 // insert a document into bar_coll
-let ins = ~"{ \"_id\":0, \"a\":0, \"msg\":\"first insert!\" }";
+let ins = ~"{ '_id':0, 'a':0, 'msg':'first insert!' }";
 bar.insert(ins, None);
     // no write concern specified---use default
 
@@ -85,7 +85,7 @@ let mut ins_batch : ~[~str] = ~[];
 let n = 200;
 let mut i = 0;
 for n.times {
-    ins_batch.push(fmt!("{ \"a\":%d, \"b\":\"ins %d\" }", i/2, i));
+    ins_batch.push(fmt!("{ 'a':%d, 'b':'ins %d' }", i/2, i));
     i += 1;
 }
 foo.insert_batch(ins_batch, None, None, None);
@@ -103,7 +103,7 @@ In general, to specify options, we put the appropriate options into a vector and
 // insert a big batch of documents with duplicated _ids
 ins_batch = ~[];
 for 5.times {
-    ins_batch.push(fmt!("{ \"_id\":%d, \"a\":%d, \"b\":\"ins %d\" }", 2*i/3, i/2, i));
+    ins_batch.push(fmt!("{ '_id':%d, 'a':%d, 'b':'ins %d' }", 2*i/3, i/2, i));
     i += 1;
 }
 
@@ -129,7 +129,7 @@ match foo.create_index(~[NORMAL(~[(~"b", ASC)])], None, Some(~[INDEX_NAME(~"fuba
 To specify queries and projections, we must input them either as ```BsonDocument```s or as properly formatted JSON strings using ```SpecObj```s or ```SpecNotation```s. In general, the order of arguments for CRUD operations is (as applicable) query, projection or operation-dependent specification (e.g. update document for ```update```), optional array of option flags, optional array of user-specified options (e.g. *number* to skip), and write concern.
 ```rust
 // interact with a cursor projected on "b" and using indices and options
-match foo.find(None, Some(SpecNotation(~"{ \"b\":1 }")), None) {
+match foo.find(None, Some(SpecNotation(~"{ 'b':1 }")), None) {
     Ok(c) => {
         let mut cursor = c;
 
@@ -159,14 +159,14 @@ match foo.drop_index(MongoIndexName(~"fubar")) {
 }
 
 // remove every element where "a" is 1
-match foo.remove(Some(SpecNotation(~"{ \"a\":1 }")), None, None, None) {
+match foo.remove(Some(SpecNotation(~"{ 'a':1 }")), None, None, None) {
     Ok(_) => (),
     Err(e) => fail!("%s", e.to_str()),     // should not happen
 }
 
 // upsert every element where "a" is 2 to be 3
-match foo.update(   SpecNotation(~"{ \"a\":2 }"),
-                    SpecNotation(~"{ \"$set\": { \"a\":3 } }"),
+match foo.update(   SpecNotation(~"{ 'a':2 }"),
+                    SpecNotation(~"{ '$set': { 'a':3 } }"),
                     Some(~[MULTI, UPSERT]), None, None) {
     Ok(_) => (),
     Err(e) => fail!("%s", e.to_str()),     // should not happen
@@ -192,7 +192,7 @@ match db.get_collection_names() {
 
 // perform a run_command, but the result (if successful, a ~BsonDocument)
 //      must be parsed appropriately
-println(fmt!("%?", db.run_command(SpecNotation(~"{ \"count\":1 }"))));
+println(fmt!("%?", db.run_command(SpecNotation(~"{ 'count':1 }"))));
 
 // drop the database
 match client.drop_db(~"foo_db") {
@@ -331,8 +331,6 @@ let myfoo = BsonFormattable::from_bson_t::<Foo>(&Embedded(~decode(b).unwrap()));
 
 ## Roadmap
 
-- Replication set support
-- Implement read preferences
 - Documentation to the [API site](http://api.mongodb.org)
 - Thorough test suite for CRUD functionality
 

@@ -25,7 +25,7 @@ databases by creating `DB` handles to those databases.
 ### Method `new`
 
 ~~~ {.rust}
-fn new(name: &str, client: @Client) -> DB
+fn new(name: ~str, client: @Client) -> DB
 ~~~
 
 Creates a new Mongo DB with given name and associated Client.
@@ -116,7 +116,7 @@ handle to collection
 ### Method `drop_collection`
 
 ~~~ {.rust}
-fn drop_collection(&self, coll: ~str) -> Result<(), MongoErr>
+fn drop_collection(&self, coll: &str) -> Result<(), MongoErr>
 ~~~
 
 Drops given collection from database associated with this `DB`.
@@ -207,7 +207,7 @@ Closing a connection will also log out.
 ### Method `get_profiling_level`
 
 ~~~ {.rust}
-fn get_profiling_level(&self) -> Result<int, MongoErr>
+fn get_profiling_level(&self) -> Result<(int, Option<int>), MongoErr>
 ~~~
 
 Get the profiling level of the database.

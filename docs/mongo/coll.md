@@ -2,21 +2,10 @@
 
 <div class='index'>
 
-* [Enum `MongoIndex`](#enum-mongoindex)
 * [Struct `Collection`](#struct-collection)
-* [Implementation ` for MongoIndex`](#implementation-for-mongoindex)
 * [Implementation ` for Collection`](#implementation-for-collection)
 
 </div>
-
-## Enum `MongoIndex`
-
-#### Variants
-
-
-* `MongoIndexName(~str)`
-
-* `MongoIndexFields(~[INDEX_FIELD])`
 
 ## Struct `Collection`
 
@@ -28,21 +17,6 @@ pub struct Collection {
 }
 ~~~
 
-## Implementation for `MongoIndex`
-
-### Method `get_name`
-
-~~~ {.rust}
-fn get_name(&self) -> ~str
-~~~
-
-From either `~str` or full specification of index, gets name.
-
-#### Returns
-
-name of index (string passed in if `MongoIndexName` passed),
-default index name if `MongoIndexFields` passed)
-
 ## Implementation for `Collection`
 
 Having created a `Client` and connected as desired
@@ -53,7 +27,7 @@ collections.
 ### Method `new`
 
 ~~~ {.rust}
-fn new(db: &str, name: &str, client: @Client) -> Collection
+fn new(db: ~str, name: ~str, client: @Client) -> Collection
 ~~~
 
 Creates a new handle to the given collection.
@@ -277,10 +251,10 @@ Removes specified documents from collection.
 ### Method `create_index`
 
 ~~~ {.rust}
-fn create_index(&self, index_arr: ~[INDEX_FIELD],
+fn create_index(&self, index_arr: ~[INDEX_TYPE],
                 flag_array: Option<~[INDEX_FLAG]>,
                 option_array: Option<~[INDEX_OPTION]>) ->
- Result<MongoIndex, MongoErr>
+ Result<MongoIndexSpec, MongoErr>
 ~~~
 
 INDICES (or "Indexes")
@@ -313,30 +287,30 @@ name of index as `MongoIndexName` (in enum `MongoIndex`) on success,
 ### Method `ensure_index`
 
 ~~~ {.rust}
-fn ensure_index(&self, index_arr: ~[INDEX_FIELD],
+fn ensure_index(&self, index_arr: ~[INDEX_TYPE],
                 flag_array: Option<~[INDEX_FLAG]>,
                 option_array: Option<~[INDEX_OPTION]>) ->
- Result<MongoIndex, MongoErr>
+ Result<MongoIndexSpec, MongoErr>
 ~~~
 
 ### Method `get_indexes`
 
 ~~~ {.rust}
-fn get_indexes(&self) -> Result<~[~str], MongoErr>
+fn get_indexes(&self) -> Result<~[MongoIndex], MongoErr>
 ~~~
 
 ### Method `drop_index`
 
 ~~~ {.rust}
-fn drop_index(&self, index: MongoIndex) -> Result<(), MongoErr>
+fn drop_index(&self, index: MongoIndexSpec) -> Result<(), MongoErr>
 ~~~
 
 Drops specified index.
 
 #### Arguments
 
-* `index` - `MongoIndex` to drop specified either by explicit name
-             or fields
+* `index` - index to drop specified either by explicit name,
+             fields, or full specification
 
 #### Returns
 

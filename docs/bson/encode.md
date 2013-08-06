@@ -468,6 +468,15 @@ fn put_all(&mut self, pairs: ~[(~str, Document)])
 
 Adds a list of key/value pairs and updates size. Returns nothing.
 
+### Method `union`
+
+~~~ {.rust}
+fn union(&mut self, other: Document)
+~~~
+
+If the provided document is Embedded, puts all of its (key,val) pairs
+into self. Otherwise, does nothing.
+
 ### Method `new`
 
 ~~~ {.rust}
