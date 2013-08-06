@@ -514,24 +514,27 @@ mod tests {
     #[test]
     fn test_recv_null_port() {
         let conn = NodeConnection::new(~"foo", 42);
-        assert!(conn.recv(false).is_err());
+        let mut buf = ~[];
+        assert!(conn.recv(&mut buf, false).is_err());
     }
 
     #[test]
     fn test_recv_read_err() {
 
         let mut conn = NodeConnection::new(~"foo", 42);
+        let mut buf = ~[];
         let p: @GenericPort<PortResult> = @MockPort {state: 1} as @GenericPort<PortResult>;
         conn.port = Cell::new(p);
-        assert!(conn.recv(false).is_err());
+        assert!(conn.recv(&mut buf, false).is_err());
     }
 
     #[test]
     fn test_recv_read() {
         let mut conn = NodeConnection::new(~"foo", 42);
+        let mut buf = ~[];
         let p: @GenericPort<PortResult> = @MockPort {state: 0} as @GenericPort<PortResult>;
         conn.port = Cell::new(p);
-        assert!(conn.recv(false).is_ok());
+        assert!(conn.recv(&mut buf, false).is_ok());
     }
 
     #[test]
