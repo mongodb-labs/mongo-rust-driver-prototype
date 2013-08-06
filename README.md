@@ -20,6 +20,7 @@ The Rust MongoDB driver is built using ```make```. Available targets include:
 - ```libs``` compile C dependencies
 - ```bson``` build a binary just for ```bson```
 - ```mongo``` build a binary just for ```mongo``` (note: this requires an existing ```bson``` binary)
+- ```gridfs``` builds a binary just for ```gridfs``` (note: this requires an existing ```bson``` and ```mongo``` binary)
 - ```test``` compile the test suite
 - ```check``` compile and run the test suite
 - ```doc``` generate documentation
@@ -334,6 +335,5 @@ let myfoo = BsonFormattable::from_bson_t::<Foo>(&Embedded(~decode(b).unwrap()));
 - Implement read preferences
 - Documentation to the [API site](http://api.mongodb.org)
 - Thorough test suite for CRUD functionality
-- GridFS implementation
 
 To be continued...
