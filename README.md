@@ -209,6 +209,59 @@ match client.disconnect() {
 }
 ```
 
+##### Using GridFS
+[GridFS](http://docs.mongodb.org/manual/core/gridfs/) can be used to store documents larger than the document size limit.
+This driver's implementation of GridFS publishes an API which is primarily based on the Reader/Writer API in ```std::rt::io```.
+Using GridFS requires an ```extern mod gridfs``` declaration, as well as the following imports:
+```rust
+use gridfs::*;
+use gridfs::gridfile::*;
+```
+
+To store files through GridFS, we first create a GridFS handle.
+```rust
+//`db` is an already-connected DB object
+let gridfs = GridFS::new(@db);
+```
+
+This handle will use the ```fs``` collection as its root collection in the given database. Now we can create a file writer and begin writing data.
+```rust
+let writer = gridfs.file_write();
+writer.chunk_size = 1024; //set the size of each chunk to 1KB; default is 16MB
+let data: ~[u8] = /*acquire some data*/
+writer.write(data);
+writer.close();
+```
+
+```writer.write``` will save as many chunks as necessary to the ```fs.chunks``` collection in the provided database.
+Once ```close``` is called, the file's metadata is written to ```fs.files``` and the writer can no longer be used.
+If the default attributes of the writer are acceptable, we can use a shortcut by simply calling ```gridfs.put(data)```.
+
+One thing to note is that ```writer.write``` can raise a _condition_: a construct similar to an exception.
+In the event of a write failure, to prevent the program from failing, the condition must be _trapped_, as follows:
+```rust
+do io_error::cond.trap(|c| {
+    //handle the error, which is `c`
+    //c is of type std::rt::io::IoError
+}).in {
+    writer.write(data);
+    writer.close();
+}
+```
+This logic is encapsulated in ```gridfs.put```.
+
+Once we've written data, it's only useful if we can read it back.
+```rust
+let reader = gridfs.file_read(doc_id); //doc_id is the id of a document already in GridFS
+//if doc_id doesn't match a document in fs.files, this will fail
+let data: ~[u8] = ~[];
+for data_size.times { //data_size is however large our file was
+    data.push(0u8);
+}
+reader.read(data); //this returns an Option<uint>, representing how many bytes were read
+//data now contains the stored Binary data as a string of bytes
+```
+
 Please refer to the documentation for a complete list of available operations.
 
 #### BSON library
