@@ -70,16 +70,16 @@ gridfs: $(GRIDDIR)/*
 
 test: $(BSONDIR)/bson.rs $(MONGODIR)/mongo.rs $(MONGODIR)/test/test.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/tool_test $(UTILDIR)/tools.rs
-	#$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
-	#$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/bson_test $(BSONDIR)/bson.rs
+	$(RC) $(FLAGS) --test -o $(TEST)/mongo_test $(MONGODIR)/mongo.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/driver_test $(MONGODIR)/test/test.rs
 	$(RC) $(FLAGS) --test -o $(TEST)/grid_test $(GRIDDIR)/test/test.rs
 
 check: test
 ifeq ($(MONGOTEST),1)
 	$(TEST)/tool_test
-	#$(TEST)/bson_test
-	#$(TEST)/mongo_test
+	$(TEST)/bson_test
+	$(TEST)/mongo_test
 	$(TEST)/driver_test
 	$(TEST)/grid_test
 else
