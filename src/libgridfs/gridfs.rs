@@ -79,7 +79,7 @@ impl GridFS {
     pub fn get(&mut self, size: uint) -> Result<~[u8], MongoErr> {
         use std::rt::io::io_error;
 
-        let mut file = self.file_read(self.last_id);
+        let mut file = self.file_read(self.last_id.clone().unwrap());
         let mut data: ~[u8] = ~[];
         let mut res = Ok(data.clone());
         do io_error::cond.trap(|c| {

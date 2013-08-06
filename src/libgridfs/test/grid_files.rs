@@ -50,11 +50,11 @@ fn grid_files() {
     let mut ofile = grid.file_read(id);
     let mut buf = ~[0u8,0,0,0,0,0,0,0,0,0]; //10
     ofile.read(buf);
-    assert_eq!(buf,
+    assert_eq!(buf.clone(),
         ~[0u8,1,2,3,4,5,6,7,8,9]);
     assert!(ofile.eof());
     match grid.get(10) {
-        Ok(dat) => assert_eq!(dat, buf),
+        Ok(dat) => assert_eq!(dat, buf.clone()),
         Err(e) => fail!(e.to_str())
     }
 }
