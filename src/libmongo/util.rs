@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 
-use std::int::*;
 use extra::treemap::*;
 
 use bson::encode::*;
@@ -302,12 +301,12 @@ pub fn parse_host(host_str : &~str) -> Result<(~str, uint), MongoErr> {
 
     if ip_str == ~"localhost" { ip_str = LOCALHOST.to_owned(); }    // XXX must exist better soln
 
-    match from_str(port_str) {
+    match FromStr::from_str::<uint>(port_str) {
         None => Err(MongoErr::new(
                         ~"conn_replica::parse_host",
                         ~"unexpected host string format",
                         fmt!("host string should be \"[IP ~str]:[uint]\",
                                     found %s:%s", ip_str, port_str))),
-        Some(k) => Ok((ip_str, k as uint)),
+        Some(k) => Ok((ip_str, k)),
     }
 }
