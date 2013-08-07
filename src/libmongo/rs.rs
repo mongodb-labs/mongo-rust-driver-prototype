@@ -92,6 +92,39 @@ impl BsonFormattable for RSMember {
         Ok(member)
     }
 }
+macro_rules! mk_get (
+    ($prop_find:ident) => ({
+        for self.opts.iter().advance |opt| {
+            match opt {
+                &$prop_find(ref x) => return Some(x),
+                _ => (),
+            }
+        }
+        None
+    });
+)
+macro_rules! mk_get_mut (
+    ($get:expr, $prop_find:ident, $default:expr) => ({
+        let mut ptr = None;
+        {
+            if $get.is_none() {
+                self.opts.push($default);
+            }
+        }
+        {
+            for self.opts.mut_iter().advance |opt| {
+                match opt {
+                    &$prop_find(ref mut x) => {
+                        ptr = Some(x);
+                        break;
+                    }
+                    _ => (),
+                }
+            }
+        }
+        ptr.unwrap()
+    });
+)
 impl RSMember {
     pub fn new( host : ~str,
                 opts : ~[RS_MEMBER_OPTION]) -> RSMember {
@@ -102,24 +135,16 @@ impl RSMember {
         }
     }
 
-    // TODO macros
-    // XXX inefficient
     /**
      * Gets read-only reference to tags.
      *
      * # Returns
      * None if there are no tags set, Some(ptr) to the tags if there are
      */
-    pub fn get_tags<'a>(&'a self) -> Option<&'a TagSet> {
-        for self.opts.iter().advance |opt| {
-            match opt {
-                &TAGS(ref x) => return Some(x),
-                _ => (),
-            }
-        }
-        None
-    }
     // XXX inefficient
+    pub fn get_tags<'a>(&'a self) -> Option<&'a TagSet> {
+        mk_get!(TAGS)
+    }
     /**
      * Gets writeable reference to tags, initializing with default
      * (empty) if there were previously none set. Intended for user
@@ -128,44 +153,20 @@ impl RSMember {
      * # Returns
      * reference to tags, possibly initializing them within the `RSMember`
      */
-    pub fn get_mut_tags<'a>(&'a mut self) -> &'a mut TagSet {
-        let mut ptr = None;
-        {
-            if self.get_tags().is_none() {
-                self.opts.push(TAGS(TagSet::new(~[])));
-            }
-        }
-        {
-            for self.opts.mut_iter().advance |opt| {
-                match opt {
-                    &TAGS(ref mut x) => {
-                        ptr = Some(x);
-                        break;
-                    }
-                    _ => (),
-                }
-            }
-        }
-        ptr.unwrap()
-    }
-
     // XXX inefficient
+    pub fn get_mut_tags<'a>(&'a mut self) -> &'a mut TagSet {
+        mk_get_mut!(self.get_tags(), TAGS, TAGS(TagSet::new(~[])))
+    }
     /**
      * Gets read-only reference to priority.
      *
      * # Returns
      * None if there is no priority set, Some(ptr) to the priority if there is
      */
-    pub fn get_priority<'a>(&'a self) -> Option<&'a float> {
-        for self.opts.iter().advance |opt| {
-            match opt {
-                &PRIORITY(ref x) => return Some(x),
-                _ => (),
-            }
-        }
-        None
-    }
     // XXX inefficient
+    pub fn get_priority<'a>(&'a self) -> Option<&'a float> {
+        mk_get!(PRIORITY)
+    }
     /**
      * Gets writeable reference to priority, initializing with default
      * (1) if there was previously none set. Intended for user
@@ -174,25 +175,9 @@ impl RSMember {
      * # Returns
      * reference to priority, possibly initializing them within the `RSMember`
      */
+    // XXX inefficient
     pub fn get_mut_priority<'a>(&'a mut self) -> &'a mut float {
-        let mut ptr = None;
-        {
-            if self.get_priority().is_none() {
-                self.opts.push(PRIORITY(1f));
-            }
-        }
-        {
-            for self.opts.mut_iter().advance |opt| {
-                match opt {
-                    &PRIORITY(ref mut x) => {
-                        ptr = Some(x);
-                        break;
-                    }
-                    _ => (),
-                }
-            }
-        }
-        ptr.unwrap()
+        mk_get_mut!(self.get_priority(), PRIORITY, PRIORITY(1f))
     }
 }
 
