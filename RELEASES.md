@@ -1,18 +1,17 @@
-Version 0.2.0 (August 2013)
-===========================
+## Version 0.2.0 (August 2013)
 
     * New features
         * Replica set connection
         * mongos connection
         * Read preferences
         * GridFS
+        * DBRef support in BSON
 
     * Bugfixes and performance enhancements
         * Benchmarks for BSON library
         * Reduced usage of GC
 
-Version 0.1.0 (July 2013)
-=========================
+## Version 0.1.0 (July 2013)
 
     * Basic functionality
         * CRUD operations
