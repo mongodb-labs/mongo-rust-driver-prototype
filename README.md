@@ -262,6 +262,13 @@ reader.read(data); //this returns an Option<uint>, representing how many bytes w
 //data now contains the stored Binary data as a string of bytes
 ```
 
+Like ```writer.write```, ```reader.read``` may raise a condition, causing the program to fail.
+The logic to trap this condition, and to build an empty data buffer, is encapsulated in the ```GridFS``` struct.
+```rust
+let data: ~[u8] = gridfs.get(doc_id).unwrap();
+//get can return a MongoErr, so unwrap isn't always safe
+```
+
 Please refer to the documentation for a complete list of available operations.
 
 #### BSON library
