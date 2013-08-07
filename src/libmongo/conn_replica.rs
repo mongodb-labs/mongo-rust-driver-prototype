@@ -402,7 +402,7 @@ impl ReplicaSetConnection {
                                 }
 
                                 if err.is_some() { break }
-                                match parse_host(&host_str) {
+                                match parse_host(host_str.as_slice()) {
                                     Ok(p) => list.push(p),
                                     Err(e) => err = Some(e),
                                 }
@@ -492,7 +492,7 @@ impl ReplicaSetConnection {
                                             }
                                         }
 
-                                        match parse_host(&host_str) {
+                                        match parse_host(host_str.as_slice()) {
                                             Ok(p) => list.push(p),
                                             Err(e) => {
                                                 err = Some(e);

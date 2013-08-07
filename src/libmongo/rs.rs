@@ -603,7 +603,7 @@ impl RS {
     pub fn node_freeze(&self, host : ~str, sec : u64)
                 -> Result<(), MongoErr> {
         let client = @Client::new();
-        let (ip, port) = match parse_host(&host) {
+        let (ip, port) = match parse_host(host.as_slice()) {
             Ok(p) => p,
             Err(e) => return Err(e),
         };
@@ -687,7 +687,7 @@ impl RS {
     pub fn node_sync_from(&self, node : ~str, from : ~str)
                 -> Result<(), MongoErr> {
         let client = @Client::new();
-        let (ip, port) = match parse_host(&node) {
+        let (ip, port) = match parse_host(node.as_slice()) {
             Ok(p) => p,
             Err(e) => return Err(e),
         };

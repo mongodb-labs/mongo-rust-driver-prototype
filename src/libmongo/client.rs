@@ -291,7 +291,7 @@ impl Client {
 
         let mut seed = ~[];
         for conf.members.iter().advance |&member| {
-            match parse_host(&member.host) {
+            match parse_host(member.host.as_slice()) {
                 Ok(p) => seed.push(p),
                 Err(e) => return Err(e),
             }

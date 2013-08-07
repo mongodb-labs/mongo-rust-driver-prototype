@@ -289,7 +289,7 @@ macro_rules! process_flags(
     );
 )
 
-pub fn parse_host(host_str : &~str) -> Result<(~str, uint), MongoErr> {
+pub fn parse_host(host_str : &str) -> Result<(~str, uint), MongoErr> {
     let mut port_str = fmt!("%?", MONGO_DEFAULT_PORT);
     let mut ip_str = match host_str.find_str(":") {
         None => host_str.to_owned(),
