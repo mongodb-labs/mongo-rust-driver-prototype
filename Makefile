@@ -13,9 +13,9 @@
 # limitations under the License.
 
 # Preprocessor versioning info
-MAJOR_VERS := `mongo --version | grep -o '[0-9].[0-9].[0-9]' | cut -d'.' -f1`
-MINOR_VERS := `mongo --version | grep -o '[0-9].[0-9].[0-9]' | cut -d'.' -f2`
-PATCH_VERS := `mongo --version | grep -o '[0-9].[0-9].[0-9]' | cut -d'.' -f3`
+MAJOR_VERS := $(shell mongo --version | grep -o '[0-9].[0-9].[0-9]' | cut -d'.' -f1)
+MINOR_VERS := $(shell mongo --version | grep -o '[0-9].[0-9].[0-9]' | cut -d'.' -f2)
+PATCH_VERS := $(shell mongo --version | grep -o '[0-9].[0-9].[0-9]' | cut -d'.' -f3)
 
 # Rust compilation
 RC = rustc
