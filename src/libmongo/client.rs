@@ -567,6 +567,7 @@ impl Client {
         tmp
     }
 
+    ///Ensure the mongod instance to which this client is connected is at least the provided version.
     pub fn check_version(@self, ver: ~str) -> Result<(), MongoErr> {
        let admin = self.get_admin();
        match admin.run_command(SpecNotation(~"{ 'buildInfo': 1 }")) {
