@@ -20,7 +20,12 @@ use extra::serialize::*;
 use tools::ord_hash::*;
 use std::vec::{VecIterator, VecRevIterator};
 
+//TODO: ideally test this on a big-endian machine
+#[cfg(target_endian = "little")]
 static L_END: bool = true;
+
+#[cfg(target_arch = "big")]
+static L_END: bool = false;
 
 /**
  * Algebraic data type representing the BSON AST.
