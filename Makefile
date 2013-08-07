@@ -94,6 +94,7 @@ bench: test
 ex: $(EXDIR)/*
 	$(RC) $(FLAGS) $(EXDIR)/bson_demo.rs
 	$(RC) $(FLAGS) $(EXDIR)/mongo_demo.rs
+	$(RC) $(FLAGS) $(EXDIR)/rs_demo.rs
 	$(RC) $(FLAGS) $(EXDIR)/tutorial.rs
 
 doc: $(BSONDIR)/*.rs $(MONGODIR)/*

@@ -27,58 +27,60 @@ use mongo::rs::*;
 use mongo::coll::*;
 
 fn main() {
-    let ports : ~[uint] = ~[37018, 37019, 37020, 37021, 37022];
+    let ports : ~[uint] = ~[37118, 37119, 37120, 37121, 37122];
     let mut do_init;
 
     // see if need to initiate, based on cmd-line args
     let args = args();
-    let opt = "make_rs=";
-    if args.len() <= 1 || !args[1].starts_with(opt) {
-        println(fmt!("[%s] cmd-line args:\n\t
-            %s[0,1]\twhether or not to initiate replica set on ports %?
-                (0 if already initiated, 1 to initiate here)",
-                args[0], opt, ports));
+    let spec = "make_rs=";
+    let msg = fmt!(
+"[%s] cmd-line args:
+    %s[0,1]     whether or not to initiate replica set on ports %?
+                    (0 if already initiated, 1 to initiate here)",
+                args[0], spec, ports);
+    if args.len() <= 1 || !args[1].starts_with(spec) {
+        println(msg);
         return;
     } else {
-        do_init = args[1].char_at(opt.len()) == '1';
-        let no_init = args[1].char_at(opt.len()) == '0';
+        do_init = args[1].char_at(spec.len()) == '1';
+        let no_init = args[1].char_at(spec.len()) == '0';
         if !do_init && !no_init {
-            println(fmt!("[%s] cmd-line args:\n\t
-                %s[0,1]\twhether or not to initiate replica set on ports %?
-                    (0 if already initiated, 1 to initiate here)",
-                    args[0], opt, ports));
+            println(msg);
             println(fmt!("\t\texpected 0 or 1, found %?",
-                    args[1].char_at(opt.len())));
+                    args[1].char_at(spec.len())));
             return;
         }
     }
 
     let pause = 5f;
     let mut t;
-
-    // set up servers
     let mut procs = ~[];
-    let base_dir_str = "./rs_demo_dir";
-    let base_dir = GenericPath::from_str::<PosixPath>(base_dir_str);
-    remove_dir_recursive(&base_dir);
-    make_dir(&base_dir, 0x1ff);
-    for ports.iter().advance |&po| {
-        let s = fmt!("%s/%?", base_dir_str, po);
-        let p = GenericPath::from_str::<PosixPath>(s.as_slice());
-        remove_dir(&p);
-        make_dir(&p, 0x1ff);
-        procs.push(Process::new("mongod",
-                                [~"--port", fmt!("%?", po),
-                                 ~"--dbpath", s,
-                                 ~"--replSet", ~"rs_demo",
-                                 ~"--smallfiles",
-                                 ~"--oplogSize", ~"128"],
-                                ProcessOptions::new()));
-    }
 
-    // give some time to set up
-    t = precise_time_s();
-    loop { if precise_time_s() - t >= pause { break; } }
+    if do_init {
+        println("starting up mongods");
+        // set up servers
+        let base_dir_str = "./rs_demo_dir";
+        let base_dir = GenericPath::from_str::<PosixPath>(base_dir_str);
+        remove_dir_recursive(&base_dir);
+        make_dir(&base_dir, 0x1ff);
+        for ports.iter().advance |&po| {
+            let s = fmt!("%s/%?", base_dir_str, po);
+            let p = GenericPath::from_str::<PosixPath>(s.as_slice());
+            remove_dir(&p);
+            make_dir(&p, 0x1ff);
+            procs.push(Process::new("mongod",
+                                    [~"--port", fmt!("%?", po),
+                                     ~"--dbpath", s,
+                                     ~"--replSet", ~"rs_demo",
+                                     ~"--smallfiles",
+                                     ~"--oplogSize", ~"128"],
+                                    ProcessOptions::new()));
+        }
+
+        // give some time to set up
+        t = precise_time_s();
+        loop { if precise_time_s() - t >= pause { break; } }
+    }
 
     let client = @Client::new();
 
@@ -103,17 +105,14 @@ fn main() {
 
     if do_init {
         // initiate configuration
-        println("initiate and connect");
+        println("initiating and connecting");
         match client.initiate_rs(("127.0.0.1", ports[0]), conf) {
             Ok(_) => (),
             Err(e) => fail!("%s", e.to_str()),
         };
-        t = precise_time_s();
-        loop { if precise_time_s() - t > pause { break; } }
 
         // to demonstrate, we disconnect, then reconnect
         //      to the now-initialized replica set
-        println("disconnect and reconnect via seed");
         client.disconnect();
     }
 
@@ -127,7 +126,7 @@ fn main() {
     let rs = RS::new(client);
 
     // check the status
-    println("get status");
+    print("getting status: ");
     match rs.get_status() {
         Ok(doc) => println(doc.to_str()),
         Err(e) => println(e.to_str()),
@@ -135,19 +134,17 @@ fn main() {
 
     // add an arbiter
     if do_init {
-        println("add arbiter");
+        println("adding arbiter");
         let host4 = RSMember::new(fmt!("localhost:%?", ports[4]),
                         ~[ARB_ONLY(true)]);
         match rs.add(host4) {
             Ok(_) => (),
             Err(e) => println(e.to_str()),
         };
-        t = precise_time_s();
-        loop { if precise_time_s() - t > pause { break; } }
     }
 
     // check configuration
-    println("get conf");
+    print("getting conf: ");
     let mut conf = None;
     match rs.get_config() {
         Ok(c) => {
@@ -158,19 +155,19 @@ fn main() {
     }
 
     // drop collection to start afresh, then insert and read some things
-    println("some CRUD ops");
+    t = precise_time_s();
+    println(fmt!("inserting %?", t));
     client.drop_db("rs_demo_db");
     let coll = Collection::new(~"rs_demo_db", ~"foo", client);
-    coll.insert(fmt!("{ 'time': '%?' }", precise_time_s()), None);
+    coll.insert(fmt!("{ 'time': '%?' }", t), None);
+    println("reading it back");
     match coll.find(None, None, None) {
         Ok(ref mut cur) => for cur.advance |doc| { println(doc.to_str()); },
         Err(e) => println(e.to_str()),
     }
-    t = precise_time_s();
-    loop { if precise_time_s() - t > 2f*pause { break; } }
 
     // change up tags
-    println("change tags");
+    println("changing tags");
     match conf {
         None => println("could not change tags; could not get conf earlier"),
         Some(c) => {
@@ -186,17 +183,16 @@ fn main() {
             rs.reconfig(tmp, false);
         }
     }
-    t = precise_time_s();
-    loop { if precise_time_s() - t > pause { break; } }
 
     // get config to check
+    println("getting conf to check: ");
     match rs.get_config() {
         Ok(c) => println(fmt!("%?", c)),
         Err(e) => println(e.to_str()),
     }
 
     // change read preference
-    println("change read preference");
+    println("changing read preference");
     let mut old_pref = None;
     match client.set_read_pref(
             SECONDARY_ONLY(Some(~[TagSet::new([("which", "this")])]))) {
@@ -204,19 +200,22 @@ fn main() {
         Err(e) => println(e.to_str()),
     }
     let _ = old_pref;
-    t = precise_time_s();
-    loop { if precise_time_s() - t > pause { break; } }
 
     // read again
-    println("read again");
+    println("reading again (SLAVE_OK, should get previous insert)");
     match coll.find(None, None, Some(~[SLAVE_OK])) {
+        Ok(ref mut cur) => for cur.advance |doc| { println(doc.to_str()); },
+        Err(e) => println(e.to_str()),
+    }
+    println("reading again (not SLAVE_OK, should get nothing (no err either))");
+    match coll.find(None, None, None) {
         Ok(ref mut cur) => for cur.advance |doc| { println(doc.to_str()); },
         Err(e) => println(e.to_str()),
     }
 
     // tell primary to step down for more than the timeout,
     //      and freeze the other nodes; set becomes read-only
-    println("make read-only");
+    println("making read-only");
     for hosts.iter().advance |&host| {
         rs.node_freeze(host.host, 2*MONGO_TIMEOUT_SECS);
     }
@@ -225,21 +224,21 @@ fn main() {
         Ok(_) => println("insert succeeded when should not have"),
         Err(e) => println(fmt!("expect timeout err; got %s", e.to_str())),
     }
+    println("trying to read (should succeed)");
     match coll.find(None, None, Some(~[SLAVE_OK])) {
         Ok(ref mut cur) => for cur.advance |doc| { println(doc.to_str()); },
         Err(e) => println(e.to_str()),
     }
 
     // disconnect
-    println("disconnect");
+    println("disconnecting");
     match client.disconnect() {
         Ok(_) => (),
         Err(e) => println(e.to_str()),
     }
 
-    // close mongods if started them
+    // destroy mongods if started
     if do_init {
-        println("kill mongods");
         for procs.mut_iter().advance |proc| {
             proc.destroy();
         }
