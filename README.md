@@ -59,6 +59,16 @@ match client.connect(~"127.0.0.1", 27017 as uint) {
         // if cannot connect, nothing to do; display error message
 }
 ```
+To connect instead to a replica set given a seed of ports 27017-27019 on localhost, we instead use the ```connect_to_rs``` method:
+```rust
+let seed = [(~"127.0.0.1", 27017),
+            (~"127.0.0.1", 27018),
+            (~"127.0.0.1", 27019)];
+match client.connect_to_rs(seed) {
+    Ok(_) => (),
+    Err(e) => fail!("%s", e.to_str()),
+}
+```
 Now we may create handles to databases and collections on the server. We start with collections to demonstrate CRUD operations.
 ```rust
 // create handles to the collections "foo_coll" and "bar_coll" in the
@@ -200,6 +210,39 @@ match client.drop_db(~"foo_db") {
     Err(e) => println(fmt!("%s", e.to_str())), // should not happen
 }
 ```
+
+##### Replica Set Operations
+We can change replica set in various ways: we can change the set itself, through its configuration, or how we interact with the set, through read preference, for instance.
+
+If we change how we interact with the set itself, we first get a handle to the replica set.
+```rust
+let rs = RS::new(client);   // client must be connected to replica set
+```
+Suppose we want to reconfigure the replica set with different tags. We need to get the current configuration, then edit it.
+```rust
+match rs.get_config() {
+    Ok(ref mut conf) => {
+        {
+            // we change the tags on the first member
+            let mut tags = tmp.members[0].get_mut_tags();
+            tags.set(~"sample", ~"tag");
+        }
+        rs.reconfig(conf.clone(), false);   // don't force the reconfiguration
+    }
+    Err(e) => println(e.to_str()),
+}
+```
+In fact, we can edit the ```conf``` struct however we wish in order to reconfigure the replica set.
+
+If, on the other hand, we want to change read preference, we must go through the client, since read preference is not a property of the replica set but rather of the connection. The default is ```PRIMARY_ONLY``; we change it to ```SECONDARY_PREFERRED``` with a tagset related to the earlier change of tags.
+```rust
+let tags = ~[TagSet::new([("sample", "tag")])];
+match client.set_read_pref(SECONDARY_PREF(Some(tags))) {
+    Ok(old_pref) => println(fmt!("%?", old_pref)),  // print the old pref
+    Err(e) => println(e.to_str()),
+}
+```
+Now reads will follow this read preference (although writes will still route to the primary).
 
 Finally, we should disconnect the client. It can be reconnected to another server after disconnection.
 ```rust
