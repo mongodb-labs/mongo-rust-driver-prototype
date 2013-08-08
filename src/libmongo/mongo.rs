@@ -30,8 +30,8 @@ extern mod tools;
 // Misc: utility module
 #[macro_escape]
 pub mod util;
-#[macro_escape]
-mod mockable;
+//#[macro_escape]
+//mod mockable;
 pub mod index;      // index for querying
 
 // Client-side components
