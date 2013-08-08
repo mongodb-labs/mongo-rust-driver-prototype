@@ -272,14 +272,16 @@ impl DB {
      * * `wc` - write concern, i.e. getLastError specifications
      *
      * # Returns
-     * () on success, `MongoErr` on failure
+     * `Option<~BsonDocument>` with full response on success (or None
+     * if write concern was 0), `MongoErr` on failure
      *
      * # Failure Types
      * * invalid write concern specification (should never happen)
      * * network
      * * getLastError error, e.g. duplicate ```_id```s
      */
-    pub fn get_last_error(&self, wc : Option<~[WRITE_CONCERN]>) -> Result<(), MongoErr>{
+    pub fn get_last_error(&self, wc : Option<~[WRITE_CONCERN]>)
+                -> Result<Option<~BsonDocument>, MongoErr>{
         // set default write concern (to 1) if not specified
         let concern = match wc {
             None => ~[W_N(1), FSYNC(false)],
@@ -294,7 +296,7 @@ impl DB {
             match opt {
                 JOURNAL(j) => concern_doc.put(~"j", Bool(j)),
                 W_N(w) => {
-                    if w <= 0 { return Ok(()); }
+                    if w <= 0 { return Ok(None); }
                     else { concern_doc.put(~"w", Int32(w as i32)) }
                 }
                 W_STR(w) => concern_doc.put(~"w", UString(w)),
@@ -339,7 +341,7 @@ impl DB {
 
         // unwrap error message
         match err_doc {
-            Null => Ok(()),
+            Null => Ok(Some(copy err_doc_tmp)),
             UString(s) => Err(MongoErr::new(
                             ~"db::get_last_error",
                             ~"getLastError error",
