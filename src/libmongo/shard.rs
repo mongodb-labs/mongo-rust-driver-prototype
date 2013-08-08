@@ -180,11 +180,16 @@ impl MongosClient {
         Ok(out)
      }
 
-     ///Add a tag to the given shard.
-     ///Requires MongoDB 2.2 or higher.
-     pub fn add_shard_tag(&self, shard: ~str, tag: ~str) -> Result<(), MongoErr> {
-         let ch = self.mongos.check_version(~"2.2.0");
-         if ch.is_err() { return ch; }
+    //TODO: using cfg! instead of #[cfg] will clean up a lot of mess,
+    //though the check will be done at runtime. It will still be
+    //much faster than client::check_version.
+
+    ///Add a tag to the given shard.
+    ///Requires MongoDB 2.2 or higher.
+    #[cfg(not(major=1), not(major=0), not(major=2,minor=1), not(major=2,minor=0))]
+    pub fn add_shard_tag(&self, shard: ~str, tag: ~str) -> Result<(), MongoErr> {
+        //let ch = self.mongos.check_version(~"2.2.0");
+        //if ch.is_err() { return ch; }
         let config = DB::new(~"config", copy self.mongos);
         match config.get_collection(~"shards").find_one(
            Some(SpecNotation(fmt!("{ '_id': '%s' }", shard))), None, None) {
@@ -193,15 +198,27 @@ impl MongosClient {
         }
         match config.get_collection(~"shards").update(
             SpecNotation(fmt!("{ '_id': '%s' }", shard)),
-            SpecNotation(fmt!("{ '$addToSet': { 'tags', '%s' } }", tag)),
+            SpecNotation(fmt!("{ '$addToSet': { 'tags': '%s' } }", tag)),
             None, None, None) {
             Ok(_) => Ok(()),
             Err(e) => Err(e)
         }
-     }
+    }
+
+    #[cfg(major=1)]
+    #[cfg(major=0)]
+    #[cfg(major=2,minor=1)]
+    #[cfg(major=2,minor=0)]
+    pub fn add_shard_tag(&self, _shard: ~str, _tag: ~str) -> Result<(), MongoErr> {
+        Err(MongoErr::new(
+            ~"shard::add_shard_tag",
+            ~"this function requires MongoDB 2.2 or higher",
+            ~"please upgrade at mongodb.org"))
+    }
 
      ///Remove a tag from the given shard.
      ///Requires MongoDB 2.2 or higher.
+    #[cfg(not(major=1), not(major=0), not(major=2,minor=1), not(major=2,minor=0))]
      pub fn remove_shard_tag(&self, shard: ~str, tag: ~str) -> Result<(), MongoErr> {
          let ch = self.mongos.check_version(~"2.2.0");
          if ch.is_err() { return ch; }
@@ -213,10 +230,21 @@ impl MongosClient {
         }
         match config.get_collection(~"shards").update(
             SpecNotation(fmt!("{ '_id': '%s' }", shard)),
-            SpecNotation(fmt!("{ '$pull': { 'tags', '%s' } }", tag)),
+            SpecNotation(fmt!("{ '$pull': { 'tags': '%s' } }", tag)),
             None, None, None) {
             Ok(_) => Ok(()),
             Err(e) => Err(e)
         }
      }
+
+    #[cfg(major=1)]
+    #[cfg(major=0)]
+    #[cfg(major=2,minor=1)]
+    #[cfg(major=2,minor=0)]
+    pub fn remove_shard_tag(&self, _shard: ~str, _tag: ~str) -> Result<(), MongoErr> {
+        Err(MongoErr::new(
+            ~"shard::remove_shard_tag",
+            ~"this function requires MongoDB 2.2 or higher",
+            ~"please upgrade at mongodb.org"))
+    }
 }

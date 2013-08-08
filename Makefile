@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Preprocessor versioning info
+MAJOR_VERS := $(shell mongo --version | grep -o '[0-9].[0-9].[0-9]' | cut -d'.' -f1)
+MINOR_VERS := $(shell mongo --version | grep -o '[0-9].[0-9].[0-9]' | cut -d'.' -f2)
+PATCH_VERS := $(shell mongo --version | grep -o '[0-9].[0-9].[0-9]' | cut -d'.' -f3)
+
 # Rust compilation
 RC = rustc
 RDOC = rustdoc
 RDOCFLAGS = --output-style doc-per-mod --output-format markdown
-FLAGS = -Z debug-info -L ./bin -D unused-unsafe -A unnecessary-allocation $(TOOLFLAGS)
+FLAGS = -Z debug-info -L ./bin -D unused-unsafe -A unnecessary-allocation --cfg major=$(MAJOR_VERS) --cfg minor=$(MINOR_VERS) --cfg patch=$(PATCH_VERS) $(TOOLFLAGS)
 
 # C compilation
 CC = gcc

@@ -29,7 +29,7 @@ fn test_sharding() {
         Err(e) => fail!("%s", e.to_str()),
     }
 
-    let mongos = ShardController::new(m);
+    let mongos = MongosClient::new(m);
 
     let mongod = @Client::new();
     match mongod.connect(~"127.0.0.1", 27017) {
@@ -55,7 +55,7 @@ fn test_sharding() {
 
     match mongos.enable_sharding(db_str) {
         Ok(_) => (),
-        Err(e) => fail!("%s", e.to_str())
+        Err(e) => fail!("%s", e.to_str()) //FIXME: maybe this should be debug?
     }
 
     info!("pre-enabling status");
@@ -77,6 +77,11 @@ fn test_sharding() {
     info!("post-enabling status");
     match mongos.status() {
         Ok(s) => info!(fmt!("Sharding status: %s", s)),
+        Err(e) => fail!("%s", e.to_str())
+    }
+
+    match mongos.add_shard_tag(~"shard0000", ~"TESTTAG") {
+        Ok(_) => (),
         Err(e) => fail!("%s", e.to_str())
     }
 
