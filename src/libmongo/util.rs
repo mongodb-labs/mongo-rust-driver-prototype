@@ -14,6 +14,7 @@
  */
 
 use extra::treemap::*;
+use url=extra::net::url;    // since "decode" also in url
 
 use bson::encode::*;
 use bson::formattable::*;
@@ -60,6 +61,92 @@ impl ToStr for MongoErr {
      */
     pub fn to_str(&self) -> ~str {
         fmt!("ERR | %s | %s => %s", self.err_type, self.err_name, self.err_msg)
+    }
+}
+
+pub struct MongoUri {
+    user : Option<url::UserInfo>,
+    hosts : ~[~str],
+    ports : ~[uint],
+    db : ~str,
+    options : url::Query,    // XXX tmp
+}
+
+impl FromStr for MongoUri {
+    pub fn from_str(s : &str) -> Option<MongoUri> {
+        // uri doesn't *quite* work with Rust's URL from_str,
+        //      so we massage things a little
+        let mut uri = s.to_owned();
+
+        // look for possible host list and substitute colons
+        let start = match uri.find_str("@") {
+            Some(ind) => ind,
+            None => match uri.find_str("://") {
+                Some(ind) => ind+2,
+                None => return None,    // know cannot be uri
+            },
+        };
+        let end = match uri.find_str("?") {
+            Some(ind) => {
+                if ind <= start { uri.len() }
+                else { ind }
+            }
+            None => uri.len(),
+        };
+        let repl_str = "RUST.DRIVER.COLON.REPLACE";
+        let fst = uri.slice(0, start).to_owned();
+        let middle = uri.slice(start, end).replace(":", repl_str).to_owned();
+        let lst = uri.slice(end, uri.len()).to_owned();
+        uri = fmt!("%s%s%s", fst, middle, lst);
+
+        // now try to parse
+        match FromStr::from_str::<url::Url>(uri) {
+            Some(url) => {
+                if url.scheme != ~"mongodb" { return None; }
+                if (url.path.len() > 0 && url.path.char_at(0) != '/')
+                        || (url.query.len() > 0 && url.path.len() <= 0)
+                        || (uri.find_str("?").is_some()
+                                && url.path.find_str("/").is_none()) {
+                    return None;
+                }
+                let mut host_str = url.host.to_owned();
+                host_str = host_str.replace(repl_str, ":");
+                let mut hosts_iter = host_str.split_iter(',');
+                let mut hosts_full = ~[];
+                for hosts_iter.advance |h| { hosts_full.push(h); }
+                let mut hosts = ~[];
+                let mut ports = ~[];
+                if url.port.is_some() {
+                    if hosts_full.len() > 1 { return None; }
+                    else {
+                        match FromStr::from_str::<uint>(url.port.clone().unwrap()) {
+                            Some(p) => ports.push(p),
+                            None => return None,
+                        }
+                    }
+                }
+                for hosts_full.iter().advance |&h| {
+                    match parse_host(h) {
+                        Ok((host_str, po)) => {
+                            hosts.push(host_str);
+                            ports.push(po);
+                        }
+                        Err(_) => return None,
+                    }
+                }
+                let result = Some(MongoUri {
+                    user : url.user.clone(),
+                    hosts : hosts,
+                    ports : ports,
+                    db : if url.path.len() > 1 {
+                            url.path.slice_from(1).to_owned()
+                        } else { ~"" },
+                    options : url.query.clone(),
+                });
+                result
+            }
+            None => None,
+        }
     }
 }
 
@@ -222,6 +309,7 @@ impl TagSet {
     }
 }
 
+#[deriving(Clone, Eq)]
 pub enum WRITE_CONCERN {
     JOURNAL(bool),      // wait for next journal commit?
     W_N(int),           // replicate to how many? (number)
@@ -292,7 +380,7 @@ macro_rules! process_flags(
 pub fn parse_host(host_str : &str) -> Result<(~str, uint), MongoErr> {
     let mut port_str = fmt!("%?", MONGO_DEFAULT_PORT);
     let mut ip_str = match host_str.find_str(":") {
-        None => host_str.to_owned(),
+        None => { host_str.to_owned() }
         Some(i) => {
             port_str = host_str.slice_from(i+1).to_owned();
             host_str.slice_to(i).to_owned()
@@ -303,10 +391,37 @@ pub fn parse_host(host_str : &str) -> Result<(~str, uint), MongoErr> {
 
     match FromStr::from_str::<uint>(port_str) {
         None => Err(MongoErr::new(
-                        ~"conn_replica::parse_host",
+                        ~"util::parse_host",
                         ~"unexpected host string format",
                         fmt!("host string should be \"[IP ~str]:[uint]\",
                                     found %s:%s", ip_str, port_str))),
         Some(k) => Ok((ip_str, k)),
+    }
+}
+
+pub fn parse_tags(tag_str : &str) -> Result<Option<TagSet>, MongoErr> {
+    if tag_str.find_str(":").is_some() {
+        let mut tags = TagSet::new([]);
+        let mut it = tag_str.split_iter(',');
+        for it.advance |tag| {
+            match tag.find_str(":") {
+                Some(i) => {
+                    tags.set(   tag.slice_to(i).to_owned(),
+                                tag.slice_from(i+1).to_owned());
+                }
+                None => return Err(MongoErr::new(
+                                    ~"util::parse_tags",
+                                    ~"improperly specified tags",
+                                    fmt!("missing colon in tag %s", tag))),
+            }
+        }
+        Ok(if tags.tags.len() > 0 { Some(tags) } else { None })
+    } else if tag_str.len() == 0 {
+        Ok(None)
+    } else {
+        Err(MongoErr::new(
+                ~"util::parse_tags",
+                ~"improper tag specification",
+                fmt!("expected comma-delimited string of colon-separated pairs, got %s", tag_str)))
     }
 }

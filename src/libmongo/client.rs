@@ -39,6 +39,7 @@ use rs::RSConfig;
 pub struct Client {
     conn : Cell<@Connection>,
     timeout : u64,
+    wc : Cell<Option<~[WRITE_CONCERN]>>,
     priv rs_conn : Cell<@ReplicaSetConnection>,
     priv cur_requestId : Cell<i32>,     // first unused requestId
     // XXX index cache?
@@ -60,14 +61,11 @@ impl Client {
         Client {
             conn : Cell::new_empty(),
             timeout : MONGO_TIMEOUT_SECS,
+            wc : Cell::new(None),
             rs_conn : Cell::new_empty(),
             cur_requestId : Cell::new(0),
         }
     }
-
-    /*pub fn parse_uri(uri : ~str) {
-        // XXX
-    }*/
 
     pub fn get_admin(@self) -> DB {
         DB::new(~"admin", self)
@@ -260,6 +258,209 @@ impl Client {
     }
 
     /**
+     * Connect via URI connection string.
+     *
+     * See [Connection String URI Format](http://docs.mongodb.org/manual/reference/connection-string/)
+     * for the URI specification. Please note, however, that because of the
+     * way the Rust URL parser operates, if the username/password option is
+     * included, so must be the '/' that would follow the hosts, even if
+     * the desired database to use is admin (the default).
+     *
+     * Currently supported options:
+     * * w
+     * * wtimeoutMS
+     * * journal
+     * * readPreference
+     * * readPreferenceTags
+     *
+     * # Arguments
+     * * `uri_str` - string containing connection parameters
+     *
+     * # Returns
+     * () on success, MongoErr on failure (on URI parsing, connection, or
+     * option setting)
+     */
+    pub fn connect_with_uri(@self, uri_str : &str) -> Result<(), MongoErr> {
+        match self._try_connect_with_uri(uri_str) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                self.disconnect();
+                Err(e)
+            }
+        }
+    }
+
+    pub fn _try_connect_with_uri(@self, uri_str : &str) -> Result<(), MongoErr> {
+        let uri = match FromStr::from_str::<MongoUri>(uri_str) {
+            Some(ok) => ok,
+            None => return Err(MongoErr::new(
+                                ~"client::connect_with_uri",
+                                ~"could not parse into URI",
+                                uri_str.to_owned())),
+        };
+
+        // try to connect given hosts
+        let result = if uri.hosts.len() > 1 {
+            let mut seed = ~[];
+            let mut it = uri.hosts.iter().zip(uri.ports.iter());
+            for it.advance |(&h, &p)| {
+                seed.push((h, p));
+            }
+            self.connect_to_rs(seed)
+        } else if uri.hosts.len() == 1 {
+            self.connect(uri.hosts[0].as_slice(), uri.ports[0])
+        } else { return Err(MongoErr::new(
+                                ~"client::connect_with_uri",
+                                ~"could not connect",
+                                ~"no hosts specified")); };
+        match result {
+            Ok(_) => (),
+            Err(e) => return Err(e),
+        }
+
+        // authenticate if applicable
+        let mut db_str = ~"admin";
+        if uri.db.len() != 0 { db_str = uri.db.clone(); }
+        if uri.user.is_some() {
+            let db = DB::new(db_str, self);
+            let uname = uri.user.clone().unwrap().user;
+            let pass = match uri.user.clone().unwrap().pass {
+                None => ~"",
+                Some(s) => s.clone(),
+            };
+            match db.authenticate(uname, pass) {
+                Ok(_) => (),
+                Err(e) => return Err(e),
+            }
+        }
+
+        // parse options
+        let mut wc = ~[];
+        let mut read_pref = None;
+        let mut ts_list = ~[];
+        for uri.options.iter().advance |&(opt, val)| {
+            match opt {
+                // write concern options
+                ~"w" => {
+                    match FromStr::from_str::<int>(val) {
+                        Some(n) => wc.push(W_N(n)),
+                        None => {
+                            if val.find_str(":").is_some() {
+                                let tags = match parse_tags(val) {
+                                    Ok(None) => return Err(MongoErr::new(
+        ~"client::connect_with_uri",
+        ~"unexpected write concern",
+        ~"cannot specify empty tagset for write concern")),
+                                    Ok(Some(t)) => t,
+                                    Err(e) => {
+                                        self.disconnect();
+                                        return Err(e);
+                                    }
+                                };
+                                wc.push(W_TAGSET(tags));
+                            } else {
+                                // NB currently succeeds even if majority but not RS
+                                wc.push(W_STR(val.clone()));
+                            }
+                        }
+                    }
+                }
+                ~"wtimeoutMS" => {
+                    match FromStr::from_str::<int>(val) {
+                        None => return Err(MongoErr::new(
+        ~"client::connect_with_uri",
+        ~"unexpected wtimeout",
+        fmt!("expected int, found %?", val))),
+                        Some(t) => wc.push(WTIMEOUT(t)),
+                    }
+                }
+                ~"journal" => {
+                    match val {
+                        ~"true" => wc.push(JOURNAL(true)),
+                        ~"false" => wc.push(JOURNAL(false)),
+                        _ => return Err(MongoErr::new(
+        ~"client::connect_with_uri",
+        ~"unexpected journal option",
+        fmt!("expected true/false, found %s", val))),
+                    }
+                }
+                // read preference options
+                ~"readPreference" => {
+                    match read_pref {
+                        None => (),
+                        Some(ref pref) => return Err(MongoErr::new(
+        ~"client::connect_with_uri",
+        ~"duplicate read preference settings",
+        fmt!("prev:%?, now:%s", pref, val))),
+                    }
+                    read_pref = match val {
+                        ~"primary" => Some(PRIMARY_ONLY),
+                        ~"primaryPreferred" => Some(PRIMARY_PREF(None)),
+                        ~"secondary" => Some(SECONDARY_ONLY(None)),
+                        ~"secondaryPreferred" => Some(SECONDARY_PREF(None)),
+                        ~"nearest" => Some(NEAREST(None)),
+                        _ => return Err(MongoErr::new(
+        ~"client::connect_with_uri",
+        ~"unknown read preference",
+        fmt!("expected primary[Preferred], secondary[Preferred], or nearest; found %s", val))),
+                    };
+                }
+                ~"readPreferenceTags" => {
+                    let tags = match parse_tags(val) {
+                        Ok(None) => TagSet::new([]),
+                        Ok(Some(t)) => t,
+                        Err(e) => return Err(e),
+                    };
+                    ts_list.push(tags);
+                }
+                // other (unsupported)
+                _ => return Err(MongoErr::new(
+                                ~"client::connect_with_uri",
+                                ~"unsupported option",
+                                fmt!("%?", opt))),
+            }
+        }
+
+        // write concern options supported; set
+        if wc.len() > 0 { self.set_default_wc(Some(wc)); }
+
+        // read preference options supported; set
+        let ts_list = match ts_list.len() {
+            0 => None,
+            _ => Some(ts_list),
+        };
+        if ts_list.is_some() && read_pref.is_none() {
+            return Err(MongoErr::new(
+                            ~"client::connect_with_uri",
+                            ~"specified read preference tags but no read preference",
+                            ~"default read preference is primary; cannot specify tags with primary"));
+        }
+        let read_pref = match read_pref {
+            None => None,
+            Some(PRIMARY_ONLY) => {
+                if ts_list.is_some() {
+                    return Err(MongoErr::new(
+                                ~"client::connect_with_uri",
+                                ~"error setting read preference",
+                                ~"cannot specify list of tagsets with PRIMARY_ONLY"));
+                } else { Some(PRIMARY_ONLY) }
+            }
+            Some(PRIMARY_PREF(_)) => Some(PRIMARY_PREF(ts_list)),
+            Some(SECONDARY_ONLY(_)) => Some(SECONDARY_ONLY(ts_list)),
+            Some(SECONDARY_PREF(_)) => Some(SECONDARY_PREF(ts_list)),
+            Some(NEAREST(_)) => Some(NEAREST(ts_list)),
+        };
+        if read_pref.is_some() {
+            match self.set_read_pref(read_pref.unwrap()) {
+                Ok(_) => (),
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(())
+    }
+
+    /**
      * Initiates given configuration specified as `RSConfig`, and connects
      * to the replica set.
      *
@@ -325,11 +526,21 @@ impl Client {
         let op = rs.read_pref.take();
         rs.read_pref_changed.take();
         // might as well only note updated if actually changed
-        rs.read_pref_changed.put_back( if op == np { false } else { true });
+        rs.read_pref_changed.put_back( if op == np { false } else { true } );
         rs.read_pref.put_back(np);
         // put everything back
         self.rs_conn.put_back(rs);
         Ok(op)
+    }
+
+    /**
+     * Sets default write concern to use, returning the former one.
+     */
+    pub fn set_default_wc(&self, wc : Option<~[WRITE_CONCERN]>)
+                -> Option<~[WRITE_CONCERN]> {
+        let old = self.wc.take();
+        self.wc.put_back(wc);
+        old
     }
 
     /**

@@ -36,6 +36,7 @@ mod add_user;
 mod authenticate;
 mod logout;
 mod validate;
+mod uri_node_parse;
 
 #[cfg(shard)]
 mod shard_dbs;
@@ -57,3 +58,5 @@ mod rs_initiate;            // 37018-37022 hosts (uninitiated)
 mod rs_members;             // 37018-37022 seed
 #[cfg(rs)]
 mod rs_read_pref;           // 27018 seed
+#[cfg(rs)]
+mod uri_rs_parse;

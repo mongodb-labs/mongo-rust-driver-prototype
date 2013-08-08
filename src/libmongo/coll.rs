@@ -145,7 +145,14 @@ impl Collection {
                         0i32,
                         bson_doc);
 
-        match self.client._send_msg(msg_to_bytes(&msg), (self.db.clone(), wc), false) {
+        let use_wc = match wc {
+            None => self.client.wc.clone().take(),
+            Some(concern) => Some(concern),
+        };
+
+        match self.client._send_msg(msg_to_bytes(&msg),
+                (self.db.clone(), use_wc),
+                false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::insert",
@@ -196,7 +203,14 @@ impl Collection {
                         flags,
                         bson_docs);
 
-        match self.client._send_msg(msg_to_bytes(&msg), (self.db.clone(), wc), false) {
+        let use_wc = match wc {
+            None => self.client.wc.clone().take(),
+            Some(concern) => Some(concern),
+        };
+
+        match self.client._send_msg(msg_to_bytes(&msg),
+                (self.db.clone(), use_wc),
+                false) {
             Ok(_) => Ok(()),
             Err(e) => return Err(MongoErr::new(
                                     ~"coll::insert_batch",
