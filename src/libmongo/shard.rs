@@ -220,8 +220,8 @@ impl MongosClient {
      ///Requires MongoDB 2.2 or higher.
     #[cfg(not(major=1), not(major=0), not(major=2,minor=1), not(major=2,minor=0))]
      pub fn remove_shard_tag(&self, shard: ~str, tag: ~str) -> Result<(), MongoErr> {
-         let ch = self.mongos.check_version(~"2.2.0");
-         if ch.is_err() { return ch; }
+         //let ch = self.mongos.check_version(~"2.2.0");
+         //if ch.is_err() { return ch; }
         let config = DB::new(~"config", copy self.mongos);
         match config.get_collection(~"shards").find_one(
            Some(SpecNotation(fmt!("{ '_id': '%s' }", shard))), None, None) {

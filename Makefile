@@ -117,4 +117,3 @@ clean:
 
 tidy:
 	for f in `find . -name '*.rs'`; do perl -pi -e "s/[ \t]*$$//" $$f; done
-	for f in `find . -name '*.rc'`; do perl -pi -e "s/[ \t]*$$//" $$f; done

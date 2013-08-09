@@ -18,7 +18,9 @@
 #[license="Apache 2.0"];
 
 extern mod std;
+extern mod extra;
 
 pub mod md5;
 pub mod stream;
 pub mod ord_hash;
+pub mod mockable;

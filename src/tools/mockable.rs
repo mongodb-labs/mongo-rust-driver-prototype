@@ -14,6 +14,7 @@
  */
 
 use extra::future;
+use extra::net::tcp;
 
 pub trait Mockable {
     fn mock(state: int) -> Self;
@@ -96,5 +97,11 @@ impl<T:Mockable,U:Mockable> Mockable for Result<T,U> {
 impl<T:Mockable + Send> Mockable for future::Future<T> {
     fn mock(state: int) -> future::Future<T> {
         do future::spawn { Mockable::mock::<T>(state) }
+    }
+}
+
+impl Mockable for tcp::TcpErrData {
+    fn mock(_: int) -> tcp::TcpErrData {
+        tcp::TcpErrData { err_name: ~"mock error", err_msg: ~"mock" }
     }
 }

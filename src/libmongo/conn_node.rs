@@ -437,7 +437,7 @@ mod tests {
     use std::cell::*;
     use extra::net::tcp::*;
     use extra::future;
-    use mockable::*;
+    use tools::mockable;
     use conn::*;
 
     struct MockPort {
@@ -448,30 +448,24 @@ mod tests {
         state: int
     }
 
-    impl Mockable for TcpErrData {
-        fn mock(_: int) -> TcpErrData {
-            TcpErrData { err_name: ~"mock error", err_msg: ~"mock" }
-        }
-    }
-
     impl GenericPort<PortResult> for MockPort {
         fn recv(&self) -> PortResult {
-            Mockable::mock::<PortResult>(self.state)
+            mockable::Mockable::mock::<PortResult>(self.state)
         }
         fn try_recv(&self) -> Option<PortResult> {
-            Mockable::mock::<Option<PortResult>>(self.state)
+            mockable::Mockable::mock::<Option<PortResult>>(self.state)
         }
     }
 
     impl Socket for MockSocket {
         fn read_start(&self) -> Result<@Port<PortResult>, TcpErrData> {
-            Err(Mockable::mock::<TcpErrData>(self.state)) //for now only allow fail mocking
+            Err(mockable::Mockable::mock::<TcpErrData>(self.state)) //for now only allow fail mocking
         }
         fn read_stop(&self) -> Result<(), TcpErrData> {
-            Mockable::mock::<Result<(), TcpErrData>>(self.state)
+            mockable::Mockable::mock::<Result<(), TcpErrData>>(self.state)
         }
         fn write_future(&self, _: ~[u8]) -> future::Future<Result<(), TcpErrData>> {
-            Mockable::mock::<future::Future<Result<(), TcpErrData>>>(self.state)
+            mockable::Mockable::mock::<future::Future<Result<(), TcpErrData>>>(self.state)
         }
     }
 
