@@ -234,7 +234,7 @@ match rs.get_config() {
 ```
 In fact, we can edit the ```conf``` struct however we wish in order to reconfigure the replica set.
 
-If, on the other hand, we want to change read preference, we must go through the client, since read preference is not a property of the replica set but rather of the connection. The default is ```PRIMARY_ONLY``; we change it to ```SECONDARY_PREFERRED``` with a tagset related to the earlier change of tags.
+If, on the other hand, we want to change read preference, we must go through the client, since read preference is not a property of the replica set but rather of the connection. The default is ```PRIMARY_ONLY```; we change it to ```SECONDARY_PREFERRED``` with a tagset related to the earlier change of tags.
 ```rust
 let tags = ~[TagSet::new([("sample", "tag")])];
 match client.set_read_pref(SECONDARY_PREF(Some(tags))) {
