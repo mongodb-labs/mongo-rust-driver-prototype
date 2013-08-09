@@ -272,7 +272,7 @@ mod tests {
         let mut inside = BsonDocument::new();
         inside.put_all(~[(~"0", UString(~"hello")), (~"1", Bool(false))]);
         let mut doc2 = BsonDocument::new();
-        doc2.put_all(~[(~"foo", Array(~ copy inside)), (~"baz", UString(~"qux"))]);
+        doc2.put_all(~[(~"foo", Array(~inside.clone())), (~"baz", UString(~"qux"))]);
         assert_eq!(decode(stream2).unwrap(), doc2);
     }
 

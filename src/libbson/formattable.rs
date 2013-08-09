@@ -214,7 +214,7 @@ impl BsonFormattable for json::Json {
         match *self {
             json::Null => Null,
             json::Number(f) => Double(f as f64),
-            json::String(ref s) => UString(copy *s),
+            json::String(ref s) => UString(s.clone()),
             json::Boolean(b) => Bool(b),
             json::List(ref l) => l.to_bson_t(),
             json::Object(ref l) => l.to_bson_t(),
@@ -318,7 +318,7 @@ impl<V:BsonFormattable> BsonFormattable for HashMap<~str,V> {
 
 impl BsonFormattable for BsonDocument {
     fn to_bson_t(&self) -> Document {
-        Embedded(~(copy *self))
+        Embedded(~(self.clone()))
     }
 
     fn from_bson_t(doc: &Document) -> Result<BsonDocument,~str> {

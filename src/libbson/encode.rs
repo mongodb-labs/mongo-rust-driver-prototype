@@ -563,18 +563,18 @@ mod tests {
         let mut inside = BsonDocument::new();
         inside.put_all(~[(~"0", UString(~"hello")), (~"1", Bool(false))]);
         let mut doc2 = BsonDocument::new();
-        doc2.put_all(~[(~"foo", Array(~ copy inside)), (~"baz", UString(~"qux"))]);
+        doc2.put_all(~[(~"foo", Array(~inside.clone())), (~"baz", UString(~"qux"))]);
 
         assert_eq!(doc2.to_bson(), ~[45,0,0,0,4,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
 
         //embedded objects
         let mut doc3 = BsonDocument::new();
-        doc3.put_all(~[(~"foo", Embedded(~ copy inside)), (~"baz", UString(~"qux"))]);
+        doc3.put_all(~[(~"foo", Embedded(~inside.clone())), (~"baz", UString(~"qux"))]);
 
         assert_eq!(doc3.to_bson(), ~[45,0,0,0,3,102,111,111,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
 
         let mut doc4 = BsonDocument::new();
-        doc4.put_all(~[(~"foo", JScriptWithScope(~"wat", ~ copy inside)), (~"baz", UString(~"qux"))]);
+        doc4.put_all(~[(~"foo", JScriptWithScope(~"wat", ~inside.clone())), (~"baz", UString(~"qux"))]);
         assert_eq!(doc4.to_bson(), ~[53,0,0,0,15,102,111,111,0,30,0,0,0,119,97,116,0,22,0,0,0,2,48,0,6,0,0,0,104,101,108,108,111,0,8,49,0,0,0,2,98,97,122,0,4,0,0,0,113,117,120,0,0]);
 
 
@@ -671,7 +671,7 @@ mod tests {
     fn test_embed_whole_encode() {
         let jstring = "{\"foo\": [\"hello\", false], \"baz\": \"qux\"}";
         let doc = match ObjParser::from_string::<Document, ExtendedJsonParser<~[char]>>(jstring).unwrap() {
-            Embedded(ref map) => BsonDocument::from_map(copy map.fields),
+            Embedded(ref map) => BsonDocument::from_map(map.fields.clone()),
             _ => fail!("test_embed_whole_encode parse failure")
         };
 
