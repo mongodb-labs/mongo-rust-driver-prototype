@@ -211,6 +211,7 @@ pub enum REPLY_FLAG {
     AWAIT_CAPABLE = 1 << 3,
 }
 
+#[deriving(Clone,Eq)]
 pub enum QuerySpec {
     SpecObj(BsonDocument),
     SpecNotation(~str)

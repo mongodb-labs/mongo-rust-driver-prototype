@@ -48,7 +48,7 @@ fn test_capped_coll() {
 
     let n_tmp = 200;
     let (_, ins_strs_tmp, ins_docs_tmp) = fill_coll(~"rust", ~"capped_tmp", client, n_tmp);
-    coll.insert(copy ins_strs_tmp[1], None);
+    coll.insert(ins_strs_tmp[1].clone(), None);
 
     // regular cursor
     match coll.find(None, None, None) {
@@ -79,7 +79,7 @@ fn test_capped_coll() {
                     let client_tmp = @Client::new();
                     client_tmp.connect(~"127.0.0.1", MONGO_DEFAULT_PORT);
                     let coll_tmp = Collection::new(~"rust", ~"capped", client_tmp);
-                    coll_tmp.insert(copy ins_strs_tmp[j], None);
+                    coll_tmp.insert(ins_strs_tmp[j].clone(), None);
                     j += 1;
                 }
             }

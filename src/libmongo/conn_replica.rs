@@ -381,7 +381,7 @@ impl ReplicaSetConnection {
                     None => (),
                     Some(doc) => {
                         match doc {
-                            &Array(ref l) => list_doc = Some(copy *l),
+                            &Array(ref l) => list_doc = Some(l.clone()),
                             _ => err = Some(MongoErr::new(
     ~"conn_replica::reconnect_with_seed",
     ~"ismaster response in unexpected format",
@@ -468,7 +468,7 @@ impl ReplicaSetConnection {
                             None => (),
                             Some(doc) => {
                                 match doc {
-                                    &Array(ref l) => list_doc = Some(copy *l),
+                                    &Array(ref l) => list_doc = Some(l.clone()),
                                     _ => err = Some(MongoErr::new(
             ~"conn_replica::reconnect_with_seed",
             ~"ismaster response in unexpected format",

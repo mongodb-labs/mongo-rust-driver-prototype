@@ -48,16 +48,15 @@ fn test_update() {
         tot += 1;
         match doc.find(~"a") {
             Some(doc) => {
-                let tmp_doc = copy *doc;
-                match tmp_doc {
-                    Double(val) => {
-                        match val {
+                match doc {
+                    &Double(ref val) => {
+                        match *val {
                             2f64 => fail!("a not updated correctly, still found 2"),
                             3f64 => a3 += 1,
                             _ => (),
                         }
                     }
-                    _ => fail!("found %? as value for a", copy *doc),
+                    _ => fail!("found %? as value for a", doc.clone()),
                 }
             }
             None => fail!("no field a found"),

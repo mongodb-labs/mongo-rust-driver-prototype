@@ -239,7 +239,7 @@ impl Collection {
             Some(id) => {
                 let mut query = BsonDocument::new();
                 query.put(~"_id", id.clone());
-                self.update(SpecObj(query), SpecObj(copy bson_doc), Some(~[UPSERT]), None, wc)
+                self.update(SpecObj(query), SpecObj(bson_doc.clone()), Some(~[UPSERT]), None, wc)
             },
         }
     }

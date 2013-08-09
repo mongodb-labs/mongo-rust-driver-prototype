@@ -34,7 +34,7 @@ fn test_good_insert_single() {
 
     // create and insert document
     let ins = ~"{ \"_id\":0, \"a\":0, \"msg\":\"first insert!\" }";
-    let ins_doc = match (copy ins).to_bson_t() {
+    let ins_doc = match ins.to_bson_t() {
             Embedded(bson) => *bson,
             _ => fail!("what happened"),
         };

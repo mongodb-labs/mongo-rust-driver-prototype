@@ -133,7 +133,7 @@ fn main() {
 
         let coll = Collection::new(~"rust_demo", ~"capped", tmp_client);
         for batch.iter().advance |&p| {
-            match coll.insert(copy p, None) {
+            match coll.insert(p.clone(), None) {
                 Ok(_) => println(fmt!("    inserted %?", p)),
                 Err(e) => println(fmt!("%s", e.to_str())),
             };

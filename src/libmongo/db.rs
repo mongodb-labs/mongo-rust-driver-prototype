@@ -228,7 +228,7 @@ impl DB {
         let coll = Collection::new(self.name.clone(), SYSTEM_COMMAND.to_owned(), self.client);
 
         //let ret_msg = match coll.find_one(Some(cmd), None, None, None) {
-        let ret_msg = match coll.find_one(Some(copy cmd), None, Some(~[NO_CUR_TIMEOUT])) {
+        let ret_msg = match coll.find_one(Some(cmd.clone()), None, Some(~[NO_CUR_TIMEOUT])) {
             Ok(msg) => msg,
             Err(e) => return Err(MongoErr::new(
                                     ~"db::run_command",
@@ -343,7 +343,7 @@ impl DB {
                 None => (),
                 Some(doc) => {
                     err_found = true;
-                    err_doc = copy *doc;
+                    err_doc = doc.clone();
                 }
             }
         };
@@ -357,7 +357,7 @@ impl DB {
 
         // unwrap error message
         match err_doc {
-            Null => Ok(Some(copy err_doc_tmp)),
+            Null => Ok(Some(err_doc_tmp.clone())),
             UString(s) => Err(MongoErr::new(
                             ~"db::get_last_error",
                             ~"getLastError error",

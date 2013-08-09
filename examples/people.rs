@@ -23,6 +23,7 @@ use bson::formattable::*;
 
 static MAX_LEN : uint = 16;
 
+#[deriving(Clone,Eq)]
 pub struct Person {
     _id : Option<Document>,
     ind : Option<i32>,
@@ -36,27 +37,27 @@ impl BsonFormattable for Person {
     pub fn to_bson_t(&self) -> Document {
         let mut bson_doc = BsonDocument::new();
         if self.ind.is_some() {
-            bson_doc.put(~"ind", Int32((copy self.ind).unwrap()));
+            bson_doc.put(~"ind", Int32(self.ind.clone().unwrap()));
         }
         if self.name.is_some() {
-            bson_doc.put(~"name", UString((copy self.name).unwrap()));
+            bson_doc.put(~"name", UString(self.name.clone().unwrap()));
         }
         if self.id_str.is_some() {
-             bson_doc.put(~"id_str", UString((copy self.id_str).unwrap()));
+             bson_doc.put(~"id_str", UString(self.id_str.clone().unwrap()));
         }
         if self.val.is_some() {
-            bson_doc.put(~"val", Int32((copy self.val).unwrap()));
+            bson_doc.put(~"val", Int32(self.val.clone().unwrap()));
         }
         let mut sub_bson_doc = BsonDocument::new();
         if self.point.is_some() {
-            let (x, y) = (copy self.point).unwrap();
+            let (x, y) = self.point.clone().unwrap();
             sub_bson_doc.put(~"x", Double(x));
             sub_bson_doc.put(~"y", Double(y));
             bson_doc.put(~"point", Embedded(~sub_bson_doc));
         }
 
         if self._id.is_some() {
-            bson_doc.put(~"_id", (copy self._id).unwrap());
+            bson_doc.put(~"_id", self._id.clone().unwrap());
         }
 
         Embedded(~bson_doc)
@@ -70,55 +71,55 @@ impl BsonFormattable for Person {
 
         let _id = match bson_doc.find(~"_id") {
             None => None,
-            Some(d) => Some(copy *d),
+            Some(d) => Some(d.clone()),
         };
 
         let ind = match bson_doc.find(~"ind") {
             None => None,
-            Some(d) => match *d {
-                Int32(i) => Some(i),
+            Some(d) => match d {
+                &Int32(ref i) => Some(*i),
                 _ => return Err(~"not Person struct (ind field not Int32)"),
             }
         };
 
         let name = match bson_doc.find(~"name") {
             None => None,
-            Some(d) => match (copy *d) {
-                UString(i) => Some(i),
+            Some(d) => match d {
+                &UString(ref i) => Some(i.clone()),
                 _ => return Err(~"not Person struct (name field not UString)"),
             }
         };
 
         let id_str = match bson_doc.find(~"id_str") {
             None => None,
-            Some(d) => match (copy *d) {
-                UString(i) => Some(i),
+            Some(d) => match d {
+                &UString(ref i) => Some(i.clone()),
                 _ => return Err(~"not Person struct (id_str field not UString)"),
             }
         };
 
         let val = match bson_doc.find(~"val") {
             None => None,
-            Some(d) => match (copy *d) {
-                Int32(i) => Some(i),
+            Some(d) => match d {
+                &Int32(ref i) => Some(*i),
                 _ => return Err(~"not Person struct (val field not Int32)"),
             }
         };
 
         let point_doc = match bson_doc.find(~"point") {
             None => None,
-            Some(d) => match (copy *d) {
-                Embedded(i) => Some(i),
+            Some(d) => match d {
+                &Embedded(ref i) => Some(i.clone()),
                 _ => return Err(~"not Person struct (point field not Embedded BsonDocument)"),
             }
         };
 
         let point = if point_doc.is_some() {
-            let tmp = (copy point_doc).unwrap();
+            let tmp = point_doc.clone().unwrap();
             let x = match tmp.find(~"x") {
                 None => return Err(~"not Person struct (no x field in point)"),
-                Some(d) => match (copy *d) {
-                    Double(i) => i,
+                Some(d) => match d {
+                    &Double(ref i) => *i,
                     _ => return Err(~"not Person struct (x field in point not Double)"),
                 }
             };

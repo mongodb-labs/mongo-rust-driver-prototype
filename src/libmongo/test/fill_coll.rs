@@ -40,7 +40,7 @@ pub fn fill_coll(db : ~str, coll : ~str, client : @Client, n : uint)
                                 \"loc\":{ \"x\":%d, \"y\":%d },
                                 \"insert no\":%d
                             }", i, i/2, i, -i, i+4, i);
-        let ins_doc = match (copy ins_str).to_bson_t() {
+        let ins_doc = match ins_str.to_bson_t() {
                 Embedded(bson) => *bson,
                 _ => fail!("what happened"),
             };

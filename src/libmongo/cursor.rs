@@ -127,8 +127,8 @@ impl Cursor {
                             self.flags,
                             self.skip,
                             self.batch_size,
-                            copy self.query_spec,
-                            copy self.proj_spec);
+                            self.query_spec.clone(),
+                            self.proj_spec.clone());
             match self.client._send_msg(msg_to_bytes(&msg), (self.db.clone(), None), true) {
                 Ok(reply) => match reply {
                     Some(r) => match r {
@@ -302,9 +302,9 @@ impl Cursor {
      * `~BsonDocument` explaining query on success, `MongoErr` on failure
      */
     pub fn explain(&mut self) -> Result<~BsonDocument, MongoErr> {
-        let mut query = copy self.query_spec;
+        let mut query = self.query_spec.clone();
         query.put(~"$explain", Double(1f64));
-        let mut tmp_cur = Cursor::new(  query, copy self.proj_spec,
+        let mut tmp_cur = Cursor::new(  query, self.proj_spec.clone(),
                                         &Collection::new(   self.db.clone(),
                                                             self.coll.clone(),
                                                             self.client),

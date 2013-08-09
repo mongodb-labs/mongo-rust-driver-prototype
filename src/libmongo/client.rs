@@ -106,7 +106,7 @@ impl Client {
                             ~"missing \"databases\" field in reply")),
             Some(tmp_doc) => {
                 match tmp_doc {
-                    &Array(ref l) => copy *l,
+                    &Array(ref l) => l.clone(),
                     _ => return Err(MongoErr::new(
                             ~"client::get_dbs",
                             ~"could not get databases",

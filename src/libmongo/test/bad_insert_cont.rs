@@ -39,7 +39,7 @@ fn test_bad_insert_cont() {
     let n = 20;
     for n.times {
         let ins_str = fmt!("{ \"_id\":%d, \"a\":%d, \"b\":\"ins %d\" }", 2*i/3, i/2, i);
-        let ins_doc = match (copy ins_str).to_bson_t() {
+        let ins_doc = match ins_str.to_bson_t() {
                 Embedded(bson) => *bson,
                 _ => fail!("what happened"),
             };
