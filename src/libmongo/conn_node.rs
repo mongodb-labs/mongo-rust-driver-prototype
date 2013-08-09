@@ -281,8 +281,8 @@ impl NodeConnection {
                                 ~"isMaster runcommand response in unexpected format",
                                 ~"no \"ismaster\" field")),
                 Some(doc) => {
-                    match copy *doc {
-                        Bool(val) => Ok(val),
+                    match doc {
+                        &Bool(ref val) => Ok(*val),
                         _ => Err(MongoErr::new(
                                 ~"conn_replica::connect",
                                 ~"isMaster runcommand response in unexpected format",

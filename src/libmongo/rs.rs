@@ -232,22 +232,22 @@ impl BsonFormattable for RSConfig {
 
         let _id = match bson_doc.find(~"_id") {
             None => None,
-            Some(doc) => match copy *doc {
-                UString(s) => Some(s),
+            Some(doc) => match doc {
+                &UString(ref s) => Some(s.to_owned()),
                 _ => return Err(~"not RSConfig struct (_id field not UString)"),
             },
         };
         let version = match bson_doc.find(~"version") {
             None => return Err(~"not RSConfig struct (no version field)"),
-            Some(doc) => match copy *doc {
-                Int32(v) => v,
+            Some(doc) => match doc {
+                &Int32(ref v) => *v,
                 _ => return Err(~"not RSConfig struct (version field not Int32)"),
             },
         };
         let members = match bson_doc.find(~"members") {
             None => return Err(~"not RSConfig struct (no members field)"),
-            Some(doc) => match copy *doc {
-                Array(a) => match BsonFormattable::from_bson_t::<~[RSMember]>(&Array(a)) {
+            Some(doc) => match doc {
+                &Array(_) => match BsonFormattable::from_bson_t::<~[RSMember]>(doc) {
                     Ok(arr) => arr,
                     Err(e) => return Err(fmt!("not RSConfig struct (members field: %s)", e)),
                 },
@@ -257,8 +257,8 @@ impl BsonFormattable for RSConfig {
         let mut s_arr = ~[];
         match bson_doc.find(~"settings") {
             None => (),
-            Some(doc) => match copy *doc {
-                Embedded(sub) => {
+            Some(doc) => match doc {
+                &Embedded(ref sub) => {
                     for sub.fields.iter().advance |&(@k,@v)| {
                         let mut tmp = BsonDocument::new();
                         tmp.put(k,v);
@@ -324,8 +324,8 @@ impl BsonFormattable for RS_OPTION {
 
         match bson_doc.find(~"chainingAllowed") {
             None => (),
-            Some(s) => match copy *s {
-                Bool(v) => return Ok(CHAINING_ALLOWED(v)),
+            Some(s) => match s {
+                &Bool(ref v) => return Ok(CHAINING_ALLOWED(*v)),
                 _ => return Err(~"not RS_OPTION (chainingAllowed field not Bool)"),
             },
         }
@@ -353,7 +353,7 @@ impl BsonFormattable for RS_MEMBER_OPTION {
             &BUILD_INDS(v) => (~"buildIndexes", Bool(v)),
             &HIDDEN(v) => (~"hidden", Bool(v)),
             &PRIORITY(p) => (~"priority", Double(p as f64)),
-            &TAGS(ref ts) => (~"tags", ts.clone().to_bson_t()),
+            &TAGS(ref ts) => (~"tags", ts.to_bson_t()),
             &SLAVE_DELAY(d) => (~"slaveDelay", Int32(d as i32)),
             &VOTES(n) => (~"votes", Int32(n as i32)),
         };
@@ -370,15 +370,15 @@ impl BsonFormattable for RS_MEMBER_OPTION {
 
         match bson_doc.find(~"arbiterOnly") {
             None => (),
-            Some(s) => match copy *s {
-                Bool(v) => return Ok(ARB_ONLY(v)),
+            Some(s) => match s {
+                &Bool(ref v) => return Ok(ARB_ONLY(*v)),
                 _ => return Err(~"not RS_MEMBER_OPTION (arbiterOnly field not Bool)"),
             },
         }
         match bson_doc.find(~"buildIndexes") {
             None => (),
-            Some(s) => match copy *s {
-                Bool(v) => return Ok(BUILD_INDS(v)),
+            Some(s) => match s {
+                &Bool(ref v) => return Ok(BUILD_INDS(*v)),
                 _ => return Err(~"not RS_MEMBER_OPTION (buildIndexes field not Bool)"),
             },
         }

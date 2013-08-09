@@ -105,9 +105,8 @@ impl Client {
                             ~"could not get databases",
                             ~"missing \"databases\" field in reply")),
             Some(tmp_doc) => {
-                let tmp = copy *tmp_doc;
-                match tmp {
-                    Array(l) => l,
+                match tmp_doc {
+                    &Array(ref l) => copy *l,
                     _ => return Err(MongoErr::new(
                             ~"client::get_dbs",
                             ~"could not get databases",
@@ -120,8 +119,8 @@ impl Client {
             match doc {
                 Embedded(bson_doc) => match bson_doc.find(~"name") {
                     Some(tmp_doc) => {
-                        match (copy *tmp_doc) {
-                            UString(n) => names.push(n),
+                        match tmp_doc {
+                            &UString(ref n) => names.push(n.clone()),
                             x => return Err(MongoErr::new(
                                         ~"client::get_dbs",
                                         ~"could not extract database name",
@@ -712,7 +711,7 @@ impl Client {
 
         // check if any errors in response and convert to MongoErr,
         //      else pass along
-        match copy m {
+        match m {
             OpReply { header:_, flags:f, cursor_id:_, start:_, nret:_, docs:_ } => {
                 if (f & CUR_NOT_FOUND as i32) != 0i32 {
                     return Err(MongoErr::new(

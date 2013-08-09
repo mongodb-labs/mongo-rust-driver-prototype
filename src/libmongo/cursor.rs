@@ -131,7 +131,7 @@ impl Cursor {
                             copy self.proj_spec);
             match self.client._send_msg(msg_to_bytes(&msg), (self.db.clone(), None), true) {
                 Ok(reply) => match reply {
-                    Some(r) => match copy r {
+                    Some(r) => match r {
                         // XXX check if need start
                         OpReply { header:_, flags:_, cursor_id:id, start:_, nret:n, docs:d } => {
                             self.id = Some(id);
@@ -208,7 +208,7 @@ impl Cursor {
                             cur_id);
         match self.client._send_msg(msg_to_bytes(&msg), (self.db.clone(), None), true) {
             Ok(reply) => match reply {
-                Some(r) => match copy r {
+                Some(r) => match r {
                     // TODO check re: start
                     OpReply { header:_, flags:_, cursor_id:id, start:_, nret:n, docs:d } => {
                         // close cursor if needed
@@ -305,8 +305,8 @@ impl Cursor {
         let mut query = copy self.query_spec;
         query.put(~"$explain", Double(1f64));
         let mut tmp_cur = Cursor::new(  query, copy self.proj_spec,
-                                        &Collection::new(   copy self.db,
-                                                            copy self.coll,
+                                        &Collection::new(   self.db.clone(),
+                                                            self.coll.clone(),
                                                             self.client),
                                         self.client,
                                         self.flags);
@@ -451,7 +451,7 @@ impl Cursor {
 
         if error.is_none() { Ok(()) }
         else {
-            self.iter_err = copy error;
+            self.iter_err = error.clone();
             Err(error.unwrap())
         }
     }
@@ -465,7 +465,7 @@ impl Cursor {
      * queried
      */
     pub fn is_dead(&self) -> bool {
-        if self.id.is_some() { return (copy self.id).unwrap() == 0; }
+        if self.id.is_some() { return self.id.clone().unwrap() == 0; }
         false
     }
     fn add_query_spec(&mut self, doc: &BsonDocument) {

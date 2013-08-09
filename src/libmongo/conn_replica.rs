@@ -380,9 +380,8 @@ impl ReplicaSetConnection {
                 match bson_doc.find(~"hosts") {
                     None => (),
                     Some(doc) => {
-                        let tmp_doc = copy *doc;
-                        match tmp_doc {
-                            Array(l) => list_doc = Some(l),
+                        match doc {
+                            &Array(ref l) => list_doc = Some(copy *l),
                             _ => err = Some(MongoErr::new(
     ~"conn_replica::reconnect_with_seed",
     ~"ismaster response in unexpected format",
@@ -468,9 +467,8 @@ impl ReplicaSetConnection {
                         match bson_doc.find(~"hosts") {
                             None => (),
                             Some(doc) => {
-                                let tmp_doc = copy *doc;
-                                match tmp_doc {
-                                    Array(l) => list_doc = Some(l),
+                                match doc {
+                                    &Array(ref l) => list_doc = Some(copy *l),
                                     _ => err = Some(MongoErr::new(
             ~"conn_replica::reconnect_with_seed",
             ~"ismaster response in unexpected format",

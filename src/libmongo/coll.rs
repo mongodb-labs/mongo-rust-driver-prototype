@@ -234,12 +234,12 @@ impl Collection {
                                 ~"unknown BsonDocument/Document error",
                                 ~"BsonFormattable not actually BSON formattable")),
         };
-        match (bson_doc.find(~"id").clone()) {
+        match bson_doc.find(~"id") {
             None => self.insert(doc, wc),
             Some(id) => {
                 let mut query = BsonDocument::new();
                 query.put(~"_id", id.clone());
-                self.update(SpecObj(query), SpecObj(bson_doc.clone()), Some(~[UPSERT]), None, wc)
+                self.update(SpecObj(query), SpecObj(copy bson_doc), Some(~[UPSERT]), None, wc)
             },
         }
     }
@@ -276,7 +276,7 @@ impl Collection {
         let _ = option_array;
         let q = match query {
             SpecObj(bson_doc) => bson_doc,
-            SpecNotation(s) => match (copy s).to_bson_t() {
+            SpecNotation(s) => match s.to_bson_t() {
                 Embedded(bson) => *bson,
                 _ => return Err(MongoErr::new(
                                         ~"coll::update",
@@ -286,7 +286,7 @@ impl Collection {
         };
         let up = match update_spec {
             SpecObj(bson_doc) => bson_doc,
-            SpecNotation(s) => match (copy s).to_bson_t() {
+            SpecNotation(s) => match s.to_bson_t() {
                 Embedded(bson) => *bson,
                 _ => return Err(MongoErr::new(
                                         ~"coll::update",
@@ -354,7 +354,7 @@ impl Collection {
         let q_field = match query {
             None => BsonDocument::new(),                // empty Bson
             Some(SpecObj(bson_doc)) => bson_doc,
-            Some(SpecNotation(s)) => match (copy s).to_bson_t() {
+            Some(SpecNotation(s)) => match s.to_bson_t() {
                 Embedded(bson) => *bson,
                 _ => return Err(MongoErr::new(
                                         ~"coll::find",
@@ -369,7 +369,7 @@ impl Collection {
         let p = match proj {
             None => None,
             Some(SpecObj(bson_doc)) => Some(bson_doc),
-            Some(SpecNotation(s)) => match (copy s).to_bson_t() {
+            Some(SpecNotation(s)) => match s.to_bson_t() {
                 Embedded(bson) => Some(*bson),
                 _ => return Err(MongoErr::new(
                                         ~"coll::find",
@@ -460,7 +460,7 @@ impl Collection {
         let q = match query {
             None => BsonDocument::new(),
             Some(SpecObj(bson_doc)) => bson_doc,
-            Some(SpecNotation(s)) => match (copy s).to_bson_t() {
+            Some(SpecNotation(s)) => match s.to_bson_t() {
                 Embedded(bson) => *bson,
                 _ => return Err(MongoErr::new(
                                         ~"coll::remove",

@@ -80,9 +80,8 @@ impl DB {
         for cur.advance |doc| {
             match doc.find(~"name") {
                 Some(val) => {
-                    let tmp = copy *val;
-                    match tmp {
-                        UString(s) => {
+                    match val {
+                        &UString(ref s) => {
                             // ignore special collections (with "$")
                             if !s.contains_char('$') {
                                 names.push(s.slice_from(self.name.len()+1).to_owned());
@@ -259,7 +258,7 @@ impl DB {
         // otherwise, extract error message
         let errmsg = match ret_msg.find(~"errmsg") {
             Some(x) => match *x {
-                UString(ref s) => s,
+                UString(ref s) => s.to_owned(),
                 _ => return Err(MongoErr::new(
                                     ~"db::run_command",
                                     fmt!("error in returned value from run_command %s", cmd.to_str()),
@@ -274,7 +273,7 @@ impl DB {
         Err(MongoErr::new(
                 ~"db::run_command",
                 fmt!("run_command %s failed", cmd.to_str()),
-                errmsg.clone()))
+                errmsg))
     }
 
     /**
@@ -414,7 +413,7 @@ impl DB {
     pub fn authenticate(&self, username: ~str, password: ~str) -> Result<(), MongoErr> {
         let nonce = match self.run_command(SpecNotation(~"{ \"getnonce\": 1 }")) {
             Ok(doc) => match *doc.find(~"nonce").unwrap() { //this unwrap should always succeed
-                UString(ref s) => (*s).clone(),
+                UString(ref s) => s.to_owned(),
                 _ => return Err(MongoErr::new(
                     ~"db::authenticate",
                     ~"error while getting nonce",

@@ -309,7 +309,7 @@ impl MongoIndexSpec {
                 for opt_arr.iter().advance |&opt| {
                     opts_str.push(match opt {
                         INDEX_NAME(n) => {
-                            name = Some(copy n);
+                            name = Some(n.clone());
                             fmt!("\"name\":\"%s\"", n)
                         }
                         EXPIRE_AFTER_SEC(exp) => fmt!("\"expireAfterSeconds\":%d", exp),
@@ -324,9 +324,9 @@ impl MongoIndexSpec {
 
         (name, opts_str)
     }
-    pub fn process_index_fields(    index_arr : ~[INDEX_TYPE],
-                                index_opts : &mut ~[~str],
-                                get_name : bool)
+    pub fn process_index_fields(    index_arr : &[INDEX_TYPE],
+                                    index_opts : &mut ~[~str],
+                                    get_name : bool)
             -> (~str, ~[~str]) {
         let mut name = ~[];
         let mut index_str = ~[];
@@ -370,14 +370,14 @@ impl MongoIndexSpec {
      * from database if `MongoIndex` passed)
      */
     pub fn get_name(&self) -> ~str {
-        match (copy *self) {
-            MongoIndexName(s) => s,
-            MongoIndexFields(arr) => {
+        match self {
+            &MongoIndexName(ref s) => s.clone(),
+            &MongoIndexFields(ref arr) => {
                 let mut tmp = ~[];
-                let (name, _) = MongoIndexSpec::process_index_fields(arr, &mut tmp, true);
+                let (name, _) = MongoIndexSpec::process_index_fields(*arr, &mut tmp, true);
                 name
             }
-            MongoIndex(ind) => ind.name.clone(),
+            &MongoIndex(ref ind) => ind.name.clone(),
         }
     }
 }
