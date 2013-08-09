@@ -55,13 +55,13 @@ fn test_rs_stepdown() {
                 hosts.push(member.host);
             }
             for hosts.iter().advance |&host| {
-                rs.node_freeze(host, time as uint);
+                rs.node_freeze(host, time);
             }
         }
         Err(e) => debug!(e.to_str()),
     }
     // ... and step down
-    rs.step_down((time+MONGO_TIMEOUT_SECS) as uint);
+    rs.step_down(time+MONGO_TIMEOUT_SECS);
     debug!("end switching primary");
     // now everything should be a secondary
 
