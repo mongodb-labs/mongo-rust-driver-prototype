@@ -88,10 +88,15 @@ impl Client {
 
         // run_command from admin database
         let db = DB::new(~"admin", self);
+        let old_pref = self.set_read_pref(PRIMARY_PREF(None));
         let resp = match db.run_command(SpecNotation(~"{ \"listDatabases\":1 }")) {
             Ok(doc) => doc,
             Err(e) => return Err(e),
         };
+        match old_pref {
+            Ok(p) => { self.set_read_pref(p); }
+            Err(_) => (),
+        }
 
         // pull out database names
         let list = match resp.find(~"databases") {
@@ -168,11 +173,17 @@ impl Client {
      * * anything propagated from run_command
      */
     pub fn drop_db(@self, db : &str) -> Result<(), MongoErr> {
+        let old_pref = self.set_read_pref(PRIMARY_ONLY);
         let db = DB::new(db.to_owned(), self);
-        match db.run_command(SpecNotation(~"{ \"dropDatabase\":1 }")) {
+        let result = match db.run_command(SpecNotation(~"{ \"dropDatabase\":1 }")) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
+        };
+        match old_pref {
+            Ok(p) => { self.set_read_pref(p); }
+            Err(_) => (),   // not RS---no matter
         }
+        result
     }
 
     /**
@@ -210,7 +221,7 @@ impl Client {
                 self.conn.put_back(conn);
                 Ok(())
             }
-            Err(e) => return Err(MongoErr::new(
+            Err(e) => Err(MongoErr::new(
                                     call.to_owned(),
                                     ~"connecting",
                                     fmt!("-->\n%s", e.to_str()))),
@@ -306,8 +317,10 @@ impl Client {
             for it.advance |(&h, &p)| {
                 seed.push((h, p));
             }
+//println(fmt!("rs, %?", seed));
             self.connect_to_rs(seed)
         } else if uri.hosts.len() == 1 {
+//println(fmt!("node, %s:%?", uri.hosts[0].as_slice(), uri.ports[0]));
             self.connect(uri.hosts[0].as_slice(), uri.ports[0])
         } else { return Err(MongoErr::new(
                                 ~"client::connect_with_uri",
@@ -332,6 +345,11 @@ impl Client {
                 Ok(_) => (),
                 Err(e) => return Err(e),
             }
+        } else if uri.db.len() != 0 {
+            return Err(MongoErr::new(
+                                ~"client::connect_with_uri",
+                                ~"specified db without credentials",
+                                fmt!("found db %s but no credentials", uri.db)));
         }
 
         // parse options
@@ -421,6 +439,7 @@ impl Client {
             }
         }
 
+//println(fmt!("wc: %?", wc));
         // write concern options supported; set
         if wc.len() > 0 { self.set_default_wc(Some(wc)); }
 
@@ -450,6 +469,7 @@ impl Client {
             Some(SECONDARY_PREF(_)) => Some(SECONDARY_PREF(ts_list)),
             Some(NEAREST(_)) => Some(NEAREST(ts_list)),
         };
+//println(fmt!("read_pref: %?", read_pref));
         if read_pref.is_some() {
             match self.set_read_pref(read_pref.unwrap()) {
                 Ok(_) => (),
@@ -588,7 +608,6 @@ impl Client {
      * if write operation, `None` on no last error, `MongoErr` on last error
      *      or network error
      */
-    // TODO check_primary for replication purposes?
     pub fn _send_msg(@self, msg : ~[u8],
                             wc_pair : (~str, Option<~[WRITE_CONCERN]>),
                             read : bool)
@@ -780,32 +799,39 @@ impl Client {
 
     ///Ensure the mongod instance to which this client is connected is at least the provided version.
     pub fn check_version(@self, ver: ~str) -> Result<(), MongoErr> {
-       let admin = self.get_admin();
-       match admin.run_command(SpecNotation(~"{ 'buildInfo': 1 }")) {
-           Ok(doc) => match doc.find(~"version") {
-               Some(&UString(ref s)) => {
-                   let mut it = s.split_iter('.').zip(ver.split_iter('.'));
-                   for it.advance |(vcur, varg)| {
-                       let ncur = FromStr::from_str::<uint>(vcur);
-                       let narg = FromStr::from_str::<uint>(varg);
-                       if ncur > narg {
-                           return Ok(());
-                       }
-                       else if ncur < narg {
-                           return Err(MongoErr::new(
-                                   ~"shard::check_version",
-                                   fmt!("version %s is too old", *s),
-                                   fmt!("please upgrade to at least version %s of MongoDB", ver)));
-                       }
-                   }
-                   return Ok(());
-               },
-               _ => return Err(MongoErr::new(
-                           ~"shard::check_version",
-                           ~"unknown error while checking version",
-                           ~"the database did not return a version field"))
-           },
-           Err(e) => return Err(e)
-       }
+        let admin = self.get_admin();
+        let old_pref = self.set_read_pref(PRIMARY_PREF(None));
+        let result = match admin.run_command(SpecNotation(~"{ 'buildInfo':1 }")) {
+            Ok(doc) => match doc.find(~"version") {
+                Some(&UString(ref s)) => {
+                    let mut it = s.split_iter('.').zip(ver.split_iter('.'));
+                    let mut res = Ok(());
+                    for it.advance |(vcur, varg)| {
+                        let ncur = FromStr::from_str::<uint>(vcur);
+                        let narg = FromStr::from_str::<uint>(varg);
+                        if ncur > narg {
+                            break;
+                        } else if ncur < narg {
+                            res = Err(MongoErr::new(
+                                    ~"shard::check_version",
+                                    fmt!("version %s is too old", *s),
+                                    fmt!("please upgrade to at least version %s of MongoDB", ver)));
+                            break;
+                        }
+                    }
+                    res
+                },
+                _ => Err(MongoErr::new(
+                                    ~"shard::check_version",
+                                    ~"unknown error while checking version",
+                                    ~"the database did not return a version field"))
+            },
+            Err(e) => Err(e),
+        };
+        match old_pref {
+            Ok(p) => { self.set_read_pref(p); }
+            Err(_) => (),
+        }
+        result
     }
 }

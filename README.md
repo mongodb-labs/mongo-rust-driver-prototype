@@ -242,7 +242,7 @@ match client.set_read_pref(SECONDARY_PREF(Some(tags))) {
     Err(e) => println(e.to_str()),
 }
 ```
-Now reads will follow this read preference (although writes will still route to the primary).
+Now reads, specified with ```SLAVE_OK```, will follow this read preference (although writes will still route to the primary).
 
 Finally, we should disconnect the client. It can be reconnected to another server after disconnection.
 ```rust

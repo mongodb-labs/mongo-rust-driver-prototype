@@ -146,10 +146,16 @@ impl DB {
         let cmd = fmt!( "{ \"create\":\"%s\", %s }",
                         coll,
                         self.process_create_ops(flags, option_array));
-        match self.run_command(SpecNotation(cmd)) {
+        let old_pref = self.client.set_read_pref(PRIMARY_ONLY);
+        let result = match self.run_command(SpecNotation(cmd)) {
             Ok(_) => Ok(Collection::new(self.name.clone(), coll, self.client)),
             Err(e) => Err(e),
+        };
+        match old_pref {
+            Ok(p) => { self.client.set_read_pref(p); }
+            Err(_) => (),
         }
+        result
     }
     priv fn process_create_ops(&self, flags : i32, options : Option<~[COLLECTION_OPTION]>)
             -> ~str {
@@ -194,10 +200,16 @@ impl DB {
      * () on success, `MongoErr` on failure
      */
     pub fn drop_collection(&self, coll : &str) -> Result<(), MongoErr> {
-        match self.run_command(SpecNotation(fmt!("{ \"drop\":\"%s\" }", coll))) {
+        let old_pref = self.client.set_read_pref(PRIMARY_ONLY);
+        let result = match self.run_command(SpecNotation(fmt!("{ \"drop\":\"%s\" }", coll))) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
+        };
+        match old_pref {
+            Ok(p) => { self.client.set_read_pref(p); }
+            Err(_) => (),
         }
+        result
     }
 
     // TODO make take options? (not strictly necessary but may be good?)
@@ -307,6 +319,7 @@ impl DB {
         }
 
         // run_command and get entire doc
+        let old_pref = self.client.set_read_pref(PRIMARY_PREF(None));
         let err_doc_tmp = match self.run_command(SpecObj(concern_doc)) {
             Ok(doc) => doc,
             Err(e) => return Err(MongoErr::new(
@@ -314,6 +327,10 @@ impl DB {
                                     ~"run_command error",
                                     fmt!("-->\n%s", e.to_str()))),
         };
+        match old_pref {
+            Ok(p) => { self.client.set_read_pref(p); }
+            Err(_) => (),
+        }
 
         // error field name possibitilies
         let err_field = ~[  err_doc_tmp.find(~"err"),
@@ -355,18 +372,24 @@ impl DB {
 
     ///Enable sharding on this database.
     pub fn enable_sharding(&self) -> Result<(), MongoErr> {
-        match self.run_command(SpecNotation(fmt!("{ \"enableSharding\": %s }", self.name))) {
+        let old_pref = self.client.set_read_pref(PRIMARY_PREF(None));   // XXX check
+        let result = match self.run_command(SpecNotation(fmt!("{ \"enableSharding\": %s }", self.name))) {
             Ok(doc) => match *doc.find(~"ok").unwrap() {
-                Double(1f64) => return Ok(()),
-                Int32(1i32) => return Ok(()),
-                Int64(1i64) => return Ok(()),
-                _ => return Err(MongoErr::new(
+                Double(1f64) => Ok(()),
+                Int32(1i32) => Ok(()),
+                Int64(1i64) => Ok(()),
+                _ => Err(MongoErr::new(
                     ~"db::logout",
                     ~"error while logging out",
-                    ~"the server returned ok: 0"))
+                    ~"the server returned ok: 0")),
             },
-            Err(e) => return Err(e)
+            Err(e) => Err(e),
         };
+        match old_pref {
+            Ok(p) => { self.client.set_read_pref(p); }
+            Err(_) => (),
+        }
+        result
     }
 
     ///Add a new database user with the given username and password.
@@ -399,7 +422,8 @@ impl DB {
             },
             Err(e) => return Err(e)
         };
-        match self.run_command(SpecNotation(fmt!(" {
+        let old_pref = self.client.set_read_pref(PRIMARY_PREF(None));
+        let result = match self.run_command(SpecNotation(fmt!(" {
               \"authenticate\": 1,
               \"user\": \"%s\",
               \"nonce\": \"%s\",
@@ -407,58 +431,86 @@ impl DB {
               username,
               nonce,
               md5(fmt!("%s%s%s", nonce, username, md5(fmt!("%s:mongo:%s",username, password))))))) {
-           Ok(_) => return Ok(()),
-           Err(e) => return Err(e)
+           Ok(_) => Ok(()),
+           Err(e) => Err(e)
+        };
+        match old_pref {
+            Ok(p) => { self.client.set_read_pref(p); }
+            Err(_) => (),
         }
+        result
     }
 
     ///Log out of the current user.
     ///Closing a connection will also log out.
     pub fn logout(&self) -> Result<(), MongoErr> {
-        match self.run_command(SpecNotation(~"{ \"logout\": 1 }")) {
+        let old_pref = self.client.set_read_pref(PRIMARY_PREF(None));
+        let result = match self.run_command(SpecNotation(~"{ \"logout\": 1 }")) {
             Ok(doc) => match *doc.find(~"ok").unwrap() {
-                Double(1f64) => return Ok(()),
-                Int32(1i32) => return Ok(()),
-                Int64(1i64) => return Ok(()),
-                _ => return Err(MongoErr::new(
+                Double(1f64) => Ok(()),
+                Int32(1i32) => Ok(()),
+                Int64(1i64) => Ok(()),
+                _ => Err(MongoErr::new(
                     ~"db::logout",
                     ~"error while logging out",
-                    ~"the server returned ok: 0"))
+                    ~"the server returned ok: 0")),
             },
-            Err(e) => return Err(e)
+            Err(e) => Err(e),
         };
+        match old_pref {
+            Ok(p) => { self.client.set_read_pref(p); }
+            Err(_) => (),
+        }
+        result
     }
 
     ///Get the profiling level of the database.
     // XXX return type; potential for change
     pub fn get_profiling_level(&self) -> Result<(int, Option<int>), MongoErr> {
-        match self.run_command(SpecNotation(~"{ \"profile\": -1 }")) {
+        let old_pref = self.client.set_read_pref(PRIMARY_PREF(None));
+        let result = match self.run_command(SpecNotation(~"{ 'profile':-1 }")) {
             Ok(d) => {
-                let level = match d.find(~"was") {
-                    Some(&Double(f)) => f as int,
-                    _ => return Err(MongoErr::new(
+                let mut err = None;
+                let mut level = None;
+                let mut thresh = None;
+                match d.find(~"was") {
+                    Some(&Double(f)) => level = Some(f as int),
+                    _ => err = Some(MongoErr::new(
                         ~"db::get_profiling_level",
                         ~"could not get profiling level",
                         ~"an invalid profiling level was returned"))
-                };
-                let thresh = match d.find(~"slowms") {
-                    None => None,
-                    Some(&Double(ms)) => Some(ms as int),
-                    _ => return Err(MongoErr::new(
+                }
+                match d.find(~"slowms") {
+                    None => (),
+                    Some(&Double(ms)) => thresh = Some(ms as int),
+                    _ => err = Some(MongoErr::new(
                         ~"db::get_profiling_level",
                         ~"could not get profiling threshold",
                         ~"an invalid profiling threshold was returned"))
                 };
 
-                Ok((level, thresh))
+                if err.is_none() { Ok((level.unwrap(), thresh)) }
+                else { Err(err.unwrap()) }
             }
-            Err(e) => return Err(e)
+            Err(e) => Err(e),
+        };
+        match old_pref {
+            Ok(p) => { self.client.set_read_pref(p); }
+            Err(_) => (),
         }
+        result
     }
 
     ///Set the profiling level of the database.
     // XXX argument types; potential for change
-    pub fn set_profiling_level(&self, level: int) -> Result<~BsonDocument, MongoErr> {
-        self.run_command(SpecNotation(fmt!("{ \"profile\": %d }", level)))
+    pub fn set_profiling_level(&self, level: int)
+                -> Result<~BsonDocument, MongoErr> {
+        let old_pref = self.client.set_read_pref(PRIMARY_PREF(None));
+        let result = self.run_command(SpecNotation(fmt!("{ \"profile\": %d }", level)));
+        match old_pref {
+            Ok(p) => { self.client.set_read_pref(p); }
+            Err(_) => (),
+        }
+        result
     }
 }

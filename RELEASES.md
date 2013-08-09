@@ -6,6 +6,7 @@
         * Read preferences
         * GridFS
         * DBRef support in BSON
+        * basic URI connection string support
 
     * Bugfixes and performance enhancements
         * Benchmarks for BSON library

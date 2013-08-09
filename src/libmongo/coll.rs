@@ -94,11 +94,17 @@ impl Collection {
             });
         }
 
+        let old_pref = self.client.set_read_pref(PRIMARY_ONLY);
         let db = DB::new(self.db.clone(), self.client);
-        match db.run_command(SpecNotation(fmt!("{ %s }", cmd))) {
+        let result = match db.run_command(SpecNotation(fmt!("{ %s }", cmd))) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
+        };
+        match old_pref {
+            Ok(p) => { self.client.set_read_pref(p); }
+            Err(_) => (),
         }
+        result
     }
 
     /**
@@ -569,27 +575,39 @@ impl Collection {
      * () on success, `MongoErr` on failure
      */
     pub fn drop_index(&self, index : MongoIndexSpec) -> Result<(), MongoErr> {
+        let old_pref = self.client.set_read_pref(PRIMARY_ONLY);
         let db = DB::new(self.db.clone(), self.client);
-        match db.run_command(SpecNotation(
+        let result = match db.run_command(SpecNotation(
                     fmt!("{ \"deleteIndexes\":\"%s\", \"index\":\"%s\" }",
                         self.name,
                         index.get_name()))) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
+        };
+        match old_pref {
+            Ok(p) => { self.client.set_read_pref(p); }
+            Err(_) => (),
         }
+        result
     }
 
     ///Validate a collection.
     //TODO: could be using options?
     pub fn validate(&self, full: bool, scandata: bool) -> Result<~BsonDocument, MongoErr> {
         let db = self.get_db();
-        match db.run_command(SpecNotation(fmt!(
+        let old_pref = self.client.set_read_pref(PRIMARY_PREF(None));
+        let result = match db.run_command(SpecNotation(fmt!(
             "{ \"validate\": \"%s\", \"full\": \"%s\", \"scandata\": \"%s\" }",
             self.name,
             full.to_str(),
             scandata.to_str()))) {
                 Ok(doc) => Ok(doc),
                 Err(e) => Err(e)
+        };
+        match old_pref {
+            Ok(p) => { self.client.set_read_pref(p); }
+            Err(_) => (),
         }
+        result
     }
 }

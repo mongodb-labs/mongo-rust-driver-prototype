@@ -157,7 +157,10 @@ fn main() {
     // drop collection to start afresh, then insert and read some things
     t = precise_time_s();
     println(fmt!("inserting %?", t));
-    client.drop_db("rs_demo_db");
+    match client.drop_db("rs_demo_db") {
+        Ok(_) => (),
+        Err(e) => println(e.to_str()),
+    };
     let coll = Collection::new(~"rs_demo_db", ~"foo", client);
     coll.insert(fmt!("{ 'time': '%?' }", t), None);
     println("reading it back");
@@ -168,17 +171,19 @@ fn main() {
 
     // change up tags
     println("changing tags");
+    let t = precise_time_s();
+    let tag_val = fmt!("%?", t);
     match conf {
         None => println("could not change tags; could not get conf earlier"),
         Some(c) => {
             let mut tmp = c;
             {
                 let tags = tmp.members[0].get_mut_tags();
-                tags.set(~"which", ~"this");
+                tags.set(~"which", tag_val.clone());
             }
             {
                 let tags = tmp.members[3].get_mut_tags();
-                tags.set(~"which", ~"this");
+                tags.set(~"which", tag_val.clone());
             }
             rs.reconfig(tmp, false);
         }
@@ -195,7 +200,7 @@ fn main() {
     println("changing read preference");
     let mut old_pref = None;
     match client.set_read_pref(
-            SECONDARY_ONLY(Some(~[TagSet::new([("which", "this")])]))) {
+            SECONDARY_ONLY(Some(~[TagSet::new([("which", tag_val.as_slice())])]))) {
         Ok(p) => old_pref = Some(p),
         Err(e) => println(e.to_str()),
     }
@@ -231,6 +236,32 @@ fn main() {
     }
 
     // disconnect
+    println("disconnecting");
+    match client.disconnect() {
+        Ok(_) => (),
+        Err(e) => println(e.to_str()),
+    }
+
+    // reconnect using uri
+    println("connecting using uri");
+    match client.connect_with_uri(fmt!("mongodb://localhost:37118,localhost:37120/?journal=true&readPreference=secondary&readPreferenceTags=which:%?", t)) {
+        Ok(_) => (),
+        Err(e) => fail!("%s", e.to_str()),
+    }
+
+    // read
+    println("reading again (SLAVE_OK, should get previous insert)");
+    match coll.find(None, None, Some(~[SLAVE_OK])) {
+        Ok(ref mut cur) => for cur.advance |doc| { println(doc.to_str()); },
+        Err(e) => println(e.to_str()),
+    }
+    println("reading again (not SLAVE_OK, should get nothing (no err either))");
+    match coll.find(None, None, None) {
+        Ok(ref mut cur) => for cur.advance |doc| { println(doc.to_str()); },
+        Err(e) => println(e.to_str()),
+    }
+
+    // disconnecting
     println("disconnecting");
     match client.disconnect() {
         Ok(_) => (),

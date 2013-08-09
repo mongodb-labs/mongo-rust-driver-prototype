@@ -581,6 +581,7 @@ impl RS {
         if !conf.version.is_empty() { conf.version.take(); }
         conf.version.put_back(tmp_conf.version.take()+1);
 
+        let old_pref = self.client.set_read_pref(PRIMARY_ONLY);
         let conf_doc = conf.to_bson_t();
         let db = self.client.get_admin();
         let mut cmd_doc = BsonDocument::new();
@@ -592,6 +593,10 @@ impl RS {
         };
         // force reconnect to give conn chance to update
         self.client.reconnect();
+        match old_pref {
+            Err(e) => { return Err(e); }    // should never happen
+            Ok(p) => { self.client.set_read_pref(p); }
+        }
         result
     }
 
