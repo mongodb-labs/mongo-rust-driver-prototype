@@ -43,6 +43,12 @@ fn file_write(&self) -> GridWriter
 fn put(&mut self, data: ~[u8]) -> Result<(), MongoErr>
 ~~~
 
+### Method `get`
+
+~~~ {.rust}
+fn get(&mut self, size: uint) -> Result<~[u8], MongoErr>
+~~~
+
 ### Method `delete`
 
 ~~~ {.rust}

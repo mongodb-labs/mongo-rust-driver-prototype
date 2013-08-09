@@ -29,19 +29,26 @@
 * [Enum `UPDATE_OPTION`](#enum-update_option)
 * [Enum `WRITE_CONCERN`](#enum-write_concern)
 * [Struct `MongoErr`](#struct-mongoerr) - Utility module for use internal and external to crate
+* [Struct `MongoUri`](#struct-mongouri)
 * [Struct `TagSet`](#struct-tagset)
 * [Implementation ` of ::std::clone::Clone for MongoErr`](#implementation-of-stdcloneclone-for-mongoerr) - Automatically derived.
 * [Implementation ` of ::std::cmp::Eq for MongoErr`](#implementation-of-stdcmpeq-for-mongoerr) - Automatically derived.
 * [Implementation ` for MongoErr`](#implementation-for-mongoerr) - MongoErr to propagate errors.
 * [Implementation ` of ToStr for MongoErr`](#implementation-of-tostr-for-mongoerr)
+* [Implementation ` of FromStr for MongoUri`](#implementation-of-fromstr-for-mongouri)
+* [Implementation ` of ::std::clone::Clone for QuerySpec`](#implementation-of-stdcloneclone-for-queryspec) - Automatically derived.
+* [Implementation ` of ::std::cmp::Eq for QuerySpec`](#implementation-of-stdcmpeq-for-queryspec) - Automatically derived.
 * [Implementation ` of ToStr for QuerySpec`](#implementation-of-tostr-for-queryspec)
 * [Implementation ` of ::std::cmp::Eq for TagSet`](#implementation-of-stdcmpeq-for-tagset) - Automatically derived.
 * [Implementation ` of Clone for TagSet`](#implementation-of-clone-for-tagset)
 * [Implementation ` of BsonFormattable for TagSet`](#implementation-of-bsonformattable-for-tagset)
 * [Implementation ` for TagSet`](#implementation-for-tagset)
+* [Implementation ` of ::std::clone::Clone for WRITE_CONCERN`](#implementation-of-stdcloneclone-for-write_concern) - Automatically derived.
+* [Implementation ` of ::std::cmp::Eq for WRITE_CONCERN`](#implementation-of-stdcmpeq-for-write_concern) - Automatically derived.
 * [Implementation ` of ::std::clone::Clone for READ_PREFERENCE`](#implementation-of-stdcloneclone-for-read_preference) - Automatically derived.
 * [Implementation ` of ::std::cmp::Eq for READ_PREFERENCE`](#implementation-of-stdcmpeq-for-read_preference) - Automatically derived.
 * [Function `parse_host`](#function-parse_host)
+* [Function `parse_tags`](#function-parse_tags)
 
 </div>
 
@@ -274,6 +281,18 @@ pub struct MongoErr {
 Utility module for use internal and external to crate.
 Users must access functionality for proper use of options, etc.
 
+## Struct `MongoUri`
+
+~~~ {.rust}
+pub struct MongoUri {
+    user: Option<url::UserInfo>,
+    hosts: ~[~str],
+    ports: ~[uint],
+    db: ~str,
+    options: url::Query,
+}
+~~~
+
 ## Struct `TagSet`
 
 ~~~ {.rust}
@@ -338,6 +357,40 @@ fn to_str(&self) -> ~str
 ~~~
 
 Prints a MongoErr to string in a standard format.
+
+## Implementation of `FromStr` for `MongoUri`
+
+### Method `from_str`
+
+~~~ {.rust}
+fn from_str(s: &str) -> Option<MongoUri>
+~~~
+
+## Implementation of `::std::clone::Clone` for `QuerySpec`
+
+Automatically derived.
+
+### Method `clone`
+
+~~~ {.rust}
+fn clone(&self) -> QuerySpec
+~~~
+
+## Implementation of `::std::cmp::Eq` for `QuerySpec`
+
+Automatically derived.
+
+### Method `eq`
+
+~~~ {.rust}
+fn eq(&self, __arg_0: &QuerySpec) -> ::bool
+~~~
+
+### Method `ne`
+
+~~~ {.rust}
+fn ne(&self, __arg_0: &QuerySpec) -> ::bool
+~~~
 
 ## Implementation of `ToStr` for `QuerySpec`
 
@@ -425,6 +478,32 @@ in self's TagSet.
 
 Usage: member.matches(tagset)
 
+## Implementation of `::std::clone::Clone` for `WRITE_CONCERN`
+
+Automatically derived.
+
+### Method `clone`
+
+~~~ {.rust}
+fn clone(&self) -> WRITE_CONCERN
+~~~
+
+## Implementation of `::std::cmp::Eq` for `WRITE_CONCERN`
+
+Automatically derived.
+
+### Method `eq`
+
+~~~ {.rust}
+fn eq(&self, __arg_0: &WRITE_CONCERN) -> ::bool
+~~~
+
+### Method `ne`
+
+~~~ {.rust}
+fn ne(&self, __arg_0: &WRITE_CONCERN) -> ::bool
+~~~
+
 ## Implementation of `::std::clone::Clone` for `READ_PREFERENCE`
 
 Automatically derived.
@@ -454,6 +533,12 @@ fn ne(&self, __arg_0: &READ_PREFERENCE) -> ::bool
 ## Function `parse_host`
 
 ~~~ {.rust}
-fn parse_host(host_str: &~str) -> Result<(~str, uint), MongoErr>
+fn parse_host(host_str: &str) -> Result<(~str, uint), MongoErr>
+~~~
+
+## Function `parse_tags`
+
+~~~ {.rust}
+fn parse_tags(tag_str: &str) -> Result<Option<TagSet>, MongoErr>
 ~~~
 

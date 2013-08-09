@@ -150,7 +150,8 @@ appropriately by caller, `MongoErr` on failure
 ### Method `get_last_error`
 
 ~~~ {.rust}
-fn get_last_error(&self, wc: Option<~[WRITE_CONCERN]>) -> Result<(), MongoErr>
+fn get_last_error(&self, wc: Option<~[WRITE_CONCERN]>) ->
+ Result<Option<~BsonDocument>, MongoErr>
 ~~~
 
 Parses write concern into bytes and sends to server.
@@ -161,7 +162,8 @@ Parses write concern into bytes and sends to server.
 
 #### Returns
 
-() on success, `MongoErr` on failure
+`Option<~BsonDocument>` with full response on success (or None
+if write concern was 0), `MongoErr` on failure
 
 #### Failure Types
 

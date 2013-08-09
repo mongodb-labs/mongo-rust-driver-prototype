@@ -393,7 +393,7 @@ Reconfigure replica set to have given configuration.
 ### Method `node_freeze`
 
 ~~~ {.rust}
-fn node_freeze(&self, host: ~str, sec: uint) -> Result<(), MongoErr>
+fn node_freeze(&self, host: ~str, sec: u64) -> Result<(), MongoErr>
 ~~~
 
 Prevent specified node from seeking election for
@@ -408,7 +408,7 @@ fn node_unfreeze(&self, host: ~str) -> Result<(), MongoErr>
 ### Method `step_down`
 
 ~~~ {.rust}
-fn step_down(&self, sec: uint) -> Result<(), MongoErr>
+fn step_down(&self, sec: u64) -> Result<(), MongoErr>
 ~~~
 
 Forces current primary to step down for specified number of seconds.

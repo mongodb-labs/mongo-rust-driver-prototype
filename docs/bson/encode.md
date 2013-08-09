@@ -50,6 +50,8 @@ by using the Embedded variant.
 
 * `Regex(~str, ~str)`
 
+* `DBRef(~str, ~Document)`
+
 * `JScript(~str)`
 
 * `JScriptWithScope(~str, ~BsonDocument)`

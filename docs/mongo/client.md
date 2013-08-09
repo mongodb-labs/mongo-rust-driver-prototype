@@ -13,6 +13,7 @@
 pub struct Client {
     conn: Cell<@Connection>,
     timeout: u64,
+    wc: Cell<Option<~[WRITE_CONCERN]>>,
     priv rs_conn: Cell<@ReplicaSetConnection>,
     priv cur_requestId: Cell<i32>,
 }
@@ -171,6 +172,42 @@ Connect to replica set with specified seed list.
 
 () on success, MongoErr on failure
 
+### Method `connect_with_uri`
+
+~~~ {.rust}
+fn connect_with_uri(@self, uri_str: &str) -> Result<(), MongoErr>
+~~~
+
+Connect via URI connection string.
+
+See [Connection String URI Format](http://docs.mongodb.org/manual/reference/connection-string/)
+for the URI specification. Please note, however, that because of the
+way the Rust URL parser operates, if the username/password option is
+included, so must be the '/' that would follow the hosts, even if
+the desired database to use is admin (the default).
+
+Currently supported options:
+* w
+* wtimeoutMS
+* journal
+* readPreference
+* readPreferenceTags
+
+#### Arguments
+
+* `uri_str` - string containing connection parameters
+
+#### Returns
+
+() on success, MongoErr on failure (on URI parsing, connection, or
+option setting)
+
+### Method `_try_connect_with_uri`
+
+~~~ {.rust}
+fn _try_connect_with_uri(@self, uri_str: &str) -> Result<(), MongoErr>
+~~~
+
 ### Method `initiate_rs`
 
 ~~~ {.rust}
@@ -206,6 +243,15 @@ Sets read preference as specified, returning former preference.
 #### Returns
 
 old read preference on success, MongoErr on failure
+
+### Method `set_default_wc`
+
+~~~ {.rust}
+fn set_default_wc(&self, wc: Option<~[WRITE_CONCERN]>) ->
+ Option<~[WRITE_CONCERN]>
+~~~
+
+Sets default write concern to use, returning the former one.
 
 ### Method `disconnect`
 
@@ -274,4 +320,6 @@ Increments first unused requestId and returns former value.
 ~~~ {.rust}
 fn check_version(@self, ver: ~str) -> Result<(), MongoErr>
 ~~~
+
+Ensure the mongod instance to which this client is connected is at least the provided version.
 

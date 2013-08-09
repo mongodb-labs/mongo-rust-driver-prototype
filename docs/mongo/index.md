@@ -336,7 +336,7 @@ fn process_index_opts(flags: i32, options: Option<~[INDEX_OPTION]>) ->
 ### Method `process_index_fields`
 
 ~~~ {.rust}
-fn process_index_fields(index_arr: ~[INDEX_TYPE], index_opts: &mut ~[~str],
+fn process_index_fields(index_arr: &[INDEX_TYPE], index_opts: &mut ~[~str],
                         get_name: bool) -> (~str, ~[~str])
 ~~~
 
