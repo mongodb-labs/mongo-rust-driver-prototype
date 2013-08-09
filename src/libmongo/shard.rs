@@ -122,12 +122,12 @@ impl MongosClient {
 
      ///Enable sharding on the specified collection.
      pub fn shard_collection(&self, db: ~str, coll: ~str, key: QuerySpec, unique: bool) -> Result<(), MongoErr> {
-        let d = DB::new(copy db, copy self.mongos);
+        let d = DB::new(db.clone(), self.mongos);
         match d.run_command(SpecNotation(
             fmt!("{ 'shardCollection': '%s.%s', 'key': %s, 'unique': '%s' }",
                 db, coll, match key {
                     SpecObj(doc) => doc.to_str(),
-                    SpecNotation(ref s) => copy *s
+                    SpecNotation(ref s) => s.clone()
                 }, unique.to_str()))) {
             Ok(doc) => match *doc.find(~"ok").unwrap() {
                 Double(1f64) => return Ok(()),
@@ -186,11 +186,11 @@ impl MongosClient {
 
     ///Add a tag to the given shard.
     ///Requires MongoDB 2.2 or higher.
-    #[cfg(not(major=1), not(major=0), not(major=2,minor=1), not(major=2,minor=0))]
+    #[cfg(not(major=1), not(major=0))]
     pub fn add_shard_tag(&self, shard: ~str, tag: ~str) -> Result<(), MongoErr> {
         //let ch = self.mongos.check_version(~"2.2.0");
         //if ch.is_err() { return ch; }
-        let config = DB::new(~"config", copy self.mongos);
+        let config = DB::new(~"config", self.mongos);
         match config.get_collection(~"shards").find_one(
            Some(SpecNotation(fmt!("{ '_id': '%s' }", shard))), None, None) {
             Ok(_) => (),
@@ -207,8 +207,6 @@ impl MongosClient {
 
     #[cfg(major=1)]
     #[cfg(major=0)]
-    #[cfg(major=2,minor=1)]
-    #[cfg(major=2,minor=0)]
     pub fn add_shard_tag(&self, _shard: ~str, _tag: ~str) -> Result<(), MongoErr> {
         Err(MongoErr::new(
             ~"shard::add_shard_tag",
@@ -222,7 +220,7 @@ impl MongosClient {
      pub fn remove_shard_tag(&self, shard: ~str, tag: ~str) -> Result<(), MongoErr> {
          //let ch = self.mongos.check_version(~"2.2.0");
          //if ch.is_err() { return ch; }
-        let config = DB::new(~"config", copy self.mongos);
+        let config = DB::new(~"config", self.mongos);
         match config.get_collection(~"shards").find_one(
            Some(SpecNotation(fmt!("{ '_id': '%s' }", shard))), None, None) {
             Ok(_) => (),
@@ -239,8 +237,6 @@ impl MongosClient {
 
     #[cfg(major=1)]
     #[cfg(major=0)]
-    #[cfg(major=2,minor=1)]
-    #[cfg(major=2,minor=0)]
     pub fn remove_shard_tag(&self, _shard: ~str, _tag: ~str) -> Result<(), MongoErr> {
         Err(MongoErr::new(
             ~"shard::remove_shard_tag",
