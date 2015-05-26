@@ -1,5 +1,5 @@
 [root]
-name = "rust-bson"
+name = "mongodb"
 version = "0.1.0"
 dependencies = [
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
