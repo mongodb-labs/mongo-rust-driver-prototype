@@ -1,0 +1,8 @@
+[package]
+name = "rust-bson"
+version = "0.1.0"
+authors = ["Valeri Karpov <valkar207@gmail.com>"]
+
+[dependencies]
+
+libc="0.1.8"
