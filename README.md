@@ -22,15 +22,20 @@ make && sudo make install
 ```
 
 #### Importing
-To use the MongoDB driver in your code, add the package to your ```Cargo.toml```.
+The 1.0 driver is currently available as a local dependency. To use the MongoDB driver in your code, pull the 1.0 branch:
+
 ```
-[dependencies]
-mongodb="0.1.0"
+git clone -b 1.0 --single-branch https://github.com/mongodbinc-interns/mongo-rust-driver-prototype.git
 ```
 
-Then, import the libc and driver libraries within your code.
+Add the package to your ```Cargo.toml```:
+```
+[dependencies.mongodb]
+path="/path/to/mongo-rust-driver-prototype"
+```
+
+Then, import the driver library within your code.
 ```rust
-extern crate libc;
 extern crate mongodb;
 ```
 
