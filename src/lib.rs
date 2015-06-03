@@ -1,5 +1,7 @@
 extern crate libc;
 
+pub mod client;
+
 use libc::c_char;
 use libc::size_t;
 use std::ffi::CStr;
