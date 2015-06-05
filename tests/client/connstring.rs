@@ -86,23 +86,23 @@ fn test_required_host() {
 
     let connstr = result.unwrap();
     assert_eq!(1, connstr.hosts.len());
-    assert_eq!("local", connstr.hosts[0].hostname);
+    assert_eq!("local", connstr.hosts[0].host_name);
 }
 
 #[test]
 fn test_replica_sets() {
-    let uri = "mongodb://local:27017,remote:27018,japan:99999";
+    let uri = "mongodb://local:27017,remote:27018,japan:30000";
     let result = connstring::parse(uri);
     assert!(result.is_ok());
 
     let connstr = result.unwrap();
     assert_eq!(3, connstr.hosts.len());
-    assert_eq!("local", connstr.hosts[0].hostname);
+    assert_eq!("local", connstr.hosts[0].host_name);
     assert_eq!(27017, connstr.hosts[0].port);
-    assert_eq!("remote", connstr.hosts[1].hostname);
+    assert_eq!("remote", connstr.hosts[1].host_name);
     assert_eq!(27018, connstr.hosts[1].port);
-    assert_eq!("japan", connstr.hosts[2].hostname);
-    assert_eq!(99999, connstr.hosts[2].port);
+    assert_eq!("japan", connstr.hosts[2].host_name);
+    assert_eq!(30000, connstr.hosts[2].port);
 }
 
 #[test]
@@ -184,7 +184,7 @@ fn test_read_pref_tags() {
 fn test_unix_domain_socket_single() {
     let uri = "mongodb:///tmp/mongodb-27017.sock/?safe=false";
     let connstr = connstring::parse(uri).unwrap();
-    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].hostname);
+    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].host_name);
 }
 
 #[test]
@@ -192,7 +192,7 @@ fn test_unix_domain_socket_auth() {
     let uri = "mongodb://user:password@/tmp/mongodb-27017.sock/?safe=false";
     let connstr = connstring::parse(uri).unwrap();
     let options = connstr.options.unwrap();
-    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].hostname);
+    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].host_name);
     assert_eq!("user", connstr.user.unwrap());
     assert_eq!("password", connstr.password.unwrap());
     assert_eq!("false", options.get_str("safe").unwrap());
@@ -203,8 +203,8 @@ fn test_unix_domain_socket_replica_set() {
     let uri = "mongodb://user:password@/tmp/mongodb-27017.sock,/tmp/mongodb-27018.sock/dbname?safe=false";
     let connstr = connstring::parse(uri).unwrap();
     let options = connstr.options.unwrap();
-    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].hostname);
-    assert_eq!("/tmp/mongodb-27018.sock", connstr.hosts[1].hostname);
+    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].host_name);
+    assert_eq!("/tmp/mongodb-27018.sock", connstr.hosts[1].host_name);
     assert_eq!("user", connstr.user.unwrap());
     assert_eq!("password", connstr.password.unwrap());
     assert_eq!("dbname", connstr.database.unwrap());
@@ -216,7 +216,7 @@ fn test_ipv6() {
     let uri = "mongodb://[::1]:27017/test";
     let connstr = connstring::parse(uri).unwrap();
     assert_eq!(1, connstr.hosts.len());
-    assert_eq!("::1", connstr.hosts[0].hostname);
+    assert_eq!("::1", connstr.hosts[0].host_name);
     assert_eq!(27017, connstr.hosts[0].port);
 }
 
@@ -229,11 +229,11 @@ fn test_full() {
     assert_eq!("pas#s", connstr.password.unwrap());
     assert_eq!("rocksdb", connstr.database.unwrap());
     assert_eq!(3, connstr.hosts.len());
-    assert_eq!("local", connstr.hosts[0].hostname);
+    assert_eq!("local", connstr.hosts[0].host_name);
     assert_eq!(connstring::DEFAULT_PORT, connstr.hosts[0].port);
-    assert_eq!("remote", connstr.hosts[1].hostname);
+    assert_eq!("remote", connstr.hosts[1].host_name);
     assert_eq!(27018, connstr.hosts[1].port);
-    assert_eq!("japan", connstr.hosts[2].hostname);
+    assert_eq!("japan", connstr.hosts[2].host_name);
     assert_eq!(27019, connstr.hosts[2].port);
 
     let options = connstr.options.unwrap();
