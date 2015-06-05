@@ -184,7 +184,8 @@ fn test_read_pref_tags() {
 fn test_unix_domain_socket_single() {
     let uri = "mongodb:///tmp/mongodb-27017.sock/?safe=false";
     let connstr = connstring::parse(uri).unwrap();
-    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].host_name);
+    assert!(connstr.hosts[0].is_ipc());
+    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].ipc);
 }
 
 #[test]
@@ -192,7 +193,8 @@ fn test_unix_domain_socket_auth() {
     let uri = "mongodb://user:password@/tmp/mongodb-27017.sock/?safe=false";
     let connstr = connstring::parse(uri).unwrap();
     let options = connstr.options.unwrap();
-    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].host_name);
+    assert!(connstr.hosts[0].is_ipc());
+    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].ipc);
     assert_eq!("user", connstr.user.unwrap());
     assert_eq!("password", connstr.password.unwrap());
     assert_eq!("false", options.get_str("safe").unwrap());
@@ -203,8 +205,10 @@ fn test_unix_domain_socket_replica_set() {
     let uri = "mongodb://user:password@/tmp/mongodb-27017.sock,/tmp/mongodb-27018.sock/dbname?safe=false";
     let connstr = connstring::parse(uri).unwrap();
     let options = connstr.options.unwrap();
-    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].host_name);
-    assert_eq!("/tmp/mongodb-27018.sock", connstr.hosts[1].host_name);
+    assert!(connstr.hosts[0].is_ipc());
+    assert!(connstr.hosts[1].is_ipc());
+    assert_eq!("/tmp/mongodb-27017.sock", connstr.hosts[0].ipc);
+    assert_eq!("/tmp/mongodb-27018.sock", connstr.hosts[1].ipc);
     assert_eq!("user", connstr.user.unwrap());
     assert_eq!("password", connstr.password.unwrap());
     assert_eq!("dbname", connstr.database.unwrap());

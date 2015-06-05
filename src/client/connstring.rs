@@ -5,27 +5,33 @@ use std::vec::Vec;
 pub const DEFAULT_PORT: u16 = 27017;
 pub const URI_SCHEME: &'static str = "mongodb://";
 
-/// MongoDB connection types.
-pub enum ConnectionType {
-    Invalid,
-    Master,
-    Pair,
-    Set,
-}
-
 /// Encapsulates the hostname and port of a host.
 pub struct Host {
     pub host_name: String,
+    pub ipc: String,
     pub port: u16,
 }
 
 impl Host {
-    /// Creates a new Host struct.
-    pub fn new(host_name: String, port: u16) -> Host {
+    // Creates a new Host struct.
+    fn new(host_name: String, port: u16) -> Host {
         Host {
             host_name: host_name,
             port: port,
+            ipc: String::new(),
         }
+    }
+
+    fn new_ipc(ipc: String) -> Host {
+        Host {
+            host_name: String::new(),
+            port: DEFAULT_PORT,
+            ipc: ipc,
+        }
+    }
+
+    pub fn is_ipc(&self) -> bool {
+        self.ipc.len() > 0
     }
 }
 
@@ -60,7 +66,6 @@ impl ConnectionOptions {
 
 /// Encapsulates information for connection to a single MongoDB host or replicated set.
 pub struct ConnectionString {
-    ctype: ConnectionType,
     pub hosts: Vec<Host>,
     pub string: Option<String>,
     pub user: Option<String>,
@@ -79,7 +84,6 @@ impl ConnectionString {
 
     fn new_from_host(host: Host) -> ConnectionString {
         ConnectionString {
-            ctype: ConnectionType::Master,
             hosts: vec![host],
             string: None,
             user: None,
@@ -88,17 +92,6 @@ impl ConnectionString {
             collection: None,
             options: None,
         }
-    }
-
-    /// Returns the connection type as an owned string.
-    pub fn type_to_string(ctype: ConnectionType) -> String {
-        let string = match ctype {
-            ConnectionType::Invalid => "invalid",
-            ConnectionType::Master => "master",
-            ConnectionType::Pair => "pair",
-            ConnectionType::Set => "set",
-        };
-        string.to_owned()
     }
 }
 
@@ -112,7 +105,6 @@ pub fn parse(address: &str) -> Result<ConnectionString, &str> {
     // Remove scheme
     let addr = &address[URI_SCHEME.len()..];
 
-    let mut ctype: ConnectionType;
     let mut hosts: Vec<Host>;
     let mut user: Option<String> = None;
     let mut password: Option<String> = None;
@@ -123,14 +115,15 @@ pub fn parse(address: &str) -> Result<ConnectionString, &str> {
     // Split on host/path
     let (host_str, path_str) = match addr.contains(".sock") {
         true => {
-            let (host_part, path_part) = rpartition(addr, "/");
-            let host_test_uri = &format!("{}{}", URI_SCHEME, host_part);
-            match parse(host_test_uri) {
-                Ok(_) => (host_part, path_part),
-                Err(_) => (addr, ""),
+            // Parse ipc socket
+            let (host_part, path_part) = rsplit(addr, ".sock");
+            if path_part.starts_with("/") {
+                (host_part, &path_part[1..])
+            } else {
+                (host_part, path_part)
             }
         },
-        false => partition(addr, "/")
+        false => partition(addr, "/"),
     };
 
     if path_str.len() == 0 && host_str.contains("?") {
@@ -147,19 +140,6 @@ pub fn parse(address: &str) -> Result<ConnectionString, &str> {
     } else {
         hosts = try!(split_hosts(host_str));
     }
-
-    // Match connection type
-    ctype = match hosts.len() {
-        1 => ConnectionType::Master,
-        2 =>  ConnectionType::Pair,
-        n => {
-            if n > 2 {
-                ConnectionType::Set
-            } else {
-                ConnectionType::Invalid
-            }
-        }
-    };
 
     let mut opts = "";
 
@@ -182,7 +162,6 @@ pub fn parse(address: &str) -> Result<ConnectionString, &str> {
     }
 
     Ok(ConnectionString {
-        ctype: ctype,
         hosts: hosts,
         string: Some(address.to_owned()),
         user: user,
@@ -219,7 +198,7 @@ fn parse_ipv6_literal_host(entity: &str) -> Result<Host, &str> {
                 },
                 None => Ok(Host::new(entity[1..].to_ascii_lowercase(), DEFAULT_PORT)),
             }
-        }
+        },
         None => Err("An IPv6 address must be enclosed in '[' and ']' according to RFC 2732."),
     }
 }
@@ -228,8 +207,10 @@ fn parse_ipv6_literal_host(entity: &str) -> Result<Host, &str> {
 // All host names are lowercased.
 fn parse_host(entity: &str) -> Result<Host, &str> {
     if entity.starts_with("[") {
+        // IPv6 host
         parse_ipv6_literal_host(entity)
     } else if entity.contains(":") {
+        // Common host:port format
         let (host, port) = partition(entity, ":");
         if port.contains(":") {
             return Err("Reserved characters such as ':' must
@@ -240,7 +221,11 @@ fn parse_host(entity: &str) -> Result<Host, &str> {
             Ok(val) => Ok(Host::new(host.to_ascii_lowercase(), val)),
             Err(_) => Err("Port must be an integer"),
         }
+    } else if entity.contains(".sock") {
+        // IPC socket
+        Ok(Host::new_ipc(entity.to_ascii_lowercase()))
     } else {
+        // Host with no port specified
         Ok(Host::new(entity.to_ascii_lowercase(), DEFAULT_PORT))
     }
 }
@@ -304,7 +289,7 @@ fn split_options(opts: &str) -> Result<ConnectionOptions, &str> {
 // Partitions a string around the left-most occurrence of the separator, if it exists.
 fn partition<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
     return match string.find(sep) {
-        Some(idx) => (&string[..idx], &string[idx+1..]),
+        Some(idx) => (&string[..idx], &string[idx+sep.len()..]),
         None => (string, ""),
     }
 }
@@ -312,7 +297,15 @@ fn partition<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
 // Partitions a string around the right-most occurrence of the separator, if it exists.
 fn rpartition<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
     return match string.rfind(sep) {
-        Some(idx) => (&string[..idx], &string[idx+1..]),
+        Some(idx) => (&string[..idx], &string[idx+sep.len()..]),
+        None => (string, ""),
+    }
+}
+
+// Splits a string around the right-most occurrence of the separator, if it exists.
+fn rsplit<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
+    return match string.rfind(sep) {
+        Some(idx) => (&string[..idx+sep.len()], &string[idx+sep.len()..]),
         None => (string, ""),
     }
 }
