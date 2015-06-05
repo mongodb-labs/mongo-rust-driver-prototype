@@ -1,5 +1,7 @@
 extern crate mongodb;
 
+mod client;
+
 #[test]
 fn single_key_doc_test() {
     let doc = mongodb::get_single_key_bson_doc();
