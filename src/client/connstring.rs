@@ -1,6 +1,5 @@
 use std::ascii::AsciiExt;
 use std::collections::HashMap;
-use std::vec::Vec;
 
 pub const DEFAULT_PORT: u16 = 27017;
 pub const URI_SCHEME: &'static str = "mongodb://";
@@ -22,7 +21,7 @@ impl Host {
         }
     }
 
-    fn new_ipc(ipc: String) -> Host {
+    fn with_ipc(ipc: String) -> Host {
         Host {
             host_name: String::new(),
             port: DEFAULT_PORT,
@@ -30,7 +29,7 @@ impl Host {
         }
     }
 
-    pub fn is_ipc(&self) -> bool {
+    pub fn has_ipc(&self) -> bool {
         self.ipc.len() > 0
     }
 }
@@ -50,17 +49,9 @@ impl ConnectionOptions {
         }
     }
 
-    /// Retrieves an option using a borrowed String
-    pub fn get(&self, key: &String) -> Option<&String> {
+    // Helper method to retrieve an option from the map.
+    pub fn get(&self, key: &str) -> Option<&String> {
         self.options.get(key)
-    }
-
-    /// Retrieves an option using a borrowed str
-    pub fn get_str(&self, key: &str) -> Option<&str> {
-        match self.options.get(&key.to_owned()) {
-            Some(val) => Some(&val),
-            None => None,
-        }
     }
 }
 
@@ -79,10 +70,10 @@ impl ConnectionString {
     /// Creates a new ConnectionString for a single, unreplicated host.
     pub fn new(host_name: &str, port: u16) -> ConnectionString {
         let host = Host::new(host_name.to_owned(), port);
-        ConnectionString::new_from_host(host)
+        ConnectionString::with_host(host)
     }
 
-    fn new_from_host(host: Host) -> ConnectionString {
+    fn with_host(host: Host) -> ConnectionString {
         ConnectionString {
             hosts: vec![host],
             string: None,
@@ -113,17 +104,17 @@ pub fn parse(address: &str) -> Result<ConnectionString, &str> {
     let mut options: Option<ConnectionOptions> = None;
 
     // Split on host/path
-    let (host_str, path_str) = match addr.contains(".sock") {
-        true => {
-            // Parse ipc socket
-            let (host_part, path_part) = rsplit(addr, ".sock");
-            if path_part.starts_with("/") {
-                (host_part, &path_part[1..])
-            } else {
-                (host_part, path_part)
-            }
-        },
-        false => partition(addr, "/"),
+    let (host_str, path_str) = if addr.contains(".sock") {
+        // Partition ipc socket
+        let (host_part, path_part) = rsplit(addr, ".sock");
+        if path_part.starts_with("/") {
+            (host_part, &path_part[1..])
+        } else {
+            (host_part, path_part)
+        }
+    } else {
+        // Partition standard format
+        partition(addr, "/")
     };
 
     if path_str.len() == 0 && host_str.contains("?") {
@@ -223,7 +214,7 @@ fn parse_host(entity: &str) -> Result<Host, &str> {
         }
     } else if entity.contains(".sock") {
         // IPC socket
-        Ok(Host::new_ipc(entity.to_ascii_lowercase()))
+        Ok(Host::with_ipc(entity.to_ascii_lowercase()))
     } else {
         // Host with no port specified
         Ok(Host::new(entity.to_ascii_lowercase(), DEFAULT_PORT))
