@@ -320,7 +320,7 @@ impl Message {
 
     /// Reads a serialized reply message from a buffer
     ///
-    /// FIXME: Right now, this returns only the first BSON document from the
+    /// Right now, this returns only the first BSON document from the
     /// response; if there are more, it ignores the rest, and if there are none,
     /// it fails.
     ///
@@ -360,8 +360,6 @@ impl Message {
     }
 
     /// Attempts to read a serialized reply Message from a buffer.
-    ///
-    /// NOTE: see the "FIXME" in #read_reply.
     ///
     /// # Arguments
     ///
