@@ -1,8 +1,5 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::clone::Clone;
 use std::io::{Read, Write};
-use std::result::Result::{Ok, Err};
-use std::string::ToString;
 
 /// Represents an opcode in the MongoDB Wire Protocol.
 #[derive(Clone)]
