@@ -1,6 +1,7 @@
 use bson::Document as BsonDocument;
 use bson;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use client::wire_protocol::flags::{Flags, OpQueryFlags, OpInsertFlags};
 use client::wire_protocol::header::{Header, OpCode};
 use std::io::{Read, Write};
 use std::mem;
@@ -27,18 +28,6 @@ impl ByteLength for BsonDocument {
     }
 }
 
-pub struct OpQueryFlags {
-    tailable_cursor: bool,    // Bit 1
-    slave_ok: bool,           // Bit 2
-    oplog_relay: bool,        // Bit 3
-    no_cursor_timeout: bool,  // Bit 4
-    await_data: bool,         // Bit 5
-    exhaust: bool,            // Bit 6
-    partial: bool,            // Bit 7
-
-    // All other bits are 0
-}
-
 impl OpQueryFlags {
     pub fn new(tc: bool, so: bool, or: bool, nct: bool, ad: bool, e: bool,
            p: bool) -> OpQueryFlags {
@@ -52,58 +41,6 @@ impl OpQueryFlags {
             partial: p,
         }
     }
-
-    pub fn no_flags() -> OpQueryFlags {
-        OpQueryFlags::new(false, false, false, false, false, false, false)
-    }
-
-    fn to_i32(&self) -> i32 {
-        let mut i = 0 as i32;
-
-        if self.tailable_cursor {
-            let bit = 1 << 1;
-
-            i &= bit;
-        }
-
-        if self.slave_ok {
-            let bit = 1 << 2;
-
-            i &= bit;
-        }
-
-        if self.oplog_relay {
-            let bit = 1 << 3;
-
-            i &= bit;
-        }
-
-        if self.no_cursor_timeout {
-            let bit = 1 << 4;
-
-            i &= bit;
-        }
-
-        if self.await_data {
-            let bit = 1 << 5;
-
-            i &= bit;
-        }
-
-        if self.exhaust {
-            let bit = 1 << 6;
-
-            i &= bit;
-        }
-
-        if self.partial {
-            let bit = 1 << 7;
-
-            i &= bit;
-        }
-
-        i
-    }
 }
 
 /// Represents a message in the MongoDB Wire Protocol.
@@ -114,6 +51,12 @@ pub enum Message {
         cursor_id: i64,
         starting_from: i32,
         number_returned: i32,
+        documents: Vec<BsonDocument>,
+    },
+    OpInsert {
+        header: Header,
+        flags: OpInsertFlags,
+        full_collection_name: String,
         documents: Vec<BsonDocument>,
     },
     OpQuery {
@@ -128,6 +71,31 @@ pub enum Message {
 }
 
 impl Message {
+    pub fn with_insert(header_request_id: i32, flags: OpInsertFlags,
+                       full_collection_name: String,
+                       documents: Vec<BsonDocument>) -> Result<Message, String> {
+        let header_length = mem::size_of::<Header>() as i32;
+        let flags_length = mem::size_of::<i32>() as i32;
+
+        // Add an extra byte after the string for null-termination.
+        let string_length = full_collection_name.len() as i32 + 1;
+
+        let mut total_length = header_length + flags_length + string_length;
+
+        for bson in documents.iter() {
+            total_length += match bson.byte_length() {
+                Ok(i) => i,
+                Err(_) => return Err("Unable to serialize documents".to_owned())
+            }
+        }
+
+        let header = Header::with_insert(total_length, header_request_id);
+
+        Ok(Message::OpInsert { header: header, flags: flags,
+                               full_collection_name: full_collection_name,
+                               documents: documents })
+    }
+
     /// Constructs a new message request for a query.
     ///
     /// # Arguments
@@ -232,12 +200,12 @@ impl Message {
                    flags: &OpQueryFlags, full_collection_name: &str,
                    number_to_skip: i32, number_to_return: i32, query: &BsonDocument,
                    return_field_selector: &Option<BsonDocument>) -> Result<(), String> {
-        let _ = match header.write(buffer) {
+        match header.write(buffer) {
             Ok(_) => (),
             Err(e) => return Err(e)
         };
 
-        let _ = match buffer.write_i32::<LittleEndian>(flags.to_i32()) {
+        match buffer.write_i32::<LittleEndian>(flags.to_i32()) {
             Ok(_) => (),
             Err(_) => return Err("Unable to write flags".to_owned())
         };
@@ -250,27 +218,27 @@ impl Message {
         }
 
         // Writes the null terminator for the collection name string.
-        let _ = match buffer.write_u8(0) {
+        match buffer.write_u8(0) {
             Ok(_) => (),
             Err(_) => return Err("Unable to write full_collection_name".to_owned())
         };
 
-        let _ = match buffer.write_i32::<LittleEndian>(number_to_skip) {
+        match buffer.write_i32::<LittleEndian>(number_to_skip) {
             Ok(_) => (),
             Err(_) => return Err("Unable to write number_to_skip".to_owned())
         };
 
-        let _ = match buffer.write_i32::<LittleEndian>(number_to_return) {
+        match buffer.write_i32::<LittleEndian>(number_to_return) {
             Ok(_) => (),
             Err(_) => return Err("Unable to write number_to_return".to_owned())
         };
 
-        let _ = match Message::write_bson_document(buffer, query) {
+        match Message::write_bson_document(buffer, query) {
             Ok(_) => (),
             Err(s) => return Err(format!("Unable to write query: {}", s))
         };
 
-        let _ = match return_field_selector {
+        match return_field_selector {
             &Some(ref bson) => match Message::write_bson_document(buffer, bson) {
                 Ok(_) => (),
                 Err(s) => {
@@ -282,16 +250,51 @@ impl Message {
             &None => ()
         };
 
-        // match buffer.write_u8(0) {
-        //     Ok(_) => (),
-        //     Err(_) => return Err("Unable to write bson terminator".to_owned())
-        // };
+        let _ = buffer.flush();
 
+        Ok(())
+    }
+
+    fn write_insert(buffer: &mut Write, header: &Header, flags: &OpInsertFlags,
+                    full_collection_name: &str,
+                    documents: &[BsonDocument]) -> Result<(), String> {
+        match header.write(buffer) {
+            Ok(_) => (),
+            Err(e) => return Err(e)
+        };
+
+        match buffer.write_i32::<LittleEndian>(flags.to_i32()) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write flags".to_owned())
+        };
+
+        for byte in full_collection_name.bytes() {
+            let _byte_reponse = match buffer.write_u8(byte) {
+                Ok(_) => (),
+                Err(_) => return Err("Unable to write full_collection_name".to_owned())
+            };
+        }
+
+        // Writes the null terminator for the collection name string.
+        match buffer.write_u8(0) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write full_collection_name".to_owned())
+        };
+
+
+        for bson in documents {
+            match Message::write_bson_document(buffer, bson) {
+                Ok(_) => (),
+                Err(s) => return Err(format!("Unable to insert document: {}", s))
+            };
+
+        }
 
         let _ = buffer.flush();
 
         Ok(())
     }
+
 
     /// Attemps to write a serialized message to a buffer.
     ///
@@ -306,6 +309,12 @@ impl Message {
         match self {
             /// Only the server should sent replies
             &Message::OpReply {..} => Err("OP_REPLY should not be sent by the client".to_owned()),
+            &Message::OpInsert {
+                header: ref h,
+                flags: ref f,
+                full_collection_name: ref fcn,
+                documents: ref d,
+            } => Message::write_insert(buffer, &h, &f, &fcn, &d),
             &Message::OpQuery {
                 header: ref h,
                 flags: ref f,
@@ -380,7 +389,7 @@ impl Message {
         };
 
         match header.op_code {
-            OpCode::OpReply => Message::read_reply(buffer),
+            OpCode::Reply => Message::read_reply(buffer),
             opcode => {
                 let s = format!("Expected to read response but instead found: {}", opcode.to_string());
                 Err(s)
