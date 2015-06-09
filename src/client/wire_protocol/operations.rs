@@ -28,13 +28,13 @@ impl ByteLength for BsonDocument {
 }
 
 pub struct OpQueryFlags {
-    tailable_cursor: bool,    // Bit 1
-    slave_ok: bool,           // Bit 2
-    oplog_relay: bool,        // Bit 3
-    no_cursor_timeout: bool,  // Bit 4
-    await_data: bool,         // Bit 5
-    exhaust: bool,            // Bit 6
-    partial: bool,            // Bit 7
+    pub tailable_cursor: bool,    // Bit 1
+    pub slave_ok: bool,           // Bit 2
+    pub oplog_relay: bool,        // Bit 3
+    pub no_cursor_timeout: bool,  // Bit 4
+    pub await_data: bool,         // Bit 5
+    pub exhaust: bool,            // Bit 6
+    pub partial: bool,            // Bit 7
 
     // All other bits are 0
 }
