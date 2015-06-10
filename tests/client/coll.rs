@@ -10,8 +10,8 @@ use std::net::TcpStream;
 //#[test]
 fn find() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
-    let db = Database::new(&client, "sample", None, None);
-    let coll = Collection::new(&db, "movies", false, None, None);
+    let db = client.db("sample");
+    let coll = db.collection("movies");
     
     let results = coll.find(None, None).unwrap();
 
@@ -27,8 +27,8 @@ fn find() {
 //#[test]
 fn find_one() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
-    let db = Database::new(&client, "sample", None, None);
-    let coll = Collection::new(&db, "movies", false, None, None);
+    let db = client.db("sample");
+    let coll = db.collection("movies");
     
     let result = coll.find_one(None, None).unwrap();
 
@@ -44,7 +44,7 @@ fn find_one() {
 //#[test]
 fn list_collections() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
-    let db = Database::new(&client, "sample", None, None);
+    let db = client.db("sample");
     let result = db.list_collections().unwrap();
     assert!(result.len() > 0);
 }

@@ -7,7 +7,7 @@ use client::wire_protocol::operations::{OpQueryFlags, Message};
 pub struct Collection<'a> {
     db: &'a Database<'a>,
     pub name: String,
-    pub full_name: String,
+    pub namespace: String,
     read_preference: Option<ReadPreference>,
     write_concern: Option<WriteConcern>,
 }
@@ -75,21 +75,9 @@ impl FindOptions {
         }
     }
 
-    pub fn with_skip(&self, skip: i32) -> FindOptions {
-        let mut new_opts = self.clone();
-        new_opts.skip = skip;
-        new_opts
-    }
-
     pub fn with_limit(&self, limit: i32) -> FindOptions {
         let mut new_opts = self.clone();
         new_opts.limit = limit;
-        new_opts
-    }
-
-    pub fn with_projection(&self, proj: Option<bson::Document>) -> FindOptions {
-        let mut new_opts = self.clone();
-        new_opts.projection = proj;
         new_opts
     }
 }
@@ -102,7 +90,7 @@ impl<'a> Collection<'a> {
                read_preference: Option<ReadPreference>, write_concern: Option<WriteConcern>) -> Collection<'a> {
 
         let coll = Collection {
-            full_name: format!("{}.{}", db.name, name),
+            namespace: format!("{}.{}", db.name, name),
             db: db,
             name: name.to_owned(),
             read_preference: read_preference,
@@ -113,8 +101,8 @@ impl<'a> Collection<'a> {
         // Since standard collections are implicitly created on insert,
         // this should only be used to create capped collections.
         if create {
-            coll.create();
-        };
+        coll.create();
+    };
          */
 
         coll
@@ -162,11 +150,16 @@ impl<'a> Collection<'a> {
             partial: options.allow_partial_results,
         };
 
-        let req = try!(Message::with_query(self.get_req_id(), flags, self.full_name.to_owned(),
+        let req = try!(Message::with_query(self.get_req_id(), flags, self.namespace.to_owned(),
                                            options.skip, options.limit, doc, options.projection));
 
-        try!(req.write(&mut *self.db.client.socket.borrow_mut()));
-        let bson = try!(Message::read(&mut *self.db.client.socket.borrow_mut()));
+        let socket = match self.db.client.socket.lock() {
+            Ok(val) => val,
+            _ => return Err("Client socket lock poisoned.".to_owned()),
+        };
+
+        try!(req.write(&mut *socket.borrow_mut()));
+        let bson = try!(Message::read(&mut *socket.borrow_mut()));
         Ok(vec!(bson))
     }
 

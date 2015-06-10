@@ -6,15 +6,16 @@ pub mod wire_protocol;
 
 use std::cell::{Cell, RefCell};
 use std::net::TcpStream;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use client::db::Database;
+use client::common::{ReadPreference, WriteConcern};
 use client::connstring::ConnectionString;
 
 /// Interfaces with a MongoDB server or replica set.
 pub struct MongoClient {
     req_id: Cell<i32>,
-    socket: Arc<RefCell<TcpStream>>,
+    socket: Arc<Mutex<RefCell<TcpStream>>>,
     config: ConnectionString,
 }
 
@@ -37,9 +38,20 @@ impl MongoClient {
         let socket = try!(MongoClient::connect(&config));
         Ok(MongoClient {
             req_id: Cell::new(0),
-            socket: Arc::new(RefCell::new(socket)),
+            socket: Arc::new(Mutex::new(RefCell::new(socket))),
             config: config,
         })
+    }
+
+    /// Creates a database representation with default read and write controls.
+    pub fn db<'a>(&'a self, db_name: &str) -> Database<'a> {
+        Database::new(self, db_name, None, None)
+    }
+
+    /// Creates a database representation with custom read and write controls.
+    pub fn db_with_prefs<'a>(&'a self, db_name: &str, read_preference: Option<ReadPreference>,
+                         write_concern: Option<WriteConcern>) -> Database<'a> {
+        Database::new(self, db_name, read_preference, write_concern)
     }
 
     /// Returns a unique operational request id.

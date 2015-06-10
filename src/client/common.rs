@@ -1,3 +1,4 @@
+#[derive(Clone, PartialEq)]
 pub enum ReadPreference {
     Primary,
     PrimaryPreferred,
@@ -6,6 +7,7 @@ pub enum ReadPreference {
     Nearest,
 }
 
+#[derive(Clone)]
 pub struct WriteConcern {
     w: i8,           // Write replication
     w_timeout: i32,  // Used in conjunction with 'w'. Propagation timeout in ms.

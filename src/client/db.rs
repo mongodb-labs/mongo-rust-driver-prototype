@@ -24,6 +24,17 @@ impl<'a> Database<'a> {
         }
     }
 
+    /// Creates a collection representation with inherited read and write controls.
+    pub fn collection(&'a self, coll_name: &str) -> Collection<'a> {
+        Collection::new(self, coll_name, false, self.read_preference.to_owned(), self.write_concern.to_owned())
+    }
+
+    /// Creates a collection representation with custom read and write controls.
+    pub fn collection_with_prefs(&'a self, coll_name: &str, create: bool,
+                                 read_preference: Option<ReadPreference>, write_concern: Option<WriteConcern>) -> Collection<'a> {
+        Collection::new(self, coll_name, create, read_preference, write_concern)
+    }
+    
     /// Return a unique operational request id.
     pub fn get_req_id(&self) -> i32 {
         self.client.get_req_id()
