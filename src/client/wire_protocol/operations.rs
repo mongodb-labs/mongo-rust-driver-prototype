@@ -1,7 +1,7 @@
 use bson::Document as BsonDocument;
 use bson;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use client::wire_protocol::flags::{Flags, OpQueryFlags, OpInsertFlags};
+use client::wire_protocol::flags::{OpInsertFlags, OpQueryFlags, OpReplyFlags};
 use client::wire_protocol::header::{Header, OpCode};
 use std::io::{Read, Write};
 use std::mem;
@@ -47,7 +47,7 @@ impl OpQueryFlags {
 pub enum Message {
     OpReply {
         header: Header,
-        flags: i32,
+        flags: OpReplyFlags,
         cursor_id: i64,
         starting_from: i32,
         number_returned: i32,
@@ -71,7 +71,16 @@ pub enum Message {
 }
 
 impl Message {
-    pub fn with_insert(header_request_id: i32, flags: OpInsertFlags,
+    fn with_reply(header: Header, flags: i32, cursor_id: i64,
+                  starting_from: i32, number_returned: i32,
+                  documents: Vec<BsonDocument>) -> Message {
+        Message::OpReply { header: header, flags: OpReplyFlags::from_i32(flags),
+                           cursor_id: cursor_id, starting_from: starting_from,
+                           number_returned: number_returned,
+                           documents: documents }
+    }
+
+    pub fn with_insert(request_id: i32, flags: OpInsertFlags,
                        full_collection_name: String,
                        documents: Vec<BsonDocument>) -> Result<Message, String> {
         let header_length = mem::size_of::<Header>() as i32;
@@ -89,7 +98,7 @@ impl Message {
             }
         }
 
-        let header = Header::with_insert(total_length, header_request_id);
+        let header = Header::with_insert(total_length, request_id);
 
         Ok(Message::OpInsert { header: header, flags: flags,
                                full_collection_name: full_collection_name,
@@ -341,31 +350,54 @@ impl Message {
     ///
     /// Returns a single BSON document on success, or an error string on
     /// failure.
-    fn read_reply(buffer: &mut Read) -> Result<BsonDocument, String> {
-        let _flags = match buffer.read_i32::<LittleEndian>() {
+    fn read_reply(buffer: &mut Read, h: Header) -> Result<Message, String> {
+        let mut length = h.message_length - mem::size_of::<Header>() as i32;
+
+        let flags = match buffer.read_i32::<LittleEndian>() {
             Ok(i) => i,
             Err(_) => return Err("Unable to read flags".to_owned())
         };
 
-        let _cid = match buffer.read_i64::<LittleEndian>() {
+        length -= mem::size_of::<i32>() as i32;
+
+        let cid = match buffer.read_i64::<LittleEndian>() {
             Ok(i) => i,
             Err(_) => return Err("Unable to read cursor_id".to_owned())
         };
 
-        let _sf = match buffer.read_i32::<LittleEndian>() {
+        length -= mem::size_of::<i64>() as i32;
+
+        let sf = match buffer.read_i32::<LittleEndian>() {
             Ok(i) => i,
             Err(_) => return Err("Unable to read starting_from".to_owned())
         };
 
-        let _nr = match buffer.read_i32::<LittleEndian>() {
+        length -= mem::size_of::<i32>() as i32;
+
+        let nr = match buffer.read_i32::<LittleEndian>() {
             Ok(i) => i,
             Err(_) => return Err("Unable to read number_returned".to_owned())
         };
 
-        match bson::decode_document(buffer) {
-            Ok(bson) => Ok(bson),
-            Err(_) => Err("Unable to read BSON".to_owned())
+        length -= mem::size_of::<i32>() as i32;
+
+        let mut v = vec![];
+
+        while length > 0 {
+            match bson::decode_document(buffer) {
+                Ok(bson) => {
+                    match bson.byte_length() {
+                        Ok(i) => length -= i,
+                        Err(e) => return Err(e)
+                    };
+
+                    v.push(bson);
+                },
+                Err(_) => return Err("Unable to read BSON".to_owned())
+            }
         }
+
+        Ok(Message::with_reply(h, flags, cid, sf, nr, v))
     }
 
     /// Attempts to read a serialized reply Message from a buffer.
@@ -378,7 +410,7 @@ impl Message {
     ///
     /// Returns a single BSON document on success, or an error string on
     /// failure.
-    pub fn read(buffer: &mut Read) -> Result<BsonDocument, String> {
+    pub fn read<T>(buffer: &mut T) -> Result<Message, String> where T: Read + Write {
         let header = match Header::read(buffer) {
             Ok(h) => h,
             Err(s) => {
@@ -389,10 +421,12 @@ impl Message {
         };
 
         match header.op_code {
-            OpCode::Reply => Message::read_reply(buffer),
+            OpCode::Reply => {
+                Message::read_reply(buffer, header)
+            },
             opcode => {
-                let s = format!("Expected to read response but instead found: {}", opcode.to_string());
-                Err(s)
+                let s = opcode.to_string();
+                Err(format!("Expected to read response but instead found: {}", s))
             }
         }
     }

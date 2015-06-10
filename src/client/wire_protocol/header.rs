@@ -53,7 +53,7 @@ impl ToString for OpCode {
 // #[derive(Clone)]
 pub struct Header {
     pub message_length: i32,
-    request_id: i32,
+    pub request_id: i32,
     response_to: i32,
     pub op_code: OpCode,
 }

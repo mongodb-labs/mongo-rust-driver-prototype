@@ -1,3 +1,27 @@
+pub struct OpReplyFlags {
+    cursor_not_found: bool, // Bit 0
+    query_failure: bool,    // Bit 1
+    await_capable: bool,    // Bit 3
+
+    // All bits remaining must be 0
+}
+
+impl OpReplyFlags {
+    pub fn from_i32(i: i32) -> OpReplyFlags {
+        let cnf = (i & 1) != 0;
+        let qf = (i & (1 << 1)) != 0;
+        let ac = (i & (1 << 3)) != 0;
+
+        OpReplyFlags { cursor_not_found: cnf, query_failure: qf, await_capable: ac }
+    }
+}
+
+pub struct OpInsertFlags {
+    pub continue_on_error: bool,  // Bit 0
+
+    // All bits remaining must be 0
+}
+
 pub struct OpQueryFlags {
     pub tailable_cursor: bool,    // Bit 1
     pub slave_ok: bool,           // Bit 2
@@ -7,27 +31,32 @@ pub struct OpQueryFlags {
     pub exhaust: bool,            // Bit 6
     pub partial: bool,            // Bit 7
 
-    // All other bits must be 0
-}
-
-pub struct OpInsertFlags {
-    pub continue_on_error: bool,  // Bit 0
-
-    // All othe bits must be 0
+    // All bits remaining must be 0
 }
 
 
-pub trait Flags<T> {
-    fn no_flags() -> T;
-    fn to_i32(&self) -> i32;
-}
-
-impl Flags<OpQueryFlags> for OpQueryFlags {
-    fn no_flags() -> OpQueryFlags {
-        OpQueryFlags::new(false, false, false, false, false, false, false)
+impl OpInsertFlags {
+    pub fn no_flags() -> OpInsertFlags {
+        OpInsertFlags { continue_on_error: false }
     }
 
-    fn to_i32(&self) -> i32 {
+    pub fn to_i32(&self) -> i32 {
+        if self.continue_on_error {
+            1
+        } else {
+            0
+        }
+    }
+}
+
+impl OpQueryFlags {
+    pub fn no_flags() -> OpQueryFlags {
+        OpQueryFlags { tailable_cursor: false, slave_ok: false,
+                       oplog_relay: false, no_cursor_timeout: false,
+                       await_data: false, exhaust: false, partial: false }
+    }
+
+    pub fn to_i32(&self) -> i32 {
         let mut i = 0 as i32;
 
         if self.tailable_cursor {
@@ -73,19 +102,5 @@ impl Flags<OpQueryFlags> for OpQueryFlags {
         }
 
         i
-    }
-}
-
-impl Flags<OpInsertFlags> for OpInsertFlags {
-    fn no_flags() -> OpInsertFlags {
-        OpInsertFlags { continue_on_error: false }
-    }
-
-    fn to_i32(&self) -> i32 {
-        if self.continue_on_error {
-            1
-        } else {
-            0
-        }
     }
 }
