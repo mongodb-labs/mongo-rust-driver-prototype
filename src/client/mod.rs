@@ -4,9 +4,10 @@ pub mod common;
 pub mod connstring;
 pub mod wire_protocol;
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 
 use client::db::Database;
 use client::common::{ReadPreference, WriteConcern};
@@ -14,7 +15,7 @@ use client::connstring::ConnectionString;
 
 /// Interfaces with a MongoDB server or replica set.
 pub struct MongoClient {
-    req_id: Cell<i32>,
+    req_id: Arc<AtomicIsize>,
     socket: Arc<Mutex<RefCell<TcpStream>>>,
     config: ConnectionString,
 }
@@ -37,7 +38,7 @@ impl MongoClient {
     fn with_config(config: ConnectionString) -> Result<MongoClient, String> {
         let socket = try!(MongoClient::connect(&config));
         Ok(MongoClient {
-            req_id: Cell::new(0),
+            req_id: Arc::new(ATOMIC_ISIZE_INIT),
             socket: Arc::new(Mutex::new(RefCell::new(socket))),
             config: config,
         })
@@ -56,8 +57,7 @@ impl MongoClient {
 
     /// Returns a unique operational request id.
     pub fn get_req_id(&self) -> i32 {
-        self.req_id.set(self.req_id.get() + 1);
-        self.req_id.get()
+        self.req_id.fetch_add(1, Ordering::SeqCst) as i32
     }
 
     // Connects to a MongoDB server as defined by `config`.
