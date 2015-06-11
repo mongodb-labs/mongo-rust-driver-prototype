@@ -6,13 +6,12 @@ use client::wire_protocol::operations::{OpQueryFlags, Message};
 /// Interfaces with a MongoDB collection.
 pub struct Collection<'a> {
     db: &'a Database<'a>,
-    pub name: String,
     pub namespace: String,
-    read_preference: Option<ReadPreference>,
-    write_concern: Option<WriteConcern>,
+    read_preference: ReadPreference,
+    write_concern: WriteConcern,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum CursorType {
     NonTailable,
     Tailable,
@@ -25,6 +24,7 @@ pub struct AggregateOptions {
     pub use_cursor: bool,
     pub batch_size: Option<i32>,
     pub max_time_ms: Option<i64>,
+    pub read_preference: Option<ReadPreference>,
 }
 
 #[derive(Clone)]
@@ -32,12 +32,14 @@ pub struct CountOptions {
     pub hint: Option<bson::Document>,
     pub limit: Option<i64>,
     pub max_time_ms: Option<i64>,
-    pub skip: Option<i64>,
+    pub skip: Option<u64>,
+    pub read_preference: Option<ReadPreference>,
 }
 
 #[derive(Clone)]
 pub struct DistinctOptions {
     pub max_time_ms: Option<i64>,
+    pub read_preference: Option<ReadPreference>,
 }
 
 #[derive(Clone)]
@@ -45,7 +47,7 @@ pub struct FindOptions {
     pub allow_partial_results: bool,
     pub no_cursor_timeout: bool,
     pub op_log_replay: bool,
-    pub skip: i32,
+    pub skip: u32,
     pub limit: i32,
     pub cursor_type: CursorType,
     pub batch_size: Option<i32>,
@@ -54,6 +56,7 @@ pub struct FindOptions {
     pub modifiers: Option<bson::Document>,
     pub projection: Option<bson::Document>,
     pub sort: Option<bson::Document>,
+    pub read_preference: Option<ReadPreference>,
 }
 
 impl FindOptions {
@@ -72,6 +75,7 @@ impl FindOptions {
             modifiers: None,
             projection: None,
             sort: None,
+            read_preference: None,
         }
     }
 
@@ -89,23 +93,22 @@ impl<'a> Collection<'a> {
     pub fn new(db: &'a Database<'a>, name: &str, create: bool,
                read_preference: Option<ReadPreference>, write_concern: Option<WriteConcern>) -> Collection<'a> {
 
-        let coll = Collection {
-            namespace: format!("{}.{}", db.name, name),
-            db: db,
-            name: name.to_owned(),
-            read_preference: read_preference,
-            write_concern: write_concern,
+        let rp = match read_preference {
+            Some(rp) => rp,
+            None => db.read_preference.to_owned(),
         };
 
-        /*
-        // Since standard collections are implicitly created on insert,
-        // this should only be used to create capped collections.
-        if create {
-        coll.create();
-    };
-         */
+        let wc = match write_concern {
+            Some(wc) => wc,
+            None => db.write_concern.to_owned(),
+        };
 
-        coll
+        Collection {
+            db: db,
+            namespace: format!("{}.{}", db.name, name),
+            read_preference: rp,
+            write_concern: wc,
+        }
     }
 
     /// Returns a unique operational request id.
@@ -113,17 +116,29 @@ impl<'a> Collection<'a> {
         self.db.client.get_req_id()
     }
 
+    /// Extracts the collection name from the namespace.
+    pub fn name(&self) -> String {
+        match self.namespace.find(".") {
+            Some(idx) => self.namespace[idx+1..].to_owned(),
+            None => {
+                // '.' is inserted in Collection::new, so this should only panic due to user error.
+                let msg = format!("Invalid namespace specified: '{}'.", self.namespace);
+                panic!(msg);
+            }
+        }
+    }
+
     // Read Spec
     pub fn aggregate(pipeline: &[bson::Document], options: AggregateOptions) -> Result<Vec<bson::Document>, String> {
-        Err("IMPL".to_owned())
+        unimplemented!()
     }
 
     pub fn count(filter: bson::Document, options: CountOptions) -> Result<i64, String> {
-        Err("IMPL".to_owned())
+        unimplemented!()
     }
 
     pub fn distinct(field_name: &str, filter: bson::Document, options: DistinctOptions) -> Result<Vec<String>, String> {
-        Err("IMPL".to_owned())
+        unimplemented!()
     }
 
     /// Returns a list of documents within the collection that match the filter.
@@ -151,7 +166,7 @@ impl<'a> Collection<'a> {
         };
 
         let req = try!(Message::with_query(self.get_req_id(), flags, self.namespace.to_owned(),
-                                           options.skip, options.limit, doc, options.projection));
+                                           options.skip as i32, options.limit, doc, options.projection));
 
         let socket = match self.db.client.socket.lock() {
             Ok(val) => val,
@@ -180,15 +195,15 @@ impl<'a> Collection<'a> {
     }
 
     // Write Spec
-    fn insert(&self, docs: &[bson::Document]) -> Result<bson::Document, String> {
-        Err("IMPL".to_owned())
+    fn insert(&self, docs: &[bson::Document], write_concern: WriteConcern) -> Result<bson::Document, String> {
+        unimplemented!()
     }
 
-    pub fn insert_one(&self, doc: bson::Document) -> Result<bson::Document, String> {
-        Err("IMPL".to_owned())
+    pub fn insert_one(&self, doc: bson::Document, write_concern: Option<WriteConcern>) -> Result<bson::Document, String> {
+        unimplemented!()
     }
 
-    pub fn insert_many(&self, docs: &[bson::Document], ordered: bool) -> Result<bson::Document, String> {
-        Err("IMPL".to_owned())
+    pub fn insert_many(&self, docs: &[bson::Document], ordered: bool, write_concern: Option<WriteConcern>) -> Result<bson::Document, String> {
+        unimplemented!()
     }
 }
