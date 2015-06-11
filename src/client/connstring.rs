@@ -86,7 +86,7 @@ impl ConnectionString {
     }
 }
 
-/// Parses a MongoDB connection string URI as defined by
+/// Parses a MongoDB connection string URI as defined by 
 /// [the manual](http://docs.mongodb.org/manual/reference/connection-string/).
 pub fn parse(address: &str) -> Result<ConnectionString, &str> {
     if !address.starts_with(URI_SCHEME) {
