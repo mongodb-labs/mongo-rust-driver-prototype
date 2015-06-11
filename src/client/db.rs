@@ -51,8 +51,8 @@ impl<'a> Database<'a> {
         self.client.get_req_id()
     }
 
-    // Sends an administrative command over find_one.
-    fn command(&'a self, spec: bson::Document) -> Result<Option<bson::Document>, String> {
+    /// Sends an administrative command over find_one.
+    pub fn command(&'a self, spec: bson::Document) -> Result<Option<bson::Document>, String> {
         let coll = Collection::new(self, "$cmd", false, None, None);
         coll.find_one(Some(spec), None)
     }
@@ -111,6 +111,14 @@ impl<'a> Database<'a> {
     pub fn drop_database(&'a self) -> Result<(), String> {
         let mut spec = bson::Document::new();
         spec.insert("dropDatabase".to_owned(), Bson::I32(1));
+        try!(self.command(spec));
+        Ok(())
+    }
+
+    /// Permanently deletes the collection from the database.
+    pub fn drop_collection(&'a self, name: &str) -> Result<(), String> {
+        let mut spec = bson::Document::new();
+        spec.insert("drop".to_owned(), Bson::String(name.to_owned()));
         try!(self.command(spec));
         Ok(())
     }
