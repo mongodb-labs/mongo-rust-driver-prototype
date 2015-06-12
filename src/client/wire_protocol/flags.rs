@@ -62,45 +62,31 @@ impl OpQueryFlags {
         let mut i = 0 as i32;
 
         if self.tailable_cursor {
-            let bit = 1 << 1;
-
-            i |= bit;
+            i |= 1 << 1;
         }
 
         if self.slave_ok {
-            let bit = 1 << 2;
-
-            i |= bit;
+            i |= 1 << 2;
         }
 
         if self.oplog_relay {
-            let bit = 1 << 3;
-
-            i |= bit;
+            i |= 1 << 3;
         }
 
         if self.no_cursor_timeout {
-            let bit = 1 << 4;
-
-            i |= bit;
+            i |= 1 << 4;
         }
 
         if self.await_data {
-            let bit = 1 << 5;
-
-            i |= bit;
+            i |= 1 << 5;
         }
 
         if self.exhaust {
-            let bit = 1 << 6;
-
-            i |= bit;
+            i |= 1 << 6;
         }
 
         if self.partial {
-            let bit = 1 << 7;
-
-            i |= bit;
+            i |= 1 << 7;
         }
 
         i

@@ -177,12 +177,12 @@ impl<'a> Collection<'a> {
         try!(req.write(&mut *socket.borrow_mut()));
         let message = try!(Message::read(&mut *socket.borrow_mut()));
 
-	match message {
-	  Message::OpReply { header: _, flags: _, cursor_id: _,
-	                     starting_from: _, number_returned: _,
-			     documents: documents } => Ok(documents),
-	  _ => Err("Invalid response received from server".to_owned())
-	}
+        match message {
+            Message::OpReply { header: _, flags: _, cursor_id: _,
+                             starting_from: _, number_returned: _,
+                             documents, } => Ok(documents),
+          _ => Err("Invalid response received from server".to_owned())
+        }
     }
 
     /// Returns the first document within the collection that matches the filter, or None.
