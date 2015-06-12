@@ -407,8 +407,8 @@ impl Message {
                 Message::read_reply(buffer, header)
             },
             opcode => {
-                let s = opcode.to_string();
-                Err(format!("Expected to read response but instead found: {}", s))
+                Err(format!("Expected to read response but instead found: {}",
+                            opcode.to_string()))
             }
         }
     }
