@@ -28,21 +28,6 @@ impl ByteLength for BsonDocument {
     }
 }
 
-impl OpQueryFlags {
-    pub fn new(tc: bool, so: bool, or: bool, nct: bool, ad: bool, e: bool,
-           p: bool) -> OpQueryFlags {
-        OpQueryFlags{
-            tailable_cursor: tc,
-            slave_ok: so,
-            oplog_relay: or,
-            no_cursor_timeout: nct,
-            await_data: ad,
-            exhaust: e,
-            partial: p,
-        }
-    }
-}
-
 /// Represents a message in the MongoDB Wire Protocol.
 pub enum Message {
     OpReply {
