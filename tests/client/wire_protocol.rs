@@ -6,7 +6,7 @@ use mongodb::client::wire_protocol::operations::Message;
 use std::io::Write;
 use std::net::TcpStream;
 
-#[test]
+// #[test]
 fn insert_single_key_doc() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
@@ -67,7 +67,7 @@ fn insert_single_key_doc() {
     }
 }
 
-#[test]
+// #[test]
 fn insert_multi_key_doc() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
@@ -134,7 +134,7 @@ fn insert_multi_key_doc() {
     }
 }
 
-#[test]
+// #[test]
 fn insert_docs() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
