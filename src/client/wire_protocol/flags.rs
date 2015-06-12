@@ -8,11 +8,13 @@ pub struct OpReplyFlags {
 
 impl OpReplyFlags {
     pub fn from_i32(i: i32) -> OpReplyFlags {
-        let cnf = (i & 1) != 0;
-        let qf = (i & (1 << 1)) != 0;
-        let ac = (i & (1 << 3)) != 0;
+        let cursor_not_found = (i & 1) != 0;
+        let query_failure = (i & (1 << 1)) != 0;
+        let await_capable = (i & (1 << 3)) != 0;
 
-        OpReplyFlags { cursor_not_found: cnf, query_failure: qf, await_capable: ac }
+        OpReplyFlags { cursor_not_found: cursor_not_found,
+                       query_failure: query_failure,
+                       await_capable: await_capable }
     }
 }
 

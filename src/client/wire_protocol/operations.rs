@@ -302,22 +302,19 @@ impl Message {
     pub fn write(&self, buffer: &mut Write) -> Result<(), String> {
         match self {
             /// Only the server should sent replies
-            &Message::OpReply {..} => Err("OP_REPLY should not be sent by the client".to_owned()),
-            &Message::OpInsert {
-                header: ref h,
-                flags: ref f,
-                full_collection_name: ref fcn,
-                documents: ref d,
-            } => Message::write_insert(buffer, &h, &f, &fcn, &d),
-            &Message::OpQuery {
-                header: ref h,
-                flags: ref f,
-                full_collection_name: ref fcn,
-                number_to_skip: ns,
-                number_to_return: nr,
-                query: ref q,
-                return_field_selector: ref rfs
-            } => Message::write_query(buffer, &h, &f, &fcn, ns, nr, &q, &rfs)
+            &Message::OpReply {..} =>
+                Err("OP_REPLY should not be sent by the client".to_owned()),
+            &Message::OpInsert { ref header, ref flags,
+                                 ref full_collection_name, ref documents,
+            } => Message::write_insert(buffer, &header, &flags,
+                                       &full_collection_name, &documents),
+            &Message::OpQuery { ref header, ref flags, ref full_collection_name,
+                                number_to_skip, number_to_return, ref query,
+                                ref return_field_selector
+            } => Message::write_query(buffer, &header, &flags,
+                                      &full_collection_name, number_to_skip,
+                                      number_to_return, &query,
+                                      &return_field_selector)
         }
     }
 
