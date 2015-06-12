@@ -1,7 +1,8 @@
 use bson;
 use client::db::Database;
 use client::common::{ReadPreference, WriteConcern};
-use client::wire_protocol::operations::{OpQueryFlags, Message};
+use client::wire_protocol::flags::OpQueryFlags;
+use client::wire_protocol::operations::Message;
 
 /// Interfaces with a MongoDB collection.
 pub struct Collection<'a> {
@@ -174,8 +175,14 @@ impl<'a> Collection<'a> {
         };
 
         try!(req.write(&mut *socket.borrow_mut()));
-        let bson = try!(Message::read(&mut *socket.borrow_mut()));
-        Ok(vec!(bson))
+        let message = try!(Message::read(&mut *socket.borrow_mut()));
+
+        match message {
+            Message::OpReply { header: _, flags: _, cursor_id: _,
+                             starting_from: _, number_returned: _,
+                             documents, } => Ok(documents),
+          _ => Err("Invalid response received from server".to_owned())
+        }
     }
 
     /// Returns the first document within the collection that matches the filter, or None.

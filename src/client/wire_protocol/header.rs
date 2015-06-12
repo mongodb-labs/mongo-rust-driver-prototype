@@ -4,8 +4,9 @@ use std::io::{Read, Write};
 /// Represents an opcode in the MongoDB Wire Protocol.
 #[derive(Clone)]
 pub enum OpCode {
-    OpReply = 1,
-    OpQuery = 2004,
+    Reply = 1,
+    Insert = 2002,
+    Query = 2004,
 }
 
 impl OpCode {
@@ -21,8 +22,9 @@ impl OpCode {
     /// opcode.
     pub fn from_i32(i: i32) -> Option<OpCode> {
         match i {
-            2004 => Some(OpCode::OpQuery),
-            1 => Some(OpCode::OpReply),
+            1 => Some(OpCode::Reply),
+            2002 => Some(OpCode::Insert),
+            2004 => Some(OpCode::Query),
             _ => None
         }
     }
@@ -31,8 +33,9 @@ impl OpCode {
 impl ToString for OpCode {
     fn to_string(&self) -> String {
         match self {
-            &OpCode::OpReply => "OP_REPLY".to_owned(),
-            &OpCode::OpQuery => "OP_QUERY".to_owned()
+            &OpCode::Reply => "OP_REPLY".to_owned(),
+            &OpCode::Insert => "OP_INSERT".to_owned(),
+            &OpCode::Query => "OP_QUERY".to_owned()
         }
     }
 }
@@ -50,7 +53,7 @@ impl ToString for OpCode {
 // #[derive(Clone)]
 pub struct Header {
     pub message_length: i32,
-    request_id: i32,
+    pub request_id: i32,
     response_to: i32,
     pub op_code: OpCode,
 }
@@ -110,9 +113,13 @@ impl Header {
     /// Returns a new Header with `response_to` set to 0 and `op_code`
     /// set to `OpQuery`.
     pub fn with_query(message_length: i32, request_id: i32) -> Header {
-        Header::new_request(message_length, request_id, OpCode::OpQuery)
+        Header::new_request(message_length, request_id, OpCode::Query)
     }
 
+
+    pub fn with_insert(message_length: i32, request_id: i32) -> Header {
+        Header::new_request(message_length, request_id, OpCode::Insert)
+    }
 
     /// Writes the serialized Header to a buffer.
     ///
@@ -173,9 +180,7 @@ impl Header {
         let op_code = match buffer.read_i32::<LittleEndian>() {
             Ok(i) => match OpCode::from_i32(i) {
                 Some(op) => op,
-                None => {
-                    return Err(format!("invalid opcode: {}", i))
-                }
+                None => return Err(format!("invalid opcode: {}", i))
             },
             Err(_) => return Err("unable to read op_code".to_owned())
         };
