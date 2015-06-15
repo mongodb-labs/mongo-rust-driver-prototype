@@ -323,7 +323,47 @@ impl Message {
     pub fn write_get_more(buffer: &mut Write, header: &Header,
                           full_collection_name: &str, number_to_return: i32,
                           cursor_id: i64) -> Result<(), String> {
-        Err("".to_owned())
+        match header.write(buffer) {
+            Ok(_) => (),
+            Err(e) => return Err(e)
+        };
+
+        // Write ZERO field
+        match buffer.write_i32::<LittleEndian>(0) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write ZERO field".to_owned())
+        };
+
+        for byte in full_collection_name.bytes() {
+            let _byte_reponse = match buffer.write_u8(byte) {
+                Ok(_) => (),
+                Err(_) => return Err("Unable to write \
+                                      full_collection_name".to_owned())
+            };
+        }
+
+        // Writes the null terminator for the collection name string.
+        match buffer.write_u8(0) {
+            Ok(_) => (),
+            Err(_) =>
+                return Err("Unable to write full_collection_name".to_owned())
+        };
+
+
+        match buffer.write_i32::<LittleEndian>(number_to_return) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write number_to_return".to_owned())
+        };
+
+
+        match buffer.write_i64::<LittleEndian>(cursor_id) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write cursor_id".to_owned())
+        };
+
+        let _ = buffer.flush();
+
+        Ok(())
     }
 
     /// Attemps to write a serialized message to a buffer.
