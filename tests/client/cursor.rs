@@ -34,7 +34,7 @@ fn cursor_features() {
 
             let doc = Document::new();
             let flags = OpQueryFlags::no_flags();
-            let name = "test.test";
+            let name = "test.cursor_test";
             let result = Cursor::query_with_batch_size(&mut stream, 3, 2, flags,
                                                        name, 0, 0, doc, None);
 
