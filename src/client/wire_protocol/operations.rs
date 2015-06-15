@@ -61,6 +61,13 @@ pub enum Message {
         query: bson::Document,
         return_field_selector: Option<bson::Document>,
     },
+    OpGetMore {
+        header: Header,
+        // The wire protocol specifies that 32-bit 0 goes here
+        full_collection_name: String,
+        number_to_return: i32,
+        cursor_id: i64,
+    }
 }
 
 impl Message {
@@ -152,7 +159,7 @@ impl Message {
     /// # Return value
     ///
     /// Returns the newly-created Message.
-    pub fn with_query(header_request_id: i32, flags: OpQueryFlags,
+    pub fn with_query(request_id: i32, flags: OpQueryFlags,
                      full_collection_name: String, number_to_skip: i32,
                      number_to_return: i32, query: bson::Document,
                      return_field_selector: Option<bson::Document>) -> Result<Message, String> {
@@ -182,13 +189,35 @@ impl Message {
         let total_length = header_length + i32_length + string_length +
                            bson_length + option_length;
 
-        let header = Header::with_query(total_length, header_request_id);
+        let header = Header::with_query(total_length, request_id);
 
         Ok(Message::OpQuery { header: header, flags: flags,
                               full_collection_name: full_collection_name,
                               number_to_skip: number_to_skip,
                               number_to_return: number_to_return, query: query,
                               return_field_selector: return_field_selector })
+    }
+
+    pub fn with_get_more(request_id: i32, full_collection_name: String,
+                         number_to_return: i32, cursor_id: i64) -> Message {
+        let header_length = mem::size_of::<Header>() as i32;
+
+        // There are two i32 fields because of the reserved "ZERO".
+        let i32_length = 2 * mem::size_of::<i32>() as i32;
+
+        // Add an extra byte after the string for null-termination.
+        let string_length = full_collection_name.len() as i32 + 1;
+
+        let i64_length = mem::size_of::<i64>() as i32;
+        let total_length = header_length + i32_length + string_length +
+                           i64_length;
+
+        let header = Header::with_get_more(total_length, request_id);
+
+        Message::OpGetMore { header: header,
+                             full_collection_name: full_collection_name,
+                             number_to_return: number_to_return,
+                             cursor_id: cursor_id }
     }
 
     /// Writes a serialized BSON document to a given buffer.
@@ -345,6 +374,8 @@ impl Message {
         Ok(())
     }
 
+
+
     fn write_insert(buffer: &mut Write, header: &Header, flags: &OpInsertFlags,
                     full_collection_name: &str,
                     documents: &[bson::Document]) -> Result<(), String> {
@@ -385,6 +416,51 @@ impl Message {
         Ok(())
     }
 
+    pub fn write_get_more(buffer: &mut Write, header: &Header,
+                          full_collection_name: &str, number_to_return: i32,
+                          cursor_id: i64) -> Result<(), String> {
+        match header.write(buffer) {
+            Ok(_) => (),
+            Err(e) => return Err(e)
+        };
+
+        // Write ZERO field
+        match buffer.write_i32::<LittleEndian>(0) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write ZERO field".to_owned())
+        };
+
+        for byte in full_collection_name.bytes() {
+            let _byte_reponse = match buffer.write_u8(byte) {
+                Ok(_) => (),
+                Err(_) => return Err("Unable to write \
+                                      full_collection_name".to_owned())
+            };
+        }
+
+        // Writes the null terminator for the collection name string.
+        match buffer.write_u8(0) {
+            Ok(_) => (),
+            Err(_) =>
+                return Err("Unable to write full_collection_name".to_owned())
+        };
+
+
+        match buffer.write_i32::<LittleEndian>(number_to_return) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write number_to_return".to_owned())
+        };
+
+
+        match buffer.write_i64::<LittleEndian>(cursor_id) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write cursor_id".to_owned())
+        };
+
+        let _ = buffer.flush();
+
+        Ok(())
+    }
 
     /// Attemps to write a serialized message to a buffer.
     ///
@@ -405,7 +481,7 @@ impl Message {
                 Message::write_update(buffer, &header,&full_collection_name,
                                       &flags, &selector, &update),
             &Message::OpInsert { ref header, ref flags,
-                                 ref full_collection_name, ref documents, } =>
+                                 ref full_collection_name, ref documents } =>
                 Message::write_insert(buffer, &header, &flags,
                                       &full_collection_name, &documents),
             &Message::OpQuery { ref header, ref flags, ref full_collection_name,
@@ -414,7 +490,11 @@ impl Message {
                 Message::write_query(buffer, &header, &flags,
                                      &full_collection_name, number_to_skip,
                                      number_to_return, &query,
-                                     &return_field_selector)
+                                     &return_field_selector),
+            &Message::OpGetMore { ref header, ref full_collection_name,
+                                  number_to_return, cursor_id } =>
+                Message::write_get_more(buffer, &header, &full_collection_name,
+                                        number_to_return, cursor_id)
         }
     }
 
