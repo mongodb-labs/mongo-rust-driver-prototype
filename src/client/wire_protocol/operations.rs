@@ -146,8 +146,8 @@ impl Message {
     ///
     /// `header_request_id` - The request ID to be placed in the message header.
     /// `flags` - Bit vector of query options.
-    /// `namespace` - The full qualified name of the collection,
-    ///                          beginning with the database name and a dot.
+    /// `namespace` - The full qualified name of the collection, beginning with
+    ///               the database name and a dot.
     /// `number_to_skip` - The number of initial documents to skip over in the query
     ///                    results.
     /// `number_to_return - The total number of documents that should be returned by
@@ -302,8 +302,8 @@ impl Message {
     /// `buffer` - The buffer to write to.
     /// `header` - The header for the given message.
     /// `flags` - Bit vector of query option.
-    /// `namespace` - The full qualified name of the collection,
-    ///                          beginning with the database name and a dot.
+    /// `namespace` - The full qualified name of the collection, beginning with
+    ///               the database name and a dot.
     /// `number_to_skip` - The number of initial documents to skip over in the
     ///                    query results.
     /// `number_to_return - The total number of documents that should be
