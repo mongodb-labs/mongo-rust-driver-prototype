@@ -19,6 +19,8 @@ pub struct Cursor<'a, T> where T: Read + Write + 'a {
     namespace: String,
     batch_size: i32,
     cursor_id: i64,
+    limit: i32,
+    count: i32,
     buffer: VecDeque<bson::Document>,
     stream: &'a mut T,
 }
@@ -58,7 +60,7 @@ impl <'a, T> Cursor<'a, T> where T: Read + Write + 'a {
                                  return_field_selector: Option<bson::Document>) -> Result<Cursor<'a, T>, String> {
         let result = Message::with_query(request_id, flags,
                                          namespace.to_owned(),
-                                         number_to_skip, number_to_return,
+                                         number_to_skip, batch_size,
                                          query, return_field_selector);
 
         let message = match result {
@@ -82,7 +84,10 @@ impl <'a, T> Cursor<'a, T> where T: Read + Write + 'a {
                 namespace: namespace.to_owned(),
                 batch_size: batch_size,
                 cursor_id: cursor_id,
-                buffer: buf, stream: stream }),
+                limit: number_to_return,
+                count: 0,
+                buffer: buf,
+                stream: stream }),
             None => Err("Invalid resonse received".to_owned()),
         }
     }
@@ -152,6 +157,12 @@ impl <'a, T> Iterator for Cursor<'a, T> where T: Read + Write + 'a {
     type Item = bson::Document;
 
     fn next(&mut self) -> Option<bson::Document> {
+        if self.limit != 0 && self.count >= self.limit {
+            return None;
+        }
+
+        self.count += 1;
+
         match self.buffer.pop_front() {
             Some(bson) => Some(bson),
             None => self.next_from_stream()
