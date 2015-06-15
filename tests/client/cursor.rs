@@ -8,7 +8,7 @@ use std::io::Write;
 use std::net::TcpStream;
 
 #[test]
-fn cursor() {
+fn cursor_features() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
             let docs : Vec<_> = (0..10).map(|i| {
@@ -34,9 +34,9 @@ fn cursor() {
 
             let doc = Document::new();
             let flags = OpQueryFlags::no_flags();
-            let name = "test.test".to_owned();
+            let name = "test.test";
             let result = Cursor::query_with_batch_size(&mut stream, 3, 2, flags,
-                                                       &name, 0, 0, doc, None);
+                                                       name, 0, 0, doc, None);
 
             let mut cursor = match result {
                 Ok(c) => c,
@@ -50,7 +50,7 @@ fn cursor() {
             for i in 0..batch.len() {
                 match batch[i].get("foo") {
                     Some(&I64(j)) => assert_eq!(i as i64, j),
-                    e => panic!("Wrong value returned from Cursor#next_batch: {:?}", e)
+                    _ => panic!("Wrong value returned from Cursor#next_batch")
                 };
             }
 
