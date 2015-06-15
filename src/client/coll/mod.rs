@@ -97,16 +97,7 @@ impl<'a> Collection<'a> {
             None => FindOptions::new(),
         };
 
-        let flags = OpQueryFlags {
-            tailable_cursor: options.cursor_type != CursorType::NonTailable,
-            slave_ok: false,
-            oplog_relay: options.op_log_replay,
-            no_cursor_timeout: options.no_cursor_timeout,
-            await_data: options.cursor_type == CursorType::TailableAwait,
-            exhaust: false,
-            partial: options.allow_partial_results,
-        };
-
+        let flags = OpQueryFlags::with_find_options(&options);
         let req = try!(Message::with_query(self.get_req_id(), flags, self.namespace.to_owned(),
                                            options.skip as i32, options.limit, doc, options.projection));
 
@@ -138,7 +129,8 @@ impl<'a> Collection<'a> {
         let res = try!(self.find(filter, Some(options.with_limit(1))));
         match res.len() {
             0 => Ok(None),
-            _ => Ok(Some(res[0].to_owned())),
+            1 => Ok(Some(res[0].to_owned())),
+            n => Err(format!("Expected a single document, found {}.", n)),
         }
     }
 
