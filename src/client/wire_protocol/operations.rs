@@ -71,6 +71,19 @@ pub enum Message {
 }
 
 impl Message {
+    /// Constructs a new message for a reply.
+    ///
+    /// # Arguments
+    ///
+    /// `header` - The message header.
+    /// `flags` - Bit vector of query options.
+    /// `cursor_id` - Uniquely identifies the cursor being returned.
+    /// `number_returned - The total number of documents being returned.
+    /// `documents` - The documents being returned.
+    ///
+    /// # Return value
+    ///
+    /// Returns the newly-created Message.
     fn with_reply(header: Header, flags: i32, cursor_id: i64,
                   starting_from: i32, number_returned: i32,
                   documents: Vec<bson::Document>) -> Message {
@@ -80,8 +93,22 @@ impl Message {
                            documents: documents }
     }
 
-    pub fn with_update(request_id: i32, namespace: String,
-                       flags: OpUpdateFlags, selector: bson::Document,
+    /// Constructs a new message for an update.
+    ///
+    /// # Arguments
+    ///
+    /// `request_id` - The request ID to be placed in the message header.
+    /// `namespace` - The full qualified name of the collection, beginning with
+    ///               the database name and a dot.
+    /// `flags` - Bit vector of query options.
+    /// `selector` - Identifies the document(s) to be updated.
+    /// `update` - Instructs how to update the document(s).
+    ///
+    /// # Return value
+    ///
+    /// Returns the newly-created Message.
+    pub fn with_update(request_id: i32, namespace: String, flags: OpUpdateFlags,
+                       selector: bson::Document,
                        update: bson::Document) -> Result<Message, String> {
         let header_length = mem::size_of::<Header>() as i32;
 
@@ -109,14 +136,25 @@ impl Message {
 
         let header = Header::with_update(total_length, request_id);
 
-        Ok(Message::OpUpdate { header: header,
-                               namespace: namespace,
+        Ok(Message::OpUpdate { header: header, namespace: namespace,
                                flags: flags, selector: selector,
                                update: update })
-   }
+    }
 
-    pub fn with_insert(request_id: i32, flags: OpInsertFlags,
-                       namespace: String,
+    /// Constructs a new message request for an insertion.
+    ///
+    /// # Arguments
+    ///
+    /// `request_id` - The request ID to be placed in the message header.
+    /// `flags` - Bit vector of query options.
+    /// `namespace` - The full qualified name of the collection, beginning with
+    ///               the database name and a dot.
+    /// `documents` - The documents to insert.
+    ///
+    /// # Return value
+    ///
+    /// Returns the newly-created Message.
+    pub fn with_insert(request_id: i32, flags: OpInsertFlags, namespace: String,
                        documents: Vec<bson::Document>) -> Result<Message, String> {
         let header_length = mem::size_of::<Header>() as i32;
         let flags_length = mem::size_of::<i32>() as i32;
@@ -136,33 +174,33 @@ impl Message {
         let header = Header::with_insert(total_length, request_id);
 
         Ok(Message::OpInsert { header: header, flags: flags,
-                               namespace: namespace,
-                               documents: documents })
+                               namespace: namespace, documents: documents })
     }
 
     /// Constructs a new message request for a query.
     ///
     /// # Arguments
     ///
-    /// `header_request_id` - The request ID to be placed in the message header.
+    /// `request_id` - The request ID to be placed in the message header.
     /// `flags` - Bit vector of query options.
     /// `namespace` - The full qualified name of the collection, beginning with
     ///               the database name and a dot.
-    /// `number_to_skip` - The number of initial documents to skip over in the query
-    ///                    results.
-    /// `number_to_return - The total number of documents that should be returned by
-    ///                     the query.
-    /// `return_field_selector - An optional projection of which fields should be
-    ///                          present in the documents to be returned by the
-    ///                          query.
+    /// `number_to_skip` - The number of initial documents to skip over in the
+    ///                    query results.
+    /// `number_to_return - The total number of documents that should be
+    ///                     returned by the query.
+    /// `query` - Specifies which documents to return.
+    /// `return_field_selector - An optional projection of which fields should
+    ///                          be present in the documents to be returned by
+    ///                          the query.
     ///
     /// # Return value
     ///
     /// Returns the newly-created Message.
-    pub fn with_query(request_id: i32, flags: OpQueryFlags,
-                     namespace: String, number_to_skip: i32,
-                     number_to_return: i32, query: bson::Document,
-                     return_field_selector: Option<bson::Document>) -> Result<Message, String> {
+    pub fn with_query(request_id: i32, flags: OpQueryFlags, namespace: String,
+                      number_to_skip: i32, number_to_return: i32,
+                      query: bson::Document,
+                      return_field_selector: Option<bson::Document>) -> Result<Message, String> {
         let header_length = mem::size_of::<Header>() as i32;
 
         // There are three i32 fields in the an OpQuery (since OpQueryFlags is
@@ -181,7 +219,9 @@ impl Message {
         let option_length = match return_field_selector {
             Some(ref bson) => match bson.byte_length() {
                 Ok(i) => i,
-                Err(_) => return Err("Unable to serialize return_field_selector".to_owned())
+                Err(_) =>
+                    return Err("Unable to serialize \
+                                return_field_selector".to_owned())
             },
             None => 0
         };
@@ -198,6 +238,20 @@ impl Message {
                               return_field_selector: return_field_selector })
     }
 
+    /// Constructs a new "get more" request message.
+    ///
+    /// # Arguments
+    ///
+    /// `request_id` - The request ID to be placed in the message header.
+    /// `namespace` - The full qualified name of the collection, beginning with
+    ///               the database name and a dot.
+    /// `number_to_return - The total number of documents that should be
+    ///                     returned by the query.
+    /// `cursor_id` - Specifies which cursor to get more documents from.
+    ///
+    /// # Return value
+    ///
+    /// Returns the newly-created Message.
     pub fn with_get_more(request_id: i32, namespace: String,
                          number_to_return: i32, cursor_id: i64) -> Message {
         let header_length = mem::size_of::<Header>() as i32;
@@ -243,9 +297,23 @@ impl Message {
         }
     }
 
-    pub fn write_update(buffer: &mut Write, header: &Header,
-                        namespace: &str, flags: &OpUpdateFlags,
-                        selector: &bson::Document,
+    /// Writes a serialized query message to a given buffer.
+    ///
+    /// # Arguments
+    ///
+    /// `buffer` - The buffer to write to.
+    /// `header` - The header for the given message.
+    /// `namespace` - The full qualified name of the collection, beginning with
+    ///               the database name and a dot.
+    /// `flags` - Bit vector of query option.
+    /// `selector` - Identifies the document(s) to be updated.
+    /// `update` - Instructs how to update the document(s).
+    ///
+    /// # Return value
+    ///
+    /// Returns nothing on success, or an error string on failure.
+    pub fn write_update(buffer: &mut Write, header: &Header, namespace: &str,
+                        flags: &OpUpdateFlags, selector: &bson::Document,
                         update: &bson::Document) -> Result<(), String> {
         match header.write(buffer) {
             Ok(_) => (),
@@ -294,6 +362,60 @@ impl Message {
         Ok(())
     }
 
+    /// Constructs a new message request for an insertion.
+    ///
+    /// # Arguments
+    ///
+    /// `buffer` - The buffer to write to.
+    /// `header` - The header for the given message.
+    /// `flags` - Bit vector of query options.
+    /// `namespace` - The full qualified name of the collection, beginning with
+    ///               the database name and a dot.
+    /// `documents` - The documents to insert.
+    ///
+    /// # Return value
+    ///
+    /// Returns the newly-created Message.
+    fn write_insert(buffer: &mut Write, header: &Header, flags: &OpInsertFlags,
+                    namespace: &str,
+                    documents: &[bson::Document]) -> Result<(), String> {
+        match header.write(buffer) {
+            Ok(_) => (),
+            Err(e) => return Err(e)
+        };
+
+        match buffer.write_i32::<LittleEndian>(flags.to_i32()) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write flags".to_owned())
+        };
+
+        for byte in namespace.bytes() {
+            let _byte_reponse = match buffer.write_u8(byte) {
+                Ok(_) => (),
+                Err(_) => return Err("Unable to write namespace".to_owned())
+            };
+        }
+
+        // Writes the null terminator for the collection name string.
+        match buffer.write_u8(0) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write namespace".to_owned())
+        };
+
+
+        for bson in documents {
+            match Message::write_bson_document(buffer, bson) {
+                Ok(_) => (),
+                Err(s) =>
+                    return Err(format!("Unable to insert document: {}", s))
+            };
+
+        }
+
+        let _ = buffer.flush();
+
+        Ok(())
+    }
 
     /// Writes a serialized query message to a given buffer.
     ///
@@ -308,6 +430,7 @@ impl Message {
     ///                    query results.
     /// `number_to_return - The total number of documents that should be
     ///                     returned by the query.
+    /// `query` - Specifies which documents to return.
     /// `return_field_selector - An optional projection of which fields should
     ///                          be present in the documents to be returned by
     ///                          the query.
@@ -358,12 +481,11 @@ impl Message {
         };
 
         match return_field_selector {
-            &Some(ref bson) => match Message::write_bson_document(buffer, bson) {
+            &Some(ref b) => match Message::write_bson_document(buffer, b) {
                 Ok(_) => (),
                 Err(s) => {
-                    let str = format!("Unable to write return_field_selector: {}", s);
-
-                    return Err(str)
+                    return Err(format!("Unable to write \
+                                        return_field_selector: {}", s))
                 }
             },
             &None => ()
@@ -374,50 +496,23 @@ impl Message {
         Ok(())
     }
 
-
-
-    fn write_insert(buffer: &mut Write, header: &Header, flags: &OpInsertFlags,
-                    namespace: &str,
-                    documents: &[bson::Document]) -> Result<(), String> {
-        match header.write(buffer) {
-            Ok(_) => (),
-            Err(e) => return Err(e)
-        };
-
-        match buffer.write_i32::<LittleEndian>(flags.to_i32()) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write flags".to_owned())
-        };
-
-        for byte in namespace.bytes() {
-            let _byte_reponse = match buffer.write_u8(byte) {
-                Ok(_) => (),
-                Err(_) => return Err("Unable to write namespace".to_owned())
-            };
-        }
-
-        // Writes the null terminator for the collection name string.
-        match buffer.write_u8(0) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write namespace".to_owned())
-        };
-
-
-        for bson in documents {
-            match Message::write_bson_document(buffer, bson) {
-                Ok(_) => (),
-                Err(s) => return Err(format!("Unable to insert document: {}", s))
-            };
-
-        }
-
-        let _ = buffer.flush();
-
-        Ok(())
-    }
-
-    pub fn write_get_more(buffer: &mut Write, header: &Header,
-                          namespace: &str, number_to_return: i32,
+    /// Writes a serialized "get more" request to a given buffer.
+    ///
+    /// # Arguments
+    ///
+    /// `buffer` - The buffer to write to.
+    /// `header` - The header for the given message.
+    /// `namespace` - The full qualified name of the collection, beginning with
+    ///               the database name and a dot.
+    /// `number_to_return - The total number of documents that should be
+    ///                     returned by the query.
+    /// `cursor_id` - Specifies which cursor to get more documents from.
+    ///
+    /// # Return value
+    ///
+    /// Returns the newly-created Message.
+    pub fn write_get_more(buffer: &mut Write, header: &Header, namespace: &str,
+                          number_to_return: i32,
                           cursor_id: i64) -> Result<(), String> {
         match header.write(buffer) {
             Ok(_) => (),
@@ -500,17 +595,13 @@ impl Message {
 
     /// Reads a serialized reply message from a buffer
     ///
-    /// Right now, this returns only the first BSON document from the
-    /// response; if there are more, it ignores the rest, and if there are none,
-    /// it fails.
-    ///
     /// # Arguments
     ///
     /// `buffer` - The buffer to read from.
     ///
     /// # Return value
     ///
-    /// Returns a single BSON document on success, or an error string on
+    /// Returns the reply message on success, or an error string on
     /// failure.
     fn read_reply(buffer: &mut Read, h: Header) -> Result<Message, String> {
         let mut length = h.message_length - mem::size_of::<Header>() as i32;
@@ -570,7 +661,7 @@ impl Message {
     ///
     /// # Return value
     ///
-    /// Returns a single BSON document on success, or an error string on
+    /// Returns the reply message on success, or an error string on
     /// failure.
     pub fn read<T>(buffer: &mut T) -> Result<Message, String> where T: Read + Write {
         let header = match Header::read(buffer) {
