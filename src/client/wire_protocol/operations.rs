@@ -1,7 +1,7 @@
-use bson::Document as BsonDocument;
 use bson;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use client::wire_protocol::flags::{OpInsertFlags, OpQueryFlags, OpReplyFlags};
+use client::wire_protocol::flags::{OpInsertFlags, OpQueryFlags, OpReplyFlags,
+                                   OpUpdateFlags};
 use client::wire_protocol::header::{Header, OpCode};
 use std::io::{Read, Write};
 use std::mem;
@@ -12,7 +12,7 @@ trait ByteLength {
     fn byte_length(&self) -> Result<i32, String>;
 }
 
-impl ByteLength for BsonDocument {
+impl ByteLength for bson::Document {
     /// Gets the length of a BSON document.
     ///
     /// # Return value
@@ -36,13 +36,21 @@ pub enum Message {
         cursor_id: i64,
         starting_from: i32,
         number_returned: i32,
-        documents: Vec<BsonDocument>,
+        documents: Vec<bson::Document>,
+    },
+    OpUpdate {
+        header: Header,
+        // ZERO goes here
+        full_collection_name: String,
+        flags: OpUpdateFlags,
+        selector: bson::Document,
+        update: bson::Document,
     },
     OpInsert {
         header: Header,
         flags: OpInsertFlags,
         full_collection_name: String,
-        documents: Vec<BsonDocument>,
+        documents: Vec<bson::Document>,
     },
     OpQuery {
         header: Header,
@@ -50,24 +58,59 @@ pub enum Message {
         full_collection_name: String,
         number_to_skip: i32,
         number_to_return: i32,
-        query: BsonDocument,
-        return_field_selector: Option<BsonDocument>,
+        query: bson::Document,
+        return_field_selector: Option<bson::Document>,
     },
 }
 
 impl Message {
     fn with_reply(header: Header, flags: i32, cursor_id: i64,
                   starting_from: i32, number_returned: i32,
-                  documents: Vec<BsonDocument>) -> Message {
+                  documents: Vec<bson::Document>) -> Message {
         Message::OpReply { header: header, flags: OpReplyFlags::from_i32(flags),
                            cursor_id: cursor_id, starting_from: starting_from,
                            number_returned: number_returned,
                            documents: documents }
     }
 
+    pub fn with_update(request_id: i32, full_collection_name: String,
+                       flags: OpUpdateFlags, selector: bson::Document,
+                       update: bson::Document) -> Result<Message, String> {
+        let header_length = mem::size_of::<Header>() as i32;
+
+        // Add an extra byte after the string for null-termination.
+        let string_length = full_collection_name.len() as i32 + 1;
+
+        // There are two i32 fields -- `flags` is represented in the struct as
+        // a bit vector, and the wire protocol-specified ZERO field.
+        let i32_length = 2 * mem::size_of::<i32>() as i32;
+
+        let selector_length = match selector.byte_length() {
+            Ok(i) => i,
+            Err(_) =>
+                return Err("Unable to serialize `selector` field".to_owned())
+        };
+
+        let update_length = match selector.byte_length() {
+            Ok(i) => i,
+            Err(_) =>
+                return Err("Unable to serialize `update` field".to_owned())
+        };
+
+        let total_length = header_length + string_length + i32_length +
+                           selector_length + update_length;
+
+        let header = Header::with_update(total_length, request_id);
+
+        Ok(Message::OpUpdate { header: header,
+                               full_collection_name: full_collection_name,
+                               flags: flags, selector: selector,
+                               update: update })
+   }
+
     pub fn with_insert(request_id: i32, flags: OpInsertFlags,
                        full_collection_name: String,
-                       documents: Vec<BsonDocument>) -> Result<Message, String> {
+                       documents: Vec<bson::Document>) -> Result<Message, String> {
         let header_length = mem::size_of::<Header>() as i32;
         let flags_length = mem::size_of::<i32>() as i32;
 
@@ -111,8 +154,8 @@ impl Message {
     /// Returns the newly-created Message.
     pub fn with_query(header_request_id: i32, flags: OpQueryFlags,
                      full_collection_name: String, number_to_skip: i32,
-                     number_to_return: i32, query: BsonDocument,
-                     return_field_selector: Option<BsonDocument>) -> Result<Message, String> {
+                     number_to_return: i32, query: bson::Document,
+                     return_field_selector: Option<bson::Document>) -> Result<Message, String> {
         let header_length = mem::size_of::<Header>() as i32;
 
         // There are three i32 fields in the an OpQuery (since OpQueryFlags is
@@ -158,7 +201,8 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an error string on failure.
-    fn write_bson_document(buffer: &mut Write, bson: &BsonDocument) -> Result<(), String>{
+    fn write_bson_document(buffer: &mut Write,
+                           bson: &bson::Document) -> Result<(), String>{
         let mut temp_buffer = vec![];
 
         match bson::encode_document(&mut temp_buffer, bson) {
@@ -169,6 +213,45 @@ impl Message {
             Err(_) => Err("unable to encode BSON".to_owned())
         }
     }
+
+    pub fn write_update(buffer: &mut Write, header: &Header,
+                        full_collection_name: &str, flags: &OpUpdateFlags,
+                        selector: &bson::Document,
+                        update: &bson::Document) -> Result<(), String> {
+        match header.write(buffer) {
+            Ok(_) => (),
+            Err(e) => return Err(e)
+        };
+
+        for byte in full_collection_name.bytes() {
+            let _byte_reponse = match buffer.write_u8(byte) {
+                Ok(_) => (),
+                Err(_) => return Err("Unable to write full_collection_name".to_owned())
+            };
+        }
+
+        match buffer.write_i32::<LittleEndian>(flags.to_i32()) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write flags".to_owned())
+        };
+
+        match Message::write_bson_document(buffer, selector) {
+            Ok(_) => (),
+            Err(s) =>
+                return Err(format!("Unable to write `selector` field: {}", s))
+        };
+
+        match Message::write_bson_document(buffer, update) {
+            Ok(_) => (),
+            Err(s) =>
+                return Err(format!("Unable to write `update` field: {}", s))
+        };
+
+        let _ = buffer.flush();
+
+        Ok(())
+    }
+
 
     /// Writes a serialized query message to a given buffer.
     ///
@@ -192,8 +275,8 @@ impl Message {
     /// Returns nothing on success, or an error string on failure.
     fn write_query(buffer: &mut Write, header: &Header,
                    flags: &OpQueryFlags, full_collection_name: &str,
-                   number_to_skip: i32, number_to_return: i32, query: &BsonDocument,
-                   return_field_selector: &Option<BsonDocument>) -> Result<(), String> {
+                   number_to_skip: i32, number_to_return: i32, query: &bson::Document,
+                   return_field_selector: &Option<bson::Document>) -> Result<(), String> {
         match header.write(buffer) {
             Ok(_) => (),
             Err(e) => return Err(e)
@@ -251,7 +334,7 @@ impl Message {
 
     fn write_insert(buffer: &mut Write, header: &Header, flags: &OpInsertFlags,
                     full_collection_name: &str,
-                    documents: &[BsonDocument]) -> Result<(), String> {
+                    documents: &[bson::Document]) -> Result<(), String> {
         match header.write(buffer) {
             Ok(_) => (),
             Err(e) => return Err(e)
@@ -304,17 +387,21 @@ impl Message {
             /// Only the server should sent replies
             &Message::OpReply {..} =>
                 Err("OP_REPLY should not be sent by the client".to_owned()),
+            &Message::OpUpdate { ref header, ref full_collection_name,
+                                 ref flags, ref selector, ref update } =>
+                Message::write_update(buffer, &header,&full_collection_name,
+                                      &flags, &selector, &update),
             &Message::OpInsert { ref header, ref flags,
-                                 ref full_collection_name, ref documents,
-            } => Message::write_insert(buffer, &header, &flags,
-                                       &full_collection_name, &documents),
+                                 ref full_collection_name, ref documents, } =>
+                Message::write_insert(buffer, &header, &flags,
+                                      &full_collection_name, &documents),
             &Message::OpQuery { ref header, ref flags, ref full_collection_name,
                                 number_to_skip, number_to_return, ref query,
-                                ref return_field_selector
-            } => Message::write_query(buffer, &header, &flags,
-                                      &full_collection_name, number_to_skip,
-                                      number_to_return, &query,
-                                      &return_field_selector)
+                                ref return_field_selector } =>
+                Message::write_query(buffer, &header, &flags,
+                                     &full_collection_name, number_to_skip,
+                                     number_to_return, &query,
+                                     &return_field_selector)
         }
     }
 
