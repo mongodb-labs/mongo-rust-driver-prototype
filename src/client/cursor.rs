@@ -42,8 +42,8 @@ impl <'a, T> Cursor<'a, T> where T: Read + Write + 'a {
                                documents: docs } => {
                 let mut v = VecDeque::new();
 
-                for bson_doc in docs {
-                    v.push_back(bson_doc);
+                for doc in docs {
+                    v.push_back(doc);
                 }
 
                 Some((v, cid))
@@ -88,7 +88,7 @@ impl <'a, T> Cursor<'a, T> where T: Read + Write + 'a {
                 count: 0,
                 buffer: buf,
                 stream: stream }),
-            None => Err("Invalid resonse received".to_owned()),
+            None => Err("Invalid response received".to_owned()),
         }
     }
 

@@ -19,7 +19,7 @@ fn cursor_features() {
             }).collect();
 
             let flags = OpInsertFlags::no_flags();
-            let name = "test.test".to_owned();
+            let name = "test.cursor_test".to_owned();
             let res = Message::with_insert(1, flags, name, docs);
 
             let cm = match res {
