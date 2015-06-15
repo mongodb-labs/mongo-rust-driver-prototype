@@ -24,6 +24,7 @@ impl OpReplyFlags {
     }
 }
 
+/// Represents the bit vector of options for an OP_UPDATE message.
 pub struct OpUpdateFlags {
     pub upsert: bool,        // Bit 0
     pub multi_update: bool,  // Bit 1
@@ -52,10 +53,20 @@ pub struct OpQueryFlags {
 }
 
 impl OpUpdateFlags {
+    /// Constructs a new struct with all flags set to false.
+    ///
+    /// # Return value
+    ///
+    /// Returns the newly-created struct.
     pub fn no_flags() -> OpUpdateFlags {
         OpUpdateFlags { upsert: false, multi_update: false }
     }
 
+    /// Gets the actual bit vector that the struct represents.
+    ///
+    /// # Return value
+    ///
+    /// Returns the bit vector as an i32.
     pub fn to_i32(&self) -> i32 {
         let mut i = 0 as i32;
 
