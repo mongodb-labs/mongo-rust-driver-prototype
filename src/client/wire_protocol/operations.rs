@@ -53,6 +53,13 @@ pub enum Message {
         query: BsonDocument,
         return_field_selector: Option<BsonDocument>,
     },
+    OpGetMore {
+        header: Header,
+        // ZERO goes here
+        full_collection_name: String,
+        number_to_return: i32,
+        cursor_id: i64,
+    }
 }
 
 impl Message {
@@ -109,7 +116,7 @@ impl Message {
     /// # Return value
     ///
     /// Returns the newly-created Message.
-    pub fn with_query(header_request_id: i32, flags: OpQueryFlags,
+    pub fn with_query(request_id: i32, flags: OpQueryFlags,
                      full_collection_name: String, number_to_skip: i32,
                      number_to_return: i32, query: BsonDocument,
                      return_field_selector: Option<BsonDocument>) -> Result<Message, String> {
@@ -139,13 +146,35 @@ impl Message {
         let total_length = header_length + i32_length + string_length +
                            bson_length + option_length;
 
-        let header = Header::with_query(total_length, header_request_id);
+        let header = Header::with_query(total_length, request_id);
 
         Ok(Message::OpQuery { header: header, flags: flags,
                               full_collection_name: full_collection_name,
                               number_to_skip: number_to_skip,
                               number_to_return: number_to_return, query: query,
                               return_field_selector: return_field_selector })
+    }
+
+    pub fn with_get_more(request_id: i32, full_collection_name: String,
+                         number_to_return: i32, cursor_id: i64) -> Message {
+        let header_length = mem::size_of::<Header>() as i32;
+
+        // There are two i32 fields because of the reserved "ZERO".
+        let i32_length = 2 * mem::size_of::<i32>() as i32;
+
+        // Add an extra byte after the string for null-termination.
+        let string_length = full_collection_name.len() as i32 + 1;
+
+        let i64_length = mem::size_of::<i64>() as i32;
+        let total_length = header_length + i32_length + string_length +
+                           i64_length;
+
+        let header = Header::with_get_more(total_length, request_id);
+
+        Message::OpGetMore { header: header,
+                             full_collection_name: full_collection_name,
+                             number_to_return: number_to_return,
+                             cursor_id: cursor_id }
     }
 
     /// Writes a serialized BSON document to a given buffer.
@@ -249,6 +278,8 @@ impl Message {
         Ok(())
     }
 
+
+
     fn write_insert(buffer: &mut Write, header: &Header, flags: &OpInsertFlags,
                     full_collection_name: &str,
                     documents: &[BsonDocument]) -> Result<(), String> {
@@ -289,6 +320,11 @@ impl Message {
         Ok(())
     }
 
+    pub fn write_get_more(buffer: &mut Write, header: &Header,
+                          full_collection_name: &str, number_to_return: i32,
+                          cursor_id: i64) -> Result<(), String> {
+        Err("".to_owned())
+    }
 
     /// Attemps to write a serialized message to a buffer.
     ///
@@ -305,16 +341,20 @@ impl Message {
             &Message::OpReply {..} =>
                 Err("OP_REPLY should not be sent by the client".to_owned()),
             &Message::OpInsert { ref header, ref flags,
-                                 ref full_collection_name, ref documents,
-            } => Message::write_insert(buffer, &header, &flags,
-                                       &full_collection_name, &documents),
+                                 ref full_collection_name, ref documents } =>
+                Message::write_insert(buffer, &header, &flags,
+                                      &full_collection_name, &documents),
             &Message::OpQuery { ref header, ref flags, ref full_collection_name,
                                 number_to_skip, number_to_return, ref query,
-                                ref return_field_selector
-            } => Message::write_query(buffer, &header, &flags,
-                                      &full_collection_name, number_to_skip,
-                                      number_to_return, &query,
-                                      &return_field_selector)
+                                ref return_field_selector } =>
+                Message::write_query(buffer, &header, &flags,
+                                     &full_collection_name, number_to_skip,
+                                     number_to_return, &query,
+                                     &return_field_selector),
+            &Message::OpGetMore { ref header, ref full_collection_name,
+                                  number_to_return, cursor_id } =>
+                Message::write_get_more(buffer, &header, &full_collection_name,
+                                        number_to_return, cursor_id)
         }
     }
 

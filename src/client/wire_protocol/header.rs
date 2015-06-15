@@ -7,6 +7,7 @@ pub enum OpCode {
     Reply = 1,
     Insert = 2002,
     Query = 2004,
+    GetMore = 2005,
 }
 
 impl OpCode {
@@ -25,6 +26,7 @@ impl OpCode {
             1 => Some(OpCode::Reply),
             2002 => Some(OpCode::Insert),
             2004 => Some(OpCode::Query),
+            2005 => Some(OpCode::GetMore),
             _ => None
         }
     }
@@ -35,7 +37,8 @@ impl ToString for OpCode {
         match self {
             &OpCode::Reply => "OP_REPLY".to_owned(),
             &OpCode::Insert => "OP_INSERT".to_owned(),
-            &OpCode::Query => "OP_QUERY".to_owned()
+            &OpCode::Query => "OP_QUERY".to_owned(),
+            &OpCode::GetMore => "OP_GET_MORE".to_owned(),
         }
     }
 }
@@ -101,6 +104,10 @@ impl Header {
         Header::new(message_length, 0, response_to, op_code)
     }
 
+    pub fn with_insert(message_length: i32, request_id: i32) -> Header {
+        Header::new_request(message_length, request_id, OpCode::Insert)
+    }
+
     /// Constructs a new Header for a query.
     ///
     /// # Arguments
@@ -116,9 +123,8 @@ impl Header {
         Header::new_request(message_length, request_id, OpCode::Query)
     }
 
-
-    pub fn with_insert(message_length: i32, request_id: i32) -> Header {
-        Header::new_request(message_length, request_id, OpCode::Insert)
+    pub fn with_get_more(message_length: i32, request_id: i32) -> Header {
+        Header::new_request(message_length, request_id, OpCode::GetMore)
     }
 
     /// Writes the serialized Header to a buffer.

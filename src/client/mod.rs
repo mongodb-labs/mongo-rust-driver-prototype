@@ -2,6 +2,7 @@ pub mod db;
 pub mod coll;
 pub mod common;
 pub mod connstring;
+pub mod cursor;
 pub mod wire_protocol;
 
 use std::cell::RefCell;
