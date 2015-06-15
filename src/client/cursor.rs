@@ -10,13 +10,13 @@ use std::io::{Read, Write};
 /// # Fields
 ///
 /// `request_id` - Uniquely identifies the request being sent.
-/// `full_collection_name` - The full qualified name of the collection,
+/// `namespace` - The full qualified name of the collection,
 ///                          beginning with the database name and a period.
 /// `batch_size` - How many documents to fetch at a given time from the server.
 /// `cursor_id` - Uniquely identifies the cursor being returned by the reply.
 pub struct Cursor<'a, T> where T: Read + Write + 'a {
     request_id: i32,
-    full_collection_name: String,
+    namespace: String,
     batch_size: i32,
     cursor_id: i64,
     buffer: VecDeque<bson::Document>,
@@ -40,8 +40,8 @@ impl <'a, T> Cursor<'a, T> where T: Read + Write + 'a {
                                documents: docs } => {
                 let mut v = VecDeque::new();
 
-                for bson in docs {
-                    v.push_back(bson);
+                for bson_doc in docs {
+                    v.push_back(bson_doc);
                 }
 
                 Some((v, cid))
@@ -52,12 +52,12 @@ impl <'a, T> Cursor<'a, T> where T: Read + Write + 'a {
 
     pub fn query_with_batch_size(stream: &'a mut T, batch_size: i32,
                                  request_id: i32, flags: OpQueryFlags,
-                                 full_collection_name: &str,
+                                 namespace: &str,
                                  number_to_skip: i32, number_to_return: i32,
                                  query: bson::Document,
                                  return_field_selector: Option<bson::Document>) -> Result<Cursor<'a, T>, String> {
         let result = Message::with_query(request_id, flags,
-                                         full_collection_name.to_owned(),
+                                         namespace.to_owned(),
                                          number_to_skip, number_to_return,
                                          query, return_field_selector);
 
@@ -79,7 +79,7 @@ impl <'a, T> Cursor<'a, T> where T: Read + Write + 'a {
         match Cursor::<T>::get_bson_and_cid_from_message(reply) {
             Some((buf, cursor_id)) => Ok(Cursor {
                 request_id: request_id,
-                full_collection_name: full_collection_name.to_owned(),
+                namespace: namespace.to_owned(),
                 batch_size: batch_size,
                 cursor_id: cursor_id,
                 buffer: buf, stream: stream }),
@@ -88,19 +88,19 @@ impl <'a, T> Cursor<'a, T> where T: Read + Write + 'a {
     }
 
     pub fn query(stream: &'a mut T, request_id: i32, flags: OpQueryFlags,
-                 full_collection_name: &str, number_to_skip: i32,
+                 namespace: &str, number_to_skip: i32,
                  number_to_return: i32, query: bson::Document,
                  return_field_selector: Option<bson::Document>) -> Result<Cursor<'a, T>, String> {
 
         Cursor::query_with_batch_size(stream, 20, request_id, flags,
-                                      full_collection_name, number_to_skip,
+                                      namespace, number_to_skip,
                                       number_to_return, query,
                                       return_field_selector)
     }
 
     fn new_get_more_request(&mut self) -> Message {
         Message::with_get_more(self.request_id,
-                               self.full_collection_name.to_owned(),
+                               self.namespace.to_owned(),
                                self.batch_size, self.cursor_id)
     }
 

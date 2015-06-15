@@ -55,7 +55,7 @@ pub enum Message {
     },
     OpGetMore {
         header: Header,
-        // ZERO goes here
+        // The wire protocol specifies that 32-bit 0 goes here
         full_collection_name: String,
         number_to_return: i32,
         cursor_id: i64,
