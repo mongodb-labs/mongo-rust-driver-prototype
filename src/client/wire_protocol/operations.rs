@@ -83,7 +83,7 @@ impl Message {
 
         // There are two i32 fields -- `flags` is represented in the struct as
         // a bit vector, and the wire protocol-specified ZERO field.
-        let i32_length = 2 * mem::size_of::<i32>() as i32;
+        let i32_length = mem::size_of::<i32>() as i32 * 2;
 
         let selector_length = match selector.byte_length() {
             Ok(i) => i,
@@ -91,7 +91,7 @@ impl Message {
                 return Err("Unable to serialize `selector` field".to_owned())
         };
 
-        let update_length = match selector.byte_length() {
+        let update_length = match update.byte_length() {
             Ok(i) => i,
             Err(_) =>
                 return Err("Unable to serialize `update` field".to_owned())
@@ -223,12 +223,25 @@ impl Message {
             Err(e) => return Err(e)
         };
 
+        // Write ZERO field
+        match buffer.write_i32::<LittleEndian>(0) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write flags".to_owned())
+        };
+
         for byte in full_collection_name.bytes() {
             let _byte_reponse = match buffer.write_u8(byte) {
                 Ok(_) => (),
                 Err(_) => return Err("Unable to write full_collection_name".to_owned())
             };
         }
+
+        // Writes the null terminator for the collection name string.
+        match buffer.write_u8(0) {
+            Ok(_) => (),
+            Err(_) => return Err("Unable to write full_collection_name".to_owned())
+        };
+
 
         match buffer.write_i32::<LittleEndian>(flags.to_i32()) {
             Ok(_) => (),
