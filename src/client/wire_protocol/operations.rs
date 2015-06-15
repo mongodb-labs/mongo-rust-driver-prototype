@@ -40,8 +40,8 @@ pub enum Message {
     },
     OpUpdate {
         header: Header,
-        // ZERO goes here
-        full_collection_name: String,
+        // The wire protocol specifies that 32-bit 0 goes here
+        namespace: String,
         flags: OpUpdateFlags,
         selector: bson::Document,
         update: bson::Document,
@@ -49,13 +49,13 @@ pub enum Message {
     OpInsert {
         header: Header,
         flags: OpInsertFlags,
-        full_collection_name: String,
+        namespace: String,
         documents: Vec<bson::Document>,
     },
     OpQuery {
         header: Header,
         flags: OpQueryFlags,
-        full_collection_name: String,
+        namespace: String,
         number_to_skip: i32,
         number_to_return: i32,
         query: bson::Document,
@@ -64,7 +64,7 @@ pub enum Message {
     OpGetMore {
         header: Header,
         // The wire protocol specifies that 32-bit 0 goes here
-        full_collection_name: String,
+        namespace: String,
         number_to_return: i32,
         cursor_id: i64,
     }
@@ -80,13 +80,13 @@ impl Message {
                            documents: documents }
     }
 
-    pub fn with_update(request_id: i32, full_collection_name: String,
+    pub fn with_update(request_id: i32, namespace: String,
                        flags: OpUpdateFlags, selector: bson::Document,
                        update: bson::Document) -> Result<Message, String> {
         let header_length = mem::size_of::<Header>() as i32;
 
         // Add an extra byte after the string for null-termination.
-        let string_length = full_collection_name.len() as i32 + 1;
+        let string_length = namespace.len() as i32 + 1;
 
         // There are two i32 fields -- `flags` is represented in the struct as
         // a bit vector, and the wire protocol-specified ZERO field.
@@ -110,19 +110,19 @@ impl Message {
         let header = Header::with_update(total_length, request_id);
 
         Ok(Message::OpUpdate { header: header,
-                               full_collection_name: full_collection_name,
+                               namespace: namespace,
                                flags: flags, selector: selector,
                                update: update })
    }
 
     pub fn with_insert(request_id: i32, flags: OpInsertFlags,
-                       full_collection_name: String,
+                       namespace: String,
                        documents: Vec<bson::Document>) -> Result<Message, String> {
         let header_length = mem::size_of::<Header>() as i32;
         let flags_length = mem::size_of::<i32>() as i32;
 
         // Add an extra byte after the string for null-termination.
-        let string_length = full_collection_name.len() as i32 + 1;
+        let string_length = namespace.len() as i32 + 1;
 
         let mut total_length = header_length + flags_length + string_length;
 
@@ -136,7 +136,7 @@ impl Message {
         let header = Header::with_insert(total_length, request_id);
 
         Ok(Message::OpInsert { header: header, flags: flags,
-                               full_collection_name: full_collection_name,
+                               namespace: namespace,
                                documents: documents })
     }
 
@@ -146,8 +146,8 @@ impl Message {
     ///
     /// `header_request_id` - The request ID to be placed in the message header.
     /// `flags` - Bit vector of query options.
-    /// `full_collection_name` - The full qualified name of the collection,
-    ///                          beginning with the database name and a dot.
+    /// `namespace` - The full qualified name of the collection, beginning with
+    ///               the database name and a dot.
     /// `number_to_skip` - The number of initial documents to skip over in the query
     ///                    results.
     /// `number_to_return - The total number of documents that should be returned by
@@ -160,7 +160,7 @@ impl Message {
     ///
     /// Returns the newly-created Message.
     pub fn with_query(request_id: i32, flags: OpQueryFlags,
-                     full_collection_name: String, number_to_skip: i32,
+                     namespace: String, number_to_skip: i32,
                      number_to_return: i32, query: bson::Document,
                      return_field_selector: Option<bson::Document>) -> Result<Message, String> {
         let header_length = mem::size_of::<Header>() as i32;
@@ -170,7 +170,7 @@ impl Message {
         let i32_length = 3 * mem::size_of::<i32>() as i32;
 
         // Add an extra byte after the string for null-termination.
-        let string_length = full_collection_name.len() as i32 + 1;
+        let string_length = namespace.len() as i32 + 1;
 
         let bson_length = match query.byte_length() {
             Ok(i) => i,
@@ -192,13 +192,13 @@ impl Message {
         let header = Header::with_query(total_length, request_id);
 
         Ok(Message::OpQuery { header: header, flags: flags,
-                              full_collection_name: full_collection_name,
+                              namespace: namespace,
                               number_to_skip: number_to_skip,
                               number_to_return: number_to_return, query: query,
                               return_field_selector: return_field_selector })
     }
 
-    pub fn with_get_more(request_id: i32, full_collection_name: String,
+    pub fn with_get_more(request_id: i32, namespace: String,
                          number_to_return: i32, cursor_id: i64) -> Message {
         let header_length = mem::size_of::<Header>() as i32;
 
@@ -206,7 +206,7 @@ impl Message {
         let i32_length = 2 * mem::size_of::<i32>() as i32;
 
         // Add an extra byte after the string for null-termination.
-        let string_length = full_collection_name.len() as i32 + 1;
+        let string_length = namespace.len() as i32 + 1;
 
         let i64_length = mem::size_of::<i64>() as i32;
         let total_length = header_length + i32_length + string_length +
@@ -215,7 +215,7 @@ impl Message {
         let header = Header::with_get_more(total_length, request_id);
 
         Message::OpGetMore { header: header,
-                             full_collection_name: full_collection_name,
+                             namespace: namespace,
                              number_to_return: number_to_return,
                              cursor_id: cursor_id }
     }
@@ -244,7 +244,7 @@ impl Message {
     }
 
     pub fn write_update(buffer: &mut Write, header: &Header,
-                        full_collection_name: &str, flags: &OpUpdateFlags,
+                        namespace: &str, flags: &OpUpdateFlags,
                         selector: &bson::Document,
                         update: &bson::Document) -> Result<(), String> {
         match header.write(buffer) {
@@ -258,17 +258,17 @@ impl Message {
             Err(_) => return Err("Unable to write flags".to_owned())
         };
 
-        for byte in full_collection_name.bytes() {
+        for byte in namespace.bytes() {
             let _byte_reponse = match buffer.write_u8(byte) {
                 Ok(_) => (),
-                Err(_) => return Err("Unable to write full_collection_name".to_owned())
+                Err(_) => return Err("Unable to write namespace".to_owned())
             };
         }
 
         // Writes the null terminator for the collection name string.
         match buffer.write_u8(0) {
             Ok(_) => (),
-            Err(_) => return Err("Unable to write full_collection_name".to_owned())
+            Err(_) => return Err("Unable to write namespace".to_owned())
         };
 
 
@@ -302,8 +302,8 @@ impl Message {
     /// `buffer` - The buffer to write to.
     /// `header` - The header for the given message.
     /// `flags` - Bit vector of query option.
-    /// `full_collection_name` - The full qualified name of the collection,
-    ///                          beginning with the database name and a dot.
+    /// `namespace` - The full qualified name of the collection, beginning with
+    ///               the database name and a dot.
     /// `number_to_skip` - The number of initial documents to skip over in the
     ///                    query results.
     /// `number_to_return - The total number of documents that should be
@@ -316,7 +316,7 @@ impl Message {
     ///
     /// Returns nothing on success, or an error string on failure.
     fn write_query(buffer: &mut Write, header: &Header,
-                   flags: &OpQueryFlags, full_collection_name: &str,
+                   flags: &OpQueryFlags, namespace: &str,
                    number_to_skip: i32, number_to_return: i32, query: &bson::Document,
                    return_field_selector: &Option<bson::Document>) -> Result<(), String> {
         match header.write(buffer) {
@@ -329,17 +329,17 @@ impl Message {
             Err(_) => return Err("Unable to write flags".to_owned())
         };
 
-        for byte in full_collection_name.bytes() {
+        for byte in namespace.bytes() {
             let _byte_reponse = match buffer.write_u8(byte) {
                 Ok(_) => (),
-                Err(_) => return Err("Unable to write full_collection_name".to_owned())
+                Err(_) => return Err("Unable to write namespace".to_owned())
             };
         }
 
         // Writes the null terminator for the collection name string.
         match buffer.write_u8(0) {
             Ok(_) => (),
-            Err(_) => return Err("Unable to write full_collection_name".to_owned())
+            Err(_) => return Err("Unable to write namespace".to_owned())
         };
 
         match buffer.write_i32::<LittleEndian>(number_to_skip) {
@@ -377,7 +377,7 @@ impl Message {
 
 
     fn write_insert(buffer: &mut Write, header: &Header, flags: &OpInsertFlags,
-                    full_collection_name: &str,
+                    namespace: &str,
                     documents: &[bson::Document]) -> Result<(), String> {
         match header.write(buffer) {
             Ok(_) => (),
@@ -389,17 +389,17 @@ impl Message {
             Err(_) => return Err("Unable to write flags".to_owned())
         };
 
-        for byte in full_collection_name.bytes() {
+        for byte in namespace.bytes() {
             let _byte_reponse = match buffer.write_u8(byte) {
                 Ok(_) => (),
-                Err(_) => return Err("Unable to write full_collection_name".to_owned())
+                Err(_) => return Err("Unable to write namespace".to_owned())
             };
         }
 
         // Writes the null terminator for the collection name string.
         match buffer.write_u8(0) {
             Ok(_) => (),
-            Err(_) => return Err("Unable to write full_collection_name".to_owned())
+            Err(_) => return Err("Unable to write namespace".to_owned())
         };
 
 
@@ -417,7 +417,7 @@ impl Message {
     }
 
     pub fn write_get_more(buffer: &mut Write, header: &Header,
-                          full_collection_name: &str, number_to_return: i32,
+                          namespace: &str, number_to_return: i32,
                           cursor_id: i64) -> Result<(), String> {
         match header.write(buffer) {
             Ok(_) => (),
@@ -430,11 +430,11 @@ impl Message {
             Err(_) => return Err("Unable to write ZERO field".to_owned())
         };
 
-        for byte in full_collection_name.bytes() {
+        for byte in namespace.bytes() {
             let _byte_reponse = match buffer.write_u8(byte) {
                 Ok(_) => (),
                 Err(_) => return Err("Unable to write \
-                                      full_collection_name".to_owned())
+                                      namespace".to_owned())
             };
         }
 
@@ -442,7 +442,7 @@ impl Message {
         match buffer.write_u8(0) {
             Ok(_) => (),
             Err(_) =>
-                return Err("Unable to write full_collection_name".to_owned())
+                return Err("Unable to write namespace".to_owned())
         };
 
 
@@ -476,24 +476,24 @@ impl Message {
             /// Only the server should sent replies
             &Message::OpReply {..} =>
                 Err("OP_REPLY should not be sent by the client".to_owned()),
-            &Message::OpUpdate { ref header, ref full_collection_name,
+            &Message::OpUpdate { ref header, ref namespace,
                                  ref flags, ref selector, ref update } =>
-                Message::write_update(buffer, &header,&full_collection_name,
+                Message::write_update(buffer, &header,&namespace,
                                       &flags, &selector, &update),
             &Message::OpInsert { ref header, ref flags,
-                                 ref full_collection_name, ref documents } =>
+                                 ref namespace, ref documents } =>
                 Message::write_insert(buffer, &header, &flags,
-                                      &full_collection_name, &documents),
-            &Message::OpQuery { ref header, ref flags, ref full_collection_name,
+                                      &namespace, &documents),
+            &Message::OpQuery { ref header, ref flags, ref namespace,
                                 number_to_skip, number_to_return, ref query,
                                 ref return_field_selector } =>
                 Message::write_query(buffer, &header, &flags,
-                                     &full_collection_name, number_to_skip,
+                                     &namespace, number_to_skip,
                                      number_to_return, &query,
                                      &return_field_selector),
-            &Message::OpGetMore { ref header, ref full_collection_name,
+            &Message::OpGetMore { ref header, ref namespace,
                                   number_to_return, cursor_id } =>
-                Message::write_get_more(buffer, &header, &full_collection_name,
+                Message::write_get_more(buffer, &header, &namespace,
                                         number_to_return, cursor_id)
         }
     }
