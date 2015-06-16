@@ -8,7 +8,7 @@ fn find_and_insert() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
     let coll = db.collection("test");
-    
+
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert document
@@ -17,14 +17,16 @@ fn find_and_insert() {
     coll.insert_one(doc, None).ok().expect("Failed to insert document");
 
     // Find document
-    let results = coll.find(None, None).ok().expect("Failed to execute find command.");
-    assert_eq!(1, results.len());
+    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let result = cursor.next().unwrap();
 
     // Assert expected title of document
-    match results[0].get("title") {
+    match result.get("title") {
         Some(&Bson::String(ref title)) => assert_eq!("Jaws", title),
         _ => panic!("Expected Bson::String!"),
     };
+
+    assert!(cursor.next().is_none());
 }
 
 #[test]
@@ -37,7 +39,7 @@ fn find_and_insert_one() {
 
     // Insert document
     let mut doc = bson::Document::new();
-    doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));    
+    doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
     coll.insert_one(doc, None).ok().expect("Failed to insert document");
 
     // Find single document
@@ -72,7 +74,7 @@ fn list_collections() {
         "test.system.indexes",
         "test.test",
         "test.test2",
-    );
+        );
 
     for i in 0..2 {
         assert_eq!(namespace[i], result[i].namespace);
@@ -96,7 +98,8 @@ fn insert_many() {
     coll.insert_many(vec!(doc, doc2), false, None).ok().expect("Failed to insert documents.");
 
     // Find documents
-    let results = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let results = cursor.next_n(2);
     assert_eq!(2, results.len());
 
     // Assert expected title of documents
@@ -121,7 +124,7 @@ fn delete_one() {
     let coll = db.collection("test");
 
     db.drop_database().ok().expect("Failed to drop database");
-    
+
     // Insert documents
     let mut doc = bson::Document::new();
     let mut doc2 = bson::Document::new();
@@ -133,13 +136,15 @@ fn delete_one() {
 
     // Delete document
     coll.delete_one(doc2.clone(), None).ok().expect("Failed to delete document.");
-    let results = coll.find(None, None).ok().expect("Failed to execute find command.");
-    assert_eq!(1, results.len());
+    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let result = cursor.next().unwrap();
 
-    match results[0].get("title") {
+    match result.get("title") {
         Some(&Bson::String(ref title)) => assert_eq!("Jaws", title),
         _ => panic!("Expected Bson::String!"),
     }
+
+    assert!(cursor.next().is_none());
 }
 
 #[test]
@@ -161,13 +166,15 @@ fn delete_many() {
 
     // Delete document
     coll.delete_many(doc2.clone(), None).ok().expect("Failed to delete documents.");
-    let results = coll.find(None, None).ok().expect("Failed to execute find command.");
-    assert_eq!(1, results.len());
+    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let result = cursor.next().unwrap();
 
-    match results[0].get("title") {
+    match result.get("title") {
         Some(&Bson::String(ref title)) => assert_eq!("Jaws", title),
         _ => panic!("Expected Bson::String!"),
     }
+
+    assert!(cursor.next().is_none());
 }
 
 #[test]
@@ -191,7 +198,8 @@ fn replace_one() {
 
     // Replace single document
     coll.replace_one(doc2.clone(), doc3.clone(), false, None).ok().expect("Failed to replace document.");
-    let results = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let results = cursor.next_n(3);
     assert_eq!(3, results.len());
 
     // Assert expected title of documents
@@ -199,7 +207,7 @@ fn replace_one() {
         "Jaws",
         "12 Angry Men",
         "12 Angry Men",
-    );
+        );
 
     for i in 0..1 {
         let ref expected_title = expected_titles[i];
@@ -228,7 +236,7 @@ fn update_one() {
     doc3.insert("title".to_owned(), Bson::String("12 Angry Men".to_owned()));
     coll.insert_many(vec!(doc.clone(), doc2.clone(), doc3.clone()), false, None)
         .ok().expect("Failed to insert documents into collection.");
-    
+
     // Update single document
     let mut update = bson::Document::new();
     let mut set = bson::Document::new();
@@ -237,7 +245,8 @@ fn update_one() {
     update.insert("$set".to_owned(), Bson::Document(set));
     coll.update_one(doc2.clone(), update, false, None).ok().expect("Failed to update document.");
 
-    let results = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let results = cursor.next_n(3);
     assert_eq!(3, results.len());
 
     // Assert director attributes
@@ -267,7 +276,7 @@ fn update_many() {
     doc3.insert("title".to_owned(), Bson::String("12 Angry Men".to_owned()));
     coll.insert_many(vec!(doc.clone(), doc2.clone(), doc3.clone(), doc2.clone()), false, None)
         .ok().expect("Failed to insert documents into collection.");
-    
+
     // Update single document
     let mut update = bson::Document::new();
     let mut set = bson::Document::new();
@@ -276,7 +285,8 @@ fn update_many() {
     update.insert("$set".to_owned(), Bson::Document(set));
     coll.update_many(doc2.clone(), update, false, None).ok().expect("Failed to update documents.");
 
-    let results = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let results = cursor.next_n(4);
     assert_eq!(4, results.len());
 
     // Assert director attributes
