@@ -79,7 +79,7 @@ impl Header {
     ///                is a response.
     /// `response_to` - Identifies which request the message is in response to,
     ///                or `0` if the the message is a request.
-    /// `op_code`    - Identifies which type of message is being sent.
+    /// `op_code` - Identifies which type of message is being sent.
     ///
     /// # Return value
     ///
@@ -97,7 +97,7 @@ impl Header {
     /// `message_length` - The length of the message in bytes.
     /// `request_id` - Identifier for the request, or `0` if the the message
     ///                is a response.
-    /// `op_code`    - Identifies which type of message is being sent.
+    /// `op_code` - Identifies which type of message is being sent.
     ///
     /// # Return value
     ///
@@ -114,7 +114,7 @@ impl Header {
     /// `message_length` - The length of the message in bytes.
     /// `request_id` - Identifier for the request, or `0` if the the message
     ///                is a response.
-    /// `op_code`    - Identifies which type of message is being sent.
+    /// `op_code` - Identifies which type of message is being sent.
     ///
     /// # Return value
     ///
