@@ -1,10 +1,11 @@
 use std::ascii::AsciiExt;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 pub const DEFAULT_PORT: u16 = 27017;
 pub const URI_SCHEME: &'static str = "mongodb://";
 
 /// Encapsulates the hostname and port of a host.
+#[derive(Clone)]
 pub struct Host {
     pub host_name: String,
     pub ipc: String,
@@ -35,14 +36,15 @@ impl Host {
 }
 
 /// Encapsulates the options and read preference tags of a MongoDB connection.
+#[derive(Clone)]
 pub struct ConnectionOptions {
-    pub options: HashMap<String, String>,
+    pub options: BTreeMap<String, String>,
     pub read_pref_tags: Vec<String>,
 }
 
 impl ConnectionOptions {
     /// Creates a new ConnectionOptions struct.
-    pub fn new(options: HashMap<String, String>, read_pref_tags: Vec<String>) -> ConnectionOptions {
+    pub fn new(options: BTreeMap<String, String>, read_pref_tags: Vec<String>) -> ConnectionOptions {
         ConnectionOptions {
             options: options,
             read_pref_tags: read_pref_tags,
@@ -56,6 +58,7 @@ impl ConnectionOptions {
 }
 
 /// Encapsulates information for connection to a single MongoDB host or replicated set.
+#[derive(Clone)]
 pub struct ConnectionString {
     pub hosts: Vec<Host>,
     pub string: Option<String>,
@@ -236,7 +239,7 @@ fn split_hosts(host_str: &str) -> Result<Vec<Host>, &str> {
 
 // Parses the delimited string into its options and Read Preference Tags.
 fn parse_options(opts: &str, delim: Option<&str>) -> ConnectionOptions {
-    let mut options: HashMap<String, String> = HashMap::new();
+    let mut options: BTreeMap<String, String> = BTreeMap::new();
     let mut read_pref_tags: Vec<String> = Vec::new();
 
     // Split and collect options into a vec
@@ -279,7 +282,7 @@ fn split_options(opts: &str) -> Result<ConnectionOptions, &str> {
 
 // Partitions a string around the left-most occurrence of the separator, if it exists.
 fn partition<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
-    return match string.find(sep) {
+    match string.find(sep) {
         Some(idx) => (&string[..idx], &string[idx+sep.len()..]),
         None => (string, ""),
     }
@@ -287,7 +290,7 @@ fn partition<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
 
 // Partitions a string around the right-most occurrence of the separator, if it exists.
 fn rpartition<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
-    return match string.rfind(sep) {
+    match string.rfind(sep) {
         Some(idx) => (&string[..idx], &string[idx+sep.len()..]),
         None => (string, ""),
     }
@@ -295,7 +298,7 @@ fn rpartition<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
 
 // Splits a string around the right-most occurrence of the separator, if it exists.
 fn rsplit<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
-    return match string.rfind(sep) {
+    match string.rfind(sep) {
         Some(idx) => (&string[..idx+sep.len()], &string[idx+sep.len()..]),
         None => (string, ""),
     }
