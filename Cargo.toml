@@ -7,7 +7,4 @@ authors = ["Valeri Karpov <valkar207@gmail.com>",
 
 [dependencies]
 byteorder = "0.3.10"
-
-[dependencies.bson]
-git = "https://github.com/zonyitoo/bson-rs.git"
-rev = "f47446f30808b93b4b466709d70bd813e62173b1"
+bson = "0.1.1"
