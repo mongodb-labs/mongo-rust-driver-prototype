@@ -7,7 +7,7 @@ before_script:
     - mkdir -p /data/db
 
 env:
-  - RUST_TEST_THREADS=1
+    - RUST_TEST_THREADS=1
 
 script:
     - 3.0.3/bin/mongod --fork --nopreallocj
