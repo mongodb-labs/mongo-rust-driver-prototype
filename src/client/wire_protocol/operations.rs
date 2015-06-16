@@ -164,8 +164,8 @@ impl Message {
 
         let mut total_length = header_length + flags_length + string_length;
 
-        for bson in documents.iter() {
-            total_length += match bson.byte_length() {
+        for doc in documents.iter() {
+            total_length += match doc.byte_length() {
                 Ok(i) => i,
                 Err(_) => return Err("Unable to serialize documents".to_owned())
             }
@@ -220,8 +220,7 @@ impl Message {
             Some(ref bson) => match bson.byte_length() {
                 Ok(i) => i,
                 Err(_) =>
-                    return Err("Unable to serialize \
-                                return_field_selector".to_owned())
+                    return Err("Unable to serialize return_field_selector".to_owned())
             },
             None => 0
         };
@@ -403,8 +402,8 @@ impl Message {
         };
 
 
-        for bson in documents {
-            match Message::write_bson_document(buffer, bson) {
+        for doc in documents {
+            match Message::write_bson_document(buffer, doc) {
                 Ok(_) => (),
                 Err(s) =>
                     return Err(format!("Unable to insert document: {}", s))
@@ -481,7 +480,7 @@ impl Message {
         };
 
         match return_field_selector {
-            &Some(ref b) => match Message::write_bson_document(buffer, b) {
+            &Some(ref doc) => match Message::write_bson_document(buffer, doc) {
                 Ok(_) => (),
                 Err(s) => {
                     return Err(format!("Unable to write \

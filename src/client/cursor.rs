@@ -158,7 +158,7 @@ impl <'a, T> Cursor<'a, T> where T: Read + Write + 'a {
                                self.batch_size, self.cursor_id)
     }
 
-    /// Attempts read another batch of BSON documents from the stream.
+    /// Attempts to read another batch of BSON documents from the stream.
     ///
     /// # Return value
     ///
