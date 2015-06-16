@@ -27,15 +27,8 @@ impl<'a> Collection<'a> {
     pub fn new(db: &'a Database<'a>, name: &str, create: bool,
                read_preference: Option<ReadPreference>, write_concern: Option<WriteConcern>) -> Collection<'a> {
 
-        let rp = match read_preference {
-            Some(rp) => rp,
-            None => db.read_preference.to_owned(),
-        };
-
-        let wc = match write_concern {
-            Some(wc) => wc,
-            None => db.write_concern.to_owned(),
-        };
+        let rp = read_preference.unwrap_or(db.read_preference.to_owned());
+        let wc = write_concern.unwrap_or(db.write_concern.to_owned());
 
         Collection {
             db: db,
@@ -53,7 +46,8 @@ impl<'a> Collection<'a> {
     /// Extracts the collection name from the namespace.
     pub fn name(&self) -> String {
         match self.namespace.find(".") {
-            Some(idx) => self.namespace[idx+1..].to_owned(),
+            Some(idx) => self.namespace[self.namespace.char_indices()
+                                        .nth(idx+1).unwrap().0..].to_owned(),
             None => {
                 // '.' is inserted in Collection::new, so this should only panic due to user error.
                 let msg = format!("Invalid namespace specified: '{}'.", self.namespace);
@@ -67,7 +61,6 @@ impl<'a> Collection<'a> {
         self.db.drop_collection(&self.name()[..])
     }
 
-    // Read Spec
     /// Runs an aggregation framework pipeline.
     pub fn aggregate(pipeline: &[bson::Document], options: AggregateOptions) -> Result<Vec<bson::Document>, String> {
         unimplemented!()
@@ -87,17 +80,10 @@ impl<'a> Collection<'a> {
     pub fn find(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
                 -> Result<Vec<bson::Document>, String> {
 
-        let doc = match filter {
-            Some(bson) => bson,
-            None => bson::Document::new(),
-        };
-
-        let options = match options {
-            Some(opts) => opts,
-            None => FindOptions::new(),
-        };
-
+        let doc = filter.unwrap_or(bson::Document::new());
+        let options = options.unwrap_or(FindOptions::new());
         let flags = OpQueryFlags::with_find_options(&options);
+
         let req = try!(Message::with_query(self.get_req_id(), flags, self.namespace.to_owned(),
                                            options.skip as i32, options.limit, doc, options.projection));
 
@@ -121,11 +107,7 @@ impl<'a> Collection<'a> {
     pub fn find_one(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
                     -> Result<Option<bson::Document>, String> {
 
-        let options = match options {
-            Some(opts) => opts,
-            None => FindOptions::new(),
-        };
-
+        let options = options.unwrap_or(FindOptions::new());
         let res = try!(self.find(filter, Some(options.with_limit(1))));
         match res.len() {
             0 => Ok(None),
@@ -134,7 +116,6 @@ impl<'a> Collection<'a> {
         }
     }
 
-    // Find and Modify Spec
     /// Finds a single document and deletes it, returning the original.
     pub fn find_one_and_delete(&self, filter: bson::Document,
                                options: Option<FindOneAndDeleteOptions>)  -> Option<bson::Document> {
@@ -142,20 +123,19 @@ impl<'a> Collection<'a> {
     }
 
     /// Finds a single document and replaces it, returning either the original
-    ///  or replaced document.
+    /// or replaced document.
     pub fn find_one_and_replace(&self, filter: bson::Document, replacement: bson::Document,
                                 options: Option<FindOneAndReplaceOptions>)  -> Option<bson::Document> {
         unimplemented!()
     }
 
     /// Finds a single document and updates it, returning either the original
-    ///  or updated document.
+    /// or updated document.
     pub fn find_one_and_update(&self, filter: bson::Document, update: bson::Document,
                                options: Option<FindOneAndUpdateOptions>)  -> Option<bson::Document> {
         unimplemented!()
     }
 
-    // Write Spec
     /// Sends a batch of writes to the server at the same time.
     pub fn bulk_write(requests: &[WriteModel], ordered: bool) -> BulkWriteResult {
         unimplemented!()
@@ -165,11 +145,7 @@ impl<'a> Collection<'a> {
     fn insert(&self, docs: Vec<bson::Document>, ordered: bool,
               write_concern: Option<WriteConcern>) -> Result<bson::Document, String> {
 
-        let wc = match write_concern {
-            Some(wc) => wc,
-            None => WriteConcern::new(),
-        };
-
+        let wc =  write_concern.unwrap_or(WriteConcern::new());
         let converted_docs = docs.iter().map(|doc| Bson::Document(doc.to_owned())).collect();
 
         let mut cmd = bson::Document::new();
@@ -186,14 +162,14 @@ impl<'a> Collection<'a> {
     }
 
     /// Inserts the provided document. If the document is missing an identifier,
-    ///  the driver should generate one.
+    /// the driver should generate one.
     pub fn insert_one(&self, doc: bson::Document, write_concern: Option<WriteConcern>) -> Result<InsertOneResult, String> {
         let res = try!(self.insert(vec!(doc), true, write_concern));
         Ok(InsertOneResult::new(res))
     }
 
     /// Inserts the provided documents. If any documents are missing an identifier,
-    ///  the driver should generate them.
+    /// the driver should generate them.
     pub fn insert_many(&self, docs: Vec<bson::Document>, ordered: bool,
                        write_concern: Option<WriteConcern>) -> Result<InsertManyResult, String> {
         let res = try!(self.insert(docs, ordered, write_concern));
@@ -202,10 +178,7 @@ impl<'a> Collection<'a> {
 
     // Internal deletion helper function.
     fn delete(&self, filter: bson::Document, limit: i64, write_concern: Option<WriteConcern>) -> Result<DeleteResult, String> {
-        let wc = match write_concern {
-            Some(wc) => wc,
-            None => WriteConcern::new(),
-        };
+        let wc = write_concern.unwrap_or(WriteConcern::new());
 
         let mut deletes = bson::Document::new();
         deletes.insert("q".to_owned(), Bson::Document(filter));
@@ -237,10 +210,7 @@ impl<'a> Collection<'a> {
     fn update(&self, filter: bson::Document, update: bson::Document, upsert: bool, multi: bool,
               write_concern: Option<WriteConcern>) -> Result<UpdateResult, String> {
 
-        let wc = match write_concern {
-            Some(wc) => wc,
-            None => WriteConcern::new(),
-        };
+        let wc = write_concern.unwrap_or(WriteConcern::new());
 
         let mut updates = bson::Document::new();
         updates.insert("q".to_owned(), Bson::Document(filter));
