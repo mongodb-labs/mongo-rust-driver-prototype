@@ -1,9 +1,15 @@
 language: rust
 
-services:
-    - "mongodb"
+before_script:
+    - wget https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.0.3.tgz
+    - tar xvf mongodb-linux-x86_64-3.0.3.tgz
+    - mv mongodb-linux-x86_64-3.0.3 3.0.3
+    - mkdir -p /data/db
+
+env:
+  - RUST_TEST_THREADS=1
 
 script:
+    - 3.0.3/bin/mongod --fork --nopreallocj
     - cargo build --verbose
-    - export RUST_TEST_THREADS=1
     - cargo test --verbose
