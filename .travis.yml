@@ -1,7 +1,7 @@
 language: rust
 
 before_script:
-    - wget https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.0.3.tgz
+    - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.0.3.tgz
     - tar xvf mongodb-linux-x86_64-3.0.3.tgz
     - mv mongodb-linux-x86_64-3.0.3 3.0.3
     - mkdir -p /data/db
