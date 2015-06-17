@@ -14,9 +14,9 @@ fn cursor_features() {
     db.drop_database().ok().expect("Failed to drop database.");
 
     let docs : Vec<_> = (0..10).map(|i| {
-        doc!(
+        doc! {
             "foo" => I64(i)
-        )
+        }
     }).collect();
 
     assert!(coll.insert_many(docs, false, None).is_ok());

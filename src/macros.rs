@@ -23,14 +23,14 @@ macro_rules! nested_doc {
 // Example for future documentation use
 //
 // ```
-// doc!(
+// doc! {
 //     "_id" => Bson::I32(1),
 //     "x" => Bson::I32(11),
-//     "$filter" => nested_doc!(
-//         "_id" => nested_doc!(
+//     "$filter" => nested_doc! {
+//         "_id" => nested_doc! {
 //             "$gt" => 1,
 //             "$lt" => 6
-//         )
-//     )
-// )
+//         }
+//     }
+// }
 // ```
