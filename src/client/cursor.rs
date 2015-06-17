@@ -217,7 +217,7 @@ impl <'a> Cursor<'a> {
         if self.limit > 0 && self.count >= self.limit {
             false
         } else {
-            if self.buffer.is_empty() {
+            if self.buffer.is_empty() && self.limit != 1 {
                 self.get_from_stream();
             }
             !self.buffer.is_empty()
@@ -235,21 +235,11 @@ impl <'a> Iterator for Cursor<'a> {
     /// Returns the document that was read, or `None` if there are no more
     /// documents to read.
     fn next(&mut self) -> Option<bson::Document> {
-        if self.limit != 0 && self.count >= self.limit {
-            return None;
-        }
-
-        self.count += 1;
-
-        match self.buffer.pop_front() {
-            Some(bson) => Some(bson),
-            None => {
-                if self.limit != 1 {
-                    self.next_from_stream()
-                } else {
-                    None
-                }
-            }
+        if self.has_next() {
+            self.count += 1;
+            self.buffer.pop_front()
+        } else {
+            None
         }
     }
 }
