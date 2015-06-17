@@ -8,14 +8,14 @@ use client::wire_protocol::operations::Message;
 use std::collections::vec_deque::VecDeque;
 use std::io::{Read, Write};
 
+pub const DEFAULT_BATCH_SIZE: i32 = 20;
+
 /// Maintains a connection to the server and lazily returns documents from a
 /// query.
 ///
 /// # Fields
 ///
-/// `request_id` - Uniquely identifies the request being sent.
-/// `namespace` - The full qualified name of the collection,
-///                          beginning with the database name and a period.
+/// `collection` - The collection to read from.
 /// `batch_size` - How many documents to fetch at a given time from the server.
 /// `cursor_id` - Uniquely identifies the cursor being returned by the reply.
 pub struct Cursor<'a> {
@@ -129,8 +129,8 @@ impl <'a> Cursor<'a> {
     pub fn query(collection: &'a Collection<'a>, flags: OpQueryFlags,
                  number_to_skip: i32, number_to_return: i32, query: bson::Document,
                  return_field_selector: Option<bson::Document>) -> Result<Cursor<'a>, String> {
-        
-        Cursor::query_with_batch_size(collection, 20, flags,
+
+        Cursor::query_with_batch_size(collection, DEFAULT_BATCH_SIZE, flags,
                                       number_to_skip,
                                       number_to_return, query,
                                       return_field_selector)
@@ -148,35 +148,34 @@ impl <'a> Cursor<'a> {
     }
 
     /// Attempts to read another batch of BSON documents from the stream.
+    fn get_from_stream(&mut self) -> Result<(), String> {
+        let socket = match self.collection.db.client.socket.lock() {
+            Ok(val) => val,
+            Err(_) => return Err("Socket lock is poisoned.".to_owned()),
+        };
+
+        let get_more = self.new_get_more_request();
+        try!(get_more.write(&mut *socket.borrow_mut()));
+        let reply = try!(Message::read(&mut *socket.borrow_mut()));
+
+        match Cursor::get_bson_and_cid_from_message(reply) {
+            Some((v, _)) => {
+                self.buffer.extend(v);
+                Ok(())
+            },
+            None => Err("No bson found from server reply.".to_owned()),
+        }
+    }
+
+    /// Attempts to read another batch of BSON documents from the stream.
     ///
     /// # Return value
     ///
     /// Returns the first BSON document returned from the stream, or `None` if
     /// there are no more documents to read.
     fn next_from_stream(&mut self) -> Option<bson::Document> {
-        let get_more = self.new_get_more_request();
-
-        let socket = match self.collection.db.client.socket.lock() {
-            Ok(val) => val,
-            Err(_) => return None,
-        };
-
-        if get_more.write(&mut *socket.borrow_mut()).is_err() {
-            return None;
-        }
-
-        let reply = match Message::read(&mut *socket.borrow_mut()) {
-            Ok(m) => m,
-            Err(_) => return None
-        };
-
-        match Cursor::get_bson_and_cid_from_message(reply) {
-            Some((v, _)) => {
-                self.buffer.extend(v);
-                self.buffer.pop_front()
-            },
-            None => None
-        }
+        self.get_from_stream();
+        self.buffer.pop_front()
     }
 
     /// Attempts to read a specified number of BSON documents from the cursor.
@@ -213,6 +212,17 @@ impl <'a> Cursor<'a> {
 
         self.next_n(n)
     }
+
+    pub fn has_next(&mut self) -> bool {
+        if self.limit > 0 && self.count >= self.limit {
+            false
+        } else {
+            if self.buffer.is_empty() {
+                self.get_from_stream();
+            }
+            !self.buffer.is_empty()
+        }
+    }
 }
 
 impl <'a> Iterator for Cursor<'a> {
@@ -233,7 +243,13 @@ impl <'a> Iterator for Cursor<'a> {
 
         match self.buffer.pop_front() {
             Some(bson) => Some(bson),
-            None => self.next_from_stream()
+            None => {
+                if self.limit != 1 {
+                    self.next_from_stream()
+                } else {
+                    None
+                }
+            }
         }
     }
 }

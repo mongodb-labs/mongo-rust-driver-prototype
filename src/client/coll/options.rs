@@ -1,4 +1,5 @@
 use bson;
+use client::cursor;
 use client::common::ReadPreference;
 
 /// Describes the type of cursor to return on collection queries.
@@ -128,7 +129,7 @@ impl FindOptions {
             skip: 0,
             limit: 0,
             cursor_type: CursorType::NonTailable,
-            batch_size: 20,
+            batch_size: cursor::DEFAULT_BATCH_SIZE,
             comment: None,
             max_time_ms: None,
             modifiers: None,

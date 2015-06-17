@@ -53,9 +53,11 @@ fn cursor_features() {
         _ => panic!("Wrong value returned from Cursor#next")
     };
 
+    assert!(cursor.has_next());
     let vec = cursor.next_n(20);
 
     assert_eq!(vec.len(), 6 as usize);
+    assert!(!cursor.has_next());
 
     for i in 0..vec.len() {
         match vec[i].get("foo") {
