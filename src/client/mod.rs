@@ -104,6 +104,13 @@ impl MongoClient {
             Err(_) => return Err(format!("Failed to connect to host '{}:{}'", host_name, port)),
         }
     }
+
+    /// Provides an iterator over the server's database information.
+    pub fn list_databases(&self) -> Result<Cursor, String> {
+        let mut doc = bson::Document::new();
+        doc.insert("listDatabases".to_owned(), Bson::I32(1));
+        Cursor::command_cursor(self, "admin", doc)
+    }
     
     /// Drops the database defined by `db_name`.
     pub fn drop_database(&self, db_name: &str) -> Result<(), String> {

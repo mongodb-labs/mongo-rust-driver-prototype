@@ -89,7 +89,7 @@ impl<'a> Collection<'a> {
         Cursor::query_with_batch_size(&self.db.client, self.namespace.to_owned(),
                                       options.batch_size, flags, options.skip as i32,
                                       options.limit, doc, options.projection.clone(),
-                                      options.is_cmd_cursor())
+                                      false)
     }
 
     /// Returns the first document within the collection that matches the filter, or None.

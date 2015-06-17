@@ -54,11 +54,8 @@ impl<'a> Database<'a> {
     }
 
     /// Sends an administrative command over find_one.
-    pub fn command_cursor(&'a self, spec: bson::Document) -> Result<Cursor, String> {
-        let coll = self.collection("$cmd");
-        let mut options = FindOptions::with_cmd_cursor();
-        options.batch_size = 1;
-        coll.find(Some(spec), Some(options))
+    pub fn command_cursor(&self, spec: bson::Document) -> Result<Cursor, String> {
+        Cursor::command_cursor(self.client, &self.name[..], spec)
     }
 
     pub fn command(&'a self, spec: bson::Document) -> Result<Option<bson::Document>, String> {

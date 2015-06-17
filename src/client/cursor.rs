@@ -16,7 +16,8 @@ pub const DEFAULT_BATCH_SIZE: i32 = 20;
 ///
 /// # Fields
 ///
-/// `collection` - The collection to read from.
+/// `client` - The client to read from.
+/// `namespace` - The namespace to read and write from.
 /// `batch_size` - How many documents to fetch at a given time from the server.
 /// `cursor_id` - Uniquely identifies the cursor being returned by the reply.
 pub struct Cursor<'a> {
@@ -31,6 +32,13 @@ pub struct Cursor<'a> {
 }
 
 impl <'a> Cursor<'a> {
+
+    pub fn command_cursor(client: &'a MongoClient, db: &str, doc: bson::Document) -> Result<Cursor<'a>, String> {
+        Cursor::query_with_batch_size(client, format!("{}.$cmd", db),
+                                      1, OpQueryFlags::no_flags(), 0, 0,
+                                      doc, None, true)
+    }
+
     /// Gets the cursor id and BSON documents from a reply Message.
     ///
     /// # Arguments
@@ -48,7 +56,6 @@ impl <'a> Cursor<'a> {
                 let mut v = VecDeque::new();
 
                 for doc in docs {
-                    println!("{}", Bson::Document(doc.clone()).to_json());
                     v.push_back(doc.clone());
                 }
 
@@ -66,35 +73,40 @@ impl <'a> Cursor<'a> {
                 }
 
                 let ref doc = v[0];
-                if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
-                    if let Some(&Bson::Array(ref batch)) = cursor.get("firstBatch") {
-                        let map = batch.iter().filter_map(|bdoc| {
-                            if let &Bson::Document(ref doc) = bdoc {
-                                Some(doc.clone())
-                            } else {
-                                None
-                            }
-                        }).collect();
-                        return Some((map, cid));
+
+                let batch = if let Some(&Bson::Array(ref dbs)) = doc.get("databases") {
+                    // list databases
+                    dbs
+                } else if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
+                    // standard command cursor
+                    match cursor.get("firstBatch") {
+                        Some(&Bson::Array(ref batch)) => batch,
+                        _ => return None,
                     }
-                }
-                None
+                } else {
+                    return None
+                };
+
+                let map = batch.iter().filter_map(|bdoc| {
+                    if let &Bson::Document(ref doc) = bdoc {
+                        Some(doc.clone())
+                    } else {
+                        None
+                    }
+                }).collect();
+                return Some((map, cid));
             },
-            None => None,
+            None => None
         }
     }
-
-    //    pub fn command_query(collection: &'a Collection<'a>,
-    //                         cmd: bson::Document) -> Result<Cursor<'a>, String> {
-
-    //    }
 
     /// Executes a query where the batch size of the returned cursor is
     /// specified.
     ///
     /// # Arguments
     ///
-    /// `collection` - The collection to read from.
+    /// `client` - The client to read from.
+    /// `namespace` - The namespace to read and write from.
     /// `batch_size` - How many documents the cursor should return at a time.
     /// `flags` - Bit vector of query options.
     /// `number_to_skip` - The number of initial documents to skip over in the
@@ -157,7 +169,8 @@ impl <'a> Cursor<'a> {
     ///
     /// # Arguments
     ///
-    /// `collection` - The collection to read from.
+    /// `client` - The client to read from.
+    /// `namespace` - The namespace to read and write from.
     /// `flags` - Bit vector of query options.
     /// `number_to_skip` - The number of initial documents to skip over in the
     ///                    query results.
@@ -261,10 +274,10 @@ impl <'a> Cursor<'a> {
     }
 
     pub fn has_next(&mut self) -> bool {
-        if self.limit > 0 && self.count >= self.limit && !self.is_cmd_cursor {
+        if self.limit > 0 && self.count >= self.limit {
             false
         } else {
-            if self.buffer.is_empty() && self.limit != 1 {
+            if self.buffer.is_empty() && self.limit != 1 && !self.is_cmd_cursor {
                 self.get_from_stream();
             }
             !self.buffer.is_empty()
