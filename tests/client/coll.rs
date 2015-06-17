@@ -1,5 +1,6 @@
 use bson;
 use bson::Bson;
+use bson::Document;
 
 use mongodb::client::MongoClient;
 
@@ -7,13 +8,17 @@ use mongodb::client::MongoClient;
 fn find_and_insert() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
-    let coll = db.collection("test");
+    let coll = db.collection("find_and_insert");
 
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert document
-    let mut doc = bson::Document::new();
-    doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
+    let doc = doc! {
+        "title" => Bson::String("Jaws".to_owned())
+    };
+
+    // let mut doc = bson::Document::new();
+    // doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
     coll.insert_one(doc, None).ok().expect("Failed to insert document");
 
     // Find document
@@ -33,13 +38,17 @@ fn find_and_insert() {
 fn find_and_insert_one() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
-    let coll = db.collection("test");
+    let coll = db.collection("find_and_insert");
 
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert document
-    let mut doc = bson::Document::new();
-    doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
+    let doc = doc! {
+        "title" => Bson::String("Jaws".to_owned())
+    };
+
+    // let mut doc = bson::Document::new();
+    // doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
     coll.insert_one(doc, None).ok().expect("Failed to insert document");
 
     // Find single document
@@ -61,20 +70,20 @@ fn list_collections() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Build collections
-    db.collection("test").insert_one(bson::Document::new(), None)
+    db.collection("list_collections1").insert_one(bson::Document::new(), None)
         .ok().expect("Failed to insert placeholder document into collection");
-    db.collection("test2").insert_one(bson::Document::new(), None)
+    db.collection("list_collections2").insert_one(bson::Document::new(), None)
         .ok().expect("Failed to insert placeholder document into collection");
 
     // Check for namespaces
     let result = db.list_collections().ok().expect("Failed to execute list_collections command.");;
     assert_eq!(3, result.len());
 
-    let namespace = vec!(
+    let namespace = vec![
+        "test.list_collections1",
+        "test.list_collections2",
         "test.system.indexes",
-        "test.test",
-        "test.test2",
-        );
+    ];
 
     for i in 0..2 {
         assert_eq!(namespace[i], result[i].namespace);
@@ -85,17 +94,25 @@ fn list_collections() {
 fn insert_many() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
-    let coll = db.collection("test");
+    let coll = db.collection("insert_many");
 
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let mut doc = bson::Document::new();
-    let mut doc2 = bson::Document::new();
+    let doc1 = doc! {
+        "title" => Bson::String("Jaws".to_owned())
+    };
 
-    doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
-    doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
-    coll.insert_many(vec!(doc, doc2), false, None).ok().expect("Failed to insert documents.");
+    let doc2 = doc! {
+        "title" => Bson::String("Back to the Future".to_owned())
+    };
+
+    // let mut doc = bson::Document::new();
+    // let mut doc2 = bson::Document::new();
+    // doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
+    // doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
+
+    coll.insert_many(vec![doc1, doc2], false, None).ok().expect("Failed to insert documents.");
 
     // Find documents
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
@@ -121,17 +138,25 @@ fn insert_many() {
 fn delete_one() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
-    let coll = db.collection("test");
+    let coll = db.collection("delete_one");
 
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let mut doc = bson::Document::new();
-    let mut doc2 = bson::Document::new();
+    let doc1 = doc! {
+        "title" => Bson::String("Jaws".to_owned())
+    };
 
-    doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
-    doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
-    coll.insert_many(vec!(doc.clone(), doc2.clone()), false, None)
+    let doc2 = doc! {
+        "title" => Bson::String("Back to the Future".to_owned())
+    };
+
+    // let mut doc = bson::Document::new();
+    // let mut doc2 = bson::Document::new();
+    // doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
+    // doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
+
+    coll.insert_many(vec![doc1.clone(), doc2.clone()], false, None)
         .ok().expect("Failed to insert documents.");
 
     // Delete document
@@ -151,17 +176,25 @@ fn delete_one() {
 fn delete_many() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
-    let coll = db.collection("test");
+    let coll = db.collection("delete_many");
 
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let mut doc = bson::Document::new();
-    let mut doc2 = bson::Document::new();
+    let doc1 = doc! {
+        "title" => Bson::String("Jaws".to_owned())
+    };
 
-    doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
-    doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
-    coll.insert_many(vec!(doc.clone(), doc2.clone(), doc2.clone()), false, None)
+    let doc2 = doc! {
+        "title" => Bson::String("Back to the Future".to_owned())
+    };
+
+    // let mut doc = bson::Document::new();
+    // let mut doc2 = bson::Document::new();
+    // doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
+    // doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
+
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc2.clone()], false, None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Delete document
@@ -181,19 +214,31 @@ fn delete_many() {
 fn replace_one() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
-    let coll = db.collection("test");
+    let coll = db.collection("replace_one");
 
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let mut doc = bson::Document::new();
-    let mut doc2 = bson::Document::new();
-    let mut doc3 = bson::Document::new();
+    let doc1 = doc! {
+        "title" => Bson::String("Jaws".to_owned())
+    };
 
-    doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
-    doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
-    doc3.insert("title".to_owned(), Bson::String("12 Angry Men".to_owned()));
-    coll.insert_many(vec!(doc.clone(), doc2.clone(), doc3.clone()), false, None)
+    let doc2 = doc! {
+        "title" => Bson::String("Back to the Future".to_owned())
+    };
+
+    let doc3 = doc! {
+        "title" => Bson::String("12 Angry Men".to_owned())
+    };
+
+    // let mut doc = bson::Document::new();
+    // let mut doc2 = bson::Document::new();
+    // let mut doc3 = bson::Document::new();
+    // doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
+    // doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
+    // doc3.insert("title".to_owned(), Bson::String("12 Angry Men".to_owned()));
+
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Replace single document
@@ -222,27 +267,46 @@ fn replace_one() {
 fn update_one() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
-    let coll = db.collection("test");
+    let coll = db.collection("update_one");
 
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let mut doc = bson::Document::new();
-    let mut doc2 = bson::Document::new();
-    let mut doc3 = bson::Document::new();
+    let doc1 = doc! {
+        "title" => Bson::String("Jaws".to_owned())
+    };
 
-    doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
-    doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
-    doc3.insert("title".to_owned(), Bson::String("12 Angry Men".to_owned()));
-    coll.insert_many(vec!(doc.clone(), doc2.clone(), doc3.clone()), false, None)
+    let doc2 = doc! {
+        "title" => Bson::String("Back to the Future".to_owned())
+    };
+
+    let doc3 = doc! {
+        "title" => Bson::String("12 Angry Men".to_owned())
+    };
+
+    // let mut doc = bson::Document::new();
+    // let mut doc2 = bson::Document::new();
+    // let mut doc3 = bson::Document::new();
+    // doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
+    // doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
+    // doc3.insert("title".to_owned(), Bson::String("12 Angry Men".to_owned()));
+
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Update single document
-    let mut update = bson::Document::new();
-    let mut set = bson::Document::new();
+    let update = doc! {
+        "$set" => nested_doc! {
+            "director" => Bson::String("Robert Zemeckis".to_owned())
+        }
+    };
 
-    set.insert("director".to_owned(), Bson::String("Robert Zemeckis".to_owned()));
-    update.insert("$set".to_owned(), Bson::Document(set));
+
+    // let mut update = bson::Document::new();
+    // let mut set = bson::Document::new();
+    // set.insert("director".to_owned(), Bson::String("Robert Zemeckis".to_owned()));
+    // update.insert("$set".to_owned(), Bson::Document(set));
+
     coll.update_one(doc2.clone(), update, false, None).ok().expect("Failed to update document.");
 
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
@@ -262,27 +326,45 @@ fn update_one() {
 fn update_many() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
-    let coll = db.collection("test");
+    let coll = db.collection("update_many");
 
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let mut doc = bson::Document::new();
-    let mut doc2 = bson::Document::new();
-    let mut doc3 = bson::Document::new();
+    let doc1 = doc! {
+        "title" => Bson::String("Jaws".to_owned())
+    };
 
-    doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
-    doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
-    doc3.insert("title".to_owned(), Bson::String("12 Angry Men".to_owned()));
-    coll.insert_many(vec!(doc.clone(), doc2.clone(), doc3.clone(), doc2.clone()), false, None)
+    let doc2 = doc! {
+        "title" => Bson::String("Back to the Future".to_owned())
+    };
+
+    let doc3 = doc! {
+        "title" => Bson::String("12 Angry Men".to_owned())
+    };
+
+    // let mut doc = bson::Document::new();
+    // let mut doc2 = bson::Document::new();
+    // let mut doc3 = bson::Document::new();
+    // doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
+    // doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
+    // doc3.insert("title".to_owned(), Bson::String("12 Angry Men".to_owned()));
+
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone(), doc2.clone()], false, None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Update single document
-    let mut update = bson::Document::new();
-    let mut set = bson::Document::new();
+    let update = doc! {
+        "$set" => nested_doc! {
+            "director" => Bson::String("Robert Zemeckis".to_owned())
+        }
+    };
 
-    set.insert("director".to_owned(), Bson::String("Robert Zemeckis".to_owned()));
-    update.insert("$set".to_owned(), Bson::Document(set));
+    // let mut update = bson::Document::new();
+    // let mut set = bson::Document::new();
+    // set.insert("director".to_owned(), Bson::String("Robert Zemeckis".to_owned()));
+    // update.insert("$set".to_owned(), Bson::Document(set));
+
     coll.update_many(doc2.clone(), update, false, None).ok().expect("Failed to update documents.");
 
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");

@@ -11,8 +11,10 @@ use std::net::TcpStream;
 fn insert_single_key_doc() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
-            let mut doc = Document::new();
-            doc.insert("foo".to_owned(), FloatingPoint(42.0));
+            let doc = doc! {
+                "foo" => FloatingPoint(42.0)
+             };
+
             let docs = vec![doc];
             let flags = OpInsertFlags::no_flags();
             let name = "test.single_key".to_owned();
@@ -72,9 +74,11 @@ fn insert_single_key_doc() {
 fn insert_multi_key_doc() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
-            let mut doc = Document::new();
-            doc.insert("foo".to_owned(), FloatingPoint(42.0));
-            doc.insert("bar".to_owned(), Bson::String("__z&".to_owned()));
+            let doc = doc! {
+                "foo" => FloatingPoint(42.0),
+                "bar" => Bson::String("__z&".to_owned())
+            };
+
             let docs = vec![doc];
             let flags = OpInsertFlags::no_flags();
             let name = "test.multi_key".to_owned();
@@ -139,12 +143,14 @@ fn insert_multi_key_doc() {
 fn insert_docs() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
-            let mut doc1 = Document::new();
-            doc1.insert("foo".to_owned(), FloatingPoint(42.0));
-            doc1.insert("bar".to_owned(), Bson::String("__z&".to_owned()));
+            let doc1 = doc! {
+                "foo" => FloatingPoint(42.0),
+                "bar" => Bson::String("__z&".to_owned())
+            };
 
-            let mut doc2 = Document::new();
-            doc2.insert("booyah".to_owned(), I32(23));
+            let doc2 = doc! {
+                "booyah" => Bson::I32(23)
+            };
 
             let docs = vec![doc1, doc2];
             let flags = OpInsertFlags::no_flags();
@@ -217,8 +223,10 @@ fn insert_docs() {
 fn insert_update_then_query() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
-            let mut doc = Document::new();
-            doc.insert("foo".to_owned(), FloatingPoint(42.0));
+            let doc = doc! {
+                "foo" => FloatingPoint(42.0)
+            };
+
             let docs = vec![doc];
             let flags = OpInsertFlags::no_flags();
             let name = "test.update".to_owned();
@@ -235,8 +243,11 @@ fn insert_update_then_query() {
             };
 
             let selector = Document::new();
-            let mut update = Document::new();
-            update.insert("foo".to_owned(), Bson::String("bar".to_owned()));
+
+            let update = doc! {
+                "foo" => Bson::String("bar".to_owned())
+            };
+
             let flags = OpUpdateFlags::no_flags();
             let name = "test.update".to_owned();
             let res = Message::with_update(2, name, flags, selector, update);
