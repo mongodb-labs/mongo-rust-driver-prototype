@@ -9,12 +9,14 @@ use client::common::{ReadPreference, WriteConcern};
 use client::coll::options::*;
 use client::coll::results::*;
 
+use client::cursor::Cursor;
+
 use client::wire_protocol::flags::OpQueryFlags;
 use client::wire_protocol::operations::Message;
 
 /// Interfaces with a MongoDB collection.
 pub struct Collection<'a> {
-    db: &'a Database<'a>,
+    pub db: &'a Database<'a>,
     pub namespace: String,
     read_preference: ReadPreference,
     write_concern: WriteConcern,
@@ -62,7 +64,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Runs an aggregation framework pipeline.
-    pub fn aggregate(pipeline: &[bson::Document], options: AggregateOptions) -> Result<Vec<bson::Document>, String> {
+    pub fn aggregate(pipeline: &[bson::Document], options: AggregateOptions) -> Result<Cursor<'a>, String> {
         unimplemented!()
     }
 
@@ -77,30 +79,15 @@ impl<'a> Collection<'a> {
     }
 
     /// Returns a list of documents within the collection that match the filter.
-    pub fn find(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
-                -> Result<Vec<bson::Document>, String> {
+    pub fn find(&'a self, filter: Option<bson::Document>, options: Option<FindOptions>)
+                -> Result<Cursor<'a>, String> {
 
         let doc = filter.unwrap_or(bson::Document::new());
         let options = options.unwrap_or(FindOptions::new());
         let flags = OpQueryFlags::with_find_options(&options);
 
-        let req = try!(Message::with_query(self.get_req_id(), flags, self.namespace.to_owned(),
-                                           options.skip as i32, options.limit, doc, options.projection));
-
-        let socket = match self.db.client.socket.lock() {
-            Ok(val) => val,
-            _ => return Err("Client socket lock poisoned.".to_owned()),
-        };
-
-        try!(req.write(&mut *socket.borrow_mut()));
-        let message = try!(Message::read(&mut *socket.borrow_mut()));
-
-        match message {
-            Message::OpReply { header: _, flags: _, cursor_id: _,
-                               starting_from: _, number_returned: _,
-                               documents, } => Ok(documents),
-            _ => Err("Invalid response received from server".to_owned())
-        }
+        Cursor::query_with_batch_size(self, options.batch_size, flags, options.skip as i32,
+                                      options.limit, doc, options.projection)
     }
 
     /// Returns the first document within the collection that matches the filter, or None.
@@ -108,12 +95,8 @@ impl<'a> Collection<'a> {
                     -> Result<Option<bson::Document>, String> {
 
         let options = options.unwrap_or(FindOptions::new());
-        let res = try!(self.find(filter, Some(options.with_limit(1))));
-        match res.len() {
-            0 => Ok(None),
-            1 => Ok(Some(res[0].to_owned())),
-            n => Err(format!("Expected a single document, found {}.", n)),
-        }
+        let mut cursor = try!(self.find(filter, Some(options.with_limit(1))));
+        Ok(cursor.next())
     }
 
     /// Finds a single document and deletes it, returning the original.

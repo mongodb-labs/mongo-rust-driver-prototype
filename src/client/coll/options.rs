@@ -1,4 +1,5 @@
 use bson;
+use client::cursor;
 use client::common::ReadPreference;
 
 /// Describes the type of cursor to return on collection queries.
@@ -50,7 +51,7 @@ pub enum WriteModel {
 pub struct AggregateOptions {
     pub allow_disk_use: bool,
     pub use_cursor: bool,
-    pub batch_size: Option<i32>,
+    pub batch_size: i32,
     pub max_time_ms: Option<i64>,
     pub read_preference: Option<ReadPreference>,
 }
@@ -81,7 +82,7 @@ pub struct FindOptions {
     pub skip: u32,
     pub limit: i32,
     pub cursor_type: CursorType,
-    pub batch_size: Option<i32>,
+    pub batch_size: i32,
     pub comment: Option<String>,
     pub max_time_ms: Option<i64>,
     pub modifiers: Option<bson::Document>,
@@ -128,7 +129,7 @@ impl FindOptions {
             skip: 0,
             limit: 0,
             cursor_type: CursorType::NonTailable,
-            batch_size: None,
+            batch_size: cursor::DEFAULT_BATCH_SIZE,
             comment: None,
             max_time_ms: None,
             modifiers: None,
