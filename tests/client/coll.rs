@@ -67,17 +67,23 @@ fn list_collections() {
         .ok().expect("Failed to insert placeholder document into collection");
 
     // Check for namespaces
-    let result = db.list_collections().ok().expect("Failed to execute list_collections command.");;
-    assert_eq!(3, result.len());
+    let mut cursor = db.list_collections(None)
+        .ok().expect("Failed to execute list_collections command.");;
+
+    let results = cursor.next_n(3);
+    assert_eq!(3, results.len());
 
     let namespace = vec!(
-        "test.system.indexes",
-        "test.test",
-        "test.test2",
+        "system.indexes",
+        "test",
+        "test2",
         );
 
     for i in 0..2 {
-        assert_eq!(namespace[i], result[i].namespace);
+        match results[i].get("name") {
+            Some(&Bson::String(ref name)) => assert_eq!(namespace[i], name),
+            _ => panic!("Expected BSON string!"),
+        }
     }
 }
 

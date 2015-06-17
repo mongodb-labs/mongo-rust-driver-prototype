@@ -89,6 +89,7 @@ pub struct FindOptions {
     pub projection: Option<bson::Document>,
     pub sort: Option<bson::Document>,
     pub read_preference: Option<ReadPreference>,
+    is_cmd_cursor: bool,
 }
 
 /// Options for findOneAndDelete operations.
@@ -136,7 +137,18 @@ impl FindOptions {
             projection: None,
             sort: None,
             read_preference: None,
+            is_cmd_cursor: false,
         }
+    }
+
+    pub fn with_cmd_cursor() -> FindOptions {
+        let mut opts = FindOptions::new();
+        opts.is_cmd_cursor = true;
+        opts
+    }
+
+    pub fn is_cmd_cursor(&self) -> bool {
+        self.is_cmd_cursor
     }
 
     /// Clone the current options struct with a new limit.
