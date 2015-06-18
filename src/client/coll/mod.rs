@@ -64,18 +64,75 @@ impl<'a> Collection<'a> {
     }
 
     /// Runs an aggregation framework pipeline.
-    pub fn aggregate(pipeline: &[bson::Document], options: AggregateOptions) -> Result<Cursor<'a>, String> {
-        unimplemented!()
+    pub fn aggregate(&'a self, pipeline: Vec<bson::Document>, options: Option<AggregateOptions>) -> Result<Cursor<'a>, String> {
+        let opts = options.unwrap_or(AggregateOptions::new());
+
+        let pipeline_map = pipeline.iter().map(|bdoc| {
+            Bson::Document(bdoc.to_owned())
+        }).collect();
+        
+        let mut spec = bson::Document::new();
+        let mut cursor = bson::Document::new();
+        cursor.insert("batchSize".to_owned(), Bson::I32(opts.batch_size));
+        spec.insert("aggregate".to_owned(), Bson::String(self.name()));
+        spec.insert("pipeline".to_owned(), Bson::Array(pipeline_map));
+        spec.insert("cursor".to_owned(), Bson::Document(cursor));
+        if opts.allow_disk_use {
+            spec.insert("allowDiskUse".to_owned(), Bson::Boolean(opts.allow_disk_use));
+        }
+
+        let mut cursor = try!(self.db.command_cursor(spec));
+        Ok(cursor)
     }
 
     /// Gets the number of documents matching the filter.
-    pub fn count(filter: bson::Document, options: CountOptions) -> Result<i64, String> {
-        unimplemented!()
+    pub fn count(&self, filter: Option<bson::Document>, options: Option<CountOptions>) -> Result<i64, String> {
+        let opts = options.unwrap_or(CountOptions::new());
+        
+        let mut spec = bson::Document::new();
+        spec.insert("count".to_owned(), Bson::String(self.name()));
+        spec.insert("skip".to_owned(), Bson::I64(opts.skip as i64));
+        spec.insert("limit".to_owned(), Bson::I64(opts.limit));
+        if filter.is_some() {
+            spec.insert("query".to_owned(), Bson::Document(filter.unwrap()));
+        }
+        if opts.hint_doc.is_some() {
+            spec.insert("hint".to_owned(), Bson::Document(opts.hint_doc.unwrap()));
+        } else if opts.hint.is_some() {
+            spec.insert("hint".to_owned(), Bson::String(opts.hint.unwrap()));
+        }
+
+        let result = try!(self.db.command(spec));
+        if result.is_some() {
+            match result.unwrap().get("n") {
+                Some(&Bson::I32(ref n)) => return Ok(*n as i64),
+                Some(&Bson::I64(ref n)) => return Ok(*n),
+                _ => (),
+            }
+        }
+        Err("Failed to receive 'count' command reply from server.".to_owned())
     }
 
     /// Finds the distinct values for a specified field across a single collection.
-    pub fn distinct(field_name: &str, filter: bson::Document, options: DistinctOptions) -> Result<Vec<Bson>, String> {
-        unimplemented!()
+    pub fn distinct(&self, field_name: &str, filter: Option<bson::Document>, options: Option<DistinctOptions>) -> Result<Vec<Bson>, String> {
+
+        let opts = options.unwrap_or(DistinctOptions::new());
+
+        let mut spec = bson::Document::new();
+        spec.insert("distinct".to_owned(), Bson::String(self.name()));
+        spec.insert("key".to_owned(), Bson::String(field_name.to_owned()));
+        if filter.is_some() {
+            spec.insert("query".to_owned(), Bson::Document(filter.unwrap()));
+        }
+
+        let result = try!(self.db.command(spec));
+        if result.is_some() {
+            if let Some(&Bson::Array(ref vals)) = result.unwrap().get("values") {
+                return Ok(vals.to_owned());
+            }
+        }
+        
+        Err("Failed to receive 'distinct' command reply from server.".to_owned())
     }
 
     /// Returns a list of documents within the collection that match the filter.

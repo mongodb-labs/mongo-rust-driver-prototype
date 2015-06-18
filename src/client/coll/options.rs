@@ -59,10 +59,11 @@ pub struct AggregateOptions {
 /// Options for count queries.
 #[derive(Clone)]
 pub struct CountOptions {
-    pub hint: Option<bson::Document>,
-    pub limit: Option<i64>,
+    pub skip: u64,
+    pub limit: i64,
+    pub hint: Option<String>,
+    pub hint_doc: Option<bson::Document>,
     pub max_time_ms: Option<i64>,
-    pub skip: Option<u64>,
     pub read_preference: Option<ReadPreference>,
 }
 
@@ -117,6 +118,40 @@ pub struct FindOneAndUpdateOptions {
     pub projection: Option<bson::Document>,
     pub sort: Option<bson::Document>,
     pub upsert: bool,
+}
+
+impl AggregateOptions {
+    pub fn new() -> AggregateOptions {
+        AggregateOptions {
+            allow_disk_use: false,
+            use_cursor: true,
+            batch_size: cursor::DEFAULT_BATCH_SIZE,
+            max_time_ms: None,
+            read_preference: None,
+        }
+    }
+}
+
+impl CountOptions {
+    pub fn new() -> CountOptions {
+        CountOptions {
+            skip: 0,
+            limit: 0,
+            hint: None,
+            hint_doc: None,
+            max_time_ms: None,
+            read_preference: None,
+        }
+    }
+}
+
+impl DistinctOptions {
+    pub fn new() -> DistinctOptions {
+        DistinctOptions {
+            max_time_ms: None,
+            read_preference: None,
+        }
+    }
 }
 
 impl FindOptions {
