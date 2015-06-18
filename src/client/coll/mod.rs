@@ -96,6 +96,8 @@ impl<'a> Collection<'a> {
         if filter.is_some() {
             spec.insert("query".to_owned(), Bson::Document(filter.unwrap()));
         }
+
+        // Favor specified hint document over string
         if opts.hint_doc.is_some() {
             spec.insert("hint".to_owned(), Bson::Document(opts.hint_doc.unwrap()));
         } else if opts.hint.is_some() {
