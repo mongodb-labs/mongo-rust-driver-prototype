@@ -106,16 +106,21 @@ impl<'a> Collection<'a> {
                            projection: Option<bson::Document>, sort: Option<bson::Document>)
                            -> Result<Option<bson::Document>, String> {
 
-        cmd.insert("findAndModify".to_owned(), Bson::String(self.name()));
-        cmd.insert("query".to_owned(), Bson::Document(filter));
+        let mut new_cmd = bson::Document::new();
+        new_cmd.insert("findAndModify".to_owned(), Bson::String(self.name()));
+        new_cmd.insert("query".to_owned(), Bson::Document(filter));
         if sort.is_some() {
-            cmd.insert("sort".to_owned(), Bson::Document(sort.unwrap()));
+            new_cmd.insert("sort".to_owned(), Bson::Document(sort.unwrap()));
         }
         if projection.is_some() {
-            cmd.insert("fields".to_owned(), Bson::Document(projection.unwrap()));
+            new_cmd.insert("fields".to_owned(), Bson::Document(projection.unwrap()));
         }
 
-        let res = try!(self.db.command(cmd.to_owned()));
+        for (key, val) in cmd.iter() {
+            new_cmd.insert(key.to_owned(), val.to_owned());
+        }
+
+        let res = try!(self.db.command(new_cmd));
         match res {
             Some(doc) => match doc.get("value") {
                 Some(&Bson::Document(ref nested_doc)) => Ok(Some(nested_doc.to_owned())),
