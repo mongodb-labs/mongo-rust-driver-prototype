@@ -146,3 +146,47 @@ impl FindOptions {
         new_opts
     }
 }
+
+impl FindOneAndDeleteOptions {
+    pub fn new() -> FindOneAndDeleteOptions {
+        FindOneAndDeleteOptions {
+            max_time_ms: None,
+            projection: None,
+            sort: None,
+        }
+    }
+}
+
+
+impl FindOneAndReplaceOptions {
+    pub fn new() -> FindOneAndReplaceOptions {
+        FindOneAndReplaceOptions {
+            return_document: ReturnDocument::Before,
+            max_time_ms: None,
+            projection: None,
+            sort: None,
+            upsert: false,
+        }
+    }
+}
+
+impl FindOneAndUpdateOptions {
+    pub fn new() -> FindOneAndUpdateOptions {
+        FindOneAndUpdateOptions {
+            return_document: ReturnDocument::Before,
+            max_time_ms: None,
+            projection: None,
+            sort: None,
+            upsert: false,
+        }
+    }
+}
+
+impl ReturnDocument {
+    pub fn to_bool(&self) -> bool {
+        match self {
+            &ReturnDocument::Before => false,
+            &ReturnDocument::After => true,
+        }
+    }
+}

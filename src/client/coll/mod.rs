@@ -101,24 +101,76 @@ impl<'a> Collection<'a> {
         Ok(cursor.next())
     }
 
+    fn find_one_and_modify(&self, cmd: &mut bson::Document,
+                           filter: bson::Document, max_time_ms: Option<i64>,
+                           projection: Option<bson::Document>, sort: Option<bson::Document>)
+                           -> Result<Option<bson::Document>, String> {
+
+        cmd.insert("findAndModify".to_owned(), Bson::String(self.name()));
+        cmd.insert("query".to_owned(), Bson::Document(filter));
+        if sort.is_some() {
+            cmd.insert("sort".to_owned(), Bson::Document(sort.unwrap()));
+        }
+        if projection.is_some() {
+            cmd.insert("fields".to_owned(), Bson::Document(projection.unwrap()));
+        }
+
+        let res = try!(self.db.command(cmd.to_owned()));
+        match res {
+            Some(doc) => match doc.get("value") {
+                Some(&Bson::Document(ref nested_doc)) => Ok(Some(nested_doc.to_owned())),
+                _ => Ok(None),
+            },
+            None => Ok(None),
+        }
+    }
+
+    fn find_and_update(&self, filter: bson::Document, update: bson::Document,
+                       after: bool, max_time_ms: Option<i64>, projection: Option<bson::Document>,
+                       sort: Option<bson::Document>, upsert: bool) -> Result<Option<bson::Document>, String> {
+
+
+        let mut cmd = bson::Document::new();
+        cmd.insert("update".to_owned(), Bson::Document(update));
+        if after {
+            cmd.insert("new".to_owned(), Bson::Boolean(true));
+        }
+        if upsert {
+            cmd.insert("upsert".to_owned(), Bson::Boolean(true));
+        }
+
+        self.find_one_and_modify(&mut cmd, filter, max_time_ms, projection, sort)
+    }
+
     /// Finds a single document and deletes it, returning the original.
     pub fn find_one_and_delete(&self, filter: bson::Document,
-                               options: Option<FindOneAndDeleteOptions>)  -> Option<bson::Document> {
-        unimplemented!()
+                               options: Option<FindOneAndDeleteOptions>)  -> Result<Option<bson::Document>, String> {
+
+        let opts = options.unwrap_or(FindOneAndDeleteOptions::new());
+        let mut cmd = bson::Document::new();
+        cmd.insert("remove".to_owned(), Bson::Boolean(true));
+        self.find_one_and_modify(&mut cmd, filter, opts.max_time_ms, opts.projection, opts.sort)
     }
 
     /// Finds a single document and replaces it, returning either the original
     /// or replaced document.
     pub fn find_one_and_replace(&self, filter: bson::Document, replacement: bson::Document,
-                                options: Option<FindOneAndReplaceOptions>)  -> Option<bson::Document> {
-        unimplemented!()
+                                options: Option<FindOneAndReplaceOptions>)  -> Result<Option<bson::Document>, String> {
+        let opts = options.unwrap_or(FindOneAndReplaceOptions::new());
+        try!(Collection::validate_replace(&replacement));
+        self.find_and_update(filter, replacement, opts.return_document.to_bool(),
+                             opts.max_time_ms, opts.projection, opts.sort, opts.upsert)
     }
 
     /// Finds a single document and updates it, returning either the original
     /// or updated document.
     pub fn find_one_and_update(&self, filter: bson::Document, update: bson::Document,
-                               options: Option<FindOneAndUpdateOptions>)  -> Option<bson::Document> {
-        unimplemented!()
+                               options: Option<FindOneAndUpdateOptions>)  -> Result<Option<bson::Document>, String> {
+        let opts = options.unwrap_or(FindOneAndUpdateOptions::new());
+        try!(Collection::validate_update(&update));
+        self.find_and_update(filter, update, opts.return_document.to_bool(),
+                             opts.max_time_ms, opts.projection, opts.sort, opts.upsert)
+
     }
 
     /// Sends a batch of writes to the server at the same time.
@@ -221,12 +273,7 @@ impl<'a> Collection<'a> {
     pub fn replace_one(&self, filter: bson::Document, replacement: bson::Document, upsert: bool,
                        write_concern: Option<WriteConcern>) -> Result<UpdateResult, String> {
 
-        for key in replacement.keys() {
-            if key.starts_with("$") {
-                return Err("Replacement cannot include $ operators.".to_owned());
-            }
-        }
-
+        let _ = try!(Collection::validate_replace(&replacement));
         self.update(filter, replacement, upsert, false, write_concern)
     }
 
@@ -234,12 +281,7 @@ impl<'a> Collection<'a> {
     pub fn update_one(&self, filter: bson::Document, update: bson::Document, upsert: bool,
                       write_concern: Option<WriteConcern>) -> Result<UpdateResult, String> {
 
-        for key in update.keys() {
-            if !key.starts_with("$") {
-                return Err("Update only works with $ operators.".to_owned());
-            }
-        }
-
+        let _ = try!(Collection::validate_update(&update));
         self.update(filter, update, upsert, false, write_concern)
     }
 
@@ -247,12 +289,25 @@ impl<'a> Collection<'a> {
     pub fn update_many(&self, filter: bson::Document, update: bson::Document, upsert: bool,
                        write_concern: Option<WriteConcern>) -> Result<UpdateResult, String> {
 
+        let _ = try!(Collection::validate_update(&update));
+        self.update(filter, update, upsert, true, write_concern)
+    }
+
+    fn validate_replace(replacement: &bson::Document) -> Result<(), String> {
+        for key in replacement.keys() {
+            if key.starts_with("$") {
+                return Err("Replacement cannot include $ operators.".to_owned());
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_update(update: &bson::Document) -> Result<(), String> {
         for key in update.keys() {
             if !key.starts_with("$") {
                 return Err("Update only works with $ operators.".to_owned());
             }
         }
-
-        self.update(filter, update, upsert, true, write_concern)
+        Ok(())
     }
 }
