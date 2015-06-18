@@ -24,8 +24,9 @@ fn cursor_features() {
     let doc = Document::new();
     let flags = OpQueryFlags::no_flags();
 
-    let result = Cursor::query_with_batch_size(&coll, 3, flags,
-                                               0, 0, doc, None);
+    let result = Cursor::query_with_batch_size(&client, "test.cursor_test".to_owned(),
+                                               3, flags,
+                                               0, 0, doc, None, false);
 
     let mut cursor = match result {
         Ok(c) => c,
