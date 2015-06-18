@@ -65,7 +65,7 @@ impl <'a> Cursor<'a> {
         }
     }
 
-    fn get_bson_and_cid_from_command_message(message: Message) -> Option<(VecDeque<bson::Document>, i64)> {
+    fn get_bson_and_cid_from_command_message(message: Message) -> Option<(VecDeque<bson::Document>, i64, String)> {
         match Cursor::get_bson_and_cid_from_message(message) {
             Some((v, cid)) => {
                 if v.len() != 1 {
@@ -74,19 +74,21 @@ impl <'a> Cursor<'a> {
 
                 let ref doc = v[0];
 
-                let batch = if let Some(&Bson::Array(ref dbs)) = doc.get("databases") {
+                let (batch, command_cid, ns) = if let Some(&Bson::Array(ref dbs)) = doc.get("databases") {
                     // list databases
-                    dbs
+                    (dbs, cid, "admin.$cmd".to_owned())
                 } else if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
-                    // standard command cursor
-                    match cursor.get("firstBatch") {
-                        Some(&Bson::Array(ref batch)) => batch,
-                        _ => return None,
-                    }
-                } else {
-                    return None
-                };
+                    // standard command cursor parsing
+                    if let Some(&Bson::I64(ref id)) = cursor.get("id") {
+                        if let Some(&Bson::String(ref ns)) = cursor.get("ns") {
+                            if let Some(&Bson::Array(ref batch)) = cursor.get("firstBatch") {
+                                (batch, *id, ns.to_owned())
+                            } else { return None }
+                        } else { return None }
+                    } else { return None }
+                } else { return None };
 
+                // Extract first batch documents
                 let map = batch.iter().filter_map(|bdoc| {
                     if let &Bson::Document(ref doc) = bdoc {
                         Some(doc.clone())
@@ -94,7 +96,8 @@ impl <'a> Cursor<'a> {
                         None
                     }
                 }).collect();
-                return Some((map, cid));
+
+                return Some((map, command_cid, ns));
             },
             None => None
         }
@@ -147,11 +150,15 @@ impl <'a> Cursor<'a> {
         let res = if is_cmd_cursor {
             Cursor::get_bson_and_cid_from_command_message(reply)
         } else {
-            Cursor::get_bson_and_cid_from_message(reply)
+            let opt = Cursor::get_bson_and_cid_from_message(reply);
+            match opt {
+                Some((buf, id)) => Some((buf, id, namespace)),
+                None => None,
+            }
         };
 
         match res {
-            Some((buf, cursor_id)) => Ok(Cursor {
+            Some((buf, cursor_id, namespace)) => Ok(Cursor {
                 client: client,
                 namespace: namespace,
                 batch_size: batch_size,

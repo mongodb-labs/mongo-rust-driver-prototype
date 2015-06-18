@@ -201,7 +201,9 @@ impl<'a> Collection<'a> {
         updates.insert("q".to_owned(), Bson::Document(filter));
         updates.insert("u".to_owned(), Bson::Document(update));
         updates.insert("upsert".to_owned(), Bson::Boolean(upsert));
-        updates.insert("multi".to_owned(), Bson::Boolean(multi));
+        if multi {
+            updates.insert("multi".to_owned(), Bson::Boolean(multi));
+        }
 
         let mut cmd = bson::Document::new();
         cmd.insert("update".to_owned(), Bson::String(self.name()));

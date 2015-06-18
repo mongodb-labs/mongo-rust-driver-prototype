@@ -1,10 +1,11 @@
 use bson;
 use bson::Bson;
+
 use client::MongoClient;
 use client::coll::Collection;
 use client::coll::options::FindOptions;
 use client::common::{ReadPreference, WriteConcern};
-use client::cursor::Cursor;
+use client::cursor::{Cursor, DEFAULT_BATCH_SIZE};
 
 /// Interfaces with a MongoDB database.
 pub struct Database<'a> {
@@ -67,8 +68,18 @@ impl<'a> Database<'a> {
 
     /// Returns a list of collections within the database.
     pub fn list_collections(&'a self, filter: Option<bson::Document>) -> Result<Cursor, String> {
+        self.list_collections_with_batch_size(filter, DEFAULT_BATCH_SIZE)
+    }
+
+    pub fn list_collections_with_batch_size(&'a self, filter: Option<bson::Document>,
+                                            batch_size: i32) -> Result<Cursor, String> {
+
         let mut spec = bson::Document::new();
+        let mut cursor = bson::Document::new();
+
+        cursor.insert("batchSize".to_owned(), Bson::I32(batch_size));
         spec.insert("listCollections".to_owned(), Bson::I32(1));
+        spec.insert("cursor".to_owned(), Bson::Document(cursor));
         if filter.is_some() {
             spec.insert("filter".to_owned(), Bson::Document(filter.unwrap()));
         }
@@ -76,6 +87,7 @@ impl<'a> Database<'a> {
         let mut cursor = try!(self.command_cursor(spec));
         Ok(cursor)
     }
+
 
     /// Returns a list of collection names within the database.
     pub fn collection_names(&'a self, filter: Option<bson::Document>) -> Result<Vec<String>, String> {

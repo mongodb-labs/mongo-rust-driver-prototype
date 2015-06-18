@@ -54,40 +54,6 @@ fn find_and_insert_one() {
 }
 
 #[test]
-fn list_collections() {
-    let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
-    let db = client.db("test");
-
-    db.drop_database().ok().expect("Failed to drop database");
-
-    // Build collections
-    db.collection("test").insert_one(bson::Document::new(), None)
-        .ok().expect("Failed to insert placeholder document into collection");
-    db.collection("test2").insert_one(bson::Document::new(), None)
-        .ok().expect("Failed to insert placeholder document into collection");
-
-    // Check for namespaces
-    let mut cursor = db.list_collections(None)
-        .ok().expect("Failed to execute list_collections command.");;
-
-    let results = cursor.next_n(3);
-    assert_eq!(3, results.len());
-
-    let namespace = vec!(
-        "system.indexes",
-        "test",
-        "test2",
-        );
-
-    for i in 0..2 {
-        match results[i].get("name") {
-            Some(&Bson::String(ref name)) => assert_eq!(namespace[i], name),
-            _ => panic!("Expected BSON string!"),
-        }
-    }
-}
-
-#[test]
 fn insert_many() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
@@ -109,17 +75,13 @@ fn insert_many() {
     assert_eq!(2, results.len());
 
     // Assert expected title of documents
-    let expected_titles = vec!(
-        "Jaws",
-        "Back to the Future",
-        );
-
-    for i in 0..1 {
-        let ref expected_title = expected_titles[i];
-        match results[i].get("title") {
-            Some(&Bson::String(ref title)) => assert_eq!(expected_title, title),
-            _ => panic!("Expected Bson::String!"),
-        };
+    match results[0].get("title") {
+        Some(&Bson::String(ref title)) => assert_eq!("Jaws", title),
+        _ => panic!("Expected Bson::String!"),
+    }
+    match results[1].get("title") {
+        Some(&Bson::String(ref title)) => assert_eq!("Back to the Future", title),
+        _ => panic!("Expected Bson::String!"),
     }
 }
 
@@ -209,19 +171,18 @@ fn replace_one() {
     assert_eq!(3, results.len());
 
     // Assert expected title of documents
-    let expected_titles = vec!(
-        "Jaws",
-        "12 Angry Men",
-        "12 Angry Men",
-        );
-
-    for i in 0..1 {
-        let ref expected_title = expected_titles[i];
-        match results[i].get("title") {
-            Some(&Bson::String(ref title)) => assert_eq!(expected_title, title),
-            _ => panic!("Expected Bson::String!"),
-        };
-    }
+    match results[0].get("title") {
+        Some(&Bson::String(ref title)) => assert_eq!("Jaws", title),
+        _ => panic!("Expected Bson::String!"),
+    };
+    match results[1].get("title") {
+        Some(&Bson::String(ref title)) => assert_eq!("12 Angry Men", title),
+        _ => panic!("Expected Bson::String!"),
+    };
+    match results[2].get("title") {
+        Some(&Bson::String(ref title)) => assert_eq!("12 Angry Men", title),
+        _ => panic!("Expected Bson::String!"),
+    };
 }
 
 #[test]
@@ -297,7 +258,6 @@ fn update_many() {
 
     // Assert director attributes
     for i in 0..3 {
-
         // Check title
         match results[i].get("title") {
             Some(&Bson::String(ref title)) => {
