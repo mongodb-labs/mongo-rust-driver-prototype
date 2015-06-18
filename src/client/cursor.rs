@@ -74,30 +74,28 @@ impl <'a> Cursor<'a> {
 
                 let ref doc = v[0];
 
-                let (batch, command_cid, ns) = if let Some(&Bson::Array(ref dbs)) = doc.get("databases") {
-                    // list databases
-                    (dbs, cid, "admin.$cmd".to_owned())
-                } else if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
-                    // standard command cursor parsing
+                // Extract cursor information
+                if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
                     if let Some(&Bson::I64(ref id)) = cursor.get("id") {
                         if let Some(&Bson::String(ref ns)) = cursor.get("ns") {
                             if let Some(&Bson::Array(ref batch)) = cursor.get("firstBatch") {
-                                (batch, *id, ns.to_owned())
-                            } else { return None }
-                        } else { return None }
-                    } else { return None }
-                } else { return None };
 
-                // Extract first batch documents
-                let map = batch.iter().filter_map(|bdoc| {
-                    if let &Bson::Document(ref doc) = bdoc {
-                        Some(doc.clone())
-                    } else {
-                        None
+                                // Extract first batch documents
+                                let map = batch.iter().filter_map(|bdoc| {
+                                    if let &Bson::Document(ref doc) = bdoc {
+                                        Some(doc.clone())
+                                    } else {
+                                        None
+                                    }
+                                }).collect();
+
+                                return Some((map, *id, ns.to_owned()))
+                            }
+                        }
                     }
-                }).collect();
+                }
 
-                return Some((map, command_cid, ns));
+                None
             },
             None => None
         }

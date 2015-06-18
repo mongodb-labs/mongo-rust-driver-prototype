@@ -1,24 +1,34 @@
-use bson::Bson;
+use bson;
 use mongodb::client::MongoClient;
-
-#[test]
-fn list_databases() {
-    let client = MongoClient::with_uri("mongodb://localhost:27018").unwrap();
-    let mut cursor = client.list_databases().ok().expect("Failed to execute list_databases.");
-    let results = cursor.next_n(3);
-    assert_eq!(1, results.len());
-    match results[0].get("name") {
-        Some(&Bson::String(ref name)) => assert_eq!("local", name),
-        _ => panic!("Expected name string!"),
-    }
-}
 
 #[test]
 fn database_names() {
     let client = MongoClient::with_uri("mongodb://localhost:27018").unwrap();
+    let state_results = client.database_names().ok().expect("Failed to execute database_names.");
+    for name in state_results {
+        if name != "local" {
+            client.drop_database(&name[..]).ok().expect("Failed to drop database from server.");
+        }
+    }
+
+    let base_results = client.database_names().ok().expect("Failed to execute database_names.");
+    assert_eq!(1, base_results.len());
+    assert_eq!("local", base_results[0]);
+
+    // Build dbs
+    let db1 = client.db("new_db");
+    let db2 = client.db("new_db_2");
+    db1.collection("test1").insert_one(bson::Document::new(), None)
+        .ok().expect("Failed to insert placeholder document into collection");
+    db2.collection("test2").insert_one(bson::Document::new(), None)
+        .ok().expect("Failed to insert placeholder document into collection");
+
+    // Check new dbs
     let results = client.database_names().ok().expect("Failed to execute database_names.");
-    assert_eq!(1, results.len());
+    assert_eq!(3, results.len());
     assert_eq!("local", results[0]);
+    assert_eq!("new_db", results[1]);
+    assert_eq!("new_db_2", results[2]);
 }
 
 #[test]

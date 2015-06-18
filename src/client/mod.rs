@@ -105,25 +105,28 @@ impl MongoClient {
         }
     }
 
-    /// Provides an iterator over the server's database information.
-    pub fn list_databases(&self) -> Result<Cursor, String> {
-        let mut doc = bson::Document::new();
-        doc.insert("listDatabases".to_owned(), Bson::I32(1));
-        Cursor::command_cursor(self, "admin", doc)
-    }
-
     /// Returns a list of all database names that exist on the server.
     pub fn database_names(&self) -> Result<Vec<String>, String> {
-        let mut cursor = try!(self.list_databases());
-        let mut results = Vec::new();
-        loop {
-            match cursor.next() {
-                Some(doc) => if let Some(&Bson::String(ref name)) = doc.get("name") {
-                    results.push(name.to_owned());
-                },
-                None => return Ok(results),
+        let mut doc = bson::Document::new();
+        doc.insert("listDatabases".to_owned(), Bson::I32(1));
+
+        let db = self.db("admin");
+        let res = try!(db.command(doc));
+        if res.is_some() {
+            if let Some(&Bson::Array(ref batch)) = res.unwrap().get("databases") {
+                // Extract database names
+                let map = batch.iter().filter_map(|bdoc| {
+                    if let &Bson::Document(ref doc) = bdoc {
+                        if let Some(&Bson::String(ref name)) = doc.get("name") {
+                            return Some(name.to_owned());
+                        }
+                    }
+                    None
+                }).collect();
+                return Ok(map)
             }
         }
+        Err("No reply received from listDatabases command.".to_owned())
     }
 
     /// Drops the database defined by `db_name`.
