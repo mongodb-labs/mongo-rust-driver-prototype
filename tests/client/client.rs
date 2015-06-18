@@ -26,10 +26,11 @@ fn database_names() {
     // Check new dbs
     let results = client.database_names().ok().expect("Failed to execute database_names.");
     assert_eq!(3, results.len());
-    assert_eq!("local", results[0]);
-    assert_eq!("new_db", results[1]);
-    assert_eq!("new_db_2", results[2]);
+    assert!(results.contains(&"local".to_owned()));
+    assert!(results.contains(&"new_db".to_owned()));
+    assert!(results.contains(&"new_db_2".to_owned()));
 }
+
 
 #[test]
 fn is_master() {
