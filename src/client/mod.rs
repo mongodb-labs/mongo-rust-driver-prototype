@@ -111,7 +111,21 @@ impl MongoClient {
         doc.insert("listDatabases".to_owned(), Bson::I32(1));
         Cursor::command_cursor(self, "admin", doc)
     }
-    
+
+    /// Returns a list of all database names that exist on the server.
+    pub fn database_names(&self) -> Result<Vec<String>, String> {
+        let mut cursor = try!(self.list_databases());
+        let mut results = Vec::new();
+        loop {
+            match cursor.next() {
+                Some(doc) => if let Some(&Bson::String(ref name)) = doc.get("name") {
+                    results.push(name.to_owned());
+                },
+                None => return Ok(results),
+            }
+        }
+    }
+
     /// Drops the database defined by `db_name`.
     pub fn drop_database(&self, db_name: &str) -> Result<(), String> {
         let db = self.db(db_name);

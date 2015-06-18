@@ -277,7 +277,7 @@ impl <'a> Cursor<'a> {
         if self.limit > 0 && self.count >= self.limit {
             false
         } else {
-            if self.buffer.is_empty() && self.limit != 1 && !self.is_cmd_cursor {
+            if self.buffer.is_empty() && self.limit != 1 && self.cursor_id != 0 {
                 self.get_from_stream();
             }
             !self.buffer.is_empty()
