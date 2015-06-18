@@ -7,12 +7,12 @@ use std::collections::BTreeMap;
 #[derive(Clone)]
 pub struct BulkWriteResult {
     pub acknowledged: bool,
-    pub inserted_count: i64,
+    pub inserted_count: i32,
     pub inserted_ids: Option<BTreeMap<i64, Bson>>,
-    pub matched_count: i64,
-    pub modified_count: i64,
-    pub deleted_count: i64,
-    pub upserted_count: i64,
+    pub matched_count: i32,
+    pub modified_count: i32,
+    pub deleted_count: i32,
+    pub upserted_count: i32,
     pub upserted_ids: BTreeMap<i64, Bson>,
 }
 
@@ -34,15 +34,15 @@ pub struct InsertManyResult {
 #[derive(Clone)]
 pub struct DeleteResult {
     pub acknowledged: bool,
-    pub deleted_count: i64,
+    pub deleted_count: i32,
 }
 
 /// Results for an update operation.
 #[derive(Clone)]
 pub struct UpdateResult {
     pub acknowledged: bool,
-    pub matched_count: i64,
-    pub modified_count: i64,
+    pub matched_count: i32,
+    pub modified_count: i32,
     pub upserted_id: Option<Bson>,
 }
 
@@ -70,7 +70,7 @@ impl DeleteResult {
     /// Extracts server reply information into a result.
     pub fn new(doc: bson::Document) -> DeleteResult {
         let n = match doc.get("n") {
-            Some(&Bson::I64(n)) => n,
+            Some(&Bson::I32(n)) => n,
             _ => 0,
         };
 
@@ -85,12 +85,12 @@ impl UpdateResult {
     /// Extracts server reply information into a result.
     pub fn new(doc: bson::Document) -> UpdateResult {
         let n = match doc.get("n") {
-            Some(&Bson::I64(n)) => n,
+            Some(&Bson::I32(n)) => n,
             _ => 0,
         };
 
         let n_modified = match doc.get("nModified") {
-            Some(&Bson::I64(n)) => n,
+            Some(&Bson::I32(n)) => n,
             _ => 0,
         };
 

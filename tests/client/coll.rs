@@ -201,7 +201,7 @@ fn update_one() {
     doc.insert("title".to_owned(), Bson::String("Jaws".to_owned()));
     doc2.insert("title".to_owned(), Bson::String("Back to the Future".to_owned()));
     doc3.insert("title".to_owned(), Bson::String("12 Angry Men".to_owned()));
-    coll.insert_many(vec!(doc.clone(), doc2.clone(), doc3.clone()), false, None)
+    coll.insert_many(vec!(doc.clone(), doc2.clone(), doc3.clone(), doc2.clone()), false, None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Update single document
@@ -257,23 +257,16 @@ fn update_many() {
     assert_eq!(4, results.len());
 
     // Assert director attributes
-    for i in 0..3 {
-        // Check title
-        match results[i].get("title") {
-            Some(&Bson::String(ref title)) => {
-                let dir_opt = results[i].get("director");
+    assert!(results[0].get("director").is_none());
+    assert!(results[2].get("director").is_none());
+    
+    match results[1].get("director") {
+        Some(&Bson::String(ref director)) => assert_eq!("Robert Zemeckis", director),
+        _ => panic!("Expected Bson::String for director!"),
+    }
 
-                // Only doc2 models should have a director field
-                if "Back to the Future" == title {
-                    match dir_opt {
-                        Some(&Bson::String(ref director)) => assert_eq!("Robert Zemeckis", director),
-                        _ => panic!("Expected Bson::String!"),
-                    }
-                } else {
-                    assert!(dir_opt.is_none());
-                }
-            },
-            _ => panic!("Expected Bson::String!"),
-        }
+    match results[3].get("director") {
+        Some(&Bson::String(ref director)) => assert_eq!("Robert Zemeckis", director),
+        _ => panic!("Expected Bson::String for director!"),
     }
 }

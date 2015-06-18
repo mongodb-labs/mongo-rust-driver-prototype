@@ -16,7 +16,7 @@ fn list_databases() {
 #[test]
 fn database_names() {
     let client = MongoClient::with_uri("mongodb://localhost:27018").unwrap();
-    let mut results = client.database_names().ok().expect("Failed to execute database_names.");
+    let results = client.database_names().ok().expect("Failed to execute database_names.");
     assert_eq!(1, results.len());
     assert_eq!("local", results[0]);
 }
