@@ -70,7 +70,7 @@ impl<'a> Collection<'a> {
         let pipeline_map = pipeline.iter().map(|bdoc| {
             Bson::Document(bdoc.to_owned())
         }).collect();
-        
+
         let mut spec = bson::Document::new();
         let mut cursor = bson::Document::new();
         cursor.insert("batchSize".to_owned(), Bson::I32(opts.batch_size));
@@ -88,7 +88,7 @@ impl<'a> Collection<'a> {
     /// Gets the number of documents matching the filter.
     pub fn count(&self, filter: Option<bson::Document>, options: Option<CountOptions>) -> Result<i64, String> {
         let opts = options.unwrap_or(CountOptions::new());
-        
+
         let mut spec = bson::Document::new();
         spec.insert("count".to_owned(), Bson::String(self.name()));
         spec.insert("skip".to_owned(), Bson::I64(opts.skip as i64));
@@ -133,7 +133,7 @@ impl<'a> Collection<'a> {
                 return Ok(vals.to_owned());
             }
         }
-        
+
         Err("Failed to receive 'distinct' command reply from server.".to_owned())
     }
 
@@ -160,10 +160,11 @@ impl<'a> Collection<'a> {
         Ok(cursor.next())
     }
 
-    fn find_one_and_modify(&self, cmd: &mut bson::Document,
-                           filter: bson::Document, max_time_ms: Option<i64>,
-                           projection: Option<bson::Document>, sort: Option<bson::Document>)
-                           -> Result<Option<bson::Document>, String> {
+    // Helper method for all findAndModify commands.
+    fn find_and_modify(&self, cmd: &mut bson::Document,
+                       filter: bson::Document, max_time_ms: Option<i64>,
+                       projection: Option<bson::Document>, sort: Option<bson::Document>)
+                       -> Result<Option<bson::Document>, String> {
 
         let mut new_cmd = bson::Document::new();
         new_cmd.insert("findAndModify".to_owned(), Bson::String(self.name()));
@@ -189,9 +190,10 @@ impl<'a> Collection<'a> {
         }
     }
 
-    fn find_and_update(&self, filter: bson::Document, update: bson::Document,
-                       after: bool, max_time_ms: Option<i64>, projection: Option<bson::Document>,
-                       sort: Option<bson::Document>, upsert: bool) -> Result<Option<bson::Document>, String> {
+    // Helper method for validated replace and update commands.
+    fn find_one_and_replace_or_update(&self, filter: bson::Document, update: bson::Document,
+                                      after: bool, max_time_ms: Option<i64>, projection: Option<bson::Document>,
+                                      sort: Option<bson::Document>, upsert: bool) -> Result<Option<bson::Document>, String> {
 
 
         let mut cmd = bson::Document::new();
@@ -203,7 +205,7 @@ impl<'a> Collection<'a> {
             cmd.insert("upsert".to_owned(), Bson::Boolean(true));
         }
 
-        self.find_one_and_modify(&mut cmd, filter, max_time_ms, projection, sort)
+        self.find_and_modify(&mut cmd, filter, max_time_ms, projection, sort)
     }
 
     /// Finds a single document and deletes it, returning the original.
@@ -213,7 +215,7 @@ impl<'a> Collection<'a> {
         let opts = options.unwrap_or(FindOneAndDeleteOptions::new());
         let mut cmd = bson::Document::new();
         cmd.insert("remove".to_owned(), Bson::Boolean(true));
-        self.find_one_and_modify(&mut cmd, filter, opts.max_time_ms, opts.projection, opts.sort)
+        self.find_and_modify(&mut cmd, filter, opts.max_time_ms, opts.projection, opts.sort)
     }
 
     /// Finds a single document and replaces it, returning either the original
@@ -222,8 +224,8 @@ impl<'a> Collection<'a> {
                                 options: Option<FindOneAndReplaceOptions>)  -> Result<Option<bson::Document>, String> {
         let opts = options.unwrap_or(FindOneAndReplaceOptions::new());
         try!(Collection::validate_replace(&replacement));
-        self.find_and_update(filter, replacement, opts.return_document.to_bool(),
-                             opts.max_time_ms, opts.projection, opts.sort, opts.upsert)
+        self.find_one_and_replace_or_update(filter, replacement, opts.return_document.to_bool(),
+                                            opts.max_time_ms, opts.projection, opts.sort, opts.upsert)
     }
 
     /// Finds a single document and updates it, returning either the original
@@ -232,8 +234,8 @@ impl<'a> Collection<'a> {
                                options: Option<FindOneAndUpdateOptions>)  -> Result<Option<bson::Document>, String> {
         let opts = options.unwrap_or(FindOneAndUpdateOptions::new());
         try!(Collection::validate_update(&update));
-        self.find_and_update(filter, update, opts.return_document.to_bool(),
-                             opts.max_time_ms, opts.projection, opts.sort, opts.upsert)
+        self.find_one_and_replace_or_update(filter, update, opts.return_document.to_bool(),
+                                            opts.max_time_ms, opts.projection, opts.sort, opts.upsert)
 
     }
 

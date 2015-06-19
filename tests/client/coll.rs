@@ -217,12 +217,11 @@ fn aggregate() {
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
         .ok().expect("Failed to execute insert_many command.");
 
-    // Build aggregation pipeline to count instances of each letter in tag arrays
+    // Build aggregation pipeline to unwind tag arrays and group distinct tags
     let project = doc! { "$project" => nested_doc! { "tags" => Bson::I32(1) } };
     let unwind = doc! { "$unwind" => Bson::String("$tags".to_owned()) };
     let group = doc! { "$group" => nested_doc! {
-        "_id" => Bson::String("$tags".to_owned()),
-        "count" => nested_doc! { "$sum" => Bson::I32(1) }
+        "_id" => Bson::String("$tags".to_owned())
     } };
 
     // Aggregate
@@ -232,25 +231,22 @@ fn aggregate() {
     let results = cursor.next_n(10);
     assert_eq!(6, results.len());
 
-    for i in 0..6 {
-        if let Some(&Bson::String(ref tag)) = results[i].get("_id") {
-            if let Some(&Bson::I32(ref count)) = results[i].get("count") {
-                match &tag[..] {
-                    "a" => assert_eq!(2, *count),
-                    "b" => assert_eq!(2, *count),
-                    "c" => assert_eq!(1, *count),
-                    "d" => assert_eq!(2, *count),
-                    "e" => assert_eq!(1, *count),
-                    "f" => assert_eq!(1, *count),
-                    _ => panic!("Unexpected tag found."),
-                }
-            } else {
-                panic!("Expected Bson::I32 'count'!");
-            }
-        } else {
-            panic!("Expected Bson::String '_id'!");
+    // Grab ids from aggregated docs
+    let vec: Vec<_> = results.iter().filter_map(|bdoc| {
+        match bdoc.get("_id") {
+            Some(&Bson::String(ref tag)) => Some(tag.to_owned()),
+            _ => None,
         }
-    }
+    }).collect();
+
+    // Validate that all distinct tags were received.
+    assert_eq!(6, vec.len());
+    assert!(vec.contains(&"a".to_owned()));
+    assert!(vec.contains(&"b".to_owned()));
+    assert!(vec.contains(&"c".to_owned()));
+    assert!(vec.contains(&"d".to_owned()));
+    assert!(vec.contains(&"e".to_owned()));
+    assert!(vec.contains(&"f".to_owned()));
 }
 
 #[test]
