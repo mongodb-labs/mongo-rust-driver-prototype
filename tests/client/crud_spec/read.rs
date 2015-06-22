@@ -6,7 +6,7 @@ use mongodb::client:: MongoClient;
 use rustc_serialize::json::Json;
 
 macro_rules! run_find_test {
-    ( $c:expr, $f:expr, $o:expr, $t:expr ) => {
+    ( $db:expr, $c:expr, $f:expr, $o:expr, $t:expr ) => {
         {
             let mut cursor = $c.find($f, $o).unwrap();
 
@@ -18,7 +18,28 @@ macro_rules! run_find_test {
             for bson in array {
                 assert!(eq::bson_eq(&bson, &Bson::Document(cursor.next().unwrap())));
             }
-        }
+
+            assert!(!cursor.has_next());
+
+            let outcome_coll = match $t.collection {
+                Some(ref coll) => coll.clone(),
+                None => return
+            };
+
+            let coll = match outcome_coll.name {
+                Some(ref str) => $db.collection(&str),
+                None => $db.collection(&$c.name())
+            };
+
+            let mut cursor = coll.find(None, None).unwrap();
+
+            for doc in outcome_coll.data.iter() {
+                assert!(eq::bson_eq(&Bson::Document(doc.clone()),
+                                    &Bson::Document(cursor.next().unwrap())));
+            }
+
+            assert!(!cursor.has_next());
+         }
     };
 }
 
@@ -36,7 +57,8 @@ macro_rules! run_suite {
             for test in suite.tests {
                 match test.operation {
                     Arguments::Find { filter, options } =>
-                        run_find_test!(coll, filter, Some(options), test.outcome)
+                        run_find_test!(db, coll, filter, Some(options),
+                                       test.outcome)
                 };
             }
         }
