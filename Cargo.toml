@@ -6,5 +6,7 @@ authors = ["Valeri Karpov <valkar207@gmail.com>",
            "Kevin Yeh <kevinyeah@utexas.edu>"]
 
 [dependencies]
-byteorder = "0.3.10"
-bson = "0.1.1"
+bson = "0.1"
+byteorder = "0.3"
+nalgebra = "0.2"
+rustc-serialize = "0.3"
