@@ -23,9 +23,14 @@ impl Test {
                                Some(&Json::String(ref s)) => s,
                                "`name` must be a string");
 
-        let args = val_or_err!(name.as_ref(),
-                               "find" => Arguments::new_find_from_json(&args_obj),
-                               "Invalid operation name");
+        let args = match name.as_ref() {
+            "find" => Arguments::new_find_from_json(&args_obj),
+            "insertOne" => match Arguments::new_insert_one_from_json(&args_obj) {
+                Ok(a) => a,
+                Err(s) => return Err(s)
+            },
+            _ => return Err("Invalid operation name".to_owned())
+        };
 
 
         let outcome_obj = val_or_err!(object.get("outcome"),
