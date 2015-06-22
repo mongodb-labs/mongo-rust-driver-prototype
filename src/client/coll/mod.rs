@@ -66,18 +66,77 @@ impl<'a> Collection<'a> {
     }
 
     /// Runs an aggregation framework pipeline.
-    pub fn aggregate(pipeline: &[bson::Document], options: AggregateOptions) -> Result<Cursor<'a>, String> {
-        unimplemented!()
+    pub fn aggregate(&'a self, pipeline: Vec<bson::Document>, options: Option<AggregateOptions>) -> Result<Cursor<'a>, String> {
+        let opts = options.unwrap_or(AggregateOptions::new());
+
+        let pipeline_map = pipeline.iter().map(|bdoc| {
+            Bson::Document(bdoc.to_owned())
+        }).collect();
+
+        let mut spec = bson::Document::new();
+        let mut cursor = bson::Document::new();
+        cursor.insert("batchSize".to_owned(), Bson::I32(opts.batch_size));
+        spec.insert("aggregate".to_owned(), Bson::String(self.name()));
+        spec.insert("pipeline".to_owned(), Bson::Array(pipeline_map));
+        spec.insert("cursor".to_owned(), Bson::Document(cursor));
+        if opts.allow_disk_use {
+            spec.insert("allowDiskUse".to_owned(), Bson::Boolean(opts.allow_disk_use));
+        }
+
+        let mut cursor = try!(self.db.command_cursor(spec));
+        Ok(cursor)
     }
 
     /// Gets the number of documents matching the filter.
-    pub fn count(filter: bson::Document, options: CountOptions) -> Result<i64, String> {
-        unimplemented!()
+    pub fn count(&self, filter: Option<bson::Document>, options: Option<CountOptions>) -> Result<i64, String> {
+        let opts = options.unwrap_or(CountOptions::new());
+
+        let mut spec = bson::Document::new();
+        spec.insert("count".to_owned(), Bson::String(self.name()));
+        spec.insert("skip".to_owned(), Bson::I64(opts.skip as i64));
+        spec.insert("limit".to_owned(), Bson::I64(opts.limit));
+        if filter.is_some() {
+            spec.insert("query".to_owned(), Bson::Document(filter.unwrap()));
+        }
+
+        // Favor specified hint document over string
+        if opts.hint_doc.is_some() {
+            spec.insert("hint".to_owned(), Bson::Document(opts.hint_doc.unwrap()));
+        } else if opts.hint.is_some() {
+            spec.insert("hint".to_owned(), Bson::String(opts.hint.unwrap()));
+        }
+
+        let result = try!(self.db.command(spec));
+        if result.is_some() {
+            match result.unwrap().get("n") {
+                Some(&Bson::I32(ref n)) => return Ok(*n as i64),
+                Some(&Bson::I64(ref n)) => return Ok(*n),
+                _ => (),
+            }
+        }
+        Err("Failed to receive 'count' command reply from server.".to_owned())
     }
 
     /// Finds the distinct values for a specified field across a single collection.
-    pub fn distinct(field_name: &str, filter: bson::Document, options: DistinctOptions) -> Result<Vec<Bson>, String> {
-        unimplemented!()
+    pub fn distinct(&self, field_name: &str, filter: Option<bson::Document>, options: Option<DistinctOptions>) -> Result<Vec<Bson>, String> {
+
+        let opts = options.unwrap_or(DistinctOptions::new());
+
+        let mut spec = bson::Document::new();
+        spec.insert("distinct".to_owned(), Bson::String(self.name()));
+        spec.insert("key".to_owned(), Bson::String(field_name.to_owned()));
+        if filter.is_some() {
+            spec.insert("query".to_owned(), Bson::Document(filter.unwrap()));
+        }
+
+        let result = try!(self.db.command(spec));
+        if result.is_some() {
+            if let Some(&Bson::Array(ref vals)) = result.unwrap().get("values") {
+                return Ok(vals.to_owned());
+            }
+        }
+
+        Err("Failed to receive 'distinct' command reply from server.".to_owned())
     }
 
     /// Returns a list of documents within the collection that match the filter.
@@ -102,24 +161,89 @@ impl<'a> Collection<'a> {
         Ok(cursor.next())
     }
 
+    // Helper method for all findAndModify commands.
+    fn find_and_modify(&self, cmd: &mut bson::Document,
+                           filter: bson::Document, max_time_ms: Option<i64>,
+                           projection: Option<bson::Document>, sort: Option<bson::Document>,
+                           write_concern: Option<WriteConcern>)
+                           -> Result<Option<bson::Document>, String> {
+
+        let wc = write_concern.unwrap_or(self.write_concern.clone());
+
+        let mut new_cmd = bson::Document::new();
+        new_cmd.insert("findAndModify".to_owned(), Bson::String(self.name()));
+        new_cmd.insert("query".to_owned(), Bson::Document(filter));
+        new_cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
+        if sort.is_some() {
+            new_cmd.insert("sort".to_owned(), Bson::Document(sort.unwrap()));
+        }
+        if projection.is_some() {
+            new_cmd.insert("fields".to_owned(), Bson::Document(projection.unwrap()));
+        }
+
+        for (key, val) in cmd.iter() {
+            new_cmd.insert(key.to_owned(), val.to_owned());
+        }
+
+        let res = try!(self.db.command(new_cmd));
+        match res {
+            Some(doc) => match doc.get("value") {
+                Some(&Bson::Document(ref nested_doc)) => Ok(Some(nested_doc.to_owned())),
+                _ => Ok(None),
+            },
+            None => Ok(None),
+        }
+    }
+
+    // Helper method for validated replace and update commands.
+    fn find_one_and_replace_or_update(&self, filter: bson::Document, update: bson::Document,
+                                      after: bool, max_time_ms: Option<i64>,
+                                      projection: Option<bson::Document>, sort: Option<bson::Document>,
+                                      upsert: bool, write_concern: Option<WriteConcern>) -> Result<Option<bson::Document>, String> {
+
+        let mut cmd = bson::Document::new();
+        cmd.insert("update".to_owned(), Bson::Document(update));
+        if after {
+            cmd.insert("new".to_owned(), Bson::Boolean(true));
+        }
+        if upsert {
+            cmd.insert("upsert".to_owned(), Bson::Boolean(true));
+        }
+
+        self.find_and_modify(&mut cmd, filter, max_time_ms, projection, sort, write_concern)
+    }
+
     /// Finds a single document and deletes it, returning the original.
     pub fn find_one_and_delete(&self, filter: bson::Document,
-                               options: Option<FindOneAndDeleteOptions>)  -> Option<bson::Document> {
-        unimplemented!()
+                               options: Option<FindOneAndDeleteOptions>)  -> Result<Option<bson::Document>, String> {
+
+        let opts = options.unwrap_or(FindOneAndDeleteOptions::new());
+        let mut cmd = bson::Document::new();
+        cmd.insert("remove".to_owned(), Bson::Boolean(true));
+        self.find_and_modify(&mut cmd, filter, opts.max_time_ms,
+                             opts.projection, opts.sort, opts.write_concern)
     }
 
     /// Finds a single document and replaces it, returning either the original
     /// or replaced document.
     pub fn find_one_and_replace(&self, filter: bson::Document, replacement: bson::Document,
-                                options: Option<FindOneAndReplaceOptions>)  -> Option<bson::Document> {
-        unimplemented!()
+                                options: Option<FindOneAndReplaceOptions>)  -> Result<Option<bson::Document>, String> {
+        let opts = options.unwrap_or(FindOneAndReplaceOptions::new());
+        try!(Collection::validate_replace(&replacement));
+        self.find_one_and_replace_or_update(filter, replacement, opts.return_document.to_bool(),
+                                            opts.max_time_ms, opts.projection, opts.sort,
+                                            opts.upsert, opts.write_concern)
     }
 
     /// Finds a single document and updates it, returning either the original
     /// or updated document.
     pub fn find_one_and_update(&self, filter: bson::Document, update: bson::Document,
-                               options: Option<FindOneAndUpdateOptions>)  -> Option<bson::Document> {
-        unimplemented!()
+                               options: Option<FindOneAndUpdateOptions>)  -> Result<Option<bson::Document>, String> {
+        let opts = options.unwrap_or(FindOneAndUpdateOptions::new());
+        try!(Collection::validate_update(&update));
+        self.find_one_and_replace_or_update(filter, update, opts.return_document.to_bool(),
+                                            opts.max_time_ms, opts.projection, opts.sort,
+                                            opts.upsert, opts.write_concern)
     }
 
     /// Sends a batch of writes to the server at the same time.
@@ -244,12 +368,7 @@ impl<'a> Collection<'a> {
     pub fn replace_one(&self, filter: bson::Document, replacement: bson::Document, upsert: bool,
                        write_concern: Option<WriteConcern>) -> Result<UpdateResult, String> {
 
-        for key in replacement.keys() {
-            if key.starts_with("$") {
-                return Err("Replacement cannot include $ operators.".to_owned());
-            }
-        }
-
+        let _ = try!(Collection::validate_replace(&replacement));
         self.update(filter, replacement, upsert, false, write_concern)
     }
 
@@ -257,12 +376,7 @@ impl<'a> Collection<'a> {
     pub fn update_one(&self, filter: bson::Document, update: bson::Document, upsert: bool,
                       write_concern: Option<WriteConcern>) -> Result<UpdateResult, String> {
 
-        for key in update.keys() {
-            if !key.starts_with("$") {
-                return Err("Update only works with $ operators.".to_owned());
-            }
-        }
-
+        let _ = try!(Collection::validate_update(&update));
         self.update(filter, update, upsert, false, write_concern)
     }
 
@@ -270,12 +384,25 @@ impl<'a> Collection<'a> {
     pub fn update_many(&self, filter: bson::Document, update: bson::Document, upsert: bool,
                        write_concern: Option<WriteConcern>) -> Result<UpdateResult, String> {
 
+        let _ = try!(Collection::validate_update(&update));
+        self.update(filter, update, upsert, true, write_concern)
+    }
+
+    fn validate_replace(replacement: &bson::Document) -> Result<(), String> {
+        for key in replacement.keys() {
+            if key.starts_with("$") {
+                return Err("Replacement cannot include $ operators.".to_owned());
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_update(update: &bson::Document) -> Result<(), String> {
         for key in update.keys() {
             if !key.starts_with("$") {
                 return Err("Update only works with $ operators.".to_owned());
             }
         }
-
-        self.update(filter, update, upsert, true, write_concern)
+        Ok(())
     }
 }

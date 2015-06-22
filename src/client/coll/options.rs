@@ -1,6 +1,6 @@
 use bson;
 use client::cursor;
-use client::common::ReadPreference;
+use client::common::{ReadPreference, WriteConcern};
 
 /// Describes the type of cursor to return on collection queries.
 #[derive(Clone, PartialEq, Eq)]
@@ -59,10 +59,11 @@ pub struct AggregateOptions {
 /// Options for count queries.
 #[derive(Clone)]
 pub struct CountOptions {
-    pub hint: Option<bson::Document>,
-    pub limit: Option<i64>,
+    pub skip: u64,
+    pub limit: i64,
+    pub hint: Option<String>,
+    pub hint_doc: Option<bson::Document>,
     pub max_time_ms: Option<i64>,
-    pub skip: Option<u64>,
     pub read_preference: Option<ReadPreference>,
 }
 
@@ -97,6 +98,7 @@ pub struct FindOneAndDeleteOptions {
     pub max_time_ms: Option<i64>,
     pub projection: Option<bson::Document>,
     pub sort: Option<bson::Document>,
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Options for findOneAndReplace operations.
@@ -107,6 +109,7 @@ pub struct FindOneAndReplaceOptions {
     pub projection: Option<bson::Document>,
     pub sort: Option<bson::Document>,
     pub upsert: bool,
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Options for findOneAndUpdate operations.
@@ -117,6 +120,41 @@ pub struct FindOneAndUpdateOptions {
     pub projection: Option<bson::Document>,
     pub sort: Option<bson::Document>,
     pub upsert: bool,
+    pub write_concern: Option<WriteConcern>,
+}
+
+impl AggregateOptions {
+    pub fn new() -> AggregateOptions {
+        AggregateOptions {
+            allow_disk_use: false,
+            use_cursor: true,
+            batch_size: cursor::DEFAULT_BATCH_SIZE,
+            max_time_ms: None,
+            read_preference: None,
+        }
+    }
+}
+
+impl CountOptions {
+    pub fn new() -> CountOptions {
+        CountOptions {
+            skip: 0,
+            limit: 0,
+            hint: None,
+            hint_doc: None,
+            max_time_ms: None,
+            read_preference: None,
+        }
+    }
+}
+
+impl DistinctOptions {
+    pub fn new() -> DistinctOptions {
+        DistinctOptions {
+            max_time_ms: None,
+            read_preference: None,
+        }
+    }
 }
 
 impl FindOptions {
@@ -144,5 +182,52 @@ impl FindOptions {
         let mut new_opts = self.clone();
         new_opts.limit = limit;
         new_opts
+    }
+}
+
+impl FindOneAndDeleteOptions {
+    pub fn new() -> FindOneAndDeleteOptions {
+        FindOneAndDeleteOptions {
+            max_time_ms: None,
+            projection: None,
+            sort: None,
+            write_concern: None,
+        }
+    }
+}
+
+
+impl FindOneAndReplaceOptions {
+    pub fn new() -> FindOneAndReplaceOptions {
+        FindOneAndReplaceOptions {
+            return_document: ReturnDocument::Before,
+            max_time_ms: None,
+            projection: None,
+            sort: None,
+            upsert: false,
+            write_concern: None,
+        }
+    }
+}
+
+impl FindOneAndUpdateOptions {
+    pub fn new() -> FindOneAndUpdateOptions {
+        FindOneAndUpdateOptions {
+            return_document: ReturnDocument::Before,
+            max_time_ms: None,
+            projection: None,
+            sort: None,
+            upsert: false,
+            write_concern: None,
+        }
+    }
+}
+
+impl ReturnDocument {
+    pub fn to_bool(&self) -> bool {
+        match self {
+            &ReturnDocument::Before => false,
+            &ReturnDocument::After => true,
+        }
     }
 }
