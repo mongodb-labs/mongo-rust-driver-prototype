@@ -1,6 +1,6 @@
 use bson;
 use client::cursor;
-use client::common::ReadPreference;
+use client::common::{ReadPreference, WriteConcern};
 
 /// Describes the type of cursor to return on collection queries.
 #[derive(Clone, PartialEq, Eq)]
@@ -98,6 +98,7 @@ pub struct FindOneAndDeleteOptions {
     pub max_time_ms: Option<i64>,
     pub projection: Option<bson::Document>,
     pub sort: Option<bson::Document>,
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Options for findOneAndReplace operations.
@@ -108,6 +109,7 @@ pub struct FindOneAndReplaceOptions {
     pub projection: Option<bson::Document>,
     pub sort: Option<bson::Document>,
     pub upsert: bool,
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Options for findOneAndUpdate operations.
@@ -118,6 +120,7 @@ pub struct FindOneAndUpdateOptions {
     pub projection: Option<bson::Document>,
     pub sort: Option<bson::Document>,
     pub upsert: bool,
+    pub write_concern: Option<WriteConcern>,
 }
 
 impl AggregateOptions {
@@ -188,6 +191,7 @@ impl FindOneAndDeleteOptions {
             max_time_ms: None,
             projection: None,
             sort: None,
+            write_concern: None,
         }
     }
 }
@@ -201,6 +205,7 @@ impl FindOneAndReplaceOptions {
             projection: None,
             sort: None,
             upsert: false,
+            write_concern: None,
         }
     }
 }
@@ -213,6 +218,7 @@ impl FindOneAndUpdateOptions {
             projection: None,
             sort: None,
             upsert: false,
+            write_concern: None,
         }
     }
 }

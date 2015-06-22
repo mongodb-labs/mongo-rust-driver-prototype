@@ -162,13 +162,17 @@ impl<'a> Collection<'a> {
 
     // Helper method for all findAndModify commands.
     fn find_and_modify(&self, cmd: &mut bson::Document,
-                       filter: bson::Document, max_time_ms: Option<i64>,
-                       projection: Option<bson::Document>, sort: Option<bson::Document>)
-                       -> Result<Option<bson::Document>, String> {
+                           filter: bson::Document, max_time_ms: Option<i64>,
+                           projection: Option<bson::Document>, sort: Option<bson::Document>,
+                           write_concern: Option<WriteConcern>)
+                           -> Result<Option<bson::Document>, String> {
+
+        let wc = write_concern.unwrap_or(self.write_concern.clone());
 
         let mut new_cmd = bson::Document::new();
         new_cmd.insert("findAndModify".to_owned(), Bson::String(self.name()));
         new_cmd.insert("query".to_owned(), Bson::Document(filter));
+        new_cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
         if sort.is_some() {
             new_cmd.insert("sort".to_owned(), Bson::Document(sort.unwrap()));
         }
@@ -192,9 +196,9 @@ impl<'a> Collection<'a> {
 
     // Helper method for validated replace and update commands.
     fn find_one_and_replace_or_update(&self, filter: bson::Document, update: bson::Document,
-                                      after: bool, max_time_ms: Option<i64>, projection: Option<bson::Document>,
-                                      sort: Option<bson::Document>, upsert: bool) -> Result<Option<bson::Document>, String> {
-
+                                      after: bool, max_time_ms: Option<i64>,
+                                      projection: Option<bson::Document>, sort: Option<bson::Document>,
+                                      upsert: bool, write_concern: Option<WriteConcern>) -> Result<Option<bson::Document>, String> {
 
         let mut cmd = bson::Document::new();
         cmd.insert("update".to_owned(), Bson::Document(update));
@@ -205,7 +209,7 @@ impl<'a> Collection<'a> {
             cmd.insert("upsert".to_owned(), Bson::Boolean(true));
         }
 
-        self.find_and_modify(&mut cmd, filter, max_time_ms, projection, sort)
+        self.find_and_modify(&mut cmd, filter, max_time_ms, projection, sort, write_concern)
     }
 
     /// Finds a single document and deletes it, returning the original.
@@ -215,7 +219,8 @@ impl<'a> Collection<'a> {
         let opts = options.unwrap_or(FindOneAndDeleteOptions::new());
         let mut cmd = bson::Document::new();
         cmd.insert("remove".to_owned(), Bson::Boolean(true));
-        self.find_and_modify(&mut cmd, filter, opts.max_time_ms, opts.projection, opts.sort)
+        self.find_and_modify(&mut cmd, filter, opts.max_time_ms,
+                             opts.projection, opts.sort, opts.write_concern)
     }
 
     /// Finds a single document and replaces it, returning either the original
@@ -225,7 +230,8 @@ impl<'a> Collection<'a> {
         let opts = options.unwrap_or(FindOneAndReplaceOptions::new());
         try!(Collection::validate_replace(&replacement));
         self.find_one_and_replace_or_update(filter, replacement, opts.return_document.to_bool(),
-                                            opts.max_time_ms, opts.projection, opts.sort, opts.upsert)
+                                            opts.max_time_ms, opts.projection, opts.sort,
+                                            opts.upsert, opts.write_concern)
     }
 
     /// Finds a single document and updates it, returning either the original
@@ -235,8 +241,8 @@ impl<'a> Collection<'a> {
         let opts = options.unwrap_or(FindOneAndUpdateOptions::new());
         try!(Collection::validate_update(&update));
         self.find_one_and_replace_or_update(filter, update, opts.return_document.to_bool(),
-                                            opts.max_time_ms, opts.projection, opts.sort, opts.upsert)
-
+                                            opts.max_time_ms, opts.projection, opts.sort,
+                                            opts.upsert, opts.write_concern)
     }
 
     /// Sends a batch of writes to the server at the same time.
