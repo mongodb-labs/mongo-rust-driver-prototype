@@ -6,7 +6,8 @@ pub mod cursor;
 pub mod error;
 pub mod wire_protocol;
 
-pub use client::error::*;
+pub use client::error::{Error, MongoResult};
+use client::error::Error::DefaultError;
 
 use bson;
 use bson::Bson;
@@ -124,7 +125,7 @@ impl MongoClient {
             return Ok(map)
         }
 
-        Err(Error::Default("Failed to receive reply from server.".to_owned()))
+        Err(DefaultError("Failed to receive reply from server.".to_owned()))
     }
 
     /// Drops the database defined by `db_name`.
@@ -144,7 +145,7 @@ impl MongoClient {
 
         match res.get("ismaster") {
             Some(&Bson::Boolean(is_master)) => Ok(is_master),
-            _ => Err(Error::Default("Unexpected bson response".to_owned())),
+            _ => Err(DefaultError("Unexpected bson response".to_owned())),
         }
     }
 }

@@ -6,7 +6,9 @@ use client::coll::Collection;
 use client::coll::options::FindOptions;
 use client::common::{ReadPreference, WriteConcern};
 use client::cursor::{Cursor, DEFAULT_BATCH_SIZE};
-use client::{Error, MongoResult};
+
+use client::MongoResult;
+use client::Error::OperationError;
 
 /// Interfaces with a MongoDB database.
 pub struct Database<'a> {
@@ -67,7 +69,7 @@ impl<'a> Database<'a> {
         let res = try!(coll.find_one(Some(spec), Some(options)));
         match res {
             Some(doc) => Ok(doc),
-            None => Err(Error::ReadError),
+            None => Err(OperationError),
         }
     }
 
@@ -89,8 +91,7 @@ impl<'a> Database<'a> {
             spec.insert("filter".to_owned(), Bson::Document(filter.unwrap()));
         }
 
-        let cursor = try!(self.command_cursor(spec));
-        Ok(cursor)
+        self.command_cursor(spec)
     }
 
 

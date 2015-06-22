@@ -7,13 +7,15 @@ pub type MongoResult<T> = Result<T, Error>;
 #[derive(Debug)]
 pub enum Error {
     WriteError(WriteException),
-    BulkWriteError(BulkWriteException),    
+    BulkWriteError(BulkWriteException),
     EncoderError(bson::EncoderError),
     IoError(io::Error),
-    //ArgumentError(String),  // For things like replace, update validation
+    ArgumentError(String),
+    OperationError,
+    CursorMissingError,
     LockError,
     ReadError,
-    Default(String),
+    DefaultError(String),
 }
 
 #[derive(Debug)]
@@ -46,13 +48,13 @@ pub struct BulkWriteError {
 
 impl<'a> From<&'a str> for Error {
     fn from(s: &str) -> Error {
-        Error::Default(s.to_owned())
+        Error::DefaultError(s.to_owned())
     }
 }
 
 impl From<String> for Error {
     fn from(s: String) -> Error {
-        Error::Default(s.to_owned())
+        Error::DefaultError(s.to_owned())
     }
 }
 
@@ -93,9 +95,12 @@ impl fmt::Display for Error {
             &Error::BulkWriteError(ref inner) => inner.fmt(fmt),
             &Error::EncoderError(ref inner) => inner.fmt(fmt),
             &Error::IoError(ref inner) => inner.fmt(fmt),
+            &Error::ArgumentError(ref inner) => inner.fmt(fmt),
+            &Error::OperationError => write!(fmt, "Operation Failed"),
+            &Error::CursorMissingError => write!(fmt, "No cursor found"),
             &Error::LockError => write!(fmt, "Socket lock poisoned."),
             &Error::ReadError => write!(fmt, "Read error"),
-            &Error::Default(ref inner) => inner.fmt(fmt),
+            &Error::DefaultError(ref inner) => inner.fmt(fmt),
         }
     }
 }
@@ -107,9 +112,12 @@ impl error::Error for Error {
             &Error::BulkWriteError(ref inner) => inner.description(),
             &Error::EncoderError(ref inner) => inner.description(),
             &Error::IoError(ref inner) => inner.description(),
+            &Error::ArgumentError(ref inner) => &inner,
+            &Error::OperationError => "Operation Failed",
+            &Error::CursorMissingError => "No cursor found",
             &Error::LockError => "Socket lock poisoned",
             &Error::ReadError => "ReadError",
-            &Error::Default(ref inner) => &inner,
+            &Error::DefaultError(ref inner) => &inner,
         }
     }
 
@@ -119,9 +127,12 @@ impl error::Error for Error {
             &Error::BulkWriteError(ref inner) => Some(inner),
             &Error::EncoderError(ref inner) => Some(inner),
             &Error::IoError(ref inner) => Some(inner),
+            &Error::ArgumentError(_) => Some(self),
+            &Error::OperationError => Some(self),
+            &Error::CursorMissingError => Some(self),
             &Error::LockError => Some(self),
             &Error::ReadError => Some(self),
-            &Error::Default(_) => Some(self),
+            &Error::DefaultError(_) => Some(self),
         }
     }
 }
@@ -210,7 +221,7 @@ impl WriteException {
 impl BulkWriteException {
     pub fn new<T: ToString>(processed: Vec<WriteModel>, unprocessed: Vec<WriteModel>,
                             write_errors: Vec<BulkWriteError>, write_concern_error: Option<WriteException>)
-                            -> BulkWriteException {        
+                            -> BulkWriteException {
         BulkWriteException {
             processed_requests: processed,
             unprocessed_requests: unprocessed,

@@ -61,24 +61,24 @@ impl <'a> Cursor<'a> {
 
                 Ok((v, cid))
             },
-            _ => Err(Error::ReadError)
+            _ => Err(Error::CursorMissingError)
         }
     }
 
     fn get_bson_and_cid_from_command_message(message: Message) -> MongoResult<(VecDeque<bson::Document>, i64, String)> {
         let (v, _) = try!(Cursor::get_bson_and_cid_from_message(message));
         if v.len() != 1 {
-            return Err(Error::ReadError);
+            return Err(Error::CursorMissingError);
         }
 
         let ref doc = v[0];
-        
+
         // Extract cursor information
         if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
             if let Some(&Bson::I64(ref id)) = cursor.get("id") {
                 if let Some(&Bson::String(ref ns)) = cursor.get("ns") {
                     if let Some(&Bson::Array(ref batch)) = cursor.get("firstBatch") {
-                        
+
                         // Extract first batch documents
                         let map = batch.iter().filter_map(|bdoc| {
                             if let &Bson::Document(ref doc) = bdoc {
@@ -87,14 +87,14 @@ impl <'a> Cursor<'a> {
                                 None
                             }
                         }).collect();
-                        
+
                         return Ok((map, *id, ns.to_owned()))
                     }
                 }
             }
         }
 
-        Err(Error::ReadError)
+        Err(Error::CursorMissingError)
     }
 
     /// Executes a query where the batch size of the returned cursor is

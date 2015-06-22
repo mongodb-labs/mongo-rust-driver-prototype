@@ -1,6 +1,9 @@
 use std::ascii::AsciiExt;
 use std::collections::BTreeMap;
 
+use client::MongoResult;
+use client::Error::ArgumentError;
+
 pub const DEFAULT_PORT: u16 = 27017;
 pub const URI_SCHEME: &'static str = "mongodb://";
 
@@ -91,9 +94,9 @@ impl ConnectionString {
 
 /// Parses a MongoDB connection string URI as defined by 
 /// [the manual](http://docs.mongodb.org/manual/reference/connection-string/).
-pub fn parse(address: &str) -> Result<ConnectionString, &str> {
+pub fn parse(address: &str) -> MongoResult<ConnectionString> {
     if !address.starts_with(URI_SCHEME) {
-        return Err("MongoDB connection string must start with 'mongodb://'")
+        return Err(ArgumentError("MongoDB connection string must start with 'mongodb://'".to_owned()))
     }
 
     // Remove scheme
@@ -121,7 +124,7 @@ pub fn parse(address: &str) -> Result<ConnectionString, &str> {
     };
 
     if path_str.len() == 0 && host_str.contains("?") {
-        return Err("A '/' is required between the host list and any options.");
+        return Err(ArgumentError("A '/' is required between the host list and any options.".to_owned()));
     }
 
     // Split on authentication and hosts
@@ -167,19 +170,19 @@ pub fn parse(address: &str) -> Result<ConnectionString, &str> {
 }
 
 // Parse user information of the form user:password
-fn parse_user_info(user_info: &str) -> Result<(&str, &str), &str> {
+fn parse_user_info(user_info: &str) -> MongoResult<(&str, &str)> {
     let (user, password) = rpartition(user_info, ":");
     if user_info.contains("@") || user.contains(":") {
-        return Err("':' or '@' characters in a username or password must be escaped according to RFC 2396.")
+        return Err(ArgumentError("':' or '@' characters in a username or password must be escaped according to RFC 2396.".to_owned()))
     }
     if user.len() == 0 {
-        return Err("The empty string is not a valid username.")
+        return Err(ArgumentError("The empty string is not a valid username.".to_owned()))
     }
     Ok((user, password))
 }
 
 // Parses a literal IPv6 literal host entity of the form [host] or [host]:port
-fn parse_ipv6_literal_host(entity: &str) -> Result<Host, &str> {
+fn parse_ipv6_literal_host(entity: &str) -> MongoResult<Host> {
     match entity.find("]") {
         Some(_) => {
             match entity.find("]:") {
@@ -187,19 +190,19 @@ fn parse_ipv6_literal_host(entity: &str) -> Result<Host, &str> {
                     let port = &entity[idx+2..];
                     match port.parse::<u16>() {
                         Ok(val) => Ok(Host::new(entity[1..idx].to_ascii_lowercase(), val)),
-                        Err(_) => Err("Port must be an integer."),
+                        Err(_) => Err(ArgumentError("Port must be an integer.".to_owned())),
                     }
                 },
                 None => Ok(Host::new(entity[1..].to_ascii_lowercase(), DEFAULT_PORT)),
             }
         },
-        None => Err("An IPv6 address must be enclosed in '[' and ']' according to RFC 2732."),
+        None => Err(ArgumentError("An IPv6 address must be enclosed in '[' and ']' according to RFC 2732.".to_owned())),
     }
 }
 
 // Parses a host entity of the form host or host:port, and redirects IPv6 entities.
 // All host names are lowercased.
-fn parse_host(entity: &str) -> Result<Host, &str> {
+fn parse_host(entity: &str) -> MongoResult<Host> {
     if entity.starts_with("[") {
         // IPv6 host
         parse_ipv6_literal_host(entity)
@@ -207,13 +210,13 @@ fn parse_host(entity: &str) -> Result<Host, &str> {
         // Common host:port format
         let (host, port) = partition(entity, ":");
         if port.contains(":") {
-            return Err("Reserved characters such as ':' must
+            return Err(ArgumentError("Reserved characters such as ':' must
                         be escaped according to RFC 2396. An IPv6 address literal
-                        must be enclosed in '[' and according to RFC 2732.");
+                        must be enclosed in '[' and according to RFC 2732.".to_owned()));
         }
         match port.parse::<u16>() {
             Ok(val) => Ok(Host::new(host.to_ascii_lowercase(), val)),
-            Err(_) => Err("Port must be an integer"),
+            Err(_) => Err(ArgumentError("Port must be an unsigned integer".to_owned())),
         }
     } else if entity.contains(".sock") {
         // IPC socket
@@ -225,11 +228,11 @@ fn parse_host(entity: &str) -> Result<Host, &str> {
 }
 
 // Splits and parses comma-separated hosts.
-fn split_hosts(host_str: &str) -> Result<Vec<Host>, &str> {
+fn split_hosts(host_str: &str) -> MongoResult<Vec<Host>> {
     let mut hosts: Vec<Host> = Vec::new();
     for entity in host_str.split(",") {
         if entity.len() == 0 {
-            return Err("Empty host, or extra comma in host list.");
+            return Err(ArgumentError("Empty host, or extra comma in host list.".to_owned()));
         }
         let host = try!(parse_host(entity));
         hosts.push(host);
@@ -262,19 +265,19 @@ fn parse_options(opts: &str, delim: Option<&str>) -> ConnectionOptions {
 }
 
 // Determines the option delimiter and offloads parsing to parse_options.
-fn split_options(opts: &str) -> Result<ConnectionOptions, &str> {
+fn split_options(opts: &str) -> MongoResult<ConnectionOptions> {
     let and_idx = opts.find("&");
     let semi_idx = opts.find(";");
     let mut delim = None;
 
     if and_idx != None && semi_idx != None {
-        return Err("Cannot mix '&' and ';' for option separators.");
+        return Err(ArgumentError("Cannot mix '&' and ';' for option separators.".to_owned()));
     } else if and_idx != None {
         delim = Some("&");
     } else if semi_idx != None {
         delim = Some(";");
     } else if opts.find("=") == None {
-        return Err("InvalidURI: MongoDB URI options are key=value pairs.");
+        return Err(ArgumentError("InvalidURI: MongoDB URI options are key=value pairs.".to_owned()));
     }
     let options = parse_options(opts, delim);
     Ok(options)

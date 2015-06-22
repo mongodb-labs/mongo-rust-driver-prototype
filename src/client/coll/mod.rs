@@ -10,7 +10,8 @@ use client::coll::options::*;
 use client::coll::results::*;
 
 use client::cursor::Cursor;
-use client::{Error, MongoResult};
+use client::MongoResult;
+use client::Error::{DefaultError, ReadError};
 
 use client::wire_protocol::flags::OpQueryFlags;
 
@@ -109,7 +110,7 @@ impl<'a> Collection<'a> {
         match result.get("n") {
             Some(&Bson::I32(ref n)) => Ok(*n as i64),
             Some(&Bson::I64(ref n)) => Ok(*n),
-            _ => Err(Error::ReadError),
+            _ => Err(ReadError),
         }
     }
 
@@ -130,7 +131,7 @@ impl<'a> Collection<'a> {
             return Ok(vals.to_owned());
         }
 
-        Err(Error::ReadError)
+        Err(ReadError)
     }
 
     /// Returns a list of documents within the collection that match the filter.
@@ -160,7 +161,7 @@ impl<'a> Collection<'a> {
                            filter: bson::Document, max_time_ms: Option<i64>,
                            projection: Option<bson::Document>, sort: Option<bson::Document>,
                            write_concern: Option<WriteConcern>)
-                           -> Result<Option<bson::Document>, String> {
+                           -> MongoResult<Option<bson::Document>> {
 
         let wc = write_concern.unwrap_or(self.write_concern.clone());
 
@@ -190,7 +191,7 @@ impl<'a> Collection<'a> {
     fn find_one_and_replace_or_update(&self, filter: bson::Document, update: bson::Document,
                                       after: bool, max_time_ms: Option<i64>,
                                       projection: Option<bson::Document>, sort: Option<bson::Document>,
-                                      upsert: bool, write_concern: Option<WriteConcern>) -> Result<Option<bson::Document>, String> {
+                                      upsert: bool, write_concern: Option<WriteConcern>) -> MongoResult<Option<bson::Document>> {
 
         let mut cmd = bson::Document::new();
         cmd.insert("update".to_owned(), Bson::Document(update));
@@ -371,7 +372,7 @@ impl<'a> Collection<'a> {
     fn validate_replace(replacement: &bson::Document) -> MongoResult<()> {
         for key in replacement.keys() {
             if key.starts_with("$") {
-                return Err(Error::Default("Replacement cannot include $ operators.".to_owned()));
+                return Err(DefaultError("Replacement cannot include $ operators.".to_owned()));
             }
         }
         Ok(())
@@ -380,7 +381,7 @@ impl<'a> Collection<'a> {
     fn validate_update(update: &bson::Document) -> MongoResult<()> {
         for key in update.keys() {
             if !key.starts_with("$") {
-                return Err(Error::Default("Update only works with $ operators.".to_owned()));
+                return Err(DefaultError("Update only works with $ operators.".to_owned()));
             }
         }
         Ok(())
