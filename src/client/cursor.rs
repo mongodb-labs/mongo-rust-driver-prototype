@@ -28,7 +28,6 @@ pub struct Cursor<'a> {
     limit: i32,
     count: i32,
     buffer: VecDeque<bson::Document>,
-    is_cmd_cursor: bool,
 }
 
 impl <'a> Cursor<'a> {
@@ -67,7 +66,7 @@ impl <'a> Cursor<'a> {
 
     fn get_bson_and_cid_from_command_message(message: Message) -> Option<(VecDeque<bson::Document>, i64, String)> {
         match Cursor::get_bson_and_cid_from_message(message) {
-            Some((v, cid)) => {
+            Some((v, _)) => {
                 if v.len() != 1 {
                     return None;
                 }
@@ -164,7 +163,6 @@ impl <'a> Cursor<'a> {
                 limit: number_to_return,
                 count: 0,
                 buffer: buf,
-                is_cmd_cursor: is_cmd_cursor,
             }),
             None => Err("Invalid response received".to_owned()),
         }
