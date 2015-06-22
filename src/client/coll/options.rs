@@ -18,7 +18,7 @@ pub enum ReturnDocument {
 }
 
 /// Marker interface for writes that can be batched together.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum WriteModel {
     InsertOneModel {
         document: bson::Document,
