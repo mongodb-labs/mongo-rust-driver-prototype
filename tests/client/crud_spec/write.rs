@@ -6,7 +6,7 @@ use mongodb::client:: MongoClient;
 use rustc_serialize::json::Json;
 
 #[test]
-fn find() {
-    run_suite!("tests/json/data/specs/source/crud/tests/read/find.json",
-               "find");
+fn insert_one() {
+    run_suite!("tests/json/data/specs/source/crud/tests/write/insertOne.json",
+               "insert_one");
 }
