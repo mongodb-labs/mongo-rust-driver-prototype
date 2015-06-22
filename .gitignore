@@ -6,4 +6,5 @@
 *~
 bin/
 test/
+tests/json/data/*
 target/
