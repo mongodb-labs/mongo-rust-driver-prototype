@@ -5,6 +5,9 @@ pub mod connstring;
 pub mod cursor;
 pub mod wire_protocol;
 
+use bson;
+use bson::Bson;
+
 use std::cell::RefCell;
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
@@ -13,6 +16,7 @@ use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 use client::db::Database;
 use client::common::{ReadPreference, WriteConcern};
 use client::connstring::ConnectionString;
+use client::cursor::Cursor;
 
 /// Interfaces with a MongoDB server or replica set.
 pub struct MongoClient {
@@ -101,10 +105,53 @@ impl MongoClient {
         }
     }
 
+    /// Returns a list of all database names that exist on the server.
+    pub fn database_names(&self) -> Result<Vec<String>, String> {
+        let mut doc = bson::Document::new();
+        doc.insert("listDatabases".to_owned(), Bson::I32(1));
+
+        let db = self.db("admin");
+        let res = try!(db.command(doc));
+        if res.is_some() {
+            if let Some(&Bson::Array(ref batch)) = res.unwrap().get("databases") {
+                // Extract database names
+                let map = batch.iter().filter_map(|bdoc| {
+                    if let &Bson::Document(ref doc) = bdoc {
+                        if let Some(&Bson::String(ref name)) = doc.get("name") {
+                            return Some(name.to_owned());
+                        }
+                    }
+                    None
+                }).collect();
+                return Ok(map)
+            }
+        }
+        Err("No reply received from listDatabases command.".to_owned())
+    }
+
     /// Drops the database defined by `db_name`.
     pub fn drop_database(&self, db_name: &str) -> Result<(), String> {
-        let db = Database::new(self, db_name, None, None);
+        let db = self.db(db_name);
         try!(db.drop_database());
         Ok(())
+    }
+
+    /// Reports whether this instance is a primary, master, mongos, or standalone mongod instance.
+    pub fn is_master(&self) -> Result<bool, String> {
+        let mut doc = bson::Document::new();
+        doc.insert("isMaster".to_owned(), Bson::I32(1));
+
+        let db = self.db("local");
+        let res_opt = try!(db.command(doc));
+
+        let res = match res_opt {
+            Some(doc) => doc,
+            None => return Err("No response received from server.".to_owned()),
+        };
+
+        match res.get("ismaster") {
+            Some(&Bson::Boolean(is_master)) => Ok(is_master),
+            _ => Err("Unexpected bson response".to_owned()),
+        }
     }
 }

@@ -79,15 +79,17 @@ impl<'a> Collection<'a> {
     }
 
     /// Returns a list of documents within the collection that match the filter.
-    pub fn find(&'a self, filter: Option<bson::Document>, options: Option<FindOptions>)
+    pub fn find(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
                 -> Result<Cursor<'a>, String> {
 
         let doc = filter.unwrap_or(bson::Document::new());
         let options = options.unwrap_or(FindOptions::new());
         let flags = OpQueryFlags::with_find_options(&options);
 
-        Cursor::query_with_batch_size(self, options.batch_size, flags, options.skip as i32,
-                                      options.limit, doc, options.projection)
+        Cursor::query_with_batch_size(&self.db.client, self.namespace.to_owned(),
+                                      options.batch_size, flags, options.skip as i32,
+                                      options.limit, doc, options.projection.clone(),
+                                      false)
     }
 
     /// Returns the first document within the collection that matches the filter, or None.
@@ -137,8 +139,8 @@ impl<'a> Collection<'a> {
         cmd.insert("ordered".to_owned(), Bson::Boolean(ordered));
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
-        let res = try!(self.db.command(cmd));
-        match res {
+        let result = try!(self.db.command(cmd));
+        match result {
             Some(doc) => Ok(doc),
             None => Err("Insertion reply not received from server.".to_owned()),
         }
@@ -172,8 +174,8 @@ impl<'a> Collection<'a> {
         cmd.insert("deletes".to_owned(), Bson::Array(vec!(Bson::Document(deletes))));
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
-        let res = try!(self.db.command(cmd));
-        match res {
+        let result = try!(self.db.command(cmd));
+        match result {
             Some(doc) => Ok(DeleteResult::new(doc)),
             None => Err("Delete reply not received from server.".to_owned()),
         }
@@ -199,15 +201,17 @@ impl<'a> Collection<'a> {
         updates.insert("q".to_owned(), Bson::Document(filter));
         updates.insert("u".to_owned(), Bson::Document(update));
         updates.insert("upsert".to_owned(), Bson::Boolean(upsert));
-        updates.insert("multi".to_owned(), Bson::Boolean(multi));
+        if multi {
+            updates.insert("multi".to_owned(), Bson::Boolean(multi));
+        }
 
         let mut cmd = bson::Document::new();
         cmd.insert("update".to_owned(), Bson::String(self.name()));
         cmd.insert("updates".to_owned(), Bson::Array(vec!(Bson::Document(updates))));
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
-        let res = try!(self.db.command(cmd));
-        match res {
+        let result = try!(self.db.command(cmd));
+        match result {
             Some(doc) => Ok(UpdateResult::new(doc)),
             None => Err("delete_many reply not received from server.".to_owned()),
         }

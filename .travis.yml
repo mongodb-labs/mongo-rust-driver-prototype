@@ -1,6 +1,6 @@
 language: rust
 
-before_script:
+before_install:
     - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.0.3.tgz
     - tar xvf mongodb-linux-x86_64-3.0.3.tgz
     - mv mongodb-linux-x86_64-3.0.3 3.0.3
@@ -9,7 +9,8 @@ env:
     - RUST_TEST_THREADS=1
 
 script:
-    - mkdir -p ./data/db
-    - 3.0.3/bin/mongod --fork --nopreallocj --dbpath ./data/db --syslog
+    - mkdir -p ./data/db ./data/test
+    - 3.0.3/bin/mongod --fork --nopreallocj --dbpath ./data/db --syslog --port 27017
+    - 3.0.3/bin/mongod --fork --nopreallocj --dbpath ./data/test --syslog --port 27018
     - cargo build --verbose
     - cargo test --verbose
