@@ -10,7 +10,6 @@ env:
 
 script:
     - mkdir -p ./data/db ./data/test
-    - git clone https://github.com/mongodb/specifications tests/json/data/specs
     - 3.0.3/bin/mongod --fork --nopreallocj --dbpath ./data/db --syslog --port 27017
     - 3.0.3/bin/mongod --fork --nopreallocj --dbpath ./data/test --syslog --port 27018
     - cargo build --verbose

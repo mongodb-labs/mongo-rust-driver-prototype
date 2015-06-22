@@ -5,6 +5,5 @@
 *.o
 *~
 bin/
-test/
-tests/json/data/*
 target/
+test/
