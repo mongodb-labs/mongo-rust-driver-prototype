@@ -1,6 +1,4 @@
-use bson;
-use bson::Bson;
-use bson::Document;
+use bson::{Bson, Document};
 
 use mongodb::client::MongoClient;
 
@@ -14,7 +12,7 @@ fn find_and_insert() {
 
     // Insert document
     let doc = doc! {
-        "title" => Bson::String("Jaws".to_owned())
+        "title" => (Bson::String("Jaws".to_owned()))
     };
 
     coll.insert_one(doc, None).ok().expect("Failed to insert document");
@@ -42,7 +40,7 @@ fn find_and_insert_one() {
 
     // Insert document
     let doc = doc! {
-        "title" => Bson::String("Jaws".to_owned())
+        "title" => (Bson::String("Jaws".to_owned()))
     };
 
     coll.insert_one(doc, None).ok().expect("Failed to insert document");
@@ -68,11 +66,11 @@ fn insert_many() {
 
     // Insert documents
     let doc1 = doc! {
-        "title" => Bson::String("Jaws".to_owned())
+        "title" => (Bson::String("Jaws".to_owned()))
     };
 
     let doc2 = doc! {
-        "title" => Bson::String("Back to the Future".to_owned())
+        "title" => (Bson::String("Back to the Future".to_owned()))
     };
 
     coll.insert_many(vec![doc1, doc2], false, None).ok().expect("Failed to insert documents.");
@@ -103,11 +101,11 @@ fn delete_one() {
 
     // Insert documents
     let doc1 = doc! {
-        "title" => Bson::String("Jaws".to_owned())
+        "title" => (Bson::String("Jaws".to_owned()))
     };
 
     let doc2 = doc! {
-        "title" => Bson::String("Back to the Future".to_owned())
+        "title" => (Bson::String("Back to the Future".to_owned()))
     };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone()], false, None)
@@ -136,11 +134,11 @@ fn delete_many() {
 
     // Insert documents
     let doc1 = doc! {
-        "title" => Bson::String("Jaws".to_owned())
+        "title" => (Bson::String("Jaws".to_owned()))
     };
 
     let doc2 = doc! {
-        "title" => Bson::String("Back to the Future".to_owned())
+        "title" => (Bson::String("Back to the Future".to_owned()))
     };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc2.clone()], false, None)
@@ -169,15 +167,15 @@ fn replace_one() {
 
     // Insert documents
     let doc1 = doc! {
-        "title" => Bson::String("Jaws".to_owned())
+        "title" => (Bson::String("Jaws".to_owned()))
     };
 
     let doc2 = doc! {
-        "title" => Bson::String("Back to the Future".to_owned())
+        "title" => (Bson::String("Back to the Future".to_owned()))
     };
 
     let doc3 = doc! {
-        "title" => Bson::String("12 Angry Men".to_owned())
+        "title" => (Bson::String("12 Angry Men".to_owned()))
     };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
@@ -213,17 +211,17 @@ fn update_one() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => Bson::String("Jaws".to_owned()) };
-    let doc2 = doc! { "title" => Bson::String("Back to the Future".to_owned()) };
-    let doc3 = doc! { "title" => Bson::String("12 Angry Men".to_owned()) };
+    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())) };
+    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
+    let doc3 = doc! { "title" => (Bson::String("12 Angry Men".to_owned())) };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Update single document
     let update = doc! {
-        "$set" => nested_doc! {
-            "director" => Bson::String("Robert Zemeckis".to_owned())
+        "$set" => {
+            "director" => (Bson::String("Robert Zemeckis".to_owned()))
         }
     };
 
@@ -252,15 +250,15 @@ fn update_many() {
 
     // Insert documents
     let doc1 = doc! {
-        "title" => Bson::String("Jaws".to_owned())
+        "title" => (Bson::String("Jaws".to_owned()))
     };
 
     let doc2 = doc! {
-        "title" => Bson::String("Back to the Future".to_owned())
+        "title" => (Bson::String("Back to the Future".to_owned()))
     };
 
     let doc3 = doc! {
-        "title" => Bson::String("12 Angry Men".to_owned())
+        "title" => (Bson::String("12 Angry Men".to_owned()))
     };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone(), doc2.clone()], false, None)
@@ -268,8 +266,8 @@ fn update_many() {
 
     // Update single document
     let update = doc! {
-        "$set" => nested_doc! {
-            "director" => Bson::String("Robert Zemeckis".to_owned())
+        "$set" => {
+            "director" => (Bson::String("Robert Zemeckis".to_owned()))
         }
     };
 
@@ -282,7 +280,7 @@ fn update_many() {
     // Assert director attributes
     assert!(results[0].get("director").is_none());
     assert!(results[2].get("director").is_none());
-    
+
     match results[1].get("director") {
         Some(&Bson::String(ref director)) => assert_eq!("Robert Zemeckis", director),
         _ => panic!("Expected Bson::String for director!"),

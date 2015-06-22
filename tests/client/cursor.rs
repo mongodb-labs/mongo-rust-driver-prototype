@@ -1,5 +1,4 @@
-use bson::Document;
-use bson::Bson::I64;
+use bson::{Bson, Document};
 
 use mongodb::client::MongoClient;
 use mongodb::client::cursor::Cursor;
@@ -13,9 +12,9 @@ fn cursor_features() {
 
     db.drop_database().ok().expect("Failed to drop database.");
 
-    let docs : Vec<_> = (0..10).map(|i| {
+    let docs = (0..10).map(|i| {
         doc! {
-            "foo" => I64(i)
+            "foo" => (Bson::I64(i))
         }
     }).collect();
 
@@ -39,7 +38,7 @@ fn cursor_features() {
 
     for i in 0..batch.len() {
         match batch[i].get("foo") {
-            Some(&I64(j)) => assert_eq!(i as i64, j),
+            Some(&Bson::I64(j)) => assert_eq!(i as i64, j),
             _ => panic!("Wrong value returned from Cursor#next_batch")
         };
     }
@@ -50,7 +49,7 @@ fn cursor_features() {
     };
 
     match bson.get("foo") {
-        Some(&I64(3)) => (),
+        Some(&Bson::I64(3)) => (),
         _ => panic!("Wrong value returned from Cursor#next")
     };
 
@@ -62,7 +61,7 @@ fn cursor_features() {
 
     for i in 0..vec.len() {
         match vec[i].get("foo") {
-            Some(&I64(j)) => assert_eq!(4 + i as i64 , j),
+            Some(&Bson::I64(j)) => assert_eq!(4 + i as i64 , j),
             _ => panic!("Wrong value returned from Cursor#next_batch")
         };
     }
