@@ -67,7 +67,7 @@ impl <'a> Cursor<'a> {
 
     fn get_bson_and_cid_from_command_message(message: Message) -> Option<(VecDeque<bson::Document>, i64, String)> {
         match Cursor::get_bson_and_cid_from_message(message) {
-            Some((v, cid)) => {
+            Some((v, _)) => {
                 if v.len() != 1 {
                     return None;
                 }
@@ -239,7 +239,7 @@ impl <'a> Cursor<'a> {
     /// Returns the first BSON document returned from the stream, or `None` if
     /// there are no more documents to read.
     fn next_from_stream(&mut self) -> Option<bson::Document> {
-        self.get_from_stream();
+        let _ = self.get_from_stream();
         self.buffer.pop_front()
     }
 
@@ -283,8 +283,9 @@ impl <'a> Cursor<'a> {
             false
         } else {
             if self.buffer.is_empty() && self.limit != 1 && self.cursor_id != 0 {
-                self.get_from_stream();
+                let _ = self.get_from_stream();
             }
+
             !self.buffer.is_empty()
         }
     }

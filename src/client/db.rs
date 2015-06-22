@@ -84,7 +84,7 @@ impl<'a> Database<'a> {
             spec.insert("filter".to_owned(), Bson::Document(filter.unwrap()));
         }
 
-        let mut cursor = try!(self.command_cursor(spec));
+        let cursor = try!(self.command_cursor(spec));
         Ok(cursor)
     }
 

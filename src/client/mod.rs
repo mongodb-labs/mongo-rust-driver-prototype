@@ -16,7 +16,6 @@ use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 use client::db::Database;
 use client::common::{ReadPreference, WriteConcern};
 use client::connstring::ConnectionString;
-use client::cursor::Cursor;
 
 /// Interfaces with a MongoDB server or replica set.
 pub struct MongoClient {
