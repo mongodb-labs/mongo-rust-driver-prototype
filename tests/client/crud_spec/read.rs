@@ -67,5 +67,6 @@ macro_rules! run_suite {
 
 #[test]
 fn find() {
-    run_suite!("tests/json/data/find.json", "find");
+    run_suite!("tests/json/data/specs/source/crud/tests/read/find.json",
+               "find");
 }
