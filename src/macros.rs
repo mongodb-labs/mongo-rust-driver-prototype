@@ -1,36 +1,34 @@
+use bson::{Bson, Document};
+
+#[macro_export]
+macro_rules! add_to_doc {
+    ($doc:expr, $key:expr => ($val:expr)) => {{
+        $doc.insert($key.to_owned(), $val);
+    }};
+
+    ($doc:expr, $key:expr => [$($val:expr),*]) => {{
+        let vec = vec![$($val),*];
+        $doc.insert($key.to_owned(), Bson::Array(vec));
+    }};
+
+    ($doc:expr, $key:expr => { $($k:expr => $v:tt),* }) => {{
+        $doc.insert($key.to_owned(), Bson::Document(doc! {
+            $(
+                $k => $v
+            ),*
+        }));
+    }};
+}
+
 #[macro_export]
 macro_rules! doc {
-    ( $( $k:expr => $v: expr),* ) => {
-        {
-            let mut doc = Document::new();
-            $(
-                doc.insert($k.to_owned(), $v);
-            )*
-            doc
-        }
-    };
-}
+    ( $($key:expr => $val:tt),* ) => {{
+        let mut document = Document::new();
 
-#[macro_export]
-macro_rules! nested_doc {
-    ( $( $k:expr => $v: expr),* ) => {
-        Bson::Document(doc!(
-            $( $k => $v),*
-        ))
-    }
-}
+        $(
+            add_to_doc!(document, $key => $val);
+        )*
 
-// Example for future documentation use
-//
-// ```
-// doc! {
-//     "_id" => Bson::I32(1),
-//     "x" => Bson::I32(11),
-//     "$filter" => nested_doc! {
-//         "_id" => nested_doc! {
-//             "$gt" => 1,
-//             "$lt" => 6
-//         }
-//     }
-// }
-// ```
+        document
+    }};
+}

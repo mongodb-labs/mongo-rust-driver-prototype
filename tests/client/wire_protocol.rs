@@ -1,6 +1,4 @@
-use bson::Bson;
-use bson::Document;
-use bson::Bson::{FloatingPoint, I32};
+use bson::{Bson, Document};
 use mongodb::client::wire_protocol::flags::{OpInsertFlags, OpQueryFlags,
                                             OpUpdateFlags};
 use mongodb::client::wire_protocol::operations::Message;
@@ -12,7 +10,7 @@ fn insert_single_key_doc() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
             let doc = doc! {
-                "foo" => FloatingPoint(42.0)
+                "foo" => (Bson::FloatingPoint(42.0))
              };
 
             let docs = vec![doc];
@@ -60,7 +58,7 @@ fn insert_single_key_doc() {
             assert_eq!(docs.len() as i32, 1);
 
             match docs[0].get("foo") {
-                Some(&FloatingPoint(42.0)) => (),
+                Some(&Bson::FloatingPoint(42.0)) => (),
                 _ => panic!("Wrong value returned!")
             };
         },
@@ -75,8 +73,8 @@ fn insert_multi_key_doc() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
             let doc = doc! {
-                "foo" => FloatingPoint(42.0),
-                "bar" => Bson::String("__z&".to_owned())
+                "foo" => (Bson::FloatingPoint(42.0)),
+                "bar" => (Bson::String("__z&".to_owned()))
             };
 
             let docs = vec![doc];
@@ -124,7 +122,7 @@ fn insert_multi_key_doc() {
             assert_eq!(docs.len() as i32, 1);
 
             match docs[0].get("foo") {
-                Some(&FloatingPoint(42.0)) => (),
+                Some(&Bson::FloatingPoint(42.0)) => (),
                 _ => panic!("Wrong value returned!")
             };
 
@@ -144,12 +142,12 @@ fn insert_docs() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
             let doc1 = doc! {
-                "foo" => FloatingPoint(42.0),
-                "bar" => Bson::String("__z&".to_owned())
+                "foo" => (Bson::FloatingPoint(42.0)),
+                "bar" => (Bson::String("__z&".to_owned()))
             };
 
             let doc2 = doc! {
-                "booyah" => Bson::I32(23)
+                "booyah" => (Bson::I32(23))
             };
 
             let docs = vec![doc1, doc2];
@@ -198,7 +196,7 @@ fn insert_docs() {
             assert_eq!(docs.len() as i32, 2);
 
             match docs[0].get("foo") {
-                Some(&FloatingPoint(42.0)) => (),
+                Some(&Bson::FloatingPoint(42.0)) => (),
                 _ => panic!("Wrong value returned!")
             };
 
@@ -208,7 +206,7 @@ fn insert_docs() {
             };
 
             match docs[1].get("booyah") {
-                Some(&I32(23)) => (),
+                Some(&Bson::I32(23)) => (),
                 _ => panic!("Wrong value returned!")
             };
         },
@@ -224,7 +222,7 @@ fn insert_update_then_query() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
             let doc = doc! {
-                "foo" => FloatingPoint(42.0)
+                "foo" => (Bson::FloatingPoint(42.0))
             };
 
             let docs = vec![doc];
@@ -245,7 +243,7 @@ fn insert_update_then_query() {
             let selector = Document::new();
 
             let update = doc! {
-                "foo" => Bson::String("bar".to_owned())
+                "foo" => (Bson::String("bar".to_owned()))
             };
 
             let flags = OpUpdateFlags::no_flags();
