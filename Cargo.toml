@@ -9,5 +9,5 @@ authors = ["Valeri Karpov <valkar207@gmail.com>",
 byteorder = "0.3.10"
 
 [dependencies.bson]
-git="https://github.com/kyeah/bson-rs"
-ref="af061a4a4f06cc522c6796b3e361b8938bd19142"
+git = "https://github.com/kyeah/bson-rs"
+ref = "af061a4a4f06cc522c6796b3e361b8938bd19142"
