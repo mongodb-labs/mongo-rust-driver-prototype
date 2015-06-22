@@ -10,8 +10,8 @@ impl NumEq for Bson {
     fn float_eq(&self, f: f64) -> bool {
         match self {
             &Bson::FloatingPoint(ref ff) => f.approx_eq(ff),
-            &Bson::I32(i) => f == (i as f64),
-            &Bson::I64(i) => f == (i as f64),
+            &Bson::I32(i) => f.approx_eq(&(i as f64)),
+            &Bson::I64(i) => f.approx_eq(&(i as f64)),
             _ => false
         }
     }
