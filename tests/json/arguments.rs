@@ -14,6 +14,9 @@ pub enum Arguments {
     InsertMany {
         documents: Vec<Document>,
     },
+    DeleteOne {
+        filter: Document,
+    },
 }
 
 impl Arguments {
@@ -55,5 +58,14 @@ impl Arguments {
         }
 
         Ok(Arguments::InsertMany { documents: docs })
+    }
+
+    pub fn delete_one_from_json(object: &Object) -> Result<Arguments, String> {
+        let f = |x| Some(Bson::from_json(x));
+        let document = val_or_err!(object.get("filter").and_then(f),
+                                   Some(Bson::Document(doc)) => doc,
+                                   "`delete_one` requires document");
+
+        Ok(Arguments::DeleteOne { filter: document })
     }
 }
