@@ -45,7 +45,7 @@ fn cursor_features() {
 
     let bson = match cursor.next() {
         Some(Ok(b)) => b,
-        Some(Err(err)) => panic!("Received error on 'cursor.next()'"),
+        Some(Err(_)) => panic!("Received error on 'cursor.next()'"),
         None => panic!("Nothing returned from Cursor#next")
     };
 

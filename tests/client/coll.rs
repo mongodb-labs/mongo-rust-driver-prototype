@@ -19,7 +19,7 @@ fn find_and_insert() {
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
     let result = match cursor.next() {
         Some(Ok(res)) => res,
-        Some(Err(err)) => panic!("Received error from 'cursor.next()'."),
+        Some(Err(_)) => panic!("Received error from 'cursor.next()'."),
         None => panic!("Expected bson."),
     };
 
@@ -83,7 +83,7 @@ fn find_one_and_delete() {
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
     let result = match cursor.next() {
         Some(Ok(res)) => res,
-        Some(Err(err)) => panic!("Received error from 'cursor.next()'."),
+        Some(Err(_)) => panic!("Received error from 'cursor.next()'."),
         None => panic!("Expected bson."),
     };
 
@@ -417,7 +417,7 @@ fn delete_one() {
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
     let result = match cursor.next() {
         Some(Ok(res)) => res,
-        Some(Err(err)) => panic!("Received error from 'cursor.next()'."),
+        Some(Err(_)) => panic!("Received error from 'cursor.next()'."),
         None => panic!("Expected bson."),
     };
 
@@ -449,7 +449,7 @@ fn delete_many() {
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
     let result = match cursor.next() {
         Some(Ok(res)) => res,
-        Some(Err(err)) => panic!("Received error from 'cursor.next()'."),
+        Some(Err(_)) => panic!("Received error from 'cursor.next()'."),
         None => panic!("Expected bson."),
     };
 
