@@ -57,7 +57,7 @@ macro_rules! run_delete_one_test {
         let expected = $coll.delete_one($filter, None).unwrap().deleted_count;
         let actual = match $outcome.result {
             Bson::Document(ref doc) => doc.get("deletedCount").unwrap(),
-            _ => panic!("`insert_one` test result should be a document")
+            _ => panic!("`delete_one` test result should be a document")
         };
 
         assert!(actual.int_eq(expected as i64));

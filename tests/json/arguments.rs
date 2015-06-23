@@ -64,7 +64,7 @@ impl Arguments {
         let f = |x| Some(Bson::from_json(x));
         let document = val_or_err!(object.get("filter").and_then(f),
                                    Some(Bson::Document(doc)) => doc,
-                                   "`insert_one` requires document");
+                                   "`delete_one` requires document");
 
         Ok(Arguments::DeleteOne { filter: document })
     }
