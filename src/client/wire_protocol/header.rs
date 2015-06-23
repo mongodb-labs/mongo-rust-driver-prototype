@@ -1,6 +1,9 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Read, Write};
 
+use client::Result;
+use client::Error::ResponseError;
+
 /// Represents an opcode in the MongoDB Wire Protocol.
 #[derive(Clone)]
 pub enum OpCode {
@@ -193,23 +196,11 @@ impl Header {
     /// # Return value
     ///
     /// Returns nothing on success, or an error string on failure.
-    pub fn write(&self, buffer: &mut Write) -> Result<(), String> {
-        if buffer.write_i32::<LittleEndian>(self.message_length).is_err() {
-            return Err("Unable to write message_length".to_owned())
-        }
-
-        if buffer.write_i32::<LittleEndian>(self.request_id).is_err() {
-            return Err("Unable to write request_id".to_owned())
-        }
-
-        if buffer.write_i32::<LittleEndian>(self.response_to).is_err() {
-            return Err("Unable to write response_to".to_owned())
-        }
-
-        if buffer.write_i32::<LittleEndian>(self.op_code.clone() as i32).is_err() {
-            return Err("Unable to write op_code".to_owned())
-        }
-
+    pub fn write(&self, buffer: &mut Write) -> Result<()> {
+        try!(buffer.write_i32::<LittleEndian>(self.message_length));
+        try!(buffer.write_i32::<LittleEndian>(self.request_id));
+        try!(buffer.write_i32::<LittleEndian>(self.response_to));
+        try!(buffer.write_i32::<LittleEndian>(self.op_code.clone() as i32));
         let _ = buffer.flush();
 
         Ok(())
@@ -224,28 +215,15 @@ impl Header {
     /// # Return value
     ///
     /// Returns the parsed Header on success, or an error string on failure.
-    pub fn read(buffer: &mut Read) -> Result<Header, String> {
-        let message_length = match buffer.read_i32::<LittleEndian>() {
-            Ok(i) => i,
-            Err(_) => return Err("unable to read length".to_owned())
-        };
+    pub fn read(buffer: &mut Read) -> Result<Header> {
+        let message_length = try!(buffer.read_i32::<LittleEndian>());
+        let request_id = try!(buffer.read_i32::<LittleEndian>());
+        let response_to = try!(buffer.read_i32::<LittleEndian>());
 
-        let request_id = match buffer.read_i32::<LittleEndian>() {
-            Ok(i) => i,
-            Err(_) => return Err("unable to read request_id".to_owned())
-        };
-
-        let response_to = match buffer.read_i32::<LittleEndian>() {
-            Ok(i) => i,
-            Err(_) => return Err("unable to read response_to".to_owned())
-        };
-
-        let op_code = match buffer.read_i32::<LittleEndian>() {
-            Ok(i) => match OpCode::from_i32(i) {
-                Some(op) => op,
-                None => return Err(format!("invalid opcode: {}", i))
-            },
-            Err(_) => return Err("unable to read op_code".to_owned())
+        let op_code_i32 = try!(buffer.read_i32::<LittleEndian>());
+        let op_code = match OpCode::from_i32(op_code_i32) {
+            Some(code) => code,
+            _ => return Err(ResponseError(format!("Invalid header opcode from server: {}.", op_code_i32))),
         };
 
         Ok(Header::new(message_length, request_id, response_to, op_code))

@@ -2,6 +2,7 @@ use bson;
 use bson::Bson;
 
 use client::MongoClient;
+use client::{Error, Result};
 
 use client::wire_protocol::flags::OpQueryFlags;
 use client::wire_protocol::operations::Message;
@@ -32,7 +33,7 @@ pub struct Cursor<'a> {
 
 impl <'a> Cursor<'a> {
 
-    pub fn command_cursor(client: &'a MongoClient, db: &str, doc: bson::Document) -> Result<Cursor<'a>, String> {
+    pub fn command_cursor(client: &'a MongoClient, db: &str, doc: bson::Document) -> Result<Cursor<'a>> {
         Cursor::query_with_batch_size(client, format!("{}.$cmd", db),
                                       1, OpQueryFlags::no_flags(), 0, 0,
                                       doc, None, true)
@@ -47,7 +48,7 @@ impl <'a> Cursor<'a> {
     /// # Return value.
     ///
     ///
-    fn get_bson_and_cid_from_message(message: Message) -> Option<(VecDeque<bson::Document>, i64)> {
+    fn get_bson_and_cid_from_message(message: Message) -> Result<(VecDeque<bson::Document>, i64)> {
         match message {
             Message::OpReply { header: _, flags: _, cursor_id: cid,
                                starting_from: _, number_returned: _,
@@ -58,46 +59,42 @@ impl <'a> Cursor<'a> {
                     v.push_back(doc.clone());
                 }
 
-                Some((v, cid))
+                Ok((v, cid))
             },
-            _ => None
+            _ => Err(Error::CursorNotFoundError)
         }
     }
 
-    fn get_bson_and_cid_from_command_message(message: Message) -> Option<(VecDeque<bson::Document>, i64, String)> {
-        match Cursor::get_bson_and_cid_from_message(message) {
-            Some((v, _)) => {
-                if v.len() != 1 {
-                    return None;
-                }
+    fn get_bson_and_cursor_info_from_command_message(message: Message) -> Result<(VecDeque<bson::Document>, i64, String)> {
+        let (v, _) = try!(Cursor::get_bson_and_cid_from_message(message));
+        if v.len() != 1 {
+            return Err(Error::CursorNotFoundError);
+        }
 
-                let ref doc = v[0];
+        let ref doc = v[0];
 
-                // Extract cursor information
-                if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
-                    if let Some(&Bson::I64(ref id)) = cursor.get("id") {
-                        if let Some(&Bson::String(ref ns)) = cursor.get("ns") {
-                            if let Some(&Bson::Array(ref batch)) = cursor.get("firstBatch") {
+        // Extract cursor information
+        if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
+            if let Some(&Bson::I64(ref id)) = cursor.get("id") {
+                if let Some(&Bson::String(ref ns)) = cursor.get("ns") {
+                    if let Some(&Bson::Array(ref batch)) = cursor.get("firstBatch") {
 
-                                // Extract first batch documents
-                                let map = batch.iter().filter_map(|bdoc| {
-                                    if let &Bson::Document(ref doc) = bdoc {
-                                        Some(doc.clone())
-                                    } else {
-                                        None
-                                    }
-                                }).collect();
-
-                                return Some((map, *id, ns.to_owned()))
+                        // Extract first batch documents
+                        let map = batch.iter().filter_map(|bdoc| {
+                            if let &Bson::Document(ref doc) = bdoc {
+                                Some(doc.clone())
+                            } else {
+                                None
                             }
-                        }
+                        }).collect();
+
+                        return Ok((map, *id, ns.to_owned()))
                     }
                 }
-
-                None
-            },
-            None => None
+            }
         }
+
+        Err(Error::CursorNotFoundError)
     }
 
     /// Executes a query where the batch size of the returned cursor is
@@ -128,44 +125,35 @@ impl <'a> Cursor<'a> {
                                      number_to_skip: i32, number_to_return: i32,
                                      query: bson::Document,
                                      return_field_selector: Option<bson::Document>,
-                                     is_cmd_cursor: bool) -> Result<Cursor<'a>, String> {
+                                     is_cmd_cursor: bool) -> Result<Cursor<'a>> {
 
         let result = Message::with_query(client.get_req_id(), flags,
                                          namespace.to_owned(),
                                          number_to_skip, batch_size,
                                          query.clone(), return_field_selector);
 
-        let socket = match client.socket.lock() {
-            Ok(val) => val,
-            Err(_) => return Err("Socket lock is poisoned.".to_owned()),
-        };
+        let socket = try!(client.socket.lock());
 
         let message = try!(result);
         try!(message.write(&mut *socket.borrow_mut()));
         let reply = try!(Message::read(&mut *socket.borrow_mut()));
 
-        let res = if is_cmd_cursor {
-            Cursor::get_bson_and_cid_from_command_message(reply)
+        let (buf, cursor_id, namespace) = if is_cmd_cursor {
+            try!(Cursor::get_bson_and_cursor_info_from_command_message(reply))
         } else {
-            let opt = Cursor::get_bson_and_cid_from_message(reply);
-            match opt {
-                Some((buf, id)) => Some((buf, id, namespace)),
-                None => None,
-            }
+            let (buf, id) = try!(Cursor::get_bson_and_cid_from_message(reply));
+            (buf, id, namespace)
         };
 
-        match res {
-            Some((buf, cursor_id, namespace)) => Ok(Cursor {
-                client: client,
-                namespace: namespace,
-                batch_size: batch_size,
-                cursor_id: cursor_id,
-                limit: number_to_return,
-                count: 0,
-                buffer: buf,
-            }),
-            None => Err("Invalid response received".to_owned()),
-        }
+        Ok(Cursor {
+            client: client,
+            namespace: namespace,
+            batch_size: batch_size,
+            cursor_id: cursor_id,
+            limit: number_to_return,
+            count: 0,
+            buffer: buf,
+        })
     }
 
     /// Executes a query with the default batch size.
@@ -191,7 +179,7 @@ impl <'a> Cursor<'a> {
     pub fn query(client: &'a MongoClient, namespace: String,
                  flags: OpQueryFlags, number_to_skip: i32, number_to_return: i32,
                  query: bson::Document, return_field_selector: Option<bson::Document>,
-                 is_cmd_cursor: bool) -> Result<Cursor<'a>, String> {
+                 is_cmd_cursor: bool) -> Result<Cursor<'a>> {
 
         Cursor::query_with_batch_size(client, namespace, DEFAULT_BATCH_SIZE, flags,
                                       number_to_skip,
@@ -211,23 +199,16 @@ impl <'a> Cursor<'a> {
     }
 
     /// Attempts to read another batch of BSON documents from the stream.
-    fn get_from_stream(&mut self) -> Result<(), String> {
-        let socket = match self.client.socket.lock() {
-            Ok(val) => val,
-            Err(_) => return Err("Socket lock is poisoned.".to_owned()),
-        };
+    fn get_from_stream(&mut self) -> Result<()> {
+        let socket = try!(self.client.socket.lock());
 
         let get_more = self.new_get_more_request();
         try!(get_more.write(&mut *socket.borrow_mut()));
         let reply = try!(Message::read(&mut *socket.borrow_mut()));
 
-        match Cursor::get_bson_and_cid_from_message(reply) {
-            Some((v, _)) => {
-                self.buffer.extend(v);
-                Ok(())
-            },
-            None => Err("No bson found from server reply.".to_owned()),
-        }
+        let (v, _) = try!(Cursor::get_bson_and_cid_from_message(reply));
+        self.buffer.extend(v);
+        Ok(())
     }
 
     /// Attempts to read another batch of BSON documents from the stream.
@@ -236,9 +217,9 @@ impl <'a> Cursor<'a> {
     ///
     /// Returns the first BSON document returned from the stream, or `None` if
     /// there are no more documents to read.
-    fn next_from_stream(&mut self) -> Option<bson::Document> {
-        let _ = self.get_from_stream();
-        self.buffer.pop_front()
+    fn next_from_stream(&mut self) -> Result<Option<bson::Document>> {
+        try!(self.get_from_stream());
+        Ok(self.buffer.pop_front())
     }
 
     /// Attempts to read a specified number of BSON documents from the cursor.
@@ -250,19 +231,20 @@ impl <'a> Cursor<'a> {
     /// # Return value
     ///
     /// Returns a vector containing the BSON documents that were read.
-    pub fn next_n(&mut self, n: i32) -> Vec<bson::Document> {
+    pub fn next_n(&mut self, n: i32) -> Result<Vec<bson::Document>> {
         let mut vec = vec![];
 
         for _ in 0..n {
             let bson_option = self.next();
 
             match bson_option {
-                Some(bson) => vec.push(bson),
-                None => break
+                Some(Ok(bson)) => vec.push(bson),
+                Some(Err(err)) => return Err(err),
+                None => break,
             };
         }
 
-        vec
+        Ok(vec)
     }
 
     /// Attempts to read a batch of BSON documents from the cursor.
@@ -270,27 +252,25 @@ impl <'a> Cursor<'a> {
     /// # Return value
     ///
     /// Returns a vector containing the BSON documents that were read.
-    pub fn next_batch(&mut self) -> Vec<bson::Document> {
+    pub fn next_batch(&mut self) -> Result<Vec<bson::Document>> {
         let n = self.batch_size;
-
         self.next_n(n)
     }
 
-    pub fn has_next(&mut self) -> bool {
+    pub fn has_next(&mut self) -> Result<bool> {
         if self.limit > 0 && self.count >= self.limit {
-            false
+            Ok(false)
         } else {
             if self.buffer.is_empty() && self.limit != 1 && self.cursor_id != 0 {
-                let _ = self.get_from_stream();
+                try!(self.get_from_stream());
             }
-
-            !self.buffer.is_empty()
+            Ok(!self.buffer.is_empty())
         }
     }
 }
 
 impl <'a> Iterator for Cursor<'a> {
-    type Item = bson::Document;
+    type Item = Result<bson::Document>;
 
     /// Attempts to read a BSON document from the cursor.
     ///
@@ -298,12 +278,17 @@ impl <'a> Iterator for Cursor<'a> {
     ///
     /// Returns the document that was read, or `None` if there are no more
     /// documents to read.
-    fn next(&mut self) -> Option<bson::Document> {
-        if self.has_next() {
-            self.count += 1;
-            self.buffer.pop_front()
-        } else {
-            None
+    fn next(&mut self) -> Option<Result<bson::Document>> {
+        match self.has_next() {
+            Ok(true) => {
+                self.count += 1;
+                match self.buffer.pop_front() {
+                    Some(bson) => Some(Ok(bson)),
+                    None => None,
+                }
+            },
+            Ok(false) => None,
+            Err(err) => Some(Err(err)),
         }
     }
 }

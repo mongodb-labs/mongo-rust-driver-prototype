@@ -32,7 +32,7 @@ fn cursor_features() {
         Err(s) => panic!("{}", s)
     };
 
-    let batch = cursor.next_batch();
+    let batch = cursor.next_batch().ok().expect("Failed to get next batch from cursor.");
 
     assert_eq!(batch.len(), 3 as usize);
 
@@ -44,7 +44,8 @@ fn cursor_features() {
     }
 
     let bson = match cursor.next() {
-        Some(b) => b,
+        Some(Ok(b)) => b,
+        Some(Err(_)) => panic!("Received error on 'cursor.next()'"),
         None => panic!("Nothing returned from Cursor#next")
     };
 
@@ -53,11 +54,11 @@ fn cursor_features() {
         _ => panic!("Wrong value returned from Cursor#next")
     };
 
-    assert!(cursor.has_next());
-    let vec = cursor.next_n(20);
+    assert!(cursor.has_next().ok().expect("Failed to execute 'has_next()'."));
+    let vec = cursor.next_n(20).ok().expect("Failed to get next 20 results.");;
 
     assert_eq!(vec.len(), 6 as usize);
-    assert!(!cursor.has_next());
+    assert!(!cursor.has_next().ok().expect("Failed to execute 'has_next()'."));
 
     for i in 0..vec.len() {
         match vec[i].get("foo") {
