@@ -21,7 +21,7 @@ macro_rules! run_insert_many_test {
         let inserted = $coll.insert_many($docs, true, None).unwrap().inserted_ids.unwrap();
         let ids_bson = match $outcome.result {
             Bson::Document(ref doc) => doc.get("insertedIds").unwrap(),
-            _ => panic!("`insert_one` test result should be a document")
+            _ => panic!("`insert_many` test result should be a document")
         };
 
         let ids = match ids_bson {
