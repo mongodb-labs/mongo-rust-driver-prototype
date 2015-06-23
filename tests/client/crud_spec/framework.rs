@@ -1,8 +1,8 @@
 macro_rules! run_find_test {
-    ( $db:expr, $c:expr, $f:expr, $o:expr, $t:expr ) => {{
-        let mut cursor = $c.find($f, $o).unwrap();
+    ( $db:expr, $coll:expr, $filter:expr, $opt:expr, $outcome:expr ) => {{
+        let mut cursor = $coll.find($filter, $opt).unwrap();
 
-        let array = match $t.result {
+        let array = match $outcome.result {
             Bson::Array(ref arr) => arr.clone(),
             _ => panic!("Invalid `result` of find test")
         };
@@ -12,32 +12,32 @@ macro_rules! run_find_test {
         }
 
         assert!(!cursor.has_next());
-        check_coll!($db, $c, $t.collection);
+        check_coll!($db, $coll, $outcome.collection);
     }};
 }
 
 macro_rules! run_insert_one_test {
-    ( $db:expr, $c: expr, $d:expr, $o:expr) => {{
-        let inserted = $c.insert_one($d, None).unwrap().inserted_id.unwrap();
-        let id = match $o.result {
+    ( $db:expr, $coll: expr, $doc:expr, $outcome:expr) => {{
+        let inserted = $coll.insert_one($doc, None).unwrap().inserted_id.unwrap();
+        let id = match $outcome.result {
             Bson::Document(ref doc) => doc.get("insertedId").unwrap(),
             _ => panic!("`insert_one` test result should be a document")
         };
 
         assert!(eq::bson_eq(&id, &inserted));
-        check_coll!($db, $c, $o.collection);
+        check_coll!($db, $coll, $outcome.collection);
     }};
 }
 
 
 #[macro_export]
 macro_rules! run_suite {
-    ( $f:expr, $c:expr ) => {{
-        let json = Json::from_file($f).unwrap();
+    ( $file:expr, $coll:expr ) => {{
+        let json = Json::from_file($file).unwrap();
         let suite = json.get_suite().unwrap();
         let client =  MongoClient::new("localhost", 27017).unwrap();
         let db = client.db("test");
-        let coll = db.collection($c);
+        let coll = db.collection($coll);
         coll.drop().unwrap();
         coll.insert_many(suite.data, true, None).unwrap();
 
@@ -55,15 +55,15 @@ macro_rules! run_suite {
 
 #[macro_export]
 macro_rules! check_coll {
-    ( $db:expr, $c:expr, $t:expr) => {{
-        let outcome_coll = match $t {
+    ( $db:expr, $coll:expr, $coll_opt:expr) => {{
+        let outcome_coll = match $coll_opt {
             Some(ref coll) => coll.clone(),
             None => return
         };
 
         let coll = match outcome_coll.name {
             Some(ref str) => $db.collection(&str),
-            None => $db.collection(&$c.name())
+            None => $db.collection(&$coll.name())
         };
 
         let mut cursor = coll.find(None, None).unwrap();
