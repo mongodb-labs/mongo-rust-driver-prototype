@@ -61,7 +61,7 @@ impl<'a> Database<'a> {
         let mut options = FindOptions::new();
         options.batch_size = 1;
         let res = try!(coll.find_one(Some(spec.clone()), Some(options)));
-        res.ok_or(OperationError(format!("Failed to execute command with spec {:?}", spec)))
+        res.ok_or(OperationError(format!("Failed to execute command with spec {:?}.", spec)))
     }
 
     /// Returns a list of collections within the database.

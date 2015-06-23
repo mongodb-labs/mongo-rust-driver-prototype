@@ -223,7 +223,7 @@ impl Header {
         let op_code_i32 = try!(buffer.read_i32::<LittleEndian>());
         let op_code = match OpCode::from_i32(op_code_i32) {
             Some(code) => code,
-            _ => return Err(ResponseError(format!("Invalid header opcode from server: {}", op_code_i32))),
+            _ => return Err(ResponseError(format!("Invalid header opcode from server: {}.", op_code_i32))),
         };
 
         Ok(Header::new(message_length, request_id, response_to, op_code))

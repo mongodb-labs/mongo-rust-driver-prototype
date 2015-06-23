@@ -531,13 +531,10 @@ impl Message {
     pub fn read<T>(buffer: &mut T) -> Result<Message> where T: Read + Write {
         let header = try!(Header::read(buffer));
         match header.op_code {
-            OpCode::Reply => {
-                Message::read_reply(buffer, header)
-            },
-            opcode => {
-                Err(ResponseError(format!("Expected to read response but instead found opcode {}",
-                                          opcode.to_string())))
-            }
+            OpCode::Reply => Message::read_reply(buffer, header),
+            opcode => Err(ResponseError(format!("Expected to read OpCode::Reply but \
+                                                 instead found opcode {}.",
+                                                opcode.to_string())))
         }
     }
 }

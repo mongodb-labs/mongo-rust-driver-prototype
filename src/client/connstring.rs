@@ -96,7 +96,7 @@ impl ConnectionString {
 /// [the manual](http://docs.mongodb.org/manual/reference/connection-string/).
 pub fn parse(address: &str) -> Result<ConnectionString> {
     if !address.starts_with(URI_SCHEME) {
-        return Err(ArgumentError("MongoDB connection string must start with 'mongodb://'".to_owned()))
+        return Err(ArgumentError("MongoDB connection string must start with 'mongodb://'.".to_owned()))
     }
 
     // Remove scheme
@@ -216,7 +216,7 @@ fn parse_host(entity: &str) -> Result<Host> {
         }
         match port.parse::<u16>() {
             Ok(val) => Ok(Host::new(host.to_ascii_lowercase(), val)),
-            Err(_) => Err(ArgumentError("Port must be an unsigned integer".to_owned())),
+            Err(_) => Err(ArgumentError("Port must be an unsigned integer.".to_owned())),
         }
     } else if entity.contains(".sock") {
         // IPC socket

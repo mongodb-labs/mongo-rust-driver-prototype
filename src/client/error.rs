@@ -10,47 +10,67 @@ pub type Result<T> = result::Result<T, Error>;
 /// The error type for MongoDB operations.
 #[derive(Debug)]
 pub enum Error {
+    /// I/O operation errors of `Read`, `Write`, `Seek`, and associated traits.
     IoError(io::Error),
+    /// A BSON struct could not be encoded.
     EncoderError(bson::EncoderError),
+    /// A BSON struct could not be decoded.
     DecoderError(bson::DecoderError),
+    /// A single-write operation failed.
     WriteError(WriteException),
+    /// A bulk-write operation failed due to one or more lower-level write-related errors.
     BulkWriteError(BulkWriteException),
+    /// An invalid function or operational argument was provided.
     ArgumentError(String),
+    /// A database operation failed to send or receive a reply.
     OperationError(String),
+    /// A database operation returned an invalid reply.
     ResponseError(String),
-    CursorMissingError,
+    /// A cursor operation failed to return a cursor.
+    CursorNotFoundError,
+    /// The application failed to secure the client connection socket due to a poisoned lock.
     LockError,
+    /// A standard error with a string description;
+    /// a more specific error should generally be used.
     DefaultError(String),
 }
 
 /// The error type for Write-related MongoDB operations.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WriteException {
-    kind: WriteExceptionKind,
+    write_concern_error: Option<WriteConcernError>,
+    write_error: Option<WriteError>,
+    message: String,
+}
+
+/// The error struct for a write-concern related error.
+#[derive(Debug, Clone)]
+pub struct WriteConcernError {
+    code: i32,
+    details: bson::Document,
+    message: String,
+}
+
+/// The error struct for a write-related error.
+#[derive(Debug, Clone)]
+pub struct WriteError {
     code: i32,
     message: String,
 }
 
-/// The two types of single-write related MongoDB operations.
-#[derive(Debug)]
-pub enum WriteExceptionKind {
-    WriteConcernError(bson::Document),
-    WriteError,
-}
-
 /// The error struct for Bulk-Write related MongoDB operations.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BulkWriteException {
     processed_requests: Vec<WriteModel>,
     unprocessed_requests: Vec<WriteModel>,
-    write_concern_error: Option<WriteException>,
     write_errors: Vec<BulkWriteError>,
+    write_concern_error: Option<WriteConcernError>,
     message: String,
 }
 
 /// The error struct for a single bulk-write step, indicating the request
 /// and its index in the original bulk-write request.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BulkWriteError {
     index: i32,
     request: Option<WriteModel>,
@@ -121,8 +141,8 @@ impl fmt::Display for Error {
             &Error::ArgumentError(ref inner) => inner.fmt(fmt),
             &Error::OperationError(ref inner) => inner.fmt(fmt),
             &Error::ResponseError(ref inner) => inner.fmt(fmt),
-            &Error::CursorMissingError => write!(fmt, "No cursor found"),
-            &Error::LockError => write!(fmt, "Socket lock poisoned."),
+            &Error::CursorNotFoundError => write!(fmt, "No cursor found for cursor operation."),
+            &Error::LockError => write!(fmt, "Socket lock poisoned while attempting to access."),
             &Error::DefaultError(ref inner) => inner.fmt(fmt),
         }
     }
@@ -139,8 +159,8 @@ impl error::Error for Error {
             &Error::ArgumentError(ref inner) => &inner,
             &Error::OperationError(ref inner) => &inner,
             &Error::ResponseError(ref inner) => &inner,
-            &Error::CursorMissingError => "No cursor found",
-            &Error::LockError => "Socket lock poisoned",
+            &Error::CursorNotFoundError => "No cursor found for cursor operation.",
+            &Error::LockError => "Socket lock poisoned while attempting to access.",
             &Error::DefaultError(ref inner) => &inner,
         }
     }
@@ -155,7 +175,7 @@ impl error::Error for Error {
             &Error::ArgumentError(_) => None,
             &Error::OperationError(_) => None,
             &Error::ResponseError(_) => None,
-            &Error::CursorMissingError => None,
+            &Error::CursorNotFoundError => None,
             &Error::LockError => None,
             &Error::DefaultError(_) => None,
         }
@@ -168,7 +188,7 @@ impl error::Error for WriteException {
     }
 
     fn cause(&self) -> Option<&error::Error> {
-        Some(self)
+        None
     }
 }
 
@@ -178,16 +198,25 @@ impl error::Error for BulkWriteException {
     }
 
     fn cause(&self) -> Option<&error::Error> {
-        match self.write_concern_error {
-            Some(ref err) => Some(err),
-            None => Some(self),
-        }
+        None
     }
 }
 
 impl fmt::Display for WriteException {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{:?} ({}): {}\n", self.kind, self.code, self.message)
+        let ref wc_err = self.write_concern_error;
+        let ref w_err = self.write_error;
+
+        try!(write!(fmt, "WriteException:\n"));
+        if wc_err.is_some() {
+            try!(write!(fmt, "{:?}\n", wc_err));
+        }
+
+        if w_err.is_some() {
+            try!(write!(fmt, "{:?}\n", w_err));
+        }
+
+        Ok(())
     }
 }
 
@@ -206,12 +235,12 @@ impl fmt::Display for BulkWriteException {
         }
 
         match self.write_concern_error {
-            Some(ref error) => try!(write!(fmt, "{}\n", error)),
+            Some(ref error) => try!(write!(fmt, "{:?}\n", error)),
             None => (),
         }
 
         for v in &self.write_errors {
-            try!(write!(fmt, "{}\n", v));
+            try!(write!(fmt, "{:?}\n", v));
         }
 
         Ok(())
@@ -222,7 +251,7 @@ impl fmt::Display for BulkWriteError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         try!(write!(fmt, "BulkWriteError at index {}: ", self.index));
         match self.request {
-            Some(ref request) => try!(write!(fmt, "Failed to execute request {:?}\n", request)),
+            Some(ref request) => try!(write!(fmt, "Failed to execute request {:?}\n.", request)),
             None => try!(write!(fmt, "No additional error information was received.\n")),
         }
         Ok(())
@@ -230,9 +259,40 @@ impl fmt::Display for BulkWriteError {
 }
 
 impl WriteException {
-    pub fn new<T: ToString>(kind: WriteExceptionKind, code: i32, message: T) -> WriteException {
+    pub fn new(wc_err: Option<WriteConcernError>, w_err: Option<WriteError>) -> WriteException {
+        let s = if wc_err.is_some() && w_err.is_some() {
+            format!("{}\n{}",
+                    wc_err.as_ref().unwrap().message.to_owned(),
+                    w_err.as_ref().unwrap().message.to_owned())
+        } else if wc_err.is_some() {
+            wc_err.as_ref().unwrap().message.to_owned()
+        } else if w_err.is_some() {
+            w_err.as_ref().unwrap().message.to_owned()
+        } else {
+            "No further information provided.".to_owned()
+        };
+
         WriteException {
-            kind: kind,
+            write_concern_error: wc_err,
+            write_error: w_err,
+            message: s,
+        }
+    }
+}
+
+impl WriteConcernError {
+    pub fn new<T: ToString>(code: i32, details: bson::Document, message: T) -> WriteConcernError {
+        WriteConcernError {
+            code: code,
+            details: details,
+            message: message.to_string(),
+        }
+    }
+}
+
+impl WriteError {
+    pub fn new<T: ToString>(code: i32, message: T) -> WriteError {
+        WriteError {
             code: code,
             message: message.to_string(),
         }
@@ -241,16 +301,16 @@ impl WriteException {
 
 impl BulkWriteException {
     pub fn new<T: ToString>(processed: Vec<WriteModel>, unprocessed: Vec<WriteModel>,
-                            write_errors: Vec<BulkWriteError>, write_concern_error: Option<WriteException>)
+                            write_errors: Vec<BulkWriteError>, write_concern_error: Option<WriteConcernError>)
                             -> BulkWriteException {
 
         let mut s = match write_concern_error {
-            Some(ref error) => format!("WriteConcernError: {}\n", error),
+            Some(ref error) => format!("WriteConcernError: {:?}\n", error),
             None => "".to_owned(),
         };
 
         for v in &write_errors {
-            s.push_str(&format!("WriteError: {}\n", v)[..]);
+            s.push_str(&format!("WriteError: {:?}\n", v)[..]);
         }
 
         BulkWriteException {

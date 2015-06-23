@@ -61,14 +61,14 @@ impl <'a> Cursor<'a> {
 
                 Ok((v, cid))
             },
-            _ => Err(Error::CursorMissingError)
+            _ => Err(Error::CursorNotFoundError)
         }
     }
 
-    fn get_bson_and_cid_from_command_message(message: Message) -> Result<(VecDeque<bson::Document>, i64, String)> {
+    fn get_bson_and_cursor_info_from_command_message(message: Message) -> Result<(VecDeque<bson::Document>, i64, String)> {
         let (v, _) = try!(Cursor::get_bson_and_cid_from_message(message));
         if v.len() != 1 {
-            return Err(Error::CursorMissingError);
+            return Err(Error::CursorNotFoundError);
         }
 
         let ref doc = v[0];
@@ -94,7 +94,7 @@ impl <'a> Cursor<'a> {
             }
         }
 
-        Err(Error::CursorMissingError)
+        Err(Error::CursorNotFoundError)
     }
 
     /// Executes a query where the batch size of the returned cursor is
@@ -139,7 +139,7 @@ impl <'a> Cursor<'a> {
         let reply = try!(Message::read(&mut *socket.borrow_mut()));
 
         let (buf, cursor_id, namespace) = if is_cmd_cursor {
-            try!(Cursor::get_bson_and_cid_from_command_message(reply))
+            try!(Cursor::get_bson_and_cursor_info_from_command_message(reply))
         } else {
             let (buf, id) = try!(Cursor::get_bson_and_cid_from_message(reply));
             (buf, id, namespace)
