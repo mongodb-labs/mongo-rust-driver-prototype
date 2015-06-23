@@ -18,7 +18,6 @@ impl Test {
             }};
         }
 
-
         let op = val_or_err!(object.get("operation"),
                              Some(&Json::Object(ref obj)) => obj.clone(),
                              "`operation` must be an object");
@@ -32,10 +31,11 @@ impl Test {
                                "`name` must be a string");
 
         let args = match name.as_ref() {
+            "deleteMany" => res_or_err!(Arguments::delete_from_json(&args_obj, true)),
+            "deleteOne" => res_or_err!(Arguments::delete_from_json(&args_obj, false)),
             "find" => Arguments::find_from_json(&args_obj),
-            "insertOne" => res_or_err!(Arguments::insert_one_from_json(&args_obj)),
             "insertMany" => res_or_err!(Arguments::insert_many_from_json(&args_obj)),
-            "deleteOne" => res_or_err!(Arguments::delete_one_from_json(&args_obj)),
+            "insertOne" => res_or_err!(Arguments::insert_one_from_json(&args_obj)),
             _ => return Err("Invalid operation name".to_owned())
         };
 

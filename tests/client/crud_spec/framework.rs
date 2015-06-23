@@ -16,19 +16,6 @@ macro_rules! run_find_test {
     }};
 }
 
-macro_rules! run_insert_one_test {
-    ( $db:expr, $coll: expr, $doc:expr, $outcome:expr) => {{
-        let inserted = $coll.insert_one($doc, None).unwrap().inserted_id.unwrap();
-        let id = match $outcome.result {
-            Bson::Document(ref doc) => doc.get("insertedId").unwrap(),
-            _ => panic!("`insert_one` test result should be a document")
-        };
-
-        assert!(eq::bson_eq(&id, &inserted));
-        check_coll!($db, $coll, $outcome.collection);
-    }};
-}
-
 macro_rules! run_insert_many_test {
     ( $db:expr, $coll: expr, $docs:expr, $outcome:expr) => {{
         let inserted = $coll.insert_many($docs, true, None).unwrap().inserted_ids.unwrap();
@@ -52,12 +39,32 @@ macro_rules! run_insert_many_test {
     }};
 }
 
-macro_rules! run_delete_one_test {
-    ( $db:expr, $coll: expr, $filter:expr, $outcome:expr) => {{
-        let expected = $coll.delete_one($filter, None).unwrap().deleted_count;
+macro_rules! run_insert_one_test {
+    ( $db:expr, $coll: expr, $doc:expr, $outcome:expr) => {{
+        let inserted = $coll.insert_one($doc, None).unwrap().inserted_id.unwrap();
+        let id = match $outcome.result {
+            Bson::Document(ref doc) => doc.get("insertedId").unwrap(),
+            _ => panic!("`insert_one` test result should be a document")
+        };
+
+        assert!(eq::bson_eq(&id, &inserted));
+        check_coll!($db, $coll, $outcome.collection);
+    }};
+}
+
+macro_rules! run_delete_test {
+    ( $db:expr, $coll: expr, $filter:expr, $outcome:expr, $many:expr) => {{
+        let count = if $many {
+                        $coll.delete_many($filter, None)
+                    } else {
+                        $coll.delete_one($filter, None)
+                    };
+
+        let expected = count.unwrap().deleted_count;
+
         let actual = match $outcome.result {
             Bson::Document(ref doc) => doc.get("deletedCount").unwrap(),
-            _ => panic!("`delete_one` test result should be a document")
+            _ => panic!("`delete` test result should be a document")
         };
 
         assert!(actual.int_eq(expected as i64));
@@ -73,20 +80,20 @@ macro_rules! run_suite {
         let client =  MongoClient::new("localhost", 27017).unwrap();
         let db = client.db("test");
         let coll = db.collection($coll);
-        coll.drop().unwrap();
-        coll.insert_many(suite.data, true, None).unwrap();
 
         for test in suite.tests {
+            coll.drop().unwrap();
+            coll.insert_many(suite.data.clone(), true, None).unwrap();
+
             match test.operation {
+                Arguments::Delete { filter, many } =>
+                    run_delete_test!(db, coll, filter, test.outcome, many),
                 Arguments::Find { filter, options } =>
-                    run_find_test!(db, coll, filter, Some(options),
-                                   test.outcome),
-                Arguments::InsertOne { document } =>
-                    run_insert_one_test!(db, coll, document, test.outcome),
+                    run_find_test!(db, coll, filter, Some(options), test.outcome),
                 Arguments::InsertMany { documents } =>
                     run_insert_many_test!(db, coll, documents, test.outcome),
-                Arguments::DeleteOne { filter } =>
-                    run_delete_one_test!(db, coll, filter, test.outcome),
+                Arguments::InsertOne { document } =>
+                    run_insert_one_test!(db, coll, document, test.outcome),
             };
         }
     }};
