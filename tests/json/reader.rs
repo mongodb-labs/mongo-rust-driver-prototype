@@ -24,12 +24,12 @@ impl Test {
                                "`name` must be a string");
 
         let args = match name.as_ref() {
-            "find" => Arguments::new_find_from_json(&args_obj),
-            "insertOne" => match Arguments::new_insert_one_from_json(&args_obj) {
+            "find" => Arguments::find_from_json(&args_obj),
+            "insertOne" => match Arguments::insert_one_from_json(&args_obj) {
                 Ok(a) => a,
                 Err(s) => return Err(s)
             },
-            "insertMany" => match Arguments::new_insert_many_from_json(&args_obj) {
+            "insertMany" => match Arguments::insert_many_from_json(&args_obj) {
                 Ok(a) => a,
                 Err(s) => return Err(s)
             },
