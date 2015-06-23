@@ -1,5 +1,3 @@
-use bson::{Bson, Document};
-
 #[macro_export]
 macro_rules! add_to_doc {
     ($doc:expr, $key:expr => ($val:expr)) => {{

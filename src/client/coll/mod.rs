@@ -12,7 +12,6 @@ use client::coll::results::*;
 use client::cursor::Cursor;
 
 use client::wire_protocol::flags::OpQueryFlags;
-use client::wire_protocol::operations::Message;
 
 use std::collections::BTreeMap;
 
