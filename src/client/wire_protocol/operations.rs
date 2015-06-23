@@ -1,7 +1,7 @@
 use bson;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
-use client::MongoResult;
+use client::Result;
 use client::Error::{ArgumentError, ResponseError};
 
 use client::wire_protocol::header::{Header, OpCode};
@@ -14,7 +14,7 @@ use std::result::Result::{Ok, Err};
 
 trait ByteLength {
     /// Calculates the number of bytes in the serialized version of the struct.
-    fn byte_length(&self) -> MongoResult<i32>;
+    fn byte_length(&self) -> Result<i32>;
 }
 
 impl ByteLength for bson::Document {
@@ -23,7 +23,7 @@ impl ByteLength for bson::Document {
     /// # Return value
     ///
     /// Returns the number of bytes in the serialized BSON document.
-    fn byte_length(&self) -> MongoResult<i32> {
+    fn byte_length(&self) -> Result<i32> {
         let mut temp_buffer = vec![];
 
         let _ = try!(bson::encode_document(&mut temp_buffer, self));
@@ -112,7 +112,7 @@ impl Message {
     /// Returns the newly-created Message.
     pub fn with_update(request_id: i32, namespace: String, flags: OpUpdateFlags,
                        selector: bson::Document,
-                       update: bson::Document) -> MongoResult<Message> {
+                       update: bson::Document) -> Result<Message> {
 
         let header_length = mem::size_of::<Header>() as i32;
 
@@ -150,7 +150,7 @@ impl Message {
     ///
     /// Returns the newly-created Message.
     pub fn with_insert(request_id: i32, flags: OpInsertFlags, namespace: String,
-                       documents: Vec<bson::Document>) -> MongoResult<Message> {
+                       documents: Vec<bson::Document>) -> Result<Message> {
 
         let header_length = mem::size_of::<Header>() as i32;
         let flags_length = mem::size_of::<i32>() as i32;
@@ -193,7 +193,7 @@ impl Message {
     pub fn with_query(request_id: i32, flags: OpQueryFlags, namespace: String,
                       number_to_skip: i32, number_to_return: i32,
                       query: bson::Document,
-                      return_field_selector: Option<bson::Document>) -> MongoResult<Message> {
+                      return_field_selector: Option<bson::Document>) -> Result<Message> {
 
         let header_length = mem::size_of::<Header>() as i32;
 
@@ -271,7 +271,7 @@ impl Message {
     ///
     /// Returns nothing on success, or an error string on failure.
     fn write_bson_document(buffer: &mut Write,
-                           bson: &bson::Document) -> MongoResult<()>{
+                           bson: &bson::Document) -> Result<()>{
         let mut temp_buffer = vec![];
 
         try!(bson::encode_document(&mut temp_buffer, bson));
@@ -296,7 +296,7 @@ impl Message {
     /// Returns nothing on success, or an error string on failure.
     pub fn write_update(buffer: &mut Write, header: &Header, namespace: &str,
                         flags: &OpUpdateFlags, selector: &bson::Document,
-                        update: &bson::Document) -> MongoResult<()> {
+                        update: &bson::Document) -> Result<()> {
 
         try!(header.write(buffer));
 
@@ -335,7 +335,7 @@ impl Message {
     /// Returns the newly-created Message.
     fn write_insert(buffer: &mut Write, header: &Header, flags: &OpInsertFlags,
                     namespace: &str,
-                    documents: &[bson::Document]) -> MongoResult<()> {
+                    documents: &[bson::Document]) -> Result<()> {
 
         try!(header.write(buffer));
         try!(buffer.write_i32::<LittleEndian>(flags.to_i32()));
@@ -379,7 +379,7 @@ impl Message {
     fn write_query(buffer: &mut Write, header: &Header,
                    flags: &OpQueryFlags, namespace: &str,
                    number_to_skip: i32, number_to_return: i32, query: &bson::Document,
-                   return_field_selector: &Option<bson::Document>) -> MongoResult<()> {
+                   return_field_selector: &Option<bson::Document>) -> Result<()> {
 
         try!(header.write(buffer));
         try!(buffer.write_i32::<LittleEndian>(flags.to_i32()));
@@ -421,7 +421,7 @@ impl Message {
     /// Returns the newly-created Message.
     pub fn write_get_more(buffer: &mut Write, header: &Header, namespace: &str,
                           number_to_return: i32,
-                          cursor_id: i64) -> MongoResult<()> {
+                          cursor_id: i64) -> Result<()> {
 
         try!(header.write(buffer));
 
@@ -451,7 +451,7 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an error string on failure.
-    pub fn write(&self, buffer: &mut Write) -> MongoResult<()> {
+    pub fn write(&self, buffer: &mut Write) -> Result<()> {
         match self {
             /// Only the server should sent replies
             &Message::OpReply {..} =>
@@ -488,7 +488,7 @@ impl Message {
     ///
     /// Returns the reply message on success, or an error string on
     /// failure.
-    fn read_reply(buffer: &mut Read, h: Header) -> MongoResult<Message> {
+    fn read_reply(buffer: &mut Read, h: Header) -> Result<Message> {
         let mut length = h.message_length - mem::size_of::<Header>() as i32;
 
         // Read flags
@@ -528,7 +528,7 @@ impl Message {
     ///
     /// Returns the reply message on success, or an error string on
     /// failure.
-    pub fn read<T>(buffer: &mut T) -> MongoResult<Message> where T: Read + Write {
+    pub fn read<T>(buffer: &mut T) -> Result<Message> where T: Read + Write {
         let header = try!(Header::read(buffer));
         match header.op_code {
             OpCode::Reply => {

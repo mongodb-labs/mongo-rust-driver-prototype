@@ -2,7 +2,7 @@ use bson;
 use bson::Bson;
 
 use client::MongoClient;
-use client::{Error, MongoResult};
+use client::{Error, Result};
 
 use client::wire_protocol::flags::OpQueryFlags;
 use client::wire_protocol::operations::Message;
@@ -33,7 +33,7 @@ pub struct Cursor<'a> {
 
 impl <'a> Cursor<'a> {
 
-    pub fn command_cursor(client: &'a MongoClient, db: &str, doc: bson::Document) -> MongoResult<Cursor<'a>> {
+    pub fn command_cursor(client: &'a MongoClient, db: &str, doc: bson::Document) -> Result<Cursor<'a>> {
         Cursor::query_with_batch_size(client, format!("{}.$cmd", db),
                                       1, OpQueryFlags::no_flags(), 0, 0,
                                       doc, None, true)
@@ -48,7 +48,7 @@ impl <'a> Cursor<'a> {
     /// # Return value.
     ///
     ///
-    fn get_bson_and_cid_from_message(message: Message) -> MongoResult<(VecDeque<bson::Document>, i64)> {
+    fn get_bson_and_cid_from_message(message: Message) -> Result<(VecDeque<bson::Document>, i64)> {
         match message {
             Message::OpReply { header: _, flags: _, cursor_id: cid,
                                starting_from: _, number_returned: _,
@@ -65,7 +65,7 @@ impl <'a> Cursor<'a> {
         }
     }
 
-    fn get_bson_and_cid_from_command_message(message: Message) -> MongoResult<(VecDeque<bson::Document>, i64, String)> {
+    fn get_bson_and_cid_from_command_message(message: Message) -> Result<(VecDeque<bson::Document>, i64, String)> {
         let (v, _) = try!(Cursor::get_bson_and_cid_from_message(message));
         if v.len() != 1 {
             return Err(Error::CursorMissingError);
@@ -125,7 +125,7 @@ impl <'a> Cursor<'a> {
                                      number_to_skip: i32, number_to_return: i32,
                                      query: bson::Document,
                                      return_field_selector: Option<bson::Document>,
-                                     is_cmd_cursor: bool) -> MongoResult<Cursor<'a>> {
+                                     is_cmd_cursor: bool) -> Result<Cursor<'a>> {
 
         let result = Message::with_query(client.get_req_id(), flags,
                                          namespace.to_owned(),
@@ -179,7 +179,7 @@ impl <'a> Cursor<'a> {
     pub fn query(client: &'a MongoClient, namespace: String,
                  flags: OpQueryFlags, number_to_skip: i32, number_to_return: i32,
                  query: bson::Document, return_field_selector: Option<bson::Document>,
-                 is_cmd_cursor: bool) -> MongoResult<Cursor<'a>> {
+                 is_cmd_cursor: bool) -> Result<Cursor<'a>> {
 
         Cursor::query_with_batch_size(client, namespace, DEFAULT_BATCH_SIZE, flags,
                                       number_to_skip,
@@ -199,7 +199,7 @@ impl <'a> Cursor<'a> {
     }
 
     /// Attempts to read another batch of BSON documents from the stream.
-    fn get_from_stream(&mut self) -> MongoResult<()> {
+    fn get_from_stream(&mut self) -> Result<()> {
         let socket = try!(self.client.socket.lock());
 
         let get_more = self.new_get_more_request();
@@ -217,7 +217,7 @@ impl <'a> Cursor<'a> {
     ///
     /// Returns the first BSON document returned from the stream, or `None` if
     /// there are no more documents to read.
-    fn next_from_stream(&mut self) -> MongoResult<Option<bson::Document>> {
+    fn next_from_stream(&mut self) -> Result<Option<bson::Document>> {
         try!(self.get_from_stream());
         Ok(self.buffer.pop_front())
     }
@@ -231,7 +231,7 @@ impl <'a> Cursor<'a> {
     /// # Return value
     ///
     /// Returns a vector containing the BSON documents that were read.
-    pub fn next_n(&mut self, n: i32) -> MongoResult<Vec<bson::Document>> {
+    pub fn next_n(&mut self, n: i32) -> Result<Vec<bson::Document>> {
         let mut vec = vec![];
 
         for _ in 0..n {
@@ -252,12 +252,12 @@ impl <'a> Cursor<'a> {
     /// # Return value
     ///
     /// Returns a vector containing the BSON documents that were read.
-    pub fn next_batch(&mut self) -> MongoResult<Vec<bson::Document>> {
+    pub fn next_batch(&mut self) -> Result<Vec<bson::Document>> {
         let n = self.batch_size;
         self.next_n(n)
     }
 
-    pub fn has_next(&mut self) -> MongoResult<bool> {
+    pub fn has_next(&mut self) -> Result<bool> {
         if self.limit > 0 && self.count >= self.limit {
             Ok(false)
         } else {
@@ -270,7 +270,7 @@ impl <'a> Cursor<'a> {
 }
 
 impl <'a> Iterator for Cursor<'a> {
-    type Item = MongoResult<bson::Document>;
+    type Item = Result<bson::Document>;
 
     /// Attempts to read a BSON document from the cursor.
     ///
@@ -278,7 +278,7 @@ impl <'a> Iterator for Cursor<'a> {
     ///
     /// Returns the document that was read, or `None` if there are no more
     /// documents to read.
-    fn next(&mut self) -> Option<MongoResult<bson::Document>> {
+    fn next(&mut self) -> Option<Result<bson::Document>> {
         match self.has_next() {
             Ok(true) => {
                 self.count += 1;

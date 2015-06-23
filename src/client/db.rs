@@ -7,7 +7,7 @@ use client::coll::options::FindOptions;
 use client::common::{ReadPreference, WriteConcern};
 use client::cursor::{Cursor, DEFAULT_BATCH_SIZE};
 
-use client::MongoResult;
+use client::Result;
 use client::Error::OperationError;
 
 /// Interfaces with a MongoDB database.
@@ -51,12 +51,12 @@ impl<'a> Database<'a> {
     }
 
     /// Generates a cursor for a relevant operational command.
-    pub fn command_cursor(&self, spec: bson::Document) -> MongoResult<Cursor> {
+    pub fn command_cursor(&self, spec: bson::Document) -> Result<Cursor> {
         Cursor::command_cursor(self.client, &self.name[..], spec)
     }
 
     /// Sends an administrative command over find_one.
-    pub fn command(&'a self, spec: bson::Document) -> MongoResult<bson::Document> {
+    pub fn command(&'a self, spec: bson::Document) -> Result<bson::Document> {
         let coll = self.collection("$cmd");
         let mut options = FindOptions::new();
         options.batch_size = 1;
@@ -65,12 +65,12 @@ impl<'a> Database<'a> {
     }
 
     /// Returns a list of collections within the database.
-    pub fn list_collections(&'a self, filter: Option<bson::Document>) -> MongoResult<Cursor> {
+    pub fn list_collections(&'a self, filter: Option<bson::Document>) -> Result<Cursor> {
         self.list_collections_with_batch_size(filter, DEFAULT_BATCH_SIZE)
     }
 
     pub fn list_collections_with_batch_size(&'a self, filter: Option<bson::Document>,
-                                            batch_size: i32) -> MongoResult<Cursor> {
+                                            batch_size: i32) -> Result<Cursor> {
 
         let mut spec = bson::Document::new();
         let mut cursor = bson::Document::new();
@@ -87,7 +87,7 @@ impl<'a> Database<'a> {
 
 
     /// Returns a list of collection names within the database.
-    pub fn collection_names(&'a self, filter: Option<bson::Document>) -> MongoResult<Vec<String>> {
+    pub fn collection_names(&'a self, filter: Option<bson::Document>) -> Result<Vec<String>> {
         let mut cursor = try!(self.list_collections(filter));
         let mut results = Vec::new();
         loop {
@@ -105,12 +105,12 @@ impl<'a> Database<'a> {
     ///
     /// Note that due to the implicit creation of collections during insertion, this
     /// method should only be used to instantiate capped collections.
-    pub fn create_collection(&'a self, name: &str) -> MongoResult<()> {
+    pub fn create_collection(&'a self, name: &str) -> Result<()> {
         unimplemented!()
     }
 
     /// Permanently deletes the database from the server.
-    pub fn drop_database(&'a self) -> MongoResult<()> {
+    pub fn drop_database(&'a self) -> Result<()> {
         let mut spec = bson::Document::new();
         spec.insert("dropDatabase".to_owned(), Bson::I32(1));
         try!(self.command(spec));
@@ -118,7 +118,7 @@ impl<'a> Database<'a> {
     }
 
     /// Permanently deletes the collection from the database.
-    pub fn drop_collection(&'a self, name: &str) -> MongoResult<()> {
+    pub fn drop_collection(&'a self, name: &str) -> Result<()> {
         let mut spec = bson::Document::new();
         spec.insert("drop".to_owned(), Bson::String(name.to_owned()));
         try!(self.command(spec));

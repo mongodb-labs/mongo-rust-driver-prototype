@@ -10,7 +10,7 @@ use client::coll::options::*;
 use client::coll::results::*;
 
 use client::cursor::Cursor;
-use client::MongoResult;
+use client::Result;
 use client::Error::{ArgumentError, ResponseError};
 
 use client::wire_protocol::flags::OpQueryFlags;
@@ -62,12 +62,12 @@ impl<'a> Collection<'a> {
     }
 
     /// Permanently deletes the collection from the database.
-    pub fn drop(&'a self) -> MongoResult<()> {
+    pub fn drop(&'a self) -> Result<()> {
         self.db.drop_collection(&self.name()[..])
     }
 
     /// Runs an aggregation framework pipeline.
-    pub fn aggregate(&'a self, pipeline: Vec<bson::Document>, options: Option<AggregateOptions>) -> MongoResult<Cursor<'a>> {
+    pub fn aggregate(&'a self, pipeline: Vec<bson::Document>, options: Option<AggregateOptions>) -> Result<Cursor<'a>> {
         let opts = options.unwrap_or(AggregateOptions::new());
 
         let pipeline_map = pipeline.iter().map(|bdoc| {
@@ -88,7 +88,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Gets the number of documents matching the filter.
-    pub fn count(&self, filter: Option<bson::Document>, options: Option<CountOptions>) -> MongoResult<i64> {
+    pub fn count(&self, filter: Option<bson::Document>, options: Option<CountOptions>) -> Result<i64> {
         let opts = options.unwrap_or(CountOptions::new());
 
         let mut spec = bson::Document::new();
@@ -115,7 +115,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Finds the distinct values for a specified field across a single collection.
-    pub fn distinct(&self, field_name: &str, filter: Option<bson::Document>, options: Option<DistinctOptions>) -> MongoResult<Vec<Bson>> {
+    pub fn distinct(&self, field_name: &str, filter: Option<bson::Document>, options: Option<DistinctOptions>) -> Result<Vec<Bson>> {
 
         let opts = options.unwrap_or(DistinctOptions::new());
 
@@ -135,7 +135,7 @@ impl<'a> Collection<'a> {
 
     /// Returns a list of documents within the collection that match the filter.
     pub fn find(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
-                -> MongoResult<Cursor<'a>> {
+                -> Result<Cursor<'a>> {
 
         let doc = filter.unwrap_or(bson::Document::new());
         let options = options.unwrap_or(FindOptions::new());
@@ -149,7 +149,7 @@ impl<'a> Collection<'a> {
 
     /// Returns the first document within the collection that matches the filter, or None.
     pub fn find_one(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
-                    -> MongoResult<Option<bson::Document>> {
+                    -> Result<Option<bson::Document>> {
         let options = options.unwrap_or(FindOptions::new());
         let mut cursor = try!(self.find(filter, Some(options.with_limit(1))));
         match cursor.next() {
@@ -164,7 +164,7 @@ impl<'a> Collection<'a> {
                            filter: bson::Document, max_time_ms: Option<i64>,
                            projection: Option<bson::Document>, sort: Option<bson::Document>,
                            write_concern: Option<WriteConcern>)
-                           -> MongoResult<Option<bson::Document>> {
+                           -> Result<Option<bson::Document>> {
 
         let wc = write_concern.unwrap_or(self.write_concern.clone());
 
@@ -194,7 +194,7 @@ impl<'a> Collection<'a> {
     fn find_one_and_replace_or_update(&self, filter: bson::Document, update: bson::Document,
                                       after: bool, max_time_ms: Option<i64>,
                                       projection: Option<bson::Document>, sort: Option<bson::Document>,
-                                      upsert: bool, write_concern: Option<WriteConcern>) -> MongoResult<Option<bson::Document>> {
+                                      upsert: bool, write_concern: Option<WriteConcern>) -> Result<Option<bson::Document>> {
 
         let mut cmd = bson::Document::new();
         cmd.insert("update".to_owned(), Bson::Document(update));
@@ -210,7 +210,7 @@ impl<'a> Collection<'a> {
 
     /// Finds a single document and deletes it, returning the original.
     pub fn find_one_and_delete(&self, filter: bson::Document,
-                               options: Option<FindOneAndDeleteOptions>)  -> MongoResult<Option<bson::Document>> {
+                               options: Option<FindOneAndDeleteOptions>)  -> Result<Option<bson::Document>> {
 
         let opts = options.unwrap_or(FindOneAndDeleteOptions::new());
         let mut cmd = bson::Document::new();
@@ -222,7 +222,7 @@ impl<'a> Collection<'a> {
     /// Finds a single document and replaces it, returning either the original
     /// or replaced document.
     pub fn find_one_and_replace(&self, filter: bson::Document, replacement: bson::Document,
-                                options: Option<FindOneAndReplaceOptions>)  -> MongoResult<Option<bson::Document>> {
+                                options: Option<FindOneAndReplaceOptions>)  -> Result<Option<bson::Document>> {
         let opts = options.unwrap_or(FindOneAndReplaceOptions::new());
         try!(Collection::validate_replace(&replacement));
         self.find_one_and_replace_or_update(filter, replacement, opts.return_document.to_bool(),
@@ -233,7 +233,7 @@ impl<'a> Collection<'a> {
     /// Finds a single document and updates it, returning either the original
     /// or updated document.
     pub fn find_one_and_update(&self, filter: bson::Document, update: bson::Document,
-                               options: Option<FindOneAndUpdateOptions>)  -> MongoResult<Option<bson::Document>> {
+                               options: Option<FindOneAndUpdateOptions>)  -> Result<Option<bson::Document>> {
         let opts = options.unwrap_or(FindOneAndUpdateOptions::new());
         try!(Collection::validate_update(&update));
         self.find_one_and_replace_or_update(filter, update, opts.return_document.to_bool(),
@@ -248,7 +248,7 @@ impl<'a> Collection<'a> {
 
     // Internal insertion helper function.
     fn insert(&self, docs: Vec<bson::Document>, ordered: bool,
-              write_concern: Option<WriteConcern>) -> MongoResult<BTreeMap<i64, Bson>> {
+              write_concern: Option<WriteConcern>) -> Result<BTreeMap<i64, Bson>> {
 
         let wc =  write_concern.unwrap_or(WriteConcern::new());
         let mut map = BTreeMap::new();
@@ -277,7 +277,7 @@ impl<'a> Collection<'a> {
 
     /// Inserts the provided document. If the document is missing an identifier,
     /// the driver should generate one.
-    pub fn insert_one(&self, doc: bson::Document, write_concern: Option<WriteConcern>) -> MongoResult<InsertOneResult> {
+    pub fn insert_one(&self, doc: bson::Document, write_concern: Option<WriteConcern>) -> Result<InsertOneResult> {
         let res = try!(self.insert(vec!(doc), true, write_concern));
         let id = match res.keys().next() {
             Some(ref key) => res.get(key),
@@ -293,13 +293,13 @@ impl<'a> Collection<'a> {
     /// Inserts the provided documents. If any documents are missing an identifier,
     /// the driver should generate them.
     pub fn insert_many(&self, docs: Vec<bson::Document>, ordered: bool,
-                       write_concern: Option<WriteConcern>) -> MongoResult<InsertManyResult> {
+                       write_concern: Option<WriteConcern>) -> Result<InsertManyResult> {
         let res = try!(self.insert(docs, ordered, write_concern));
         Ok(InsertManyResult::new(Some(res)))
     }
 
     // Internal deletion helper function.
-    fn delete(&self, filter: bson::Document, limit: i64, write_concern: Option<WriteConcern>) -> MongoResult<DeleteResult> {
+    fn delete(&self, filter: bson::Document, limit: i64, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
         let wc = write_concern.unwrap_or(WriteConcern::new());
 
         let mut deletes = bson::Document::new();
@@ -316,18 +316,18 @@ impl<'a> Collection<'a> {
     }
 
     /// Deletes a single document.
-    pub fn delete_one(&self, filter: bson::Document, write_concern: Option<WriteConcern>) -> MongoResult<DeleteResult> {
+    pub fn delete_one(&self, filter: bson::Document, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
         self.delete(filter, 1, write_concern)
     }
 
     /// Deletes multiple documents.
-    pub fn delete_many(&self, filter: bson::Document, write_concern: Option<WriteConcern>) -> MongoResult<DeleteResult> {
+    pub fn delete_many(&self, filter: bson::Document, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
         self.delete(filter, 0, write_concern)
     }
 
     // Internal update helper function.
     fn update(&self, filter: bson::Document, update: bson::Document, upsert: bool, multi: bool,
-              write_concern: Option<WriteConcern>) -> MongoResult<UpdateResult> {
+              write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
 
         let wc = write_concern.unwrap_or(WriteConcern::new());
 
@@ -350,7 +350,7 @@ impl<'a> Collection<'a> {
 
     /// Replaces a single document.
     pub fn replace_one(&self, filter: bson::Document, replacement: bson::Document, upsert: bool,
-                       write_concern: Option<WriteConcern>) -> MongoResult<UpdateResult> {
+                       write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
 
         let _ = try!(Collection::validate_replace(&replacement));
         self.update(filter, replacement, upsert, false, write_concern)
@@ -358,7 +358,7 @@ impl<'a> Collection<'a> {
 
     /// Updates a single document.
     pub fn update_one(&self, filter: bson::Document, update: bson::Document, upsert: bool,
-                      write_concern: Option<WriteConcern>) -> MongoResult<UpdateResult> {
+                      write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
 
         let _ = try!(Collection::validate_update(&update));
         self.update(filter, update, upsert, false, write_concern)
@@ -366,13 +366,13 @@ impl<'a> Collection<'a> {
 
     /// Updates multiple documents.
     pub fn update_many(&self, filter: bson::Document, update: bson::Document, upsert: bool,
-                       write_concern: Option<WriteConcern>) -> MongoResult<UpdateResult> {
+                       write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
 
         let _ = try!(Collection::validate_update(&update));
         self.update(filter, update, upsert, true, write_concern)
     }
 
-    fn validate_replace(replacement: &bson::Document) -> MongoResult<()> {
+    fn validate_replace(replacement: &bson::Document) -> Result<()> {
         for key in replacement.keys() {
             if key.starts_with("$") {
                 return Err(ArgumentError("Replacement cannot include $ operators.".to_owned()));
@@ -381,7 +381,7 @@ impl<'a> Collection<'a> {
         Ok(())
     }
 
-    fn validate_update(update: &bson::Document) -> MongoResult<()> {
+    fn validate_update(update: &bson::Document) -> Result<()> {
         for key in update.keys() {
             if !key.starts_with("$") {
                 return Err(ArgumentError("Update only works with $ operators.".to_owned()));

@@ -6,7 +6,7 @@ pub mod cursor;
 pub mod error;
 pub mod wire_protocol;
 
-pub use client::error::{Error, MongoResult};
+pub use client::error::{Error, Result};
 use client::error::Error::ResponseError;
 
 use bson;
@@ -32,13 +32,13 @@ pub struct MongoClient {
 
 impl MongoClient {
     /// Creates a new MongoClient connected to a single MongoDB server.
-    pub fn new(host: &str, port: u16) -> MongoResult<MongoClient> {
+    pub fn new(host: &str, port: u16) -> Result<MongoClient> {
         MongoClient::with_prefs(host, port, None, None)
     }
 
     /// `new` with custom read and write controls.
     pub fn with_prefs(host: &str, port: u16, read_pref: Option<ReadPreference>,
-                      write_concern: Option<WriteConcern>) -> MongoResult<MongoClient> {
+                      write_concern: Option<WriteConcern>) -> Result<MongoClient> {
         let config = ConnectionString::new(host, port);
         MongoClient::with_config(config, read_pref, write_concern)
     }
@@ -46,19 +46,19 @@ impl MongoClient {
     /// Creates a new MongoClient connected to a server or replica set using
     /// a MongoDB connection string URI as defined by
     /// [the manual](http://docs.mongodb.org/manual/reference/connection-string/).
-    pub fn with_uri(uri: &str) -> MongoResult<MongoClient> {
+    pub fn with_uri(uri: &str) -> Result<MongoClient> {
         MongoClient::with_uri_and_prefs(uri, None, None)
     }
 
     /// `with_uri` with custom read and write controls.
     pub fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
-                              write_concern: Option<WriteConcern>) -> MongoResult<MongoClient> {
+                              write_concern: Option<WriteConcern>) -> Result<MongoClient> {
         let config = try!(connstring::parse(uri));
         MongoClient::with_config(config, read_pref, write_concern)
     }
 
     fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>,
-                   write_concern: Option<WriteConcern>) -> MongoResult<MongoClient> {
+                   write_concern: Option<WriteConcern>) -> Result<MongoClient> {
 
         let socket = try!(MongoClient::connect(&config));
 
@@ -98,7 +98,7 @@ impl MongoClient {
     }
 
     // Connects to a MongoDB server as defined by `config`.
-    fn connect(config: &ConnectionString) -> MongoResult<TcpStream> {
+    fn connect(config: &ConnectionString) -> Result<TcpStream> {
         let host_name = config.hosts[0].host_name.to_owned();
         let port = config.hosts[0].port;
         let stream = try!(TcpStream::connect((&host_name[..], port)));
@@ -106,7 +106,7 @@ impl MongoClient {
     }
 
     /// Returns a list of all database names that exist on the server.
-    pub fn database_names(&self) -> MongoResult<Vec<String>> {
+    pub fn database_names(&self) -> Result<Vec<String>> {
         let mut doc = bson::Document::new();
         doc.insert("listDatabases".to_owned(), Bson::I32(1));
 
@@ -129,14 +129,14 @@ impl MongoClient {
     }
 
     /// Drops the database defined by `db_name`.
-    pub fn drop_database(&self, db_name: &str) -> MongoResult<()> {
+    pub fn drop_database(&self, db_name: &str) -> Result<()> {
         let db = self.db(db_name);
         try!(db.drop_database());
         Ok(())
     }
 
     /// Reports whether this instance is a primary, master, mongos, or standalone mongod instance.
-    pub fn is_master(&self) -> MongoResult<bool> {
+    pub fn is_master(&self) -> Result<bool> {
         let mut doc = bson::Document::new();
         doc.insert("isMaster".to_owned(), Bson::I32(1));
 

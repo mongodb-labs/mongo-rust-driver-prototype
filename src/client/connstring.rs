@@ -1,7 +1,7 @@
 use std::ascii::AsciiExt;
 use std::collections::BTreeMap;
 
-use client::MongoResult;
+use client::Result;
 use client::Error::ArgumentError;
 
 pub const DEFAULT_PORT: u16 = 27017;
@@ -94,7 +94,7 @@ impl ConnectionString {
 
 /// Parses a MongoDB connection string URI as defined by 
 /// [the manual](http://docs.mongodb.org/manual/reference/connection-string/).
-pub fn parse(address: &str) -> MongoResult<ConnectionString> {
+pub fn parse(address: &str) -> Result<ConnectionString> {
     if !address.starts_with(URI_SCHEME) {
         return Err(ArgumentError("MongoDB connection string must start with 'mongodb://'".to_owned()))
     }
@@ -170,7 +170,7 @@ pub fn parse(address: &str) -> MongoResult<ConnectionString> {
 }
 
 // Parse user information of the form user:password
-fn parse_user_info(user_info: &str) -> MongoResult<(&str, &str)> {
+fn parse_user_info(user_info: &str) -> Result<(&str, &str)> {
     let (user, password) = rpartition(user_info, ":");
     if user_info.contains("@") || user.contains(":") {
         return Err(ArgumentError("':' or '@' characters in a username or password must be escaped according to RFC 2396.".to_owned()))
@@ -182,7 +182,7 @@ fn parse_user_info(user_info: &str) -> MongoResult<(&str, &str)> {
 }
 
 // Parses a literal IPv6 literal host entity of the form [host] or [host]:port
-fn parse_ipv6_literal_host(entity: &str) -> MongoResult<Host> {
+fn parse_ipv6_literal_host(entity: &str) -> Result<Host> {
     match entity.find("]") {
         Some(_) => {
             match entity.find("]:") {
@@ -202,7 +202,7 @@ fn parse_ipv6_literal_host(entity: &str) -> MongoResult<Host> {
 
 // Parses a host entity of the form host or host:port, and redirects IPv6 entities.
 // All host names are lowercased.
-fn parse_host(entity: &str) -> MongoResult<Host> {
+fn parse_host(entity: &str) -> Result<Host> {
     if entity.starts_with("[") {
         // IPv6 host
         parse_ipv6_literal_host(entity)
@@ -228,7 +228,7 @@ fn parse_host(entity: &str) -> MongoResult<Host> {
 }
 
 // Splits and parses comma-separated hosts.
-fn split_hosts(host_str: &str) -> MongoResult<Vec<Host>> {
+fn split_hosts(host_str: &str) -> Result<Vec<Host>> {
     let mut hosts: Vec<Host> = Vec::new();
     for entity in host_str.split(",") {
         if entity.len() == 0 {
@@ -265,7 +265,7 @@ fn parse_options(opts: &str, delim: Option<&str>) -> ConnectionOptions {
 }
 
 // Determines the option delimiter and offloads parsing to parse_options.
-fn split_options(opts: &str) -> MongoResult<ConnectionOptions> {
+fn split_options(opts: &str) -> Result<ConnectionOptions> {
     let and_idx = opts.find("&");
     let semi_idx = opts.find(";");
     let mut delim = None;

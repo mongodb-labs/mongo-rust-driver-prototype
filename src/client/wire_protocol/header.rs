@@ -1,7 +1,7 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Read, Write};
 
-use client::MongoResult;
+use client::Result;
 use client::Error::ResponseError;
 
 /// Represents an opcode in the MongoDB Wire Protocol.
@@ -196,7 +196,7 @@ impl Header {
     /// # Return value
     ///
     /// Returns nothing on success, or an error string on failure.
-    pub fn write(&self, buffer: &mut Write) -> MongoResult<()> {
+    pub fn write(&self, buffer: &mut Write) -> Result<()> {
         try!(buffer.write_i32::<LittleEndian>(self.message_length));
         try!(buffer.write_i32::<LittleEndian>(self.request_id));
         try!(buffer.write_i32::<LittleEndian>(self.response_to));
@@ -215,7 +215,7 @@ impl Header {
     /// # Return value
     ///
     /// Returns the parsed Header on success, or an error string on failure.
-    pub fn read(buffer: &mut Read) -> MongoResult<Header> {
+    pub fn read(buffer: &mut Read) -> Result<Header> {
         let message_length = try!(buffer.read_i32::<LittleEndian>());
         let request_id = try!(buffer.read_i32::<LittleEndian>());
         let response_to = try!(buffer.read_i32::<LittleEndian>());
