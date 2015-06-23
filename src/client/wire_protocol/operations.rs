@@ -1,15 +1,20 @@
 use bson;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use client::wire_protocol::flags::{OpInsertFlags, OpQueryFlags, OpReplyFlags,
-                                   OpUpdateFlags};
+
+use client::MongoResult;
+use client::Error::{ArgumentError, ResponseError};
+
 use client::wire_protocol::header::{Header, OpCode};
+use client::wire_protocol::flags::{OpInsertFlags, OpQueryFlags,
+                                   OpReplyFlags, OpUpdateFlags};
+
 use std::io::{Read, Write};
 use std::mem;
 use std::result::Result::{Ok, Err};
 
 trait ByteLength {
     /// Calculates the number of bytes in the serialized version of the struct.
-    fn byte_length(&self) -> Result<i32, String>;
+    fn byte_length(&self) -> MongoResult<i32>;
 }
 
 impl ByteLength for bson::Document {
@@ -18,13 +23,11 @@ impl ByteLength for bson::Document {
     /// # Return value
     ///
     /// Returns the number of bytes in the serialized BSON document.
-    fn byte_length(&self) -> Result<i32, String> {
+    fn byte_length(&self) -> MongoResult<i32> {
         let mut temp_buffer = vec![];
 
-        match bson::encode_document(&mut temp_buffer, self) {
-            Ok(_) => Ok(temp_buffer.len() as i32),
-            Err(_) => Err("unable to serialize BSON document".to_owned())
-        }
+        let _ = try!(bson::encode_document(&mut temp_buffer, self));
+        Ok(temp_buffer.len() as i32)
     }
 }
 
@@ -109,7 +112,8 @@ impl Message {
     /// Returns the newly-created Message.
     pub fn with_update(request_id: i32, namespace: String, flags: OpUpdateFlags,
                        selector: bson::Document,
-                       update: bson::Document) -> Result<Message, String> {
+                       update: bson::Document) -> MongoResult<Message> {
+
         let header_length = mem::size_of::<Header>() as i32;
 
         // Add an extra byte after the string for null-termination.
@@ -119,17 +123,8 @@ impl Message {
         // a bit vector, and the wire protocol-specified ZERO field.
         let i32_length = mem::size_of::<i32>() as i32 * 2;
 
-        let selector_length = match selector.byte_length() {
-            Ok(i) => i,
-            Err(_) =>
-                return Err("Unable to serialize `selector` field".to_owned())
-        };
-
-        let update_length = match update.byte_length() {
-            Ok(i) => i,
-            Err(_) =>
-                return Err("Unable to serialize `update` field".to_owned())
-        };
+        let selector_length = try!(selector.byte_length());
+        let update_length = try!(update.byte_length());
 
         let total_length = header_length + string_length + i32_length +
                            selector_length + update_length;
@@ -155,7 +150,8 @@ impl Message {
     ///
     /// Returns the newly-created Message.
     pub fn with_insert(request_id: i32, flags: OpInsertFlags, namespace: String,
-                       documents: Vec<bson::Document>) -> Result<Message, String> {
+                       documents: Vec<bson::Document>) -> MongoResult<Message> {
+
         let header_length = mem::size_of::<Header>() as i32;
         let flags_length = mem::size_of::<i32>() as i32;
 
@@ -165,10 +161,7 @@ impl Message {
         let mut total_length = header_length + flags_length + string_length;
 
         for doc in documents.iter() {
-            total_length += match doc.byte_length() {
-                Ok(i) => i,
-                Err(_) => return Err("Unable to serialize documents".to_owned())
-            }
+            total_length += try!(doc.byte_length());
         }
 
         let header = Header::with_insert(total_length, request_id);
@@ -200,7 +193,8 @@ impl Message {
     pub fn with_query(request_id: i32, flags: OpQueryFlags, namespace: String,
                       number_to_skip: i32, number_to_return: i32,
                       query: bson::Document,
-                      return_field_selector: Option<bson::Document>) -> Result<Message, String> {
+                      return_field_selector: Option<bson::Document>) -> MongoResult<Message> {
+
         let header_length = mem::size_of::<Header>() as i32;
 
         // There are three i32 fields in the an OpQuery (since OpQueryFlags is
@@ -210,19 +204,12 @@ impl Message {
         // Add an extra byte after the string for null-termination.
         let string_length = namespace.len() as i32 + 1;
 
-        let bson_length = match query.byte_length() {
-            Ok(i) => i,
-            Err(_) => return Err("Unable to serialize query".to_owned())
-        };
+        let bson_length = try!(query.byte_length());
 
         // Add the length of the optional BSON document only if it exists.
         let option_length = match return_field_selector {
-            Some(ref bson) => match bson.byte_length() {
-                Ok(i) => i,
-                Err(_) =>
-                    return Err("Unable to serialize return_field_selector".to_owned())
-            },
-            None => 0
+            Some(ref bson) => try!(bson.byte_length()),
+            None => 0,
         };
 
         let total_length = header_length + i32_length + string_length +
@@ -284,16 +271,12 @@ impl Message {
     ///
     /// Returns nothing on success, or an error string on failure.
     fn write_bson_document(buffer: &mut Write,
-                           bson: &bson::Document) -> Result<(), String>{
+                           bson: &bson::Document) -> MongoResult<()>{
         let mut temp_buffer = vec![];
 
-        match bson::encode_document(&mut temp_buffer, bson) {
-            Ok(_) => match buffer.write(&temp_buffer) {
-                Ok(_) => Ok(()),
-                Err(_) => Err("unable to write BSON".to_owned())
-            },
-            Err(_) => Err("unable to encode BSON".to_owned())
-        }
+        try!(bson::encode_document(&mut temp_buffer, bson));
+        try!(buffer.write(&temp_buffer));
+        Ok(())
     }
 
     /// Writes a serialized query message to a given buffer.
@@ -313,51 +296,26 @@ impl Message {
     /// Returns nothing on success, or an error string on failure.
     pub fn write_update(buffer: &mut Write, header: &Header, namespace: &str,
                         flags: &OpUpdateFlags, selector: &bson::Document,
-                        update: &bson::Document) -> Result<(), String> {
-        match header.write(buffer) {
-            Ok(_) => (),
-            Err(e) => return Err(e)
-        };
+                        update: &bson::Document) -> MongoResult<()> {
+
+        try!(header.write(buffer));
 
         // Write ZERO field
-        match buffer.write_i32::<LittleEndian>(0) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write flags".to_owned())
-        };
+        try!(buffer.write_i32::<LittleEndian>(0));
 
         for byte in namespace.bytes() {
-            let _byte_reponse = match buffer.write_u8(byte) {
-                Ok(_) => (),
-                Err(_) => return Err("Unable to write namespace".to_owned())
-            };
+            try!(buffer.write_u8(byte));
         }
 
         // Writes the null terminator for the collection name string.
-        match buffer.write_u8(0) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write namespace".to_owned())
-        };
+        try!(buffer.write_u8(0));
 
+        try!(buffer.write_i32::<LittleEndian>(flags.to_i32()));
 
-        match buffer.write_i32::<LittleEndian>(flags.to_i32()) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write flags".to_owned())
-        };
-
-        match Message::write_bson_document(buffer, selector) {
-            Ok(_) => (),
-            Err(s) =>
-                return Err(format!("Unable to write `selector` field: {}", s))
-        };
-
-        match Message::write_bson_document(buffer, update) {
-            Ok(_) => (),
-            Err(s) =>
-                return Err(format!("Unable to write `update` field: {}", s))
-        };
+        try!(Message::write_bson_document(buffer, selector));
+        try!(Message::write_bson_document(buffer, update));
 
         let _ = buffer.flush();
-
         Ok(())
     }
 
@@ -377,42 +335,23 @@ impl Message {
     /// Returns the newly-created Message.
     fn write_insert(buffer: &mut Write, header: &Header, flags: &OpInsertFlags,
                     namespace: &str,
-                    documents: &[bson::Document]) -> Result<(), String> {
-        match header.write(buffer) {
-            Ok(_) => (),
-            Err(e) => return Err(e)
-        };
+                    documents: &[bson::Document]) -> MongoResult<()> {
 
-        match buffer.write_i32::<LittleEndian>(flags.to_i32()) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write flags".to_owned())
-        };
+        try!(header.write(buffer));
+        try!(buffer.write_i32::<LittleEndian>(flags.to_i32()));
 
         for byte in namespace.bytes() {
-            let _byte_reponse = match buffer.write_u8(byte) {
-                Ok(_) => (),
-                Err(_) => return Err("Unable to write namespace".to_owned())
-            };
+            try!(buffer.write_u8(byte));
         }
 
         // Writes the null terminator for the collection name string.
-        match buffer.write_u8(0) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write namespace".to_owned())
-        };
-
+        try!(buffer.write_u8(0));
 
         for doc in documents {
-            match Message::write_bson_document(buffer, doc) {
-                Ok(_) => (),
-                Err(s) =>
-                    return Err(format!("Unable to insert document: {}", s))
-            };
-
+            try!(Message::write_bson_document(buffer, doc));
         }
 
         let _ = buffer.flush();
-
         Ok(())
     }
 
@@ -440,58 +379,28 @@ impl Message {
     fn write_query(buffer: &mut Write, header: &Header,
                    flags: &OpQueryFlags, namespace: &str,
                    number_to_skip: i32, number_to_return: i32, query: &bson::Document,
-                   return_field_selector: &Option<bson::Document>) -> Result<(), String> {
-        match header.write(buffer) {
-            Ok(_) => (),
-            Err(e) => return Err(e)
-        };
+                   return_field_selector: &Option<bson::Document>) -> MongoResult<()> {
 
-        match buffer.write_i32::<LittleEndian>(flags.to_i32()) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write flags".to_owned())
-        };
+        try!(header.write(buffer));
+        try!(buffer.write_i32::<LittleEndian>(flags.to_i32()));
 
         for byte in namespace.bytes() {
-            let _byte_reponse = match buffer.write_u8(byte) {
-                Ok(_) => (),
-                Err(_) => return Err("Unable to write namespace".to_owned())
-            };
+            try!(buffer.write_u8(byte));
         }
 
         // Writes the null terminator for the collection name string.
-        match buffer.write_u8(0) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write namespace".to_owned())
-        };
-
-        match buffer.write_i32::<LittleEndian>(number_to_skip) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write number_to_skip".to_owned())
-        };
-
-        match buffer.write_i32::<LittleEndian>(number_to_return) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write number_to_return".to_owned())
-        };
-
-        match Message::write_bson_document(buffer, query) {
-            Ok(_) => (),
-            Err(s) => return Err(format!("Unable to write query: {}", s))
-        };
+        try!(buffer.write_u8(0));
+        
+        try!(buffer.write_i32::<LittleEndian>(number_to_skip));
+        try!(buffer.write_i32::<LittleEndian>(number_to_return));
+        try!(Message::write_bson_document(buffer, query));
 
         match return_field_selector {
-            &Some(ref doc) => match Message::write_bson_document(buffer, doc) {
-                Ok(_) => (),
-                Err(s) => {
-                    return Err(format!("Unable to write \
-                                        return_field_selector: {}", s))
-                }
-            },
-            &None => ()
+            &Some(ref doc) => try!(Message::write_bson_document(buffer, doc)),
+            &None => (),
         };
 
         let _ = buffer.flush();
-
         Ok(())
     }
 
@@ -512,47 +421,24 @@ impl Message {
     /// Returns the newly-created Message.
     pub fn write_get_more(buffer: &mut Write, header: &Header, namespace: &str,
                           number_to_return: i32,
-                          cursor_id: i64) -> Result<(), String> {
-        match header.write(buffer) {
-            Ok(_) => (),
-            Err(e) => return Err(e)
-        };
+                          cursor_id: i64) -> MongoResult<()> {
+
+        try!(header.write(buffer));
 
         // Write ZERO field
-        match buffer.write_i32::<LittleEndian>(0) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write ZERO field".to_owned())
-        };
+        try!(buffer.write_i32::<LittleEndian>(0));
 
         for byte in namespace.bytes() {
-            let _byte_reponse = match buffer.write_u8(byte) {
-                Ok(_) => (),
-                Err(_) => return Err("Unable to write \
-                                      namespace".to_owned())
-            };
+            try!(buffer.write_u8(byte));
         }
 
         // Writes the null terminator for the collection name string.
-        match buffer.write_u8(0) {
-            Ok(_) => (),
-            Err(_) =>
-                return Err("Unable to write namespace".to_owned())
-        };
+        try!(buffer.write_u8(0));
 
-
-        match buffer.write_i32::<LittleEndian>(number_to_return) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write number_to_return".to_owned())
-        };
-
-
-        match buffer.write_i64::<LittleEndian>(cursor_id) {
-            Ok(_) => (),
-            Err(_) => return Err("Unable to write cursor_id".to_owned())
-        };
+        try!(buffer.write_i32::<LittleEndian>(number_to_return));
+        try!(buffer.write_i64::<LittleEndian>(cursor_id));
 
         let _ = buffer.flush();
-
         Ok(())
     }
 
@@ -565,11 +451,11 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an error string on failure.
-    pub fn write(&self, buffer: &mut Write) -> Result<(), String> {
+    pub fn write(&self, buffer: &mut Write) -> MongoResult<()> {
         match self {
             /// Only the server should sent replies
             &Message::OpReply {..} =>
-                Err("OP_REPLY should not be sent by the client".to_owned()),
+                Err(ArgumentError("OP_REPLY should not be sent to the client.".to_owned())),
             &Message::OpUpdate { ref header, ref namespace,
                                  ref flags, ref selector, ref update } =>
                 Message::write_update(buffer, &header,&namespace,
@@ -602,51 +488,31 @@ impl Message {
     ///
     /// Returns the reply message on success, or an error string on
     /// failure.
-    fn read_reply(buffer: &mut Read, h: Header) -> Result<Message, String> {
+    fn read_reply(buffer: &mut Read, h: Header) -> MongoResult<Message> {
         let mut length = h.message_length - mem::size_of::<Header>() as i32;
 
-        let flags = match buffer.read_i32::<LittleEndian>() {
-            Ok(i) => i,
-            Err(_) => return Err("Unable to read flags".to_owned())
-        };
-
+        // Read flags
+        let flags = try!(buffer.read_i32::<LittleEndian>());
         length -= mem::size_of::<i32>() as i32;
 
-        let cid = match buffer.read_i64::<LittleEndian>() {
-            Ok(i) => i,
-            Err(_) => return Err("Unable to read cursor_id".to_owned())
-        };
-
+        // Read cursor_id
+        let cid = try!(buffer.read_i64::<LittleEndian>());
         length -= mem::size_of::<i64>() as i32;
 
-        let sf = match buffer.read_i32::<LittleEndian>() {
-            Ok(i) => i,
-            Err(_) => return Err("Unable to read starting_from".to_owned())
-        };
-
+        // Read starting_from
+        let sf = try!(buffer.read_i32::<LittleEndian>());
         length -= mem::size_of::<i32>() as i32;
 
-        let nr = match buffer.read_i32::<LittleEndian>() {
-            Ok(i) => i,
-            Err(_) => return Err("Unable to read number_returned".to_owned())
-        };
-
+        // Read number_returned
+        let nr = try!(buffer.read_i32::<LittleEndian>());
         length -= mem::size_of::<i32>() as i32;
 
         let mut v = vec![];
 
         while length > 0 {
-            match bson::decode_document(buffer) {
-                Ok(bson) => {
-                    match bson.byte_length() {
-                        Ok(i) => length -= i,
-                        Err(e) => return Err(e)
-                    };
-
-                    v.push(bson);
-                },
-                Err(_) => return Err("Unable to read BSON".to_owned())
-            }
+            let bson = try!(bson::decode_document(buffer));
+            length -= try!(bson.byte_length());
+            v.push(bson);
         }
 
         Ok(Message::with_reply(h, flags, cid, sf, nr, v))
@@ -662,23 +528,15 @@ impl Message {
     ///
     /// Returns the reply message on success, or an error string on
     /// failure.
-    pub fn read<T>(buffer: &mut T) -> Result<Message, String> where T: Read + Write {
-        let header = match Header::read(buffer) {
-            Ok(h) => h,
-            Err(s) => {
-                let str = format!("Unable to read reply header: {}", s);
-
-                return Err(str)
-            }
-        };
-
+    pub fn read<T>(buffer: &mut T) -> MongoResult<Message> where T: Read + Write {
+        let header = try!(Header::read(buffer));
         match header.op_code {
             OpCode::Reply => {
                 Message::read_reply(buffer, header)
             },
             opcode => {
-                Err(format!("Expected to read response but instead found: {}",
-                            opcode.to_string()))
+                Err(ResponseError(format!("Expected to read response but instead found opcode {}",
+                                          opcode.to_string())))
             }
         }
     }

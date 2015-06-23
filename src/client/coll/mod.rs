@@ -11,7 +11,7 @@ use client::coll::results::*;
 
 use client::cursor::Cursor;
 use client::MongoResult;
-use client::Error::{DefaultError, ReadError};
+use client::Error::{ArgumentError, ResponseError};
 
 use client::wire_protocol::flags::OpQueryFlags;
 
@@ -110,7 +110,7 @@ impl<'a> Collection<'a> {
         match result.get("n") {
             Some(&Bson::I32(ref n)) => Ok(*n as i64),
             Some(&Bson::I64(ref n)) => Ok(*n),
-            _ => Err(ReadError),
+            _ => Err(ResponseError("No count received from server.".to_owned())),
         }
     }
 
@@ -127,11 +127,10 @@ impl<'a> Collection<'a> {
         }
 
         let result = try!(self.db.command(spec));
-        if let Some(&Bson::Array(ref vals)) = result.get("values") {
-            return Ok(vals.to_owned());
+        match result.get("values") {
+            Some(&Bson::Array(ref vals)) => Ok(vals.to_owned()),
+            _ => Err(ResponseError("No values received from server.".to_owned()))
         }
-
-        Err(ReadError)
     }
 
     /// Returns a list of documents within the collection that match the filter.
@@ -372,7 +371,7 @@ impl<'a> Collection<'a> {
     fn validate_replace(replacement: &bson::Document) -> MongoResult<()> {
         for key in replacement.keys() {
             if key.starts_with("$") {
-                return Err(DefaultError("Replacement cannot include $ operators.".to_owned()));
+                return Err(ArgumentError("Replacement cannot include $ operators.".to_owned()));
             }
         }
         Ok(())
@@ -381,7 +380,7 @@ impl<'a> Collection<'a> {
     fn validate_update(update: &bson::Document) -> MongoResult<()> {
         for key in update.keys() {
             if !key.starts_with("$") {
-                return Err(DefaultError("Update only works with $ operators.".to_owned()));
+                return Err(ArgumentError("Update only works with $ operators.".to_owned()));
             }
         }
         Ok(())

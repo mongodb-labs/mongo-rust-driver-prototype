@@ -277,6 +277,31 @@ fn count() {
 }
 
 #[test]
+fn distinct_none() {
+    let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
+    let db = client.db("test");
+    let coll = db.collection("distinct_none");
+
+    db.drop_database().ok().expect("Failed to drop database");
+    let distinct_titles = coll.distinct("title", None, None).ok().expect("Failed to execute 'distinct'.");
+    assert_eq!(0, distinct_titles.len());
+}
+
+#[test]
+fn distinct_one() {
+    let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
+    let db = client.db("test");
+    let coll = db.collection("distinct_none");
+
+    db.drop_database().ok().expect("Failed to drop database");
+    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
+    coll.insert_one(doc2, None).ok().expect("Failed to insert document.");
+
+    let distinct_titles = coll.distinct("title", None, None).ok().expect("Failed to execute 'distinct'.");
+    assert_eq!(1, distinct_titles.len());
+}
+
+#[test]
 fn distinct() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");

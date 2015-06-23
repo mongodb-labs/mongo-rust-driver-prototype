@@ -23,15 +23,8 @@ impl<'a> Database<'a> {
     pub fn new(client: &'a MongoClient, name: &str,
                read_preference: Option<ReadPreference>, write_concern: Option<WriteConcern>) -> Database<'a> {
 
-        let rp = match read_preference {
-            Some(rp) => rp,
-            None => client.read_preference.to_owned(),
-        };
-
-        let wc = match write_concern {
-            Some(wc) => wc,
-            None => client.write_concern.to_owned(),
-        };
+        let rp = read_preference.unwrap_or(client.read_preference.to_owned());
+        let wc = write_concern.unwrap_or(client.write_concern.to_owned());
 
         Database {
             name: name.to_owned(),
@@ -57,20 +50,18 @@ impl<'a> Database<'a> {
         self.client.get_req_id()
     }
 
-    /// Sends an administrative command over find_one.
+    /// Generates a cursor for a relevant operational command.
     pub fn command_cursor(&self, spec: bson::Document) -> MongoResult<Cursor> {
         Cursor::command_cursor(self.client, &self.name[..], spec)
     }
 
+    /// Sends an administrative command over find_one.
     pub fn command(&'a self, spec: bson::Document) -> MongoResult<bson::Document> {
         let coll = self.collection("$cmd");
         let mut options = FindOptions::new();
         options.batch_size = 1;
-        let res = try!(coll.find_one(Some(spec), Some(options)));
-        match res {
-            Some(doc) => Ok(doc),
-            None => Err(OperationError),
-        }
+        let res = try!(coll.find_one(Some(spec.clone()), Some(options)));
+        res.ok_or(OperationError(format!("Failed to execute command with spec {:?}", spec)))
     }
 
     /// Returns a list of collections within the database.
