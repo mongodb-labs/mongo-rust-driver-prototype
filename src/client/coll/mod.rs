@@ -1,4 +1,5 @@
 pub mod options;
+pub mod error;
 pub mod results;
 
 use bson;
@@ -11,7 +12,10 @@ use client::coll::results::*;
 
 use client::cursor::Cursor;
 use client::Result;
-use client::Error::{ArgumentError, ResponseError};
+
+use client::coll::error::{BulkWriteException, WriteException};
+use client::Error::{ArgumentError, ResponseError,
+                    OperationError, BulkWriteError, WriteError};
 
 use client::wire_protocol::flags::OpQueryFlags;
 
@@ -49,6 +53,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Extracts the collection name from the namespace.
+    /// If the namespace is invalid, this method will panic.
     pub fn name(&self) -> String {
         match self.namespace.find(".") {
             Some(idx) => self.namespace[self.namespace.char_indices()
@@ -161,10 +166,10 @@ impl<'a> Collection<'a> {
 
     // Helper method for all findAndModify commands.
     fn find_and_modify(&self, cmd: &mut bson::Document,
-                           filter: bson::Document, max_time_ms: Option<i64>,
-                           projection: Option<bson::Document>, sort: Option<bson::Document>,
-                           write_concern: Option<WriteConcern>)
-                           -> Result<Option<bson::Document>> {
+                       filter: bson::Document, max_time_ms: Option<i64>,
+                       projection: Option<bson::Document>, sort: Option<bson::Document>,
+                       write_concern: Option<WriteConcern>)
+                       -> Result<Option<bson::Document>> {
 
         let wc = write_concern.unwrap_or(self.write_concern.clone());
 
@@ -184,10 +189,13 @@ impl<'a> Collection<'a> {
         }
 
         let res = try!(self.db.command(new_cmd));
-        match res.get("value") {
-            Some(&Bson::Document(ref nested_doc)) => Ok(Some(nested_doc.to_owned())),
-            _ => Ok(None),
-        }
+        try!(WriteException::validate_write_result(res.clone(), wc));
+        let doc = match res.get("value") {
+            Some(&Bson::Document(ref nested_doc)) => Some(nested_doc.to_owned()),
+            _ => None,
+        };
+
+        Ok(doc)
     }
 
     // Helper method for validated replace and update commands.
@@ -242,26 +250,22 @@ impl<'a> Collection<'a> {
     }
 
     /// Sends a batch of writes to the server at the same time.
-    pub fn bulk_write(requests: &[WriteModel], ordered: bool) -> BulkWriteResult {
+    pub fn bulk_write(requests: Vec<WriteModel>, ordered: bool) -> BulkWriteResult {
         unimplemented!()
     }
 
-    // Internal insertion helper function.
+    // Internal insertion helper function. Returns a vec of collected ids and a possible exception.
     fn insert(&self, docs: Vec<bson::Document>, ordered: bool,
-              write_concern: Option<WriteConcern>) -> Result<BTreeMap<i64, Bson>> {
+              write_concern: Option<WriteConcern>) -> Result<(Vec<Bson>,
+                                                              Option<BulkWriteException>)> {
 
-        let wc =  write_concern.unwrap_or(WriteConcern::new());
-        let mut map = BTreeMap::new();
-
-        let ids = for i in 0..docs.len() {
-            match docs[i].get("_id") {
-                Some(bson) => {
-                    let _ = map.insert(i as i64, bson.clone());
-                    ()
-                },
-                None => ()
-            };
-        };
+        let wc =  write_concern.unwrap_or(self.write_concern.clone());
+        let ids = docs.iter().map(|ref doc| {
+            match doc.get("_id") {
+                Some(bson) => bson.clone(),
+                None => Bson::String("Unimplemented OID".to_owned()),
+            }
+        }).collect();
 
         let converted_docs = docs.iter().map(|doc| Bson::Document(doc.to_owned())).collect();
 
@@ -271,36 +275,55 @@ impl<'a> Collection<'a> {
         cmd.insert("ordered".to_owned(), Bson::Boolean(ordered));
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
-        let _ = try!(self.db.command(cmd));
-        Ok(map)
+        let result = try!(self.db.command(cmd));
+
+        // Intercept bulk write exceptions and insert into the result
+        let exception_res = BulkWriteException::validate_bulk_write_result(result.clone(), wc);
+        let exception = match exception_res {
+            Ok(()) => None,
+            Err(BulkWriteError(err)) => Some(err),
+            Err(e) => return Err(e),
+        };
+
+        Ok((ids, exception))
     }
 
     /// Inserts the provided document. If the document is missing an identifier,
     /// the driver should generate one.
     pub fn insert_one(&self, doc: bson::Document, write_concern: Option<WriteConcern>) -> Result<InsertOneResult> {
-        let res = try!(self.insert(vec!(doc), true, write_concern));
-        let id = match res.keys().next() {
-            Some(ref key) => res.get(key),
+        let (ids, bulk_exception) = try!(self.insert(vec!(doc), true, write_concern.clone()));
+
+        if ids.len() == 0 {
+            return Err(OperationError("No ids returned for insert_one.".to_owned()));
+        }
+
+        // Downgrade bulk exception, if it exists.
+        let exception = match bulk_exception {
+            Some(e) => Some(WriteException::with_bulk_exception(e)),
             None => None
         };
 
-        match id {
-            Some(id) => Ok(InsertOneResult::new(Some(id.clone()))),
-            None => Ok(InsertOneResult::new(None))
-        }
+        Ok(InsertOneResult::new(Some(ids[0].to_owned()), exception))
     }
 
     /// Inserts the provided documents. If any documents are missing an identifier,
     /// the driver should generate them.
     pub fn insert_many(&self, docs: Vec<bson::Document>, ordered: bool,
                        write_concern: Option<WriteConcern>) -> Result<InsertManyResult> {
-        let res = try!(self.insert(docs, ordered, write_concern));
-        Ok(InsertManyResult::new(Some(res)))
+
+        let (ids, exception) = try!(self.insert(docs, ordered, write_concern));
+
+        let mut map = BTreeMap::new();
+        for i in 0..ids.len() {
+            map.insert(i as i64, ids.get(i).unwrap().to_owned());
+        }
+
+        Ok(InsertManyResult::new(Some(map), exception))
     }
 
     // Internal deletion helper function.
     fn delete(&self, filter: bson::Document, limit: i64, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
-        let wc = write_concern.unwrap_or(WriteConcern::new());
+        let wc = write_concern.unwrap_or(self.write_concern.clone());
 
         let mut deletes = bson::Document::new();
         deletes.insert("q".to_owned(), Bson::Document(filter));
@@ -312,7 +335,16 @@ impl<'a> Collection<'a> {
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
         let result = try!(self.db.command(cmd));
-        Ok(DeleteResult::new(result))
+
+        // Intercept write exceptions and insert into the result
+        let exception_res = WriteException::validate_write_result(result.clone(), wc);
+        let exception = match exception_res {
+            Ok(()) => None,
+            Err(WriteError(err)) => Some(err),
+            Err(e) => return Err(e),
+        };
+
+        Ok(DeleteResult::new(result, exception))
     }
 
     /// Deletes a single document.
@@ -329,7 +361,7 @@ impl<'a> Collection<'a> {
     fn update(&self, filter: bson::Document, update: bson::Document, upsert: bool, multi: bool,
               write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
 
-        let wc = write_concern.unwrap_or(WriteConcern::new());
+        let wc = write_concern.unwrap_or(self.write_concern.clone());
 
         let mut updates = bson::Document::new();
         updates.insert("q".to_owned(), Bson::Document(filter));
@@ -345,7 +377,16 @@ impl<'a> Collection<'a> {
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
         let result = try!(self.db.command(cmd));
-        Ok(UpdateResult::new(result))
+
+        // Intercept write exceptions and insert into the result
+        let exception_res = WriteException::validate_write_result(result.clone(), wc);
+        let exception = match exception_res {
+            Ok(()) => None,
+            Err(WriteError(err)) => Some(err),
+            Err(e) => return Err(e),
+        };
+
+        Ok(UpdateResult::new(result, exception))
     }
 
     /// Replaces a single document.
