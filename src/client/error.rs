@@ -29,7 +29,7 @@ pub enum Error {
     /// A cursor operation failed to return a cursor.
     CursorNotFoundError,
     /// The application failed to secure the client connection socket due to a poisoned lock.
-    LockError,
+    PoisonLockError,
     /// A standard error with a string description;
     /// a more specific error should generally be used.
     DefaultError(String),
@@ -126,7 +126,7 @@ impl From<byteorder::Error> for Error {
 
 impl<T> From<sync::PoisonError<T>> for Error {
     fn from(_: sync::PoisonError<T>) -> Error {
-        Error::LockError
+        Error::PoisonLockError
     }
 }
 
@@ -142,7 +142,7 @@ impl fmt::Display for Error {
             &Error::OperationError(ref inner) => inner.fmt(fmt),
             &Error::ResponseError(ref inner) => inner.fmt(fmt),
             &Error::CursorNotFoundError => write!(fmt, "No cursor found for cursor operation."),
-            &Error::LockError => write!(fmt, "Socket lock poisoned while attempting to access."),
+            &Error::PoisonLockError => write!(fmt, "Socket lock poisoned while attempting to access."),
             &Error::DefaultError(ref inner) => inner.fmt(fmt),
         }
     }
@@ -160,7 +160,7 @@ impl error::Error for Error {
             &Error::OperationError(ref inner) => &inner,
             &Error::ResponseError(ref inner) => &inner,
             &Error::CursorNotFoundError => "No cursor found for cursor operation.",
-            &Error::LockError => "Socket lock poisoned while attempting to access.",
+            &Error::PoisonLockError => "Socket lock poisoned while attempting to access.",
             &Error::DefaultError(ref inner) => &inner,
         }
     }
@@ -176,7 +176,7 @@ impl error::Error for Error {
             &Error::OperationError(_) => None,
             &Error::ResponseError(_) => None,
             &Error::CursorNotFoundError => None,
-            &Error::LockError => None,
+            &Error::PoisonLockError => None,
             &Error::DefaultError(_) => None,
         }
     }
