@@ -11,6 +11,9 @@ pub enum Arguments {
     InsertOne {
         document: Document,
     },
+    InsertMany {
+        documents: Vec<Document>,
+    },
 }
 
 impl Arguments {
@@ -33,5 +36,24 @@ impl Arguments {
                                    "`insert_one` requires document");
 
         Ok(Arguments::InsertOne { document: document })
+    }
+
+    pub fn new_insert_many_from_json(object: &Object) -> Result<Arguments, String> {
+        let f = |x| Some(Bson::from_json(x));
+
+        let bsons = val_or_err!(object.get("documents").and_then(f),
+                                   Some(Bson::Array(arr)) => arr,
+                                    "`insert_many` requires documents");
+
+        let mut docs = vec![];
+
+        for bson in bsons.into_iter() {
+            match bson {
+                Bson::Document(doc) => docs.push(doc),
+                _ => return Err("`insert_many` can only insert documents".to_owned())
+            };
+        }
+
+        Ok(Arguments::InsertMany { documents: docs })
     }
 }

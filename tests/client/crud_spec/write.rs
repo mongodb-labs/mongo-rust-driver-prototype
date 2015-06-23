@@ -10,3 +10,9 @@ fn insert_one() {
     run_suite!("tests/json/data/specs/source/crud/tests/write/insertOne.json",
                "insert_one");
 }
+
+#[test]
+fn insert_many() {
+    run_suite!("tests/json/data/specs/source/crud/tests/write/insertMany.json",
+               "insert_many");
+}

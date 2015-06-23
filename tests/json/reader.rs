@@ -29,6 +29,10 @@ impl Test {
                 Ok(a) => a,
                 Err(s) => return Err(s)
             },
+            "insertMany" => match Arguments::new_insert_many_from_json(&args_obj) {
+                Ok(a) => a,
+                Err(s) => return Err(s)
+            },
             _ => return Err("Invalid operation name".to_owned())
         };
 

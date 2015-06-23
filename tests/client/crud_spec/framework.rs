@@ -29,6 +29,29 @@ macro_rules! run_insert_one_test {
     }};
 }
 
+macro_rules! run_insert_many_test {
+    ( $db:expr, $coll: expr, $docs:expr, $outcome:expr) => {{
+        let inserted = $coll.insert_many($docs, true, None).unwrap().inserted_ids.unwrap();
+        let ids_bson = match $outcome.result {
+            Bson::Document(ref doc) => doc.get("insertedIds").unwrap(),
+            _ => panic!("`insert_one` test result should be a document")
+        };
+
+        let ids = match ids_bson {
+            &Bson::Array(ref arr) => arr.into_iter(),
+            _ => panic!("`insertedIds` test result should be an array")
+        };
+
+        let mut actual_ids = inserted.values();
+
+        for expected_id in ids {
+            assert!(eq::bson_eq(&expected_id, actual_ids.next().unwrap()));
+        }
+
+        check_coll!($db, $coll, $outcome.collection);
+    }};
+}
+
 
 #[macro_export]
 macro_rules! run_suite {
@@ -47,7 +70,9 @@ macro_rules! run_suite {
                     run_find_test!(db, coll, filter, Some(options),
                                    test.outcome),
                 Arguments::InsertOne { document } =>
-                    run_insert_one_test!(db, coll, document, test.outcome)
+                    run_insert_one_test!(db, coll, document, test.outcome),
+                Arguments::InsertMany { documents } =>
+                    run_insert_many_test!(db, coll, documents, test.outcome),
             };
         }
     }};
