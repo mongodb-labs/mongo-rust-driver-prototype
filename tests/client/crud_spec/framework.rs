@@ -52,6 +52,18 @@ macro_rules! run_insert_many_test {
     }};
 }
 
+macro_rules! run_delete_one_test {
+    ( $db:expr, $coll: expr, $filter:expr, $outcome:expr) => {{
+        let expected = $coll.delete_one($filter, None).unwrap().deleted_count;
+        let actual = match $outcome.result {
+            Bson::Document(ref doc) => doc.get("deletedCount").unwrap(),
+            _ => panic!("`insert_one` test result should be a document")
+        };
+
+        assert!(actual.int_eq(expected as i64));
+        check_coll!($db, $coll, $outcome.collection);
+    }};
+}
 
 #[macro_export]
 macro_rules! run_suite {
@@ -73,6 +85,8 @@ macro_rules! run_suite {
                     run_insert_one_test!(db, coll, document, test.outcome),
                 Arguments::InsertMany { documents } =>
                     run_insert_many_test!(db, coll, documents, test.outcome),
+                Arguments::DeleteOne { filter } =>
+                    run_delete_one_test!(db, coll, filter, test.outcome),
             };
         }
     }};

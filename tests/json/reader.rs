@@ -11,6 +11,14 @@ pub struct Test {
 
 impl Test {
     fn from_json(object: &Object) -> Result<Test, String> {
+        macro_rules! res_or_err {
+            ($exp:expr) => { match $exp {
+                Ok(a) => a,
+                Err(s) => return Err(s)
+            }};
+        }
+
+
         let op = val_or_err!(object.get("operation"),
                              Some(&Json::Object(ref obj)) => obj.clone(),
                              "`operation` must be an object");
@@ -25,14 +33,9 @@ impl Test {
 
         let args = match name.as_ref() {
             "find" => Arguments::find_from_json(&args_obj),
-            "insertOne" => match Arguments::insert_one_from_json(&args_obj) {
-                Ok(a) => a,
-                Err(s) => return Err(s)
-            },
-            "insertMany" => match Arguments::insert_many_from_json(&args_obj) {
-                Ok(a) => a,
-                Err(s) => return Err(s)
-            },
+            "insertOne" => res_or_err!(Arguments::insert_one_from_json(&args_obj)),
+            "insertMany" => res_or_err!(Arguments::insert_many_from_json(&args_obj)),
+            "deleteOne" => res_or_err!(Arguments::delete_one_from_json(&args_obj)),
             _ => return Err("Invalid operation name".to_owned())
         };
 

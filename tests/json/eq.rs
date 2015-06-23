@@ -1,7 +1,7 @@
 use bson::Bson;
 use nalgebra::ApproxEq;
 
-trait NumEq {
+pub trait NumEq {
     fn float_eq(&self, f: f64) -> bool;
     fn int_eq(&self, i: i64) -> bool;
 }
