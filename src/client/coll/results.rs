@@ -48,20 +48,20 @@ pub struct UpdateResult {
 
 impl InsertOneResult {
     /// Extracts server reply information into a result.
-    pub fn new(doc: bson::Document) -> InsertOneResult {
+    pub fn new(inserted_id: Option<Bson>) -> InsertOneResult {
         InsertOneResult {
             acknowledged: true,
-            inserted_id: None,
+            inserted_id: inserted_id,
         }
     }
 }
 
 impl InsertManyResult {
     /// Extracts server reply information into a result.
-    pub fn new(doc: bson::Document) -> InsertManyResult {
+    pub fn new(inserted_ids: Option<BTreeMap<i64, Bson>>) -> InsertManyResult {
         InsertManyResult {
             acknowledged: true,
-            inserted_ids: None,
+            inserted_ids: inserted_ids,
         }
     }
 }

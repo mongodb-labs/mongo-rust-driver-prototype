@@ -13,6 +13,8 @@ use client::cursor::Cursor;
 
 use client::wire_protocol::flags::OpQueryFlags;
 
+use std::collections::BTreeMap;
+
 /// Interfaces with a MongoDB collection.
 pub struct Collection<'a> {
     pub db: &'a Database<'a>,
@@ -153,7 +155,6 @@ impl<'a> Collection<'a> {
     /// Returns the first document within the collection that matches the filter, or None.
     pub fn find_one(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
                     -> Result<Option<bson::Document>, String> {
-
         let options = options.unwrap_or(FindOptions::new());
         let mut cursor = try!(self.find(filter, Some(options.with_limit(1))));
         Ok(cursor.next())
@@ -251,9 +252,20 @@ impl<'a> Collection<'a> {
 
     // Internal insertion helper function.
     fn insert(&self, docs: Vec<bson::Document>, ordered: bool,
-              write_concern: Option<WriteConcern>) -> Result<bson::Document, String> {
-
+              write_concern: Option<WriteConcern>) -> Result<BTreeMap<i64, Bson>, String> {
         let wc =  write_concern.unwrap_or(WriteConcern::new());
+        let mut map = BTreeMap::new();
+
+        let ids = for i in 0..docs.len() {
+            match docs[i].get("_id") {
+                Some(bson) => {
+                    let _ = map.insert(i as i64, bson.clone());
+                    ()
+                },
+                None => ()
+            };
+        };
+
         let converted_docs = docs.iter().map(|doc| Bson::Document(doc.to_owned())).collect();
 
         let mut cmd = bson::Document::new();
@@ -263,17 +275,28 @@ impl<'a> Collection<'a> {
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
         let result = try!(self.db.command(cmd));
+
         match result {
-            Some(doc) => Ok(doc),
-            None => Err("Insertion reply not received from server.".to_owned()),
-        }
+            Some(_) => (),
+            None => return Err("Insertion reply not received from server.".to_owned()),
+        };
+
+        Ok(map)
     }
 
     /// Inserts the provided document. If the document is missing an identifier,
     /// the driver should generate one.
     pub fn insert_one(&self, doc: bson::Document, write_concern: Option<WriteConcern>) -> Result<InsertOneResult, String> {
         let res = try!(self.insert(vec!(doc), true, write_concern));
-        Ok(InsertOneResult::new(res))
+        let id = match res.keys().next() {
+            Some(ref key) => res.get(key),
+            None => None
+        };
+
+        match id {
+            Some(id) => Ok(InsertOneResult::new(Some(id.clone()))),
+            None => Ok(InsertOneResult::new(None))
+        }
     }
 
     /// Inserts the provided documents. If any documents are missing an identifier,
@@ -281,7 +304,7 @@ impl<'a> Collection<'a> {
     pub fn insert_many(&self, docs: Vec<bson::Document>, ordered: bool,
                        write_concern: Option<WriteConcern>) -> Result<InsertManyResult, String> {
         let res = try!(self.insert(docs, ordered, write_concern));
-        Ok(InsertManyResult::new(res))
+        Ok(InsertManyResult::new(Some(res)))
     }
 
     // Internal deletion helper function.

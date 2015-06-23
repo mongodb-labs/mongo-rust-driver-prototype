@@ -6,7 +6,9 @@ authors = ["Valeri Karpov <valkar207@gmail.com>",
            "Kevin Yeh <kevinyeah@utexas.edu>"]
 
 [dependencies]
-byteorder = "0.3.10"
+byteorder = "0.3"
+nalgebra = "0.2"
+rustc-serialize = "0.3"
 
 [dependencies.bson]
 git = "https://github.com/kyeah/bson-rs"

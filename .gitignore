@@ -5,5 +5,5 @@
 *.o
 *~
 bin/
-test/
 target/
+test/
