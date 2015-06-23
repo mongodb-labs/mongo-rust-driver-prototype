@@ -1,5 +1,5 @@
 use bson::Bson;
-use na::ApproxEq;
+use nalgebra::ApproxEq;
 
 trait NumEq {
     fn float_eq(&self, f: f64) -> bool;
