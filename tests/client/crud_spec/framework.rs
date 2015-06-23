@@ -64,7 +64,7 @@ macro_rules! run_delete_test {
 
         let actual = match $outcome.result {
             Bson::Document(ref doc) => doc.get("deletedCount").unwrap(),
-            _ => panic!("`insert_one` test result should be a document")
+            _ => panic!("`delete` test result should be a document")
         };
 
         assert!(actual.int_eq(expected as i64));
