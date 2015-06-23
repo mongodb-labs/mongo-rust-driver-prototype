@@ -217,9 +217,9 @@ impl <'a> Cursor<'a> {
     ///
     /// Returns the first BSON document returned from the stream, or `None` if
     /// there are no more documents to read.
-    fn next_from_stream(&mut self) -> Option<bson::Document> {
-        let _ = self.get_from_stream();
-        self.buffer.pop_front()
+    fn next_from_stream(&mut self) -> MongoResult<Option<bson::Document>> {
+        try!(self.get_from_stream());
+        Ok(self.buffer.pop_front())
     }
 
     /// Attempts to read a specified number of BSON documents from the cursor.
@@ -231,19 +231,20 @@ impl <'a> Cursor<'a> {
     /// # Return value
     ///
     /// Returns a vector containing the BSON documents that were read.
-    pub fn next_n(&mut self, n: i32) -> Vec<bson::Document> {
+    pub fn next_n(&mut self, n: i32) -> MongoResult<Vec<bson::Document>> {
         let mut vec = vec![];
 
         for _ in 0..n {
             let bson_option = self.next();
 
             match bson_option {
-                Some(bson) => vec.push(bson),
-                None => break
+                Some(Ok(bson)) => vec.push(bson),
+                Some(Err(err)) => return Err(err),
+                None => break,
             };
         }
 
-        vec
+        Ok(vec)
     }
 
     /// Attempts to read a batch of BSON documents from the cursor.
@@ -251,27 +252,25 @@ impl <'a> Cursor<'a> {
     /// # Return value
     ///
     /// Returns a vector containing the BSON documents that were read.
-    pub fn next_batch(&mut self) -> Vec<bson::Document> {
+    pub fn next_batch(&mut self) -> MongoResult<Vec<bson::Document>> {
         let n = self.batch_size;
-
         self.next_n(n)
     }
 
-    pub fn has_next(&mut self) -> bool {
+    pub fn has_next(&mut self) -> MongoResult<bool> {
         if self.limit > 0 && self.count >= self.limit {
-            false
+            Ok(false)
         } else {
             if self.buffer.is_empty() && self.limit != 1 && self.cursor_id != 0 {
-                let _ = self.get_from_stream();
+                try!(self.get_from_stream());
             }
-
-            !self.buffer.is_empty()
+            Ok(!self.buffer.is_empty())
         }
     }
 }
 
 impl <'a> Iterator for Cursor<'a> {
-    type Item = bson::Document;
+    type Item = MongoResult<bson::Document>;
 
     /// Attempts to read a BSON document from the cursor.
     ///
@@ -279,12 +278,17 @@ impl <'a> Iterator for Cursor<'a> {
     ///
     /// Returns the document that was read, or `None` if there are no more
     /// documents to read.
-    fn next(&mut self) -> Option<bson::Document> {
-        if self.has_next() {
-            self.count += 1;
-            self.buffer.pop_front()
-        } else {
-            None
+    fn next(&mut self) -> Option<MongoResult<bson::Document>> {
+        match self.has_next() {
+            Ok(true) => {
+                self.count += 1;
+                match self.buffer.pop_front() {
+                    Some(bson) => Some(Ok(bson)),
+                    None => None,
+                }
+            },
+            Ok(false) => None,
+            Err(err) => Some(Err(err)),
         }
     }
 }

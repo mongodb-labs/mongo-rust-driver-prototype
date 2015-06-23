@@ -17,7 +17,11 @@ fn find_and_insert() {
 
     // Find document
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let result = cursor.next().unwrap();
+    let result = match cursor.next() {
+        Some(Ok(res)) => res,
+        Some(Err(err)) => panic!("Received error from 'cursor.next()'."),
+        None => panic!("Expected bson."),
+    };
 
     // Assert expected title of document
     match result.get("title") {
@@ -77,7 +81,11 @@ fn find_one_and_delete() {
 
     // Validate state of collection
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let result = cursor.next().unwrap();
+    let result = match cursor.next() {
+        Some(Ok(res)) => res,
+        Some(Err(err)) => panic!("Received error from 'cursor.next()'."),
+        None => panic!("Expected bson."),
+    };
 
     match result.get("title") {
         Some(&Bson::String(ref title)) => assert_eq!("Jaws", title),
@@ -114,7 +122,7 @@ fn find_one_and_replace() {
 
     // Validate state of collection
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(3);
+    let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
     assert_eq!(3, results.len());
 
     // Assert expected title of documents
@@ -174,7 +182,7 @@ fn find_one_and_update() {
 
     // Validate state of collection
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(3);
+    let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
     assert_eq!(3, results.len());
 
     // Assert director attributes
@@ -223,7 +231,7 @@ fn aggregate() {
     let mut cursor = coll.aggregate(vec![project, unwind, group], None)
         .ok().expect("Failed to execute aggregate command.");
 
-    let results = cursor.next_n(10);
+    let results = cursor.next_n(10).ok().expect("Failed to get next 10 from cursor.");
     assert_eq!(6, results.len());
 
     // Grab ids from aggregated docs
@@ -375,7 +383,7 @@ fn insert_many() {
 
     // Find documents
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(2);
+    let results = cursor.next_n(2).ok().expect("Failed to get next 2 from cursor.");
     assert_eq!(2, results.len());
 
     // Assert expected title of documents
@@ -407,7 +415,11 @@ fn delete_one() {
     // Delete document
     coll.delete_one(doc2.clone(), None).ok().expect("Failed to delete document.");
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let result = cursor.next().unwrap();
+    let result = match cursor.next() {
+        Some(Ok(res)) => res,
+        Some(Err(err)) => panic!("Received error from 'cursor.next()'."),
+        None => panic!("Expected bson."),
+    };
 
     match result.get("title") {
         Some(&Bson::String(ref title)) => assert_eq!("Jaws", title),
@@ -435,7 +447,11 @@ fn delete_many() {
     // Delete document
     coll.delete_many(doc2.clone(), None).ok().expect("Failed to delete documents.");
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let result = cursor.next().unwrap();
+    let result = match cursor.next() {
+        Some(Ok(res)) => res,
+        Some(Err(err)) => panic!("Received error from 'cursor.next()'."),
+        None => panic!("Expected bson."),
+    };
 
     match result.get("title") {
         Some(&Bson::String(ref title)) => assert_eq!("Jaws", title),
@@ -464,7 +480,7 @@ fn replace_one() {
     // Replace single document
     coll.replace_one(doc2.clone(), doc3.clone(), false, None).ok().expect("Failed to replace document.");
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(3);
+    let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
     assert_eq!(3, results.len());
 
     // Assert expected title of documents
@@ -508,7 +524,7 @@ fn update_one() {
     coll.update_one(doc2.clone(), update, false, None).ok().expect("Failed to update document.");
 
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(3);
+    let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
     assert_eq!(3, results.len());
 
     // Assert director attributes
@@ -546,7 +562,7 @@ fn update_many() {
     coll.update_many(doc2.clone(), update, false, None).ok().expect("Failed to update documents.");
 
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(4);
+    let results = cursor.next_n(4).ok().expect("Failed to get next 4 from cursor.");
     assert_eq!(4, results.len());
 
     // Assert director attributes

@@ -92,9 +92,10 @@ impl<'a> Database<'a> {
         let mut results = Vec::new();
         loop {
             match cursor.next() {
-                Some(doc) => if let Some(&Bson::String(ref name)) = doc.get("name") {
+                Some(Ok(doc)) => if let Some(&Bson::String(ref name)) = doc.get("name") {
                     results.push(name.to_owned());
                 },
+                Some(Err(err)) => return Err(err),
                 None => return Ok(results),
             }
         }

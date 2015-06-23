@@ -152,7 +152,11 @@ impl<'a> Collection<'a> {
                     -> MongoResult<Option<bson::Document>> {
         let options = options.unwrap_or(FindOptions::new());
         let mut cursor = try!(self.find(filter, Some(options.with_limit(1))));
-        Ok(cursor.next())
+        match cursor.next() {
+            Some(Ok(bson)) => Ok(Some(bson)),
+            Some(Err(err)) => Err(err),
+            None => Ok(None)
+        }
     }
 
     // Helper method for all findAndModify commands.
