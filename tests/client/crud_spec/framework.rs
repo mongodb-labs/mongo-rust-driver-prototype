@@ -73,12 +73,12 @@ macro_rules! run_delete_test {
 }
 
 macro_rules! run_update_test {
-    ( $db:expr, $coll: expr, $filter:expr, $delete:expr, $upsert:expr,
+    ( $db:expr, $coll: expr, $filter:expr, $update:expr, $upsert:expr,
       $many:expr, $outcome:expr ) => {{
           let result = if $many {
-                           $coll.update_many($filter, $delete, $upsert, None)
+                           $coll.update_many($filter, $update, $upsert, None)
                        } else {
-                           $coll.update_one($filter, $delete, $upsert, None)
+                           $coll.update_one($filter, $update, $upsert, None)
                        };
 
           let actual = result.unwrap();
