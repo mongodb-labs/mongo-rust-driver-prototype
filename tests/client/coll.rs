@@ -12,7 +12,7 @@ fn find_and_insert() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert document
-    let doc = doc! { "title" => (Bson::String("Jaws".to_owned())) };
+    let doc = doc! { "title" => ("Jaws") };
     coll.insert_one(doc, None).ok().expect("Failed to insert document");
 
     // Find document
@@ -41,7 +41,7 @@ fn find_and_insert_one() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert document
-    let doc = doc! { "title" => (Bson::String("Jaws".to_owned())) };
+    let doc = doc! { "title" => ("Jaws") };
     coll.insert_one(doc, None).ok().expect("Failed to insert document");
 
     // Find single document
@@ -64,8 +64,8 @@ fn find_one_and_delete() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())) };
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
+    let doc1 = doc! { "title" => ("Jaws") };
+    let doc2 = doc! { "title" => ("Back to the Future") };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone()], false, None)
         .ok().expect("Failed to insert documents.");
@@ -104,9 +104,9 @@ fn find_one_and_replace() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())) };
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
-    let doc3 = doc! { "title" => (Bson::String("12 Angry Men".to_owned())) };
+    let doc1 = doc! { "title" => ("Jaws") };
+    let doc2 = doc! { "title" => ("Back to the Future") };
+    let doc3 = doc! { "title" => ("12 Angry Men") };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
         .ok().expect("Failed to insert documents into collection.");
@@ -160,17 +160,15 @@ fn find_one_and_update() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())) };
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
-    let doc3 = doc! { "title" => (Bson::String("12 Angry Men".to_owned())) };
+    let doc1 = doc! { "title" => ("Jaws") };
+    let doc2 = doc! { "title" => ("Back to the Future") };
+    let doc3 = doc! { "title" => ("12 Angry Men") };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Update single document
-    let update = doc! {
-        "$set" => { "director" => (Bson::String("Robert Zemeckis".to_owned())) }
-    };
+    let update = doc! { "$set" => { "director" => ("Robert Zemeckis") } };
 
     let result = coll.find_one_and_update(doc2.clone(), update, None)
         .ok().expect("Failed to execute find_one_and_update command.");
@@ -203,29 +201,17 @@ fn aggregate() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let tags1 = vec![Bson::String("a".to_owned()),
-                     Bson::String("b".to_owned()),
-                     Bson::String("c".to_owned())];
-
-    let tags2 = vec![Bson::String("a".to_owned()),
-                     Bson::String("b".to_owned()),
-                     Bson::String("d".to_owned())];
-
-    let tags3 = vec![Bson::String("d".to_owned()),
-                     Bson::String("e".to_owned()),
-                     Bson::String("f".to_owned())];
-
-    let doc1 = doc! { "tags" => (Bson::Array(tags1)) };
-    let doc2 = doc! { "tags" => (Bson::Array(tags2)) };
-    let doc3 = doc! { "tags" => (Bson::Array(tags3)) };
+    let doc1 = doc! { "tags" => ["a", "b", "c"] };
+    let doc2 = doc! { "tags" => ["a", "b", "d"] };
+    let doc3 = doc! { "tags" => ["d", "e", "f"] };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
         .ok().expect("Failed to execute insert_many command.");
 
     // Build aggregation pipeline to unwind tag arrays and group distinct tags
-    let project = doc! { "$project" => { "tags" => (Bson::I32(1)) } };
-    let unwind = doc! { "$unwind" => (Bson::String("$tags".to_owned())) };
-    let group = doc! { "$group" => { "_id" => (Bson::String("$tags".to_owned())) } };
+    let project = doc! { "$project" => { "tags" => (1) } };
+    let unwind = doc! { "$unwind" => ("$tags") };
+    let group = doc! { "$group" => { "_id" => ("$tags") } };
 
     // Aggregate
     let mut cursor = coll.aggregate(vec![project, unwind, group], None)
@@ -261,8 +247,8 @@ fn count() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())) };
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
+    let doc1 = doc! { "title" => ("Jaws") };
+    let doc2 = doc! { "title" => ("Back to the Future") };
 
     let mut vec = vec![doc1.clone()];
     for _ in 0..10 {
@@ -279,7 +265,7 @@ fn count() {
     let count_all = coll.count(None, None).ok().expect("Failed to execute count.");
     assert_eq!(11, count_all);
 
-    let no_doc = doc! { "title" => (Bson::String("Houdini".to_owned())) };
+    let no_doc = doc! { "title" => ("Houdini") };
     let count_none = coll.count(Some(no_doc), None).ok().expect("Failed to execute count.");
     assert_eq!(0, count_none);
 }
@@ -302,7 +288,7 @@ fn distinct_one() {
     let coll = db.collection("distinct_none");
 
     db.drop_database().ok().expect("Failed to drop database");
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
+    let doc2 = doc! { "title" => ("Back to the Future") };
     coll.insert_one(doc2, None).ok().expect("Failed to insert document.");
 
     let distinct_titles = coll.distinct("title", None, None).ok().expect("Failed to execute 'distinct'.");
@@ -318,13 +304,13 @@ fn distinct() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())),
-                      "director" => (Bson::String("MB".to_owned())) };
+    let doc1 = doc! { "title" => ("Jaws"),
+                      "director" => ("MB") };
 
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
+    let doc2 = doc! { "title" => ("Back to the Future") };
 
-    let doc3 = doc! { "title" => (Bson::String("12 Angry Men".to_owned())),
-                      "director" => (Bson::String("MB".to_owned())) };
+    let doc3 = doc! { "title" => ("12 Angry Men"),
+                      "director" => ("MB") };
 
     let mut vec = vec![doc1.clone()];
     for _ in 0..4 {
@@ -351,7 +337,7 @@ fn distinct() {
     assert!(titles.contains(&"12 Angry Men".to_owned()));
 
     // Distinct titles over documents with certain director
-    let filter = doc! { "director" => (Bson::String("MB".to_owned())) };
+    let filter = doc! { "director" => ("MB") };
     let distinct_titles = coll.distinct("title", Some(filter), None)
         .ok().expect("Failed to execute 'distinct'.");
 
@@ -376,8 +362,8 @@ fn insert_many() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())) };
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
+    let doc1 = doc! { "title" => ("Jaws") };
+    let doc2 = doc! { "title" => ("Back to the Future") };
 
     coll.insert_many(vec![doc1, doc2], false, None).ok().expect("Failed to insert documents.");
 
@@ -406,8 +392,8 @@ fn delete_one() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())) };
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
+    let doc1 = doc! { "title" => ("Jaws") };
+    let doc2 = doc! { "title" => ("Back to the Future") };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone()], false, None)
         .ok().expect("Failed to insert documents.");
@@ -438,8 +424,8 @@ fn delete_many() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())) };
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
+    let doc1 = doc! { "title" => ("Jaws") };
+    let doc2 = doc! { "title" => ("Back to the Future") };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc2.clone()], false, None)
         .ok().expect("Failed to insert documents into collection.");
@@ -470,9 +456,9 @@ fn replace_one() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())) };
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
-    let doc3 = doc! { "title" => (Bson::String("12 Angry Men".to_owned())) };
+    let doc1 = doc! { "title" => ("Jaws") };
+    let doc2 = doc! { "title" => ("Back to the Future") };
+    let doc3 = doc! { "title" => ("12 Angry Men") };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
         .ok().expect("Failed to insert documents into collection.");
@@ -507,19 +493,15 @@ fn update_one() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())) };
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
-    let doc3 = doc! { "title" => (Bson::String("12 Angry Men".to_owned())) };
+    let doc1 = doc! { "title" => ("Jaws") };
+    let doc2 = doc! { "title" => ("Back to the Future") };
+    let doc3 = doc! { "title" => ("12 Angry Men") };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Update single document
-    let update = doc! {
-        "$set" => {
-            "director" => (Bson::String("Robert Zemeckis".to_owned()))
-        }
-    };
+    let update = doc! { "$set" => { "director" => ("Robert Zemeckis") } };
 
     coll.update_one(doc2.clone(), update, false, None).ok().expect("Failed to update document.");
 
@@ -545,19 +527,15 @@ fn update_many() {
     db.drop_database().ok().expect("Failed to drop database");
 
     // Insert documents
-    let doc1 = doc! { "title" => (Bson::String("Jaws".to_owned())) };
-    let doc2 = doc! { "title" => (Bson::String("Back to the Future".to_owned())) };
-    let doc3 = doc! { "title" => (Bson::String("12 Angry Men".to_owned())) };
+    let doc1 = doc! { "title" => ("Jaws") };
+    let doc2 = doc! { "title" => ("Back to the Future") };
+    let doc3 = doc! { "title" => ("12 Angry Men") };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone(), doc2.clone()], false, None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Update single document
-    let update = doc! {
-        "$set" => {
-            "director" => (Bson::String("Robert Zemeckis".to_owned()))
-        }
-    };
+    let update = doc! { "$set" => { "director" => ("Robert Zemeckis") } };
 
     coll.update_many(doc2.clone(), update, false, None).ok().expect("Failed to update documents.");
 
