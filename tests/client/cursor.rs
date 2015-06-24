@@ -13,9 +13,7 @@ fn cursor_features() {
     db.drop_database().ok().expect("Failed to drop database.");
 
     let docs = (0..10).map(|i| {
-        doc! {
-            "foo" => (Bson::I64(i))
-        }
+        doc! { "foo" => (i as i64) }
     }).collect();
 
     assert!(coll.insert_many(docs, false, None).is_ok());
