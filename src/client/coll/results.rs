@@ -89,6 +89,13 @@ impl UpdateResult {
             _ => 0,
         };
 
+        let (n_upserted, id) = match doc.get("upserted") {
+            Some(&Bson::Array(ref arr)) => (arr.len() as i32, Some(arr[0].clone())),
+            _ => (0, None)
+        };
+
+        let n_matched = n - n_upserted;
+
         let n_modified = match doc.get("nModified") {
             Some(&Bson::I32(n)) => n,
             _ => 0,
@@ -96,9 +103,9 @@ impl UpdateResult {
 
         UpdateResult {
             acknowledged: true,
-            matched_count: n,
+            matched_count: n_matched,
             modified_count: n_modified,
-            upserted_id: None,
+            upserted_id: id,
         }
     }
 }

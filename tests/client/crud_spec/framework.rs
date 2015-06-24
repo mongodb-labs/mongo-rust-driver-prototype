@@ -95,7 +95,12 @@ macro_rules! run_update_test {
           assert!(matched.int_eq(actual.matched_count as i64));
           assert!(modified.int_eq(actual.modified_count as i64));
 
-          match (upserted, actual.upserted_id) {
+          let id = match actual.upserted_id {
+	          Some(Bson::Document(ref doc)) => doc.get("_id"),
+              _ => None
+          };
+
+          match (upserted, id) {
               (None, None) => (),
               (Some(ref bson1), Some(ref bson2)) =>
                   assert!(eq::bson_eq(&bson1, &bson2)),
