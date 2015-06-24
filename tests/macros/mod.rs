@@ -53,15 +53,15 @@ fn print_bson_with_indent_level(bson: &Bson, n: i32) {
 #[test]
 fn recursive_macro() {
     let doc = doc! {
-        "a" => (Bson::String("foo".to_owned())),
+        "a" => ("foo"),
         "b" => {
             "bar" => {
-                "harbor" => [Bson::String("seal".to_owned()), Bson::Boolean(false)],
-                "jelly" => (Bson::FloatingPoint(42.0))
+                "harbor" => ["seal", false],
+                "jelly" => (42.0)
             },
-            "grape" => (Bson::I64(27))
+            "grape" => (27)
         },
-        "c" => [Bson::I32(-7)]
+        "c" => [-7]
     };
 
     print_doc!(&doc);
