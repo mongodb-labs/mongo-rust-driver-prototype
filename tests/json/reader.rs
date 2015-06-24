@@ -36,6 +36,8 @@ impl Test {
             "find" => Arguments::find_from_json(&args_obj),
             "insertMany" => res_or_err!(Arguments::insert_many_from_json(&args_obj)),
             "insertOne" => res_or_err!(Arguments::insert_one_from_json(&args_obj)),
+            "updateMany" => res_or_err!(Arguments::update_from_json(&args_obj, true)),
+            "updateOne" => res_or_err!(Arguments::update_from_json(&args_obj, false)),
             _ => return Err("Invalid operation name".to_owned())
         };
 
