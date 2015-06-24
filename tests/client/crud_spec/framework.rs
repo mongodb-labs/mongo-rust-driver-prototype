@@ -1,3 +1,23 @@
+macro_rules! run_delete_test {
+    ( $db:expr, $coll:expr, $filter:expr, $outcome:expr, $many:expr ) => {{
+        let count = if $many {
+                        $coll.delete_many($filter, None)
+                    } else {
+                        $coll.delete_one($filter, None)
+                    };
+
+        let expected = count.unwrap().deleted_count;
+
+        let actual = match $outcome.result {
+            Bson::Document(ref doc) => doc.get("deletedCount").unwrap(),
+            _ => panic!("`delete` test result should be a document")
+        };
+
+        assert!(actual.int_eq(expected as i64));
+        check_coll!($db, $coll, $outcome.collection);
+    }};
+}
+
 macro_rules! run_find_test {
     ( $db:expr, $coll:expr, $filter:expr, $opt:expr, $outcome:expr ) => {{
         let mut cursor = $coll.find($filter, $opt).unwrap();
@@ -17,7 +37,7 @@ macro_rules! run_find_test {
 }
 
 macro_rules! run_insert_many_test {
-    ( $db:expr, $coll: expr, $docs:expr, $outcome:expr ) => {{
+    ( $db:expr, $coll:expr, $docs:expr, $outcome:expr ) => {{
         let inserted = $coll.insert_many($docs, true, None).unwrap().inserted_ids.unwrap();
         let ids_bson = match $outcome.result {
             Bson::Document(ref doc) => doc.get("insertedIds").unwrap(),
@@ -40,7 +60,7 @@ macro_rules! run_insert_many_test {
 }
 
 macro_rules! run_insert_one_test {
-    ( $db:expr, $coll: expr, $doc:expr, $outcome:expr ) => {{
+    ( $db:expr, $coll:expr, $doc:expr, $outcome:expr ) => {{
         let inserted = $coll.insert_one($doc, None).unwrap().inserted_id.unwrap();
         let id = match $outcome.result {
             Bson::Document(ref doc) => doc.get("insertedId").unwrap(),
@@ -52,28 +72,42 @@ macro_rules! run_insert_one_test {
     }};
 }
 
-macro_rules! run_delete_test {
-    ( $db:expr, $coll: expr, $filter:expr, $outcome:expr, $many:expr ) => {{
-        let count = if $many {
-                        $coll.delete_many($filter, None)
-                    } else {
-                        $coll.delete_one($filter, None)
-                    };
+macro_rules! run_replace_one_test {
+    ( $db:expr, $coll:expr, $filter:expr, $replacement:expr, $upsert:expr,
+        $outcome:expr ) => {{
+            let actual = $coll.replace_one($filter, $replacement, $upsert,
+                                           None).unwrap();
 
-        let expected = count.unwrap().deleted_count;
+            let (matched, modified, upserted) = match $outcome.result {
+                Bson::Document(ref doc) => (
+                    doc.get("matchedCount").unwrap(),
+                    doc.get("modifiedCount").unwrap(),
+                    doc.get("upsertedId"),
+                    ),
+                _ => panic!("`delete` test result should be a document")
+            };
 
-        let actual = match $outcome.result {
-            Bson::Document(ref doc) => doc.get("deletedCount").unwrap(),
-            _ => panic!("`delete` test result should be a document")
-        };
+            assert!(matched.int_eq(actual.matched_count as i64));
+            assert!(modified.int_eq(actual.modified_count as i64));
 
-        assert!(actual.int_eq(expected as i64));
-        check_coll!($db, $coll, $outcome.collection);
+            let id = match actual.upserted_id {
+                Some(Bson::Document(ref doc)) => doc.get("_id"),
+                _ => None
+            };
+
+            match (upserted, id) {
+                (None, None) => (),
+                (Some(ref bson1), Some(ref bson2)) =>
+                assert!(eq::bson_eq(&bson1, &bson2)),
+                _ => panic!("Wrong `upsertedId` returned")
+            };
+
+            check_coll!($db, $coll, $outcome.collection);
     }};
 }
 
 macro_rules! run_update_test {
-    ( $db:expr, $coll: expr, $filter:expr, $update:expr, $upsert:expr,
+    ( $db:expr, $coll:expr, $filter:expr, $update:expr, $upsert:expr,
       $many:expr, $outcome:expr ) => {{
           let result = if $many {
                            $coll.update_many($filter, $update, $upsert, None)
@@ -133,8 +167,12 @@ macro_rules! run_suite {
                     run_insert_many_test!(db, coll, documents, test.outcome),
                 Arguments::InsertOne { document } =>
                     run_insert_one_test!(db, coll, document, test.outcome),
+                Arguments::ReplaceOne { filter, replacement, upsert } =>
+                    run_replace_one_test!(db, coll, filter, replacement, upsert,
+                                          test.outcome),
                 Arguments::Update { filter, update, upsert, many } =>
-                    run_update_test!(db, coll, filter, update, upsert, many, test.outcome),
+                    run_update_test!(db, coll, filter, update, upsert, many,
+                                     test.outcome),
             };
         }
     }};
