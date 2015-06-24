@@ -10,6 +10,8 @@ use client::coll::options::*;
 use client::coll::results::*;
 
 use client::cursor::Cursor;
+use client::Result;
+use client::Error::{ArgumentError, ResponseError};
 
 use client::wire_protocol::flags::OpQueryFlags;
 
@@ -60,12 +62,12 @@ impl<'a> Collection<'a> {
     }
 
     /// Permanently deletes the collection from the database.
-    pub fn drop(&'a self) -> Result<(), String> {
+    pub fn drop(&'a self) -> Result<()> {
         self.db.drop_collection(&self.name()[..])
     }
 
     /// Runs an aggregation framework pipeline.
-    pub fn aggregate(&'a self, pipeline: Vec<bson::Document>, options: Option<AggregateOptions>) -> Result<Cursor<'a>, String> {
+    pub fn aggregate(&'a self, pipeline: Vec<bson::Document>, options: Option<AggregateOptions>) -> Result<Cursor<'a>> {
         let opts = options.unwrap_or(AggregateOptions::new());
 
         let pipeline_map = pipeline.iter().map(|bdoc| {
@@ -82,12 +84,11 @@ impl<'a> Collection<'a> {
             spec.insert("allowDiskUse".to_owned(), Bson::Boolean(opts.allow_disk_use));
         }
 
-        let mut cursor = try!(self.db.command_cursor(spec));
-        Ok(cursor)
+        self.db.command_cursor(spec)
     }
 
     /// Gets the number of documents matching the filter.
-    pub fn count(&self, filter: Option<bson::Document>, options: Option<CountOptions>) -> Result<i64, String> {
+    pub fn count(&self, filter: Option<bson::Document>, options: Option<CountOptions>) -> Result<i64> {
         let opts = options.unwrap_or(CountOptions::new());
 
         let mut spec = bson::Document::new();
@@ -106,18 +107,15 @@ impl<'a> Collection<'a> {
         }
 
         let result = try!(self.db.command(spec));
-        if result.is_some() {
-            match result.unwrap().get("n") {
-                Some(&Bson::I32(ref n)) => return Ok(*n as i64),
-                Some(&Bson::I64(ref n)) => return Ok(*n),
-                _ => (),
-            }
+        match result.get("n") {
+            Some(&Bson::I32(ref n)) => Ok(*n as i64),
+            Some(&Bson::I64(ref n)) => Ok(*n),
+            _ => Err(ResponseError("No count received from server.".to_owned())),
         }
-        Err("Failed to receive 'count' command reply from server.".to_owned())
     }
 
     /// Finds the distinct values for a specified field across a single collection.
-    pub fn distinct(&self, field_name: &str, filter: Option<bson::Document>, options: Option<DistinctOptions>) -> Result<Vec<Bson>, String> {
+    pub fn distinct(&self, field_name: &str, filter: Option<bson::Document>, options: Option<DistinctOptions>) -> Result<Vec<Bson>> {
 
         let opts = options.unwrap_or(DistinctOptions::new());
 
@@ -129,18 +127,15 @@ impl<'a> Collection<'a> {
         }
 
         let result = try!(self.db.command(spec));
-        if result.is_some() {
-            if let Some(&Bson::Array(ref vals)) = result.unwrap().get("values") {
-                return Ok(vals.to_owned());
-            }
+        match result.get("values") {
+            Some(&Bson::Array(ref vals)) => Ok(vals.to_owned()),
+            _ => Err(ResponseError("No values received from server.".to_owned()))
         }
-
-        Err("Failed to receive 'distinct' command reply from server.".to_owned())
     }
 
     /// Returns a list of documents within the collection that match the filter.
     pub fn find(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
-                -> Result<Cursor<'a>, String> {
+                -> Result<Cursor<'a>> {
 
         let doc = filter.unwrap_or(bson::Document::new());
         let options = options.unwrap_or(FindOptions::new());
@@ -154,10 +149,14 @@ impl<'a> Collection<'a> {
 
     /// Returns the first document within the collection that matches the filter, or None.
     pub fn find_one(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
-                    -> Result<Option<bson::Document>, String> {
+                    -> Result<Option<bson::Document>> {
         let options = options.unwrap_or(FindOptions::new());
         let mut cursor = try!(self.find(filter, Some(options.with_limit(1))));
-        Ok(cursor.next())
+        match cursor.next() {
+            Some(Ok(bson)) => Ok(Some(bson)),
+            Some(Err(err)) => Err(err),
+            None => Ok(None)
+        }
     }
 
     // Helper method for all findAndModify commands.
@@ -165,7 +164,7 @@ impl<'a> Collection<'a> {
                            filter: bson::Document, max_time_ms: Option<i64>,
                            projection: Option<bson::Document>, sort: Option<bson::Document>,
                            write_concern: Option<WriteConcern>)
-                           -> Result<Option<bson::Document>, String> {
+                           -> Result<Option<bson::Document>> {
 
         let wc = write_concern.unwrap_or(self.write_concern.clone());
 
@@ -185,12 +184,9 @@ impl<'a> Collection<'a> {
         }
 
         let res = try!(self.db.command(new_cmd));
-        match res {
-            Some(doc) => match doc.get("value") {
-                Some(&Bson::Document(ref nested_doc)) => Ok(Some(nested_doc.to_owned())),
-                _ => Ok(None),
-            },
-            None => Ok(None),
+        match res.get("value") {
+            Some(&Bson::Document(ref nested_doc)) => Ok(Some(nested_doc.to_owned())),
+            _ => Ok(None),
         }
     }
 
@@ -198,7 +194,7 @@ impl<'a> Collection<'a> {
     fn find_one_and_replace_or_update(&self, filter: bson::Document, update: bson::Document,
                                       after: bool, max_time_ms: Option<i64>,
                                       projection: Option<bson::Document>, sort: Option<bson::Document>,
-                                      upsert: bool, write_concern: Option<WriteConcern>) -> Result<Option<bson::Document>, String> {
+                                      upsert: bool, write_concern: Option<WriteConcern>) -> Result<Option<bson::Document>> {
 
         let mut cmd = bson::Document::new();
         cmd.insert("update".to_owned(), Bson::Document(update));
@@ -214,7 +210,7 @@ impl<'a> Collection<'a> {
 
     /// Finds a single document and deletes it, returning the original.
     pub fn find_one_and_delete(&self, filter: bson::Document,
-                               options: Option<FindOneAndDeleteOptions>)  -> Result<Option<bson::Document>, String> {
+                               options: Option<FindOneAndDeleteOptions>)  -> Result<Option<bson::Document>> {
 
         let opts = options.unwrap_or(FindOneAndDeleteOptions::new());
         let mut cmd = bson::Document::new();
@@ -226,7 +222,7 @@ impl<'a> Collection<'a> {
     /// Finds a single document and replaces it, returning either the original
     /// or replaced document.
     pub fn find_one_and_replace(&self, filter: bson::Document, replacement: bson::Document,
-                                options: Option<FindOneAndReplaceOptions>)  -> Result<Option<bson::Document>, String> {
+                                options: Option<FindOneAndReplaceOptions>)  -> Result<Option<bson::Document>> {
         let opts = options.unwrap_or(FindOneAndReplaceOptions::new());
         try!(Collection::validate_replace(&replacement));
         self.find_one_and_replace_or_update(filter, replacement, opts.return_document.to_bool(),
@@ -237,7 +233,7 @@ impl<'a> Collection<'a> {
     /// Finds a single document and updates it, returning either the original
     /// or updated document.
     pub fn find_one_and_update(&self, filter: bson::Document, update: bson::Document,
-                               options: Option<FindOneAndUpdateOptions>)  -> Result<Option<bson::Document>, String> {
+                               options: Option<FindOneAndUpdateOptions>)  -> Result<Option<bson::Document>> {
         let opts = options.unwrap_or(FindOneAndUpdateOptions::new());
         try!(Collection::validate_update(&update));
         self.find_one_and_replace_or_update(filter, update, opts.return_document.to_bool(),
@@ -252,7 +248,8 @@ impl<'a> Collection<'a> {
 
     // Internal insertion helper function.
     fn insert(&self, docs: Vec<bson::Document>, ordered: bool,
-              write_concern: Option<WriteConcern>) -> Result<BTreeMap<i64, Bson>, String> {
+              write_concern: Option<WriteConcern>) -> Result<BTreeMap<i64, Bson>> {
+
         let wc =  write_concern.unwrap_or(WriteConcern::new());
         let mut map = BTreeMap::new();
 
@@ -274,19 +271,13 @@ impl<'a> Collection<'a> {
         cmd.insert("ordered".to_owned(), Bson::Boolean(ordered));
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
-        let result = try!(self.db.command(cmd));
-
-        match result {
-            Some(_) => (),
-            None => return Err("Insertion reply not received from server.".to_owned()),
-        };
-
+        let _ = try!(self.db.command(cmd));
         Ok(map)
     }
 
     /// Inserts the provided document. If the document is missing an identifier,
     /// the driver should generate one.
-    pub fn insert_one(&self, doc: bson::Document, write_concern: Option<WriteConcern>) -> Result<InsertOneResult, String> {
+    pub fn insert_one(&self, doc: bson::Document, write_concern: Option<WriteConcern>) -> Result<InsertOneResult> {
         let res = try!(self.insert(vec!(doc), true, write_concern));
         let id = match res.keys().next() {
             Some(ref key) => res.get(key),
@@ -302,13 +293,13 @@ impl<'a> Collection<'a> {
     /// Inserts the provided documents. If any documents are missing an identifier,
     /// the driver should generate them.
     pub fn insert_many(&self, docs: Vec<bson::Document>, ordered: bool,
-                       write_concern: Option<WriteConcern>) -> Result<InsertManyResult, String> {
+                       write_concern: Option<WriteConcern>) -> Result<InsertManyResult> {
         let res = try!(self.insert(docs, ordered, write_concern));
         Ok(InsertManyResult::new(Some(res)))
     }
 
     // Internal deletion helper function.
-    fn delete(&self, filter: bson::Document, limit: i64, write_concern: Option<WriteConcern>) -> Result<DeleteResult, String> {
+    fn delete(&self, filter: bson::Document, limit: i64, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
         let wc = write_concern.unwrap_or(WriteConcern::new());
 
         let mut deletes = bson::Document::new();
@@ -321,25 +312,22 @@ impl<'a> Collection<'a> {
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
         let result = try!(self.db.command(cmd));
-        match result {
-            Some(doc) => Ok(DeleteResult::new(doc)),
-            None => Err("Delete reply not received from server.".to_owned()),
-        }
+        Ok(DeleteResult::new(result))
     }
 
     /// Deletes a single document.
-    pub fn delete_one(&self, filter: bson::Document, write_concern: Option<WriteConcern>) -> Result<DeleteResult, String> {
+    pub fn delete_one(&self, filter: bson::Document, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
         self.delete(filter, 1, write_concern)
     }
 
     /// Deletes multiple documents.
-    pub fn delete_many(&self, filter: bson::Document, write_concern: Option<WriteConcern>) -> Result<DeleteResult, String> {
+    pub fn delete_many(&self, filter: bson::Document, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
         self.delete(filter, 0, write_concern)
     }
 
     // Internal update helper function.
     fn update(&self, filter: bson::Document, update: bson::Document, upsert: bool, multi: bool,
-              write_concern: Option<WriteConcern>) -> Result<UpdateResult, String> {
+              write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
 
         let wc = write_concern.unwrap_or(WriteConcern::new());
 
@@ -357,15 +345,12 @@ impl<'a> Collection<'a> {
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
         let result = try!(self.db.command(cmd));
-        match result {
-            Some(doc) => Ok(UpdateResult::new(doc)),
-            None => Err("delete_many reply not received from server.".to_owned()),
-        }
+        Ok(UpdateResult::new(result))
     }
 
     /// Replaces a single document.
     pub fn replace_one(&self, filter: bson::Document, replacement: bson::Document, upsert: bool,
-                       write_concern: Option<WriteConcern>) -> Result<UpdateResult, String> {
+                       write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
 
         let _ = try!(Collection::validate_replace(&replacement));
         self.update(filter, replacement, upsert, false, write_concern)
@@ -373,7 +358,7 @@ impl<'a> Collection<'a> {
 
     /// Updates a single document.
     pub fn update_one(&self, filter: bson::Document, update: bson::Document, upsert: bool,
-                      write_concern: Option<WriteConcern>) -> Result<UpdateResult, String> {
+                      write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
 
         let _ = try!(Collection::validate_update(&update));
         self.update(filter, update, upsert, false, write_concern)
@@ -381,25 +366,25 @@ impl<'a> Collection<'a> {
 
     /// Updates multiple documents.
     pub fn update_many(&self, filter: bson::Document, update: bson::Document, upsert: bool,
-                       write_concern: Option<WriteConcern>) -> Result<UpdateResult, String> {
+                       write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
 
         let _ = try!(Collection::validate_update(&update));
         self.update(filter, update, upsert, true, write_concern)
     }
 
-    fn validate_replace(replacement: &bson::Document) -> Result<(), String> {
+    fn validate_replace(replacement: &bson::Document) -> Result<()> {
         for key in replacement.keys() {
             if key.starts_with("$") {
-                return Err("Replacement cannot include $ operators.".to_owned());
+                return Err(ArgumentError("Replacement cannot include $ operators.".to_owned()));
             }
         }
         Ok(())
     }
 
-    fn validate_update(update: &bson::Document) -> Result<(), String> {
+    fn validate_update(update: &bson::Document) -> Result<()> {
         for key in update.keys() {
             if !key.starts_with("$") {
-                return Err("Update only works with $ operators.".to_owned());
+                return Err(ArgumentError("Update only works with $ operators.".to_owned()));
             }
         }
         Ok(())

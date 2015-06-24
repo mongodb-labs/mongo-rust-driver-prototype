@@ -8,10 +8,10 @@ macro_rules! run_find_test {
         };
 
         for bson in array {
-            assert!(eq::bson_eq(&bson, &Bson::Document(cursor.next().unwrap())));
+            assert!(eq::bson_eq(&bson, &Bson::Document(cursor.next().unwrap().unwrap())));
         }
 
-        assert!(!cursor.has_next());
+        assert!(!cursor.has_next().ok().expect("Failed to execute 'has_next()' on cursor."));
         check_coll!($db, $coll, $outcome.collection);
     }};
 }
@@ -21,7 +21,7 @@ macro_rules! run_insert_many_test {
         let inserted = $coll.insert_many($docs, true, None).unwrap().inserted_ids.unwrap();
         let ids_bson = match $outcome.result {
             Bson::Document(ref doc) => doc.get("insertedIds").unwrap(),
-            _ => panic!("`insert_one` test result should be a document")
+            _ => panic!("`insert_many` test result should be a document")
         };
 
         let ids = match ids_bson {
@@ -152,11 +152,9 @@ macro_rules! check_coll {
 
         for doc in outcome_coll.data.iter() {
             assert!(eq::bson_eq(&Bson::Document(doc.clone()),
-                                &Bson::Document(cursor.next().unwrap())));
+                                &Bson::Document(cursor.next().unwrap().unwrap())));
         }
 
-        assert!(!cursor.has_next());
-
-        println!("done one...");
+        assert!(!cursor.has_next().ok().expect("Failed to execute 'has_next()' on cursor."));
     }};
 }
