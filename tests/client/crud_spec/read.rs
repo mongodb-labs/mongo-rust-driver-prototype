@@ -6,6 +6,12 @@ use mongodb::client:: MongoClient;
 use rustc_serialize::json::Json;
 
 #[test]
+fn aggregate() {
+    run_suite!("tests/json/data/specs/source/crud/tests/read/aggregate.json",
+               "aggregate");
+}
+
+#[test]
 fn count() {
     run_suite!("tests/json/data/specs/source/crud/tests/read/count.json",
                "count");

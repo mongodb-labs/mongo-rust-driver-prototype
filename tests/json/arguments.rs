@@ -1,9 +1,14 @@
 use bson::{Bson, Document};
 use json::options::FromJson;
-use mongodb::client::coll::options::{CountOptions, FindOptions};
+use mongodb::client::coll::options::{AggregateOptions, CountOptions, FindOptions};
 use rustc_serialize::json::Object;
 
-pub enum Arguments {    
+pub enum Arguments {
+    Aggregate {
+        pipeline: Vec<Document>,
+        options: AggregateOptions,
+        out: bool,
+    },
     Count {
         filter: Option<Document>,
         options: CountOptions,
@@ -40,6 +45,33 @@ pub enum Arguments {
 }
 
 impl Arguments {
+    pub fn aggregate_from_json(object: &Object) -> Result<Arguments, String> {
+        let options = AggregateOptions::from_json(object);
+
+        let f = |x| Some(Bson::from_json(x));
+
+        let array = val_or_err!(object.get("pipeline").and_then(f),
+                                   Some(Bson::Array(arr)) => arr,
+                                   "`aggregate` requires pipeline array");
+
+        let mut docs = vec![];
+        let mut out = false;
+
+        for bson in array {
+            let doc = match bson {
+                Bson::Document(doc) => {
+                    out = out || doc.contains_key("$out");
+                    doc
+                },
+                _ => return Err("aggregate pipeline can only contain documents".to_owned())
+            };
+
+            docs.push(doc);
+        }
+
+        Ok(Arguments::Aggregate { pipeline: docs, options: options, out: out })
+    }
+
     pub fn count_from_json(object: &Object) -> Arguments {
         let options = CountOptions::from_json(object);
 
