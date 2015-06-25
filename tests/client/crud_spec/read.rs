@@ -12,6 +12,12 @@ fn count() {
 }
 
 #[test]
+fn distinct() {
+    run_suite!("tests/json/data/specs/source/crud/tests/read/distinct.json",
+               "distinct");
+}
+
+#[test]
 fn find() {
     run_suite!("tests/json/data/specs/source/crud/tests/read/find.json",
                "find");

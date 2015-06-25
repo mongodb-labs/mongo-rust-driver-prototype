@@ -26,6 +26,26 @@ macro_rules! run_delete_test {
     }};
 }
 
+macro_rules! run_distinct_test {
+    ( $db:expr, $coll:expr, $field_name:expr, $filter:expr, $outcome:expr ) => {{
+        let actual = $coll.distinct(&$field_name, $filter, None).unwrap();
+
+        let expected = match $outcome.result {
+            Bson::Array(ref arr) => arr.clone(),
+            _ => panic!("Invalid `result` of find test")
+        };
+
+        assert_eq!(actual.len(), expected.len());
+
+        for i in 0..actual.len() {
+            assert!(eq::bson_eq(&actual[i], &expected[i]));
+        }
+
+        check_coll!($db, $coll, $outcome.collection);
+    }};
+}
+
+
 macro_rules! run_find_test {
     ( $db:expr, $coll:expr, $filter:expr, $opt:expr, $outcome:expr ) => {{
         let mut cursor = $coll.find($filter, $opt).unwrap();
@@ -168,9 +188,11 @@ macro_rules! run_suite {
 
             match test.operation {
                 Arguments::Count { filter, options } =>
-                run_count_test!(db, coll, filter, Some(options), test.outcome),
+                    run_count_test!(db, coll, filter, Some(options), test.outcome),
                 Arguments::Delete { filter, many } =>
                     run_delete_test!(db, coll, filter, test.outcome, many),
+                Arguments::Distinct { field_name, filter } =>
+                    run_distinct_test!(db, coll, field_name, filter, test.outcome),
                 Arguments::Find { filter, options } =>
                     run_find_test!(db, coll, filter, Some(options), test.outcome),
                 Arguments::InsertMany { documents } =>

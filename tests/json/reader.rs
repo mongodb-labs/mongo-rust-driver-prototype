@@ -34,6 +34,7 @@ impl Test {
             "count" => Arguments::count_from_json(&args_obj),
             "deleteMany" => res_or_err!(Arguments::delete_from_json(&args_obj, true)),
             "deleteOne" => res_or_err!(Arguments::delete_from_json(&args_obj, false)),
+            "distinct" => res_or_err!(Arguments::distinct_from_json(&args_obj)),
             "find" => Arguments::find_from_json(&args_obj),
             "insertMany" => res_or_err!(Arguments::insert_many_from_json(&args_obj)),
             "insertOne" => res_or_err!(Arguments::insert_one_from_json(&args_obj)),
