@@ -1,7 +1,7 @@
 use bson;
 use bson::Bson;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReadPreference {
     Primary,
     PrimaryPreferred,
@@ -10,7 +10,7 @@ pub enum ReadPreference {
     Nearest,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WriteConcern {
     pub w: i32,          // Write replication
     pub w_timeout: i32,  // Used in conjunction with 'w'. Propagation timeout in ms.
