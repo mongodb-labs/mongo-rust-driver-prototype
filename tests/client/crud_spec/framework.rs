@@ -123,7 +123,7 @@ macro_rules! run_update_test {
                   doc.get("modifiedCount").unwrap(),
                   doc.get("upsertedId"),
               ),
-              _ => panic!("`delete` test result should be a document")
+              _ => panic!("`update` test result should be a document")
           };
 
           assert!(matched.int_eq(actual.matched_count as i64));
