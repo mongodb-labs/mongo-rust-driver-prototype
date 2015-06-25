@@ -1,3 +1,11 @@
+macro_rules! run_count_test {
+    ( $db:expr, $coll:expr, $filter:expr, $opt:expr, $outcome:expr ) => {{
+        let n = $coll.count($filter, $opt).unwrap();
+        assert!($outcome.result.int_eq(n));
+        check_coll!($db, $coll, $outcome.collection);
+    }};
+}
+
 macro_rules! run_delete_test {
     ( $db:expr, $coll:expr, $filter:expr, $outcome:expr, $many:expr ) => {{
         let count = if $many {
@@ -159,6 +167,8 @@ macro_rules! run_suite {
             coll.insert_many(suite.data.clone(), true, None).unwrap();
 
             match test.operation {
+                Arguments::Count { filter, options } =>
+                run_count_test!(db, coll, filter, Some(options), test.outcome),
                 Arguments::Delete { filter, many } =>
                     run_delete_test!(db, coll, filter, test.outcome, many),
                 Arguments::Find { filter, options } =>
