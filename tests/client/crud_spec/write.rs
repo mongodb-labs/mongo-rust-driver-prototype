@@ -28,3 +28,15 @@ fn insert_one() {
     run_suite!("tests/json/data/specs/source/crud/tests/write/insertOne.json",
                "insert_one");
 }
+
+#[test]
+fn update_one() {
+    run_suite!("tests/json/data/specs/source/crud/tests/write/updateOne.json",
+               "update_one");
+}
+
+#[test]
+fn update_many() {
+    run_suite!("tests/json/data/specs/source/crud/tests/write/updateMany.json",
+               "update_many");
+}
