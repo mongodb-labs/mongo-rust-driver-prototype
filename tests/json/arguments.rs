@@ -3,7 +3,7 @@ use json::options::FromJson;
 use mongodb::client::coll::options::{CountOptions, FindOptions};
 use rustc_serialize::json::Object;
 
-pub enum Arguments {
+pub enum Arguments {    
     Count {
         filter: Option<Document>,
         options: CountOptions,
@@ -11,6 +11,10 @@ pub enum Arguments {
     Delete {
         filter: Document,
         many: bool,
+    },
+    Distinct {
+        field_name: String,
+        filter: Option<Document>,
     },
     Find {
         filter: Option<Document>,
@@ -56,6 +60,21 @@ impl Arguments {
                                    "`delete` requires document");
 
         Ok(Arguments::Delete { filter: document, many: many })
+    }
+
+    pub fn distinct_from_json(object: &Object) -> Result<Arguments, String> {
+        let f = |x| Some(Bson::from_json(x));
+        let field_name = val_or_err!(object.get("fieldName").and_then(f),
+                                     Some(Bson::String(ref s)) => s.to_owned(),
+                                     "`distinct` requires field name");
+
+        let f = |x| Some(Bson::from_json(x));
+        let filter = match object.get("filter").and_then(f) {
+            Some(Bson::Document(doc)) => Some(doc),
+            _ => None
+        };
+
+        Ok(Arguments::Distinct { field_name: field_name, filter: filter })
     }
 
     pub fn find_from_json(object: &Object) -> Arguments {
