@@ -1,9 +1,13 @@
 use bson::{Bson, Document};
 use json::options::FromJson;
-use mongodb::client::coll::options::FindOptions;
+use mongodb::client::coll::options::{CountOptions, FindOptions};
 use rustc_serialize::json::Object;
 
 pub enum Arguments {
+    Count {
+        filter: Option<Document>,
+        options: CountOptions,
+    },
     Delete {
         filter: Document,
         many: bool,
@@ -32,6 +36,18 @@ pub enum Arguments {
 }
 
 impl Arguments {
+    pub fn count_from_json(object: &Object) -> Arguments {
+        let options = CountOptions::from_json(object);
+
+        let f = |x| Some(Bson::from_json(x));
+        let filter = match object.get("filter").and_then(f) {
+            Some(Bson::Document(doc)) => Some(doc),
+            _ => None
+        };
+
+        Arguments::Count { filter: filter, options: options }
+    }
+
     pub fn delete_from_json(object: &Object,
                             many: bool) -> Result<Arguments, String> {
         let f = |x| Some(Bson::from_json(x));
@@ -51,7 +67,7 @@ impl Arguments {
             _ => None
         };
 
-        Arguments::Find{ filter: filter, options: options }
+        Arguments::Find { filter: filter, options: options }
     }
 
     pub fn insert_many_from_json(object: &Object) -> Result<Arguments, String> {

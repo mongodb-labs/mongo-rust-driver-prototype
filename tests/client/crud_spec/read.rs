@@ -6,6 +6,12 @@ use mongodb::client:: MongoClient;
 use rustc_serialize::json::Json;
 
 #[test]
+fn count() {
+    run_suite!("tests/json/data/specs/source/crud/tests/read/count.json",
+               "count");
+}
+
+#[test]
 fn find() {
     run_suite!("tests/json/data/specs/source/crud/tests/read/find.json",
                "find");
