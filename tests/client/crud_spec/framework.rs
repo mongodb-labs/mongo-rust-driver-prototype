@@ -1,3 +1,25 @@
+macro_rules! run_aggregate_test {
+    ( $db:expr, $coll:expr, $pipeline:expr, $opt:expr, $out:expr, $outcome:expr ) => {{
+        let mut cursor = $coll.aggregate($pipeline, $opt).unwrap();
+
+        if !$out {
+            let array = match $outcome.result {
+                Bson::Array(ref arr) => arr.clone(),
+                _ => panic!("Invalid `result` of aggregate test")
+            };
+
+            for bson in array {
+                let b2 = &Bson::Document(cursor.next().unwrap().unwrap());
+                assert!(eq::bson_eq(&bson, b2));
+            }
+
+            assert!(!cursor.has_next().ok().expect("Failed to execute 'has_next()' on cursor"));
+        }
+
+        check_coll!($db, $coll, $outcome.collection);
+    }};
+}
+
 macro_rules! run_count_test {
     ( $db:expr, $coll:expr, $filter:expr, $opt:expr, $outcome:expr ) => {{
         let n = $coll.count($filter, $opt).unwrap();
@@ -59,7 +81,7 @@ macro_rules! run_find_test {
             assert!(eq::bson_eq(&bson, &Bson::Document(cursor.next().unwrap().unwrap())));
         }
 
-        assert!(!cursor.has_next().ok().expect("Failed to execute 'has_next()' on cursor."));
+        assert!(!cursor.has_next().ok().expect("Failed to execute 'has_next()' on cursor"));
         check_coll!($db, $coll, $outcome.collection);
     }};
 }
@@ -177,16 +199,21 @@ macro_rules! run_update_test {
 macro_rules! run_suite {
     ( $file:expr, $coll:expr ) => {{
         let json = Json::from_file($file).unwrap();
-        let suite = json.get_suite().unwrap();
+        let mut suite = json.get_suite().unwrap();
         let client =  MongoClient::new("localhost", 27017).unwrap();
         let db = client.db("test");
         let coll = db.collection($coll);
+
+        suite.tests.remove(0);
 
         for test in suite.tests {
             coll.drop().unwrap();
             coll.insert_many(suite.data.clone(), true, None).unwrap();
 
             match test.operation {
+                Arguments::Aggregate { pipeline, options, out } =>
+                    run_aggregate_test!(db, coll, pipeline, Some(options), out,
+                                        test.outcome),
                 Arguments::Count { filter, options } =>
                     run_count_test!(db, coll, filter, Some(options), test.outcome),
                 Arguments::Delete { filter, many } =>
@@ -230,6 +257,8 @@ macro_rules! check_coll {
                                 &Bson::Document(cursor.next().unwrap().unwrap())));
         }
 
-        assert!(!cursor.has_next().ok().expect("Failed to execute 'has_next()' on cursor."));
+        assert!(!cursor.has_next().ok().expect("Failed to execute 'has_next()' on cursor"));
+
+        $coll.drop().unwrap();
     }};
 }
