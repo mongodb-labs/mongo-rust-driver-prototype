@@ -32,7 +32,7 @@ macro_rules! run_distinct_test {
 
         let expected = match $outcome.result {
             Bson::Array(ref arr) => arr.clone(),
-            _ => panic!("Invalid `result` of find test")
+            _ => panic!("Invalid `result` of distinct test")
         };
 
         assert_eq!(actual.len(), expected.len());
