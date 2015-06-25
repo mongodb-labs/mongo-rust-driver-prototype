@@ -18,6 +18,11 @@ pub enum Arguments {
     InsertMany {
         documents: Vec<Document>,
     },
+    ReplaceOne {
+        filter: Document,
+        replacement: Document,
+        upsert: bool,
+    },
     Update {
         filter: Document,
         update: Document,
@@ -75,6 +80,25 @@ impl Arguments {
                                    "`delete_one` requires document");
 
         Ok(Arguments::InsertOne { document: document })
+    }
+
+    pub fn replace_one_from_json(object: &Object) -> Result<Arguments, String> {
+        let f = |x| Some(Bson::from_json(x));
+        let filter = val_or_err!(object.get("filter").and_then(f),
+                                 Some(Bson::Document(doc)) => doc,
+                                 "`update` requires filter document");
+
+        let f = |x| Some(Bson::from_json(x));
+        let replacement = val_or_err!(object.get("replacement").and_then(f),
+                                 Some(Bson::Document(doc)) => doc,
+                                 "`update` requires update document");
+
+        let f = |x| Some(Bson::from_json(x));
+        let upsert = var_match!(object.get("upsert").and_then(f),
+                                Some(Bson::Boolean(b)) => b);
+
+        Ok(Arguments::ReplaceOne { filter: filter, replacement: replacement,
+                                upsert: upsert })
     }
 
     pub fn update_from_json(object: &Object, many: bool) -> Result<Arguments, String> {
