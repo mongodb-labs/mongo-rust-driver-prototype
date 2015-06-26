@@ -1,7 +1,7 @@
 use bson::{Bson, Document};
 
 use mongodb::client::MongoClient;
-use mongodb::client::coll::options::{FindOneAndReplaceOptions, ReturnDocument};
+use mongodb::client::coll::options::{FindOneAndUpdateOptions, ReturnDocument};
 
 #[test]
 fn find_and_insert() {
@@ -140,7 +140,7 @@ fn find_one_and_replace() {
     };
 
     // Replace with 'new' option
-    let mut opts = FindOneAndReplaceOptions::new();
+    let mut opts = FindOneAndUpdateOptions::new();
     opts.return_document = ReturnDocument::After;
     let result = coll.find_one_and_replace(doc3.clone(), doc2.clone(), Some(opts))
         .ok().expect("Failed to execute find_one_and_replace command.");

@@ -1,6 +1,7 @@
 use bson::{Bson, Document};
 use json::options::FromJson;
-use mongodb::client::coll::options::{AggregateOptions, CountOptions, FindOptions};
+use mongodb::client::coll::options::{AggregateOptions, CountOptions,
+    FindOneAndDeleteOptions, FindOneAndUpdateOptions, FindOptions};
 use rustc_serialize::json::Object;
 
 pub enum Arguments {
@@ -24,6 +25,20 @@ pub enum Arguments {
     Find {
         filter: Option<Document>,
         options: FindOptions,
+    },
+    FindOneAndDelete {
+        filter: Document,
+        options: FindOneAndDeleteOptions,
+    },
+    FindOneAndReplace {
+        filter: Document,
+        replacement: Document,
+        options: FindOneAndUpdateOptions,
+    },
+    FindOneAndUpdate {
+        filter: Document,
+        update: Document,
+        options: FindOneAndUpdateOptions,
     },
     InsertOne {
         document: Document,
@@ -119,6 +134,52 @@ impl Arguments {
         };
 
         Arguments::Find { filter: filter, options: options }
+    }
+
+    pub fn find_one_and_delete_from_json(object: &Object) -> Result<Arguments, String> {
+        let options = FindOneAndDeleteOptions::from_json(object);
+
+        let f = |x| Some(Bson::from_json(x));
+        let filter = val_or_err!(object.get("filter").and_then(f),
+                                 Some(Bson::Document(doc)) => doc,
+                                 "`find_one_and_delete` requires filter document");
+
+        Ok(Arguments::FindOneAndDelete { filter: filter, options: options })
+    }
+
+    pub fn find_one_and_replace_from_json(object: &Object) -> Result<Arguments, String> {
+        let options = FindOneAndUpdateOptions::from_json(object);
+
+        let f = |x| Some(Bson::from_json(x));
+        let filter = val_or_err!(object.get("filter").and_then(f),
+                                 Some(Bson::Document(doc)) => doc,
+                                 "`find_one_and_update` requires filter document");
+
+        let f = |x| Some(Bson::from_json(x));
+        let replacement = val_or_err!(object.get("replacement").and_then(f),
+                                 Some(Bson::Document(doc)) => doc,
+                                 "`find_one_and_replace` requires replacement document");
+
+        Ok(Arguments::FindOneAndReplace { filter: filter,
+                                          replacement: replacement,
+                                          options: options })
+    }
+
+    pub fn find_one_and_update_from_json(object: &Object) -> Result<Arguments, String> {
+        let options = FindOneAndUpdateOptions::from_json(object);
+
+        let f = |x| Some(Bson::from_json(x));
+        let filter = val_or_err!(object.get("filter").and_then(f),
+                                 Some(Bson::Document(doc)) => doc,
+                                 "`find_one_and_update` requires filter document");
+
+        let f = |x| Some(Bson::from_json(x));
+        let update = val_or_err!(object.get("update").and_then(f),
+                                 Some(Bson::Document(doc)) => doc,
+                                 "`find_one_and_update` requires update document");
+
+        Ok(Arguments::FindOneAndUpdate { filter: filter, update: update,
+                                         options: options })
     }
 
     pub fn insert_many_from_json(object: &Object) -> Result<Arguments, String> {

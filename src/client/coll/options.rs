@@ -101,17 +101,6 @@ pub struct FindOneAndDeleteOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
-/// Options for findOneAndReplace operations.
-#[derive(Clone)]
-pub struct FindOneAndReplaceOptions {
-    pub return_document: ReturnDocument,
-    pub max_time_ms: Option<i64>,
-    pub projection: Option<bson::Document>,
-    pub sort: Option<bson::Document>,
-    pub upsert: bool,
-    pub write_concern: Option<WriteConcern>,
-}
-
 /// Options for findOneAndUpdate operations.
 #[derive(Clone)]
 pub struct FindOneAndUpdateOptions {
@@ -191,20 +180,6 @@ impl FindOneAndDeleteOptions {
             max_time_ms: None,
             projection: None,
             sort: None,
-            write_concern: None,
-        }
-    }
-}
-
-
-impl FindOneAndReplaceOptions {
-    pub fn new() -> FindOneAndReplaceOptions {
-        FindOneAndReplaceOptions {
-            return_document: ReturnDocument::Before,
-            max_time_ms: None,
-            projection: None,
-            sort: None,
-            upsert: false,
             write_concern: None,
         }
     }

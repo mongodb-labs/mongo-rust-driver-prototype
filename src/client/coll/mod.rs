@@ -230,8 +230,8 @@ impl<'a> Collection<'a> {
     /// Finds a single document and replaces it, returning either the original
     /// or replaced document.
     pub fn find_one_and_replace(&self, filter: bson::Document, replacement: bson::Document,
-                                options: Option<FindOneAndReplaceOptions>)  -> Result<Option<bson::Document>> {
-        let opts = options.unwrap_or(FindOneAndReplaceOptions::new());
+                                options: Option<FindOneAndUpdateOptions>)  -> Result<Option<bson::Document>> {
+        let opts = options.unwrap_or(FindOneAndUpdateOptions::new());
         try!(Collection::validate_replace(&replacement));
         self.find_one_and_replace_or_update(filter, replacement, opts.return_document.to_bool(),
                                             opts.max_time_ms, opts.projection, opts.sort,
