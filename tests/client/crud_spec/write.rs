@@ -18,6 +18,24 @@ fn delete_one() {
 }
 
 #[test]
+fn find_one_and_delete() {
+    run_suite!("tests/json/data/specs/source/crud/tests/write/findOneAndDelete.json",
+               "find_one_and_delete_one");
+}
+
+#[test]
+fn find_one_and_replace() {
+    run_suite!("tests/json/data/specs/source/crud/tests/write/findOneAndReplace.json",
+               "find_one_and_replace_one");
+}
+
+#[test]
+fn find_one_and_update() {
+    run_suite!("tests/json/data/specs/source/crud/tests/write/findOneAndUpdate.json",
+               "find_one_and_update_one");
+}
+
+#[test]
 fn insert_many() {
     run_suite!("tests/json/data/specs/source/crud/tests/write/insertMany.json",
                "insert_many");

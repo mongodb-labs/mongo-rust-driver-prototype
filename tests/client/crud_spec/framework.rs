@@ -67,6 +67,50 @@ macro_rules! run_distinct_test {
     }};
 }
 
+macro_rules! run_find_one_and_delete_test {
+    ( $db:expr, $coll:expr, $filter:expr, $opt:expr, $outcome:expr ) => {{
+        let doc_opt = $coll.find_one_and_delete($filter, $opt).unwrap();
+
+        let bson = match doc_opt {
+            Some(ref doc) => Bson::Document(doc.clone()),
+            None => Bson::Null
+        };
+
+        assert!(eq::bson_eq(&bson, &$outcome.result));
+        check_coll!($db, $coll, $outcome.collection);
+    }};
+}
+
+macro_rules! run_find_one_and_replace_test {
+    ( $db:expr, $coll:expr, $filter:expr, $replacement:expr, $opt:expr,
+      $outcome:expr ) => {{
+          let doc_opt = $coll.find_one_and_replace($filter, $replacement,
+                                                   $opt).unwrap();
+
+          let bson = match doc_opt {
+              Some(ref doc) => Bson::Document(doc.clone()),
+              None => Bson::Null
+          };
+
+          assert!(eq::bson_eq(&bson, &$outcome.result));
+          check_coll!($db, $coll, $outcome.collection);
+    }};
+}
+
+macro_rules! run_find_one_and_update_test {
+    ( $db:expr, $coll:expr, $filter:expr, $update:expr, $opt:expr,
+      $outcome:expr ) => {{
+          let doc_opt = $coll.find_one_and_update($filter, $update, $opt).unwrap();
+
+          let bson = match doc_opt {
+              Some(ref doc) => Bson::Document(doc.clone()),
+              None => Bson::Null
+          };
+
+          assert!(eq::bson_eq(&bson, &$outcome.result));
+          check_coll!($db, $coll, $outcome.collection);
+    }};
+}
 
 macro_rules! run_find_test {
     ( $db:expr, $coll:expr, $filter:expr, $opt:expr, $outcome:expr ) => {{
@@ -222,6 +266,15 @@ macro_rules! run_suite {
                     run_distinct_test!(db, coll, field_name, filter, test.outcome),
                 Arguments::Find { filter, options } =>
                     run_find_test!(db, coll, filter, Some(options), test.outcome),
+                Arguments::FindOneAndDelete { filter, options } =>
+                    run_find_one_and_delete_test!(db, coll, filter,
+                                                  Some(options), test.outcome),
+                Arguments::FindOneAndReplace { filter, replacement, options } =>
+                    run_find_one_and_replace_test!(db, coll, filter, replacement,
+                                                   Some(options), test.outcome),
+                Arguments::FindOneAndUpdate { filter, update, options } =>
+                    run_find_one_and_update_test!(db, coll, filter, update,
+                                                  Some(options), test.outcome),
                 Arguments::InsertMany { documents } =>
                     run_insert_many_test!(db, coll, documents, test.outcome),
                 Arguments::InsertOne { document } =>
