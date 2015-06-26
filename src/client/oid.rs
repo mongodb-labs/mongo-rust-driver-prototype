@@ -13,9 +13,20 @@ use time;
 
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
-static MAX_U24: usize = 0xFFFFFF;
+const TIMESTAMP_SIZE: usize = 4;
+const MACHINE_ID_SIZE: usize = 3;
+const PROCESS_ID_SIZE: usize = 2;
+const COUNTER_SIZE: usize = 3;
+
+const TIMESTAMP_OFFSET: usize = 0;
+const MACHINE_ID_OFFSET: usize = TIMESTAMP_OFFSET + TIMESTAMP_SIZE;
+const PROCESS_ID_OFFSET: usize = MACHINE_ID_OFFSET + MACHINE_ID_SIZE;
+const COUNTER_OFFSET: usize = PROCESS_ID_OFFSET + PROCESS_ID_SIZE;
+
+const MAX_U24: usize = 0xFFFFFF;
+
 static OID_COUNTER: AtomicUsize = ATOMIC_USIZE_INIT;
-static mut machine_bytes: [u8; 3] = [0; 3];
+static mut MACHINE_BYTES: [u8; 3] = [0; 3];
 
 extern {
     fn gethostname(name: *mut libc::c_char, size: libc::size_t) -> libc::c_int;
@@ -31,10 +42,10 @@ pub fn generate() -> Result<[u8; 12]> {
     let counter = try!(gen_count());
 
     let mut buf: [u8; 12] = [0; 12];
-    for i in 0..4 { buf[i] = timestamp[i]; }
-    for i in 0..3 { buf[4+i] = machine_id[i]; }
-    for i in 0..2 { buf[7+i] = process_id[i]; }
-    for i in 0..3 { buf[9+i] = counter[i]; }
+    for i in 0..TIMESTAMP_SIZE { buf[TIMESTAMP_OFFSET + i] = timestamp[i]; }
+    for i in 0..MACHINE_ID_SIZE { buf[MACHINE_ID_OFFSET + i] = machine_id[i]; }
+    for i in 0..PROCESS_ID_SIZE { buf[PROCESS_ID_OFFSET + i] = process_id[i]; }
+    for i in 0..COUNTER_SIZE { buf[COUNTER_OFFSET +i] = counter[i]; }
 
     Ok(buf)
 }
@@ -70,22 +81,22 @@ pub fn get_timestamp(oid: [u8; 12]) -> u32 {
 /// Retrieves the machine id associated with an ObjectId.
 pub fn get_machine_id(oid: [u8; 12]) -> u32 {
     let mut buf: [u8; 4] = [0; 4];
-    for i in 0..3 {
-        buf[i] = oid[4+i];
+    for i in 0..MACHINE_ID_SIZE {
+        buf[i] = oid[MACHINE_ID_OFFSET+i];
     }
     LittleEndian::read_u32(&buf)
 }
 
 /// Retrieves the process id associated with an ObjectId.
 pub fn get_pid(oid: [u8; 12]) -> u16 {
-    LittleEndian::read_u16(&oid[7..])
+    LittleEndian::read_u16(&oid[PROCESS_ID_OFFSET..])
 }
 
 /// Retrieves the increment counter from an ObjectId.
 pub fn get_counter(oid: [u8; 12]) -> u32 {
     let mut buf: [u8; 4] = [0; 4];
-    for i in 0..3 {
-        buf[i+1] = oid[9+i];
+    for i in 0..COUNTER_SIZE {
+        buf[i+1] = oid[COUNTER_OFFSET+i];
     }
     BigEndian::read_u32(&buf)
 }
@@ -106,10 +117,10 @@ fn gen_timestamp() -> [u8; 4] {
 fn gen_machine_id() -> Result<[u8; 3]> {
     // Short-circuit if machine id has already been calculated.
     // Since the generated machine id is not variable, arising race conditions
-    // will have the same machine_bytes result.
+    // will have the same MACHINE_BYTES result.
     unsafe {
-        if machine_bytes[0] != 0 || machine_bytes[1] != 0 || machine_bytes[2] != 0 {
-            return Ok(machine_bytes);
+        if MACHINE_BYTES[0] != 0 || MACHINE_BYTES[1] != 0 || MACHINE_BYTES[2] != 0 {
+            return Ok(MACHINE_BYTES);
         }
     }
 
@@ -143,14 +154,14 @@ fn gen_machine_id() -> Result<[u8; 3]> {
     // Re-convert string to bytes and grab first three
     let mut bytes = hash.bytes();
     let mut vec: [u8; 3] = [0; 3];
-    for i in 0..3 {
+    for i in 0..MACHINE_ID_SIZE {
         match bytes.next() {
             Some(b) => vec[i] = b,
             None => break,
         }
     }
 
-    unsafe { machine_bytes = vec };
+    unsafe { MACHINE_BYTES = vec };
     Ok(vec)
 }
 
@@ -207,10 +218,23 @@ fn count_generation() {
     let count_bytes = count_res.unwrap();
 
     let mut buf: [u8; 4] = [0; 4];
-    for i in 0..3 {
+    for i in 0..COUNTER_SIZE {
         buf[i] = count_bytes[i];
     }
 
     let count = BigEndian::read_u32(&buf);
     assert_eq!(start.to_be() as u32, count);
+}
+
+#[test]
+fn count_is_big_endian() {
+    let start = 1122867;
+    OID_COUNTER.store(start, Ordering::SeqCst);
+    let oid_res = generate();
+    assert!(oid_res.is_ok());
+    let oid = oid_res.unwrap();
+
+    assert_eq!(0x11u8, oid[COUNTER_OFFSET]);
+    assert_eq!(0x22u8, oid[COUNTER_OFFSET + 1]);
+    assert_eq!(0x33u8, oid[COUNTER_OFFSET + 2]);
 }

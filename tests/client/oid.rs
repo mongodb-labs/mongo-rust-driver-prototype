@@ -33,6 +33,16 @@ fn timestamp() {
 }
 
 #[test]
+fn timestamp_is_big_endian() {
+    let time: u32 = 3857379;
+    let oid = oid::with_timestamp(time);
+    assert_eq!(0x00u8, oid[0]);
+    assert_eq!(0x3Au8, oid[1]);
+    assert_eq!(0xDBu8, oid[2]);
+    assert_eq!(0xE3u8, oid[3]);
+}
+
+#[test]
 fn string_oid() {
     let s = "123456789012123456789012";
     let oid_res = oid::with_string(s);
@@ -51,7 +61,13 @@ fn byte_string_oid() {
                            0xE8u8, 0xA2u8, 0x3Au8, 0xFAu8,
                            0x83u8, 0x2Bu8, 0x21u8, 0x8Eu8];
 
-    for i in 0..12 {
-        assert_eq!(bytes[i], oid[i]);
-    }
+    assert_eq!(bytes, oid);
+}
+
+#[test]
+fn oid_equals() {
+    let oid_res = oid::generate();
+    assert!(oid_res.is_ok());
+    let oid = oid_res.unwrap();
+    assert_eq!(oid, oid);
 }
