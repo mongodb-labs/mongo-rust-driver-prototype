@@ -4,6 +4,7 @@ pub mod common;
 pub mod connstring;
 pub mod cursor;
 pub mod error;
+pub mod oid;
 pub mod wire_protocol;
 
 pub use client::error::{Error, Result};
