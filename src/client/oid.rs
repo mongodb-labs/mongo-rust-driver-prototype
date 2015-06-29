@@ -11,7 +11,6 @@ use rand::{Rng, OsRng};
 use rustc_serialize::hex::FromHex;
 use time;
 
-use std::cmp;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
 const TIMESTAMP_SIZE: usize = 4;

@@ -2,8 +2,7 @@ pub mod options;
 pub mod error;
 pub mod results;
 
-use bson;
-use bson::Bson;
+use bson::{self, Bson};
 
 use client::db::Database;
 use client::common::{ReadPreference, WriteConcern};
@@ -12,6 +11,8 @@ use client::coll::results::*;
 
 use client::cursor::Cursor;
 use client::Result;
+
+use client::oid;
 
 use client::coll::error::{BulkWriteException, WriteException};
 use client::Error::{ArgumentError, ResponseError,
@@ -260,14 +261,22 @@ impl<'a> Collection<'a> {
                                                               Option<BulkWriteException>)> {
 
         let wc =  write_concern.unwrap_or(self.write_concern.clone());
-        let ids = docs.iter().map(|ref doc| {
-            match doc.get("_id") {
-                Some(bson) => bson.clone(),
-                None => Bson::String("Unimplemented OID".to_owned()),
-            }
-        }).collect();
 
-        let converted_docs = docs.iter().map(|doc| Bson::Document(doc.to_owned())).collect();
+        let mut converted_docs = Vec::new();
+        let mut ids = Vec::new();
+
+        for doc in &docs {
+            let mut cdoc = doc.to_owned();
+            match doc.get("_id") {
+                Some(id) => ids.push(id.clone()),
+                None => {
+                    let id = Bson::ObjectId(try!(oid::ObjectId::new()).bytes());
+                    cdoc.insert("_id".to_owned(), id.clone());
+                    ids.push(id);
+                }
+            }
+            converted_docs.push(Bson::Document(cdoc));
+        }
 
         let mut cmd = bson::Document::new();
         cmd.insert("insert".to_owned(), Bson::String(self.name()));
@@ -300,10 +309,18 @@ impl<'a> Collection<'a> {
         // Downgrade bulk exception, if it exists.
         let exception = match bulk_exception {
             Some(e) => Some(WriteException::with_bulk_exception(e)),
-            None => None
+            None => None,
         };
 
-        Ok(InsertOneResult::new(Some(ids[0].to_owned()), exception))
+        let id = match exception {
+            Some(ref exc) => match exc.write_error {
+                Some(_) => None,
+                None => Some(ids[0].to_owned()),
+            },
+            None => Some(ids[0].to_owned()),
+        };
+
+        Ok(InsertOneResult::new(id, exception))
     }
 
     /// Inserts the provided documents. If any documents are missing an identifier,
@@ -316,6 +333,12 @@ impl<'a> Collection<'a> {
         let mut map = BTreeMap::new();
         for i in 0..ids.len() {
             map.insert(i as i64, ids.get(i).unwrap().to_owned());
+        }
+
+        if let Some(ref exc) = exception {
+            for error in &exc.write_errors {
+                map.remove(&(error.index as i64));
+            }
         }
 
         Ok(InsertManyResult::new(Some(map), exception))
