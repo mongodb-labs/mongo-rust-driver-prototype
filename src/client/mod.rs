@@ -5,6 +5,7 @@ pub mod connstring;
 pub mod cursor;
 pub mod error;
 pub mod oid;
+pub mod pool;
 pub mod wire_protocol;
 
 pub use client::error::{Error, Result};
@@ -13,23 +14,24 @@ use client::error::Error::ResponseError;
 use bson;
 use bson::Bson;
 
-use std::cell::RefCell;
-use std::net::TcpStream;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 
 use client::db::Database;
 use client::common::{ReadPreference, WriteConcern};
 use client::connstring::ConnectionString;
+use client::pool::{ConnectionPool, PooledStream};
 
 /// Interfaces with a MongoDB server or replica set.
+#[derive(Clone)]
 pub struct MongoClient {
     req_id: Arc<AtomicIsize>,
-    socket: Arc<Mutex<RefCell<TcpStream>>>,
-    config: ConnectionString,
+    pool: ConnectionPool,
     pub read_preference: ReadPreference,
     pub write_concern: WriteConcern,
 }
+
+unsafe impl Sync for MongoClient {}
 
 impl MongoClient {
     /// Creates a new MongoClient connected to a single MongoDB server.
@@ -61,8 +63,6 @@ impl MongoClient {
     fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>,
                    write_concern: Option<WriteConcern>) -> Result<MongoClient> {
 
-        let socket = try!(MongoClient::connect(&config));
-
         let rp = match read_pref {
             Some(rp) => rp,
             None => ReadPreference::Primary,
@@ -75,8 +75,7 @@ impl MongoClient {
 
         Ok(MongoClient {
             req_id: Arc::new(ATOMIC_ISIZE_INIT),
-            socket: Arc::new(Mutex::new(RefCell::new(socket))),
-            config: config,
+            pool: ConnectionPool::new(config),
             read_preference: rp,
             write_concern: wc,
         })
@@ -93,17 +92,14 @@ impl MongoClient {
         Database::new(self, db_name, read_preference, write_concern)
     }
 
+    /// Acquires a connection stream from the pool.
+    pub fn acquire_stream(&self) -> Result<PooledStream> {
+        Ok(try!(self.pool.acquire_stream()))
+    }
+
     /// Returns a unique operational request id.
     pub fn get_req_id(&self) -> i32 {
         self.req_id.fetch_add(1, Ordering::SeqCst) as i32
-    }
-
-    // Connects to a MongoDB server as defined by `config`.
-    fn connect(config: &ConnectionString) -> Result<TcpStream> {
-        let host_name = config.hosts[0].host_name.to_owned();
-        let port = config.hosts[0].port;
-        let stream = try!(TcpStream::connect((&host_name[..], port)));
-        Ok(stream)
     }
 
     /// Returns a list of all database names that exist on the server.

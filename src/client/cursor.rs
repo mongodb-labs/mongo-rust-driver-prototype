@@ -10,6 +10,8 @@ use client::wire_protocol::operations::Message;
 use std::collections::vec_deque::VecDeque;
 use std::io::{Read, Write};
 
+use std::ops::DerefMut;
+
 pub const DEFAULT_BATCH_SIZE: i32 = 20;
 
 /// Maintains a connection to the server and lazily returns documents from a
@@ -132,11 +134,13 @@ impl <'a> Cursor<'a> {
                                          number_to_skip, batch_size,
                                          query.clone(), return_field_selector);
 
-        let socket = try!(client.socket.lock());
+        let stream = try!(client.acquire_stream());
+        let mut locked = try!(stream.socket.lock());
+        let mut socket = locked.deref_mut();
 
         let message = try!(result);
-        try!(message.write(&mut *socket.borrow_mut()));
-        let reply = try!(Message::read(&mut *socket.borrow_mut()));
+        try!(message.write(&mut socket));
+        let reply = try!(Message::read(&mut socket));
 
         let (buf, cursor_id, namespace) = if is_cmd_cursor {
             try!(Cursor::get_bson_and_cursor_info_from_command_message(reply))
@@ -200,11 +204,13 @@ impl <'a> Cursor<'a> {
 
     /// Attempts to read another batch of BSON documents from the stream.
     fn get_from_stream(&mut self) -> Result<()> {
-        let socket = try!(self.client.socket.lock());
+        let stream = try!(self.client.acquire_stream());
+        let mut locked = try!(stream.socket.lock());
+        let mut socket = locked.deref_mut();
 
         let get_more = self.new_get_more_request();
-        try!(get_more.write(&mut *socket.borrow_mut()));
-        let reply = try!(Message::read(&mut *socket.borrow_mut()));
+        try!(get_more.write(&mut socket));
+        let reply = try!(Message::read(&mut socket));
 
         let (v, _) = try!(Cursor::get_bson_and_cid_from_message(reply));
         self.buffer.extend(v);
