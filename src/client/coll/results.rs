@@ -3,13 +3,14 @@ use bson::Bson;
 
 use std::collections::BTreeMap;
 use client::coll::error::{BulkWriteException, WriteException};
+use client::coll::options::WriteModel;
 
 /// Results for a bulk write operation.
 #[derive(Clone)]
 pub struct BulkWriteResult {
     pub acknowledged: bool,
     pub inserted_count: i32,
-    pub inserted_ids: Option<BTreeMap<i64, Bson>>,
+    pub inserted_ids: BTreeMap<i64, Bson>,
     pub matched_count: i32,
     pub modified_count: i32,
     pub deleted_count: i32,
@@ -54,18 +55,52 @@ pub struct UpdateResult {
 
 impl BulkWriteResult {
     /// Extracts server reply information into a result.
-    pub fn new(inserted_ids: Option<BTreeMap<i64, Bson>>, upserted_ids: BTreeMap<i64, Bson>,
-               doc: bson::Document, exception: Option<BulkWriteException>) -> BulkWriteResult {
+    pub fn new() -> BulkWriteResult {
         BulkWriteResult {
             acknowledged: true,
+            inserted_ids: BTreeMap::new(),
             inserted_count: 0,
-            inserted_ids: inserted_ids,
             matched_count: 0,
             modified_count: 0,
             deleted_count: 0,
             upserted_count: 0,
-            upserted_ids: upserted_ids,
-            bulk_write_exception: exception,
+            upserted_ids: BTreeMap::new(),
+            bulk_write_exception: None,
+        }
+    }
+
+    pub fn process_insert_one_result(&mut self, result: InsertOneResult, i: i64,
+                                     req: WriteModel,
+                                     exception: &mut BulkWriteException) {
+        match result.write_exception {
+            Some(write_exception) =>
+                exception.add_write_exception(write_exception, i as i32, req),
+            None => {
+                let id = result.inserted_id.expect("`inserted_id` should not be `None` \
+                                                    if there is no WriteException");
+                self.inserted_ids.insert(i, id);
+                self.inserted_count += 1;
+
+                exception.processed_requests.push(req)
+            }
+        };
+    }
+
+    pub fn process_insert_many_result(&mut self, result: InsertManyResult,
+                                      models: Vec<WriteModel>,
+                                      exception: &mut BulkWriteException) {
+        match result.bulk_write_exception {
+            Some(new_exception) =>
+                exception.add_bulk_write_exception(new_exception),
+            None => for model in models {
+                exception.processed_requests.push(model);
+            }
+        }
+
+        if let Some(ids) = result.inserted_ids {
+            for (i, id) in ids {
+                self.inserted_ids.insert(i, id);
+            }
         }
     }
 }

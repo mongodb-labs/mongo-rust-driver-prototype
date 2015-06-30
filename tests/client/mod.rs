@@ -1,3 +1,4 @@
+mod bulk;
 mod coll;
 mod connstring;
 mod crud_spec;

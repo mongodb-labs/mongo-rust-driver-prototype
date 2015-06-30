@@ -264,6 +264,54 @@ impl BulkWriteException {
         }
     }
 
+    pub fn add_unproccessed_model(&mut self, model: WriteModel) {
+        self.unprocessed_requests.push(model);
+    }
+
+    pub fn add_unproccessed_models(&mut self, models: Vec<WriteModel>) {
+        for model in models {
+            self.add_unproccessed_model(model);
+        }
+    }
+
+    pub fn add_bulk_write_exception(&mut self, exception: BulkWriteException) {
+        for req in exception.processed_requests.iter() {
+            self.processed_requests.push(req.clone());
+        }
+
+        for req in exception.unprocessed_requests.iter() {
+            self.unprocessed_requests.push(req.clone());
+        }
+
+        for err in exception.write_errors.iter() {
+            self.write_errors.push(err.clone());
+        }
+
+        if exception.write_concern_error.is_some() {
+            self.write_concern_error = exception.write_concern_error;
+        };
+
+        self.message.push_str(&exception.message);
+    }
+
+    pub fn add_write_exception(&mut self, exception: WriteException, i: i32,
+                               req: WriteModel) {
+        self.add_unproccessed_model(req.clone());
+
+        if exception.write_concern_error.is_some() {
+            self.write_concern_error = exception.write_concern_error;
+        };
+
+        if let Some(write_err) = exception.write_error {
+            let bulk_write_error = BulkWriteError::new(i, write_err.code,
+                                                       write_err.message,
+                                                       Some(req));
+            self.write_errors.push(bulk_write_error);
+        }
+
+        self.message.push_str(&exception.message);
+    }
+
     /// Validates a bulk write result.
     pub fn validate_bulk_write_result(result: bson::Document, write_concern: WriteConcern) -> Result<()> {
 

@@ -1,13 +1,16 @@
-pub mod options;
+mod batch;
 pub mod error;
+pub mod options;
 pub mod results;
 
 use bson::{self, Bson};
 
+use self::batch::Batch;
+use self::options::*;
+use self::results::*;
+
 use client::db::Database;
 use client::common::{ReadPreference, WriteConcern};
-use client::coll::options::*;
-use client::coll::results::*;
 
 use client::cursor::Cursor;
 use client::Result;
@@ -250,9 +253,102 @@ impl<'a> Collection<'a> {
                                             opts.upsert, opts.write_concern)
     }
 
+    pub fn get_unordered_batches(requests: Vec<WriteModel>) -> Vec<Batch> {
+        let mut inserts = vec![];
+
+        for req in requests {
+            match req {
+                WriteModel::InsertOne { document }  => {
+                    inserts.push(document)
+                }
+                _ => ()
+            }
+        }
+
+        vec![Batch::Insert { documents: inserts }]
+    }
+
+    pub fn get_ordered_batches(requests: Vec<WriteModel>) -> Vec<Batch> {
+        let mut inserts = vec![];
+
+        for req in requests {
+            match req {
+                WriteModel::InsertOne { document }  => {
+                    inserts.push(document)
+                }
+                _ => ()
+            }
+        }
+
+        vec![Batch::Insert { documents: inserts }]
+    }
+
+    fn execute_insert_one_batch(&self, document: bson::Document, i: i64,
+                                result: &mut BulkWriteResult,
+                                exception: &mut BulkWriteException) {
+        let model = WriteModel::InsertOne { document: document.clone() };
+
+        match self.insert_one(document, None) {
+            Ok(insert_result) => {
+
+                result.process_insert_one_result(insert_result, i, model,
+                                                 exception);
+            },
+            Err(err) => exception.add_unproccessed_model(model)
+        }
+    }
+
+    fn execute_insert_many_batch(&self, documents: Vec<bson::Document>,
+                                 ordered: bool, result: &mut BulkWriteResult,
+                                 exception: &mut BulkWriteException) {
+        let models = documents.iter().map(|doc|
+          WriteModel::InsertOne { document: doc.clone() }
+        ).collect();
+
+        match self.insert_many(documents, ordered, None) {
+            Ok(insert_result) =>
+                result.process_insert_many_result(insert_result, models,
+                                                  exception),
+            Err(err) => exception.add_unproccessed_models(models)
+        }
+    }
+
+    fn execute_batch(&self, batch: Batch, ordered: bool, i: i64,
+                     result: &mut BulkWriteResult,
+                     exception: &mut BulkWriteException) {
+        match batch {
+            Batch::Insert { mut documents } =>
+                if documents.len() == 1 {
+                    self.execute_insert_one_batch(documents.pop().unwrap(), i, result,
+                                                  exception)
+                } else {
+                    self.execute_insert_many_batch(documents, ordered,
+                                                       result, exception)
+                }
+        }
+    }
+
     /// Sends a batch of writes to the server at the same time.
-    pub fn bulk_write(requests: Vec<WriteModel>, ordered: bool) -> BulkWriteResult {
-        unimplemented!()
+    pub fn bulk_write(&self, requests: Vec<WriteModel>, ordered: bool) -> BulkWriteResult {
+        let batches = if ordered {
+                          Collection::get_ordered_batches(requests)
+                      } else {
+                          Collection::get_unordered_batches(requests)
+                      };
+
+        let mut result = BulkWriteResult::new();
+        let mut exception = BulkWriteException::new(vec![], vec![], vec![], None);
+
+        for (i, batch) in batches.into_iter().enumerate() {
+            self.execute_batch(batch, ordered, i as i64, &mut result,
+                               &mut exception);
+        }
+
+        if exception.unprocessed_requests.len() == 0 {
+            result.bulk_write_exception = Some(exception);
+        }
+
+        result
     }
 
     // Internal insertion helper function. Returns a vec of collected ids and a possible exception.
