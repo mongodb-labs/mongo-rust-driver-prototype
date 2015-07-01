@@ -442,7 +442,7 @@ impl<'a> Collection<'a> {
     }
 
     // Sends a batch of delete ops to the server at once.
-    fn bulk_delete(&self, models: Vec<DeleteModel>, write_concern: Option<WriteConcern>) -> Result<BulkDeleteResult> {
+    fn bulk_delete(&self, models: Vec<DeleteModel>, ordered: bool, write_concern: Option<WriteConcern>) -> Result<BulkDeleteResult> {
 
         let wc = write_concern.unwrap_or(self.write_concern.clone());
 
@@ -458,6 +458,9 @@ impl<'a> Collection<'a> {
         let mut cmd = bson::Document::new();
         cmd.insert("delete".to_owned(), Bson::String(self.name()));
         cmd.insert("deletes".to_owned(), Bson::Array(deletes));
+        if !ordered {
+            cmd.insert("ordered".to_owned(), Bson::Boolean(ordered));
+        }
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
         let result = try!(self.db.command(cmd));
@@ -477,7 +480,7 @@ impl<'a> Collection<'a> {
     fn delete(&self, filter: bson::Document, multi: bool, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
 
         let result = try!(self.bulk_delete(vec!(DeleteModel::new(filter, multi)),
-                                           write_concern));
+                                           true, write_concern));
 
         Ok(DeleteResult::with_bulk_result(result))
     }
@@ -493,7 +496,7 @@ impl<'a> Collection<'a> {
     }
 
     // Sends a batch of replace and update ops to the server at once.
-    fn bulk_update(&self, models: Vec<UpdateModel>, write_concern: Option<WriteConcern>) -> Result<BulkUpdateResult> {
+    fn bulk_update(&self, models: Vec<UpdateModel>, ordered: bool, write_concern: Option<WriteConcern>) -> Result<BulkUpdateResult> {
         let wc = write_concern.unwrap_or(self.write_concern.clone());
 
         let mut updates = Vec::new();
@@ -502,6 +505,9 @@ impl<'a> Collection<'a> {
             update.insert("q".to_owned(), Bson::Document(model.filter));
             update.insert("u".to_owned(), Bson::Document(model.update));
             update.insert("upsert".to_owned(), Bson::Boolean(model.upsert));
+            if !ordered {
+                update.insert("ordered".to_owned(), Bson::Boolean(ordered));
+            }
             if model.multi {
                 update.insert("multi".to_owned(), Bson::Boolean(model.multi));
             }
@@ -531,7 +537,7 @@ impl<'a> Collection<'a> {
               write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
 
         let result = try!(self.bulk_update(vec!(UpdateModel::new(filter, update, upsert, multi)),
-                                           write_concern));
+                                           true, write_concern));
 
         Ok(UpdateResult::with_bulk_result(result))
     }
