@@ -20,26 +20,26 @@ pub enum ReturnDocument {
 /// Marker interface for writes that can be batched together.
 #[derive(Debug, Clone)]
 pub enum WriteModel {
-    InsertOneModel {
+    InsertOne {
         document: bson::Document,
     },
-    DeleteOneModel {
+    DeleteOne {
         filter: bson::Document,
     },
-    DeleteManyModel {
+    DeleteMany {
         filter: bson::Document,
     },
-    ReplaceOneModel {
+    ReplaceOne {
         filter: bson::Document,
         replacement: bson::Document,
         upsert: bool,
     },
-    UpdateOneModel {
+    UpdateOne {
         filter: bson::Document,
         update: bson::Document,
         upsert: bool,
     },
-    UpdateManyModel {
+    UpdateMany {
         filter: bson::Document,
         update: bson::Document,
         upsert: bool,
