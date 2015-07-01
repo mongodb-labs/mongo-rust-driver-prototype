@@ -19,6 +19,24 @@ pub struct BulkWriteResult {
     pub bulk_write_exception: Option<BulkWriteException>,
 }
 
+/// Results for a bulk delete operation.
+#[derive(Clone)]
+pub struct BulkDeleteResult {
+    pub acknowledged: bool,
+    pub deleted_count: i32,
+    pub write_exception: Option<BulkWriteException>,
+}
+
+/// Results for a bulk update operation.
+#[derive(Clone)]
+pub struct BulkUpdateResult {
+    pub acknowledged: bool,
+    pub matched_count: i32,
+    pub modified_count: i32,
+    pub upserted_id: Option<Bson>,
+    pub write_exception: Option<BulkWriteException>,
+}
+
 /// Results for an insertOne operation.
 #[derive(Clone)]
 pub struct InsertOneResult {
@@ -105,6 +123,52 @@ impl BulkWriteResult {
     }
 }
 
+impl BulkDeleteResult {
+    /// Extracts server reply information into a result.
+    pub fn new(doc: bson::Document, exception: Option<BulkWriteException>) -> BulkDeleteResult {
+        let n = match doc.get("n") {
+            Some(&Bson::I32(n)) => n,
+            _ => 0,
+        };
+
+        BulkDeleteResult {
+            acknowledged: true,
+            deleted_count: n,
+            write_exception: exception,
+        }
+    }
+}
+
+impl BulkUpdateResult {
+    /// Extracts server reply information into a result.
+    pub fn new(doc: bson::Document, exception: Option<BulkWriteException>) -> BulkUpdateResult {
+        let n = match doc.get("n") {
+            Some(&Bson::I32(n)) => n,
+            _ => 0,
+        };
+
+        let (n_upserted, id) = match doc.get("upserted") {
+            Some(&Bson::Array(ref arr)) => (arr.len() as i32, Some(arr[0].clone())),
+            _ => (0, None)
+        };
+
+        let n_matched = n - n_upserted;
+
+        let n_modified = match doc.get("nModified") {
+            Some(&Bson::I32(n)) => n,
+            _ => 0,
+        };
+
+        BulkUpdateResult {
+            acknowledged: true,
+            matched_count: n_matched,
+            modified_count: n_modified,
+            upserted_id: id,
+            write_exception: exception,
+        }
+    }
+}
+
 impl InsertOneResult {
     /// Extracts server reply information into a result.
     pub fn new(inserted_id: Option<Bson>, exception: Option<WriteException>) -> InsertOneResult {
@@ -141,6 +205,19 @@ impl DeleteResult {
             write_exception: exception,
         }
     }
+
+    pub fn with_bulk_result(result: BulkDeleteResult) -> DeleteResult {
+        let exception = match result.write_exception {
+            Some(bulk_exception) => Some(WriteException::with_bulk_exception(bulk_exception)),
+            None => None,
+        };
+
+        DeleteResult {
+            acknowledged: result.acknowledged,
+            deleted_count: result.deleted_count,
+            write_exception: exception,
+        }
+    }
 }
 
 impl UpdateResult {
@@ -168,6 +245,21 @@ impl UpdateResult {
             matched_count: n_matched,
             modified_count: n_modified,
             upserted_id: id,
+            write_exception: exception,
+        }
+    }
+
+    pub fn with_bulk_result(result: BulkUpdateResult) -> UpdateResult {
+        let exception = match result.write_exception {
+            Some(bulk_exception) => Some(WriteException::with_bulk_exception(bulk_exception)),
+            None => None,
+        };
+        
+        UpdateResult {
+            acknowledged: result.acknowledged,
+            matched_count: result.matched_count,
+            modified_count: result.modified_count,
+            upserted_id: result.upserted_id,
             write_exception: exception,
         }
     }

@@ -8,6 +8,7 @@ use bson::{self, Bson};
 use self::batch::Batch;
 use self::options::*;
 use self::results::*;
+use self::batch::{DeleteModel, UpdateModel};
 
 use client::db::Database;
 use client::common::{ReadPreference, WriteConcern};
@@ -301,9 +302,9 @@ impl<'a> Collection<'a> {
     fn execute_insert_many_batch(&self, documents: Vec<bson::Document>,
                                  ordered: bool, result: &mut BulkWriteResult,
                                  exception: &mut BulkWriteException) {
-        let models = documents.iter().map(|doc|
-          WriteModel::InsertOne { document: doc.clone() }
-        ).collect();
+        let models = documents.iter().map(|doc| {
+            WriteModel::InsertOne { document: doc.clone() }
+        }).collect();
 
         match self.insert_many(documents, ordered, None) {
             Ok(insert_result) =>
@@ -323,7 +324,7 @@ impl<'a> Collection<'a> {
                                                   exception)
                 } else {
                     self.execute_insert_many_batch(documents, ordered,
-                                                       result, exception)
+                                                   result, exception)
                 }
         }
     }
@@ -331,10 +332,10 @@ impl<'a> Collection<'a> {
     /// Sends a batch of writes to the server at the same time.
     pub fn bulk_write(&self, requests: Vec<WriteModel>, ordered: bool) -> BulkWriteResult {
         let batches = if ordered {
-                          Collection::get_ordered_batches(requests)
-                      } else {
-                          Collection::get_unordered_batches(requests)
-                      };
+            Collection::get_ordered_batches(requests)
+        } else {
+            Collection::get_unordered_batches(requests)
+        };
 
         let mut result = BulkWriteResult::new();
         let mut exception = BulkWriteException::new(vec![], vec![], vec![], None);
@@ -440,72 +441,99 @@ impl<'a> Collection<'a> {
         Ok(InsertManyResult::new(Some(map), exception))
     }
 
-    // Internal deletion helper function.
-    fn delete(&self, filter: bson::Document, limit: i64, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
+    // Sends a batch of delete ops to the server at once.
+    fn bulk_delete(&self, models: Vec<DeleteModel>, write_concern: Option<WriteConcern>) -> Result<BulkDeleteResult> {
+
         let wc = write_concern.unwrap_or(self.write_concern.clone());
 
-        let mut deletes = bson::Document::new();
-        deletes.insert("q".to_owned(), Bson::Document(filter));
-        deletes.insert("limit".to_owned(), Bson::I64(limit));
+        let mut deletes = Vec::new();
+        for model in models {
+            let mut delete = bson::Document::new();
+            delete.insert("q".to_owned(), Bson::Document(model.filter));
+            let limit = if model.multi { 0 } else { 1 };
+            delete.insert("limit".to_owned(), Bson::I64(limit));
+            deletes.push(Bson::Document(delete));
+        }
 
         let mut cmd = bson::Document::new();
         cmd.insert("delete".to_owned(), Bson::String(self.name()));
-        cmd.insert("deletes".to_owned(), Bson::Array(vec!(Bson::Document(deletes))));
+        cmd.insert("deletes".to_owned(), Bson::Array(deletes));
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
         let result = try!(self.db.command(cmd));
 
         // Intercept write exceptions and insert into the result
-        let exception_res = WriteException::validate_write_result(result.clone(), wc);
+        let exception_res = BulkWriteException::validate_bulk_write_result(result.clone(), wc);
         let exception = match exception_res {
             Ok(()) => None,
-            Err(WriteError(err)) => Some(err),
+            Err(BulkWriteError(err)) => Some(err),
             Err(e) => return Err(e),
         };
 
-        Ok(DeleteResult::new(result, exception))
+        Ok(BulkDeleteResult::new(result, exception))
+    }
+
+    // Internal deletion helper function.
+    fn delete(&self, filter: bson::Document, multi: bool, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
+
+        let result = try!(self.bulk_delete(vec!(DeleteModel::new(filter, multi)),
+                                           write_concern));
+
+        Ok(DeleteResult::with_bulk_result(result))
     }
 
     /// Deletes a single document.
     pub fn delete_one(&self, filter: bson::Document, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
-        self.delete(filter, 1, write_concern)
+        self.delete(filter, false, write_concern)
     }
 
     /// Deletes multiple documents.
     pub fn delete_many(&self, filter: bson::Document, write_concern: Option<WriteConcern>) -> Result<DeleteResult> {
-        self.delete(filter, 0, write_concern)
+        self.delete(filter, true, write_concern)
+    }
+
+    // Sends a batch of replace and update ops to the server at once.
+    fn bulk_update(&self, models: Vec<UpdateModel>, write_concern: Option<WriteConcern>) -> Result<BulkUpdateResult> {
+        let wc = write_concern.unwrap_or(self.write_concern.clone());
+
+        let mut updates = Vec::new();
+        for model in models {
+            let mut update = bson::Document::new();
+            update.insert("q".to_owned(), Bson::Document(model.filter));
+            update.insert("u".to_owned(), Bson::Document(model.update));
+            update.insert("upsert".to_owned(), Bson::Boolean(model.upsert));
+            if model.multi {
+                update.insert("multi".to_owned(), Bson::Boolean(model.multi));
+            }
+            updates.push(Bson::Document(update));
+        }
+
+        let mut cmd = bson::Document::new();
+        cmd.insert("update".to_owned(), Bson::String(self.name()));
+        cmd.insert("updates".to_owned(), Bson::Array(updates));
+        cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
+
+        let result = try!(self.db.command(cmd));
+
+        // Intercept write exceptions and insert into the result
+        let exception_res = BulkWriteException::validate_bulk_write_result(result.clone(), wc);
+        let exception = match exception_res {
+            Ok(()) => None,
+            Err(BulkWriteError(err)) => Some(err),
+            Err(e) => return Err(e),
+        };
+
+        Ok(BulkUpdateResult::new(result, exception))
     }
 
     // Internal update helper function.
     fn update(&self, filter: bson::Document, update: bson::Document, upsert: bool, multi: bool,
               write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
 
-        let wc = write_concern.unwrap_or(self.write_concern.clone());
+        let result = try!(self.bulk_update(vec!(UpdateModel::new(filter, update, upsert, multi)),
+                                           write_concern));
 
-        let mut updates = bson::Document::new();
-        updates.insert("q".to_owned(), Bson::Document(filter));
-        updates.insert("u".to_owned(), Bson::Document(update));
-        updates.insert("upsert".to_owned(), Bson::Boolean(upsert));
-        if multi {
-            updates.insert("multi".to_owned(), Bson::Boolean(multi));
-        }
-
-        let mut cmd = bson::Document::new();
-        cmd.insert("update".to_owned(), Bson::String(self.name()));
-        cmd.insert("updates".to_owned(), Bson::Array(vec!(Bson::Document(updates))));
-        cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
-
-        let result = try!(self.db.command(cmd));
-
-        // Intercept write exceptions and insert into the result
-        let exception_res = WriteException::validate_write_result(result.clone(), wc);
-        let exception = match exception_res {
-            Ok(()) => None,
-            Err(WriteError(err)) => Some(err),
-            Err(e) => return Err(e),
-        };
-
-        Ok(UpdateResult::new(result, exception))
+        Ok(UpdateResult::with_bulk_result(result))
     }
 
     /// Replaces a single document.
