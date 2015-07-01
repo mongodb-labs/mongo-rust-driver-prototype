@@ -23,15 +23,15 @@ fn bulk_ordered_insert_only() {
 
     for (i, result) in cursor.into_iter().enumerate() {
         let doc = result.unwrap();
-        let i = i + 1;
+        let expected_id = i + 1;
 
         match doc.get("_id") {
-            Some(&Bson::I32(j)) => assert_eq!(i as i32, j),
+            Some(&Bson::I32(j)) => assert_eq!(expected_id as i32, j),
             _ => panic!("Invalid id: {:?}", doc)
         }
 
         match doc.get("x") {
-            Some(&Bson::I32(j)) => assert_eq!(11 * i as i32, j),
+            Some(&Bson::I32(j)) => assert_eq!(11 * expected_id as i32, j),
             _ => panic!("Invalid id: {:?}", doc)
         }
     }
@@ -58,15 +58,15 @@ fn bulk_unordered_insert_only() {
 
     for (i, result) in cursor.into_iter().enumerate() {
         let doc = result.unwrap();
-        let i = i + 1;
+        let expected_id = i + 1;
 
         match doc.get("_id") {
-            Some(&Bson::I32(j)) => assert_eq!(i as i32, j),
+            Some(&Bson::I32(j)) => assert_eq!(expected_id as i32, j),
             _ => panic!("Invalid id: {:?}", doc)
         }
 
         match doc.get("x") {
-            Some(&Bson::I32(j)) => assert_eq!(11 * i as i32, j),
+            Some(&Bson::I32(j)) => assert_eq!(11 * expected_id as i32, j),
             _ => panic!("Invalid id: {:?}", doc)
         }
     }
