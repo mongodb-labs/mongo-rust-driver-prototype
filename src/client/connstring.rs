@@ -8,7 +8,7 @@ pub const DEFAULT_PORT: u16 = 27017;
 pub const URI_SCHEME: &'static str = "mongodb://";
 
 /// Encapsulates the hostname and port of a host.
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Host {
     pub host_name: String,
     pub ipc: String,
@@ -39,7 +39,7 @@ impl Host {
 }
 
 /// Encapsulates the options and read preference tags of a MongoDB connection.
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConnectionOptions {
     pub options: BTreeMap<String, String>,
     pub read_pref_tags: Vec<String>,
@@ -61,7 +61,7 @@ impl ConnectionOptions {
 }
 
 /// Encapsulates information for connection to a single MongoDB host or replicated set.
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConnectionString {
     pub hosts: Vec<Host>,
     pub string: Option<String>,

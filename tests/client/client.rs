@@ -1,5 +1,7 @@
 use bson;
 use mongodb::client::MongoClient;
+use std::sync::Arc;
+use std::thread;
 
 #[test]
 fn database_names() {
@@ -37,4 +39,48 @@ fn is_master() {
     let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
     let res = client.is_master().ok().expect("Failed to execute is_master.");
     assert!(res);
+}
+
+#[test]
+fn is_sync() {
+    let client = Arc::new(MongoClient::with_uri("mongodb://localhost:27018").unwrap());    
+    let state_results = client.database_names().ok().expect("Failed to execute database_names.");
+    for name in state_results {
+        if name != "local" {
+            client.drop_database(&name[..]).ok().expect("Failed to drop database from server.");
+        }
+    }
+
+    let client1 = client.clone();
+    let client2 = client.clone();
+    
+    let base_results = client.database_names().ok().expect("Failed to execute database_names.");
+    assert_eq!(1, base_results.len());
+    assert_eq!("local", base_results[0]);
+
+    let child1 = thread::spawn(move || {
+        let db = client1.db("concurrent_db");
+        db.collection("test1").insert_one(bson::Document::new(), None)
+            .ok().expect("Failed to insert placeholder document into collection");
+        let results = client1.database_names().ok().expect("Failed to execute database_names.");
+        assert!(results.contains(&"concurrent_db".to_owned()));
+    });
+
+    let child2 = thread::spawn(move || {
+        let db = client2.db("concurrent_db_2");
+        db.collection("test2").insert_one(bson::Document::new(), None)
+            .ok().expect("Failed to insert placeholder document into collection");
+        let results = client2.database_names().ok().expect("Failed to execute database_names.");
+        assert!(results.contains(&"concurrent_db_2".to_owned()));
+    });
+
+    let _ = child1.join();
+    let _ = child2.join();
+    
+    // Check new dbs
+    let results = client.database_names().ok().expect("Failed to execute database_names.");
+    assert_eq!(3, results.len());
+    assert!(results.contains(&"local".to_owned()));
+    assert!(results.contains(&"concurrent_db".to_owned()));
+    assert!(results.contains(&"concurrent_db_2".to_owned()));
 }
