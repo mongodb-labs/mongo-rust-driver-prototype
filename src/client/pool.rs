@@ -1,4 +1,4 @@
-use client::Error::OperationError;
+use client::Error::{ArgumentError, OperationError};
 use client::Result;
 use client::connstring::ConnectionString;
 
@@ -87,9 +87,13 @@ impl ConnectionPool {
 
     /// Sets the maximum number of open connections.
     pub fn set_size(&self, size: usize) -> Result<()> {
-        let mut locked = try!(self.inner.lock());
-        locked.size = size;
-        Ok(())
+        if size < 1 {
+            Err(ArgumentError("The connection pool size must be greater than zero.".to_owned()))
+        } else {
+            let mut locked = try!(self.inner.lock());
+            locked.size = size;
+            Ok(())
+        }
     }
     
     /// Attempts to acquire a connected socket. If none are available and
