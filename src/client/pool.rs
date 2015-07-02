@@ -1,3 +1,9 @@
+//! This module implements a client connection pool with a capped number
+//! of open connections. Connection streams are explicitly taken from the pool
+//! and returned once they drop out of scope. If all available connections are
+//! in use in an attempt to acquire a stream, the thread will release the pool lock
+//! until it is notified that a connection has been returned.
+
 use client::Error::{ArgumentError, OperationError};
 use client::Result;
 use client::connstring::ConnectionString;
@@ -32,10 +38,12 @@ struct Pool {
 /// Holds an available socket, with logic to return the socket
 /// to the connection pool when dropped.
 pub struct PooledStream {
-    // This socket will always be Some until it is
+    // This socket option will always be Some(stream) until it is
     // returned to the pool using take().
     socket: Option<TcpStream>,
+    // A reference to the pool that the stream was taken from.
     pool: Arc<Mutex<Pool>>,
+    // A reference to the waiting condvar associated with the pool.
     wait_lock: Arc<Condvar>,
 }
 
