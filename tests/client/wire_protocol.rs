@@ -1,7 +1,7 @@
 use bson::{Bson, Document};
-use mongodb::client::wire_protocol::flags::{OpInsertFlags, OpQueryFlags,
+use mongodb::wire_protocol::flags::{OpInsertFlags, OpQueryFlags,
                                             OpUpdateFlags};
-use mongodb::client::wire_protocol::operations::Message;
+use mongodb::wire_protocol::operations::Message;
 use std::io::Write;
 use std::net::TcpStream;
 

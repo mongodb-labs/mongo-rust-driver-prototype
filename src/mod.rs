@@ -9,59 +9,59 @@ pub mod pool;
 pub mod wire_protocol;
 
 pub use client::error::{Error, Result};
-use client::error::Error::ResponseError;
 
 use bson;
 use bson::Bson;
 
+use common::{ReadPreference, WriteConcern};
+use connstring::ConnectionString;
+use db::Database;
+use error::Error::ResponseError;
+use pool::{ConnectionPool, PooledStream};
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 
-use client::db::Database;
-use client::common::{ReadPreference, WriteConcern};
-use client::connstring::ConnectionString;
-use client::pool::{ConnectionPool, PooledStream};
-
 /// Interfaces with a MongoDB server or replica set.
 #[derive(Clone)]
-pub struct MongoClient {
+pub struct Client {
     req_id: Arc<AtomicIsize>,
     pool: ConnectionPool,
     pub read_preference: ReadPreference,
     pub write_concern: WriteConcern,
 }
 
-unsafe impl Sync for MongoClient {}
+unsafe impl Sync for Client {}
 
-impl MongoClient {
-    /// Creates a new MongoClient connected to a single MongoDB server.
-    pub fn new(host: &str, port: u16) -> Result<MongoClient> {
-        MongoClient::with_prefs(host, port, None, None)
+impl Client {
+    /// Creates a new Client connected to a single MongoDB server.
+    pub fn new(host: &str, port: u16) -> Result<Client> {
+        Client::with_prefs(host, port, None, None)
     }
 
     /// `new` with custom read and write controls.
     pub fn with_prefs(host: &str, port: u16, read_pref: Option<ReadPreference>,
-                      write_concern: Option<WriteConcern>) -> Result<MongoClient> {
+                      write_concern: Option<WriteConcern>) -> Result<Client> {
         let config = ConnectionString::new(host, port);
-        MongoClient::with_config(config, read_pref, write_concern)
+        Client::with_config(config, read_pref, write_concern)
     }
 
-    /// Creates a new MongoClient connected to a server or replica set using
+    /// Creates a new Client connected to a server or replica set using
     /// a MongoDB connection string URI as defined by
     /// [the manual](http://docs.mongodb.org/manual/reference/connection-string/).
-    pub fn with_uri(uri: &str) -> Result<MongoClient> {
-        MongoClient::with_uri_and_prefs(uri, None, None)
+    pub fn with_uri(uri: &str) -> Result<Client> {
+        Client::with_uri_and_prefs(uri, None, None)
     }
 
     /// `with_uri` with custom read and write controls.
     pub fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
-                              write_concern: Option<WriteConcern>) -> Result<MongoClient> {
+                              write_concern: Option<WriteConcern>) -> Result<Client> {
         let config = try!(connstring::parse(uri));
-        MongoClient::with_config(config, read_pref, write_concern)
+        Client::with_config(config, read_pref, write_concern)
     }
 
     fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>,
-                   write_concern: Option<WriteConcern>) -> Result<MongoClient> {
+                   write_concern: Option<WriteConcern>) -> Result<Client> {
 
         let rp = match read_pref {
             Some(rp) => rp,
@@ -73,7 +73,7 @@ impl MongoClient {
             None => WriteConcern::new(),
         };
 
-        Ok(MongoClient {
+        Ok(Client {
             req_id: Arc::new(ATOMIC_ISIZE_INIT),
             pool: ConnectionPool::new(config),
             read_preference: rp,

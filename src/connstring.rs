@@ -1,8 +1,8 @@
+use Result;
+use Error::ArgumentError;
+
 use std::ascii::AsciiExt;
 use std::collections::BTreeMap;
-
-use client::Result;
-use client::Error::ArgumentError;
 
 pub const DEFAULT_PORT: u16 = 27017;
 pub const URI_SCHEME: &'static str = "mongodb://";

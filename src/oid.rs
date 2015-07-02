@@ -1,7 +1,7 @@
 use libc;
 
-use client::Result;
-use client::Error::{ArgumentError, DefaultError};
+use Result;
+use Error::{ArgumentError, DefaultError};
 
 use crypto::digest::Digest;
 use crypto::md5::Md5;

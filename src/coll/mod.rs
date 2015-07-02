@@ -5,24 +5,21 @@ pub mod results;
 
 use bson::{self, Bson};
 
-use self::batch::Batch;
+use self::batch::{Batch, DeleteModel, UpdateModel};
+use self::error::{BulkWriteException, WriteException};
 use self::options::*;
 use self::results::*;
-use self::batch::{DeleteModel, UpdateModel};
 
-use client::db::Database;
-use client::common::{ReadPreference, WriteConcern};
+use common::{ReadPreference, WriteConcern};
+use cursor::Cursor;
+use db::Database;
+use oid;
 
-use client::cursor::Cursor;
-use client::Result;
+use Result;
+use Error::{ArgumentError, ResponseError,
+            OperationError, BulkWriteError, WriteError};
 
-use client::oid;
-
-use client::coll::error::{BulkWriteException, WriteException};
-use client::Error::{ArgumentError, ResponseError,
-                    OperationError, BulkWriteError, WriteError};
-
-use client::wire_protocol::flags::OpQueryFlags;
+use wire_protocol::flags::OpQueryFlags;
 
 use std::collections::BTreeMap;
 

@@ -1,9 +1,9 @@
 use bson::Document as Document;
 use bson::Bson;
 
-use mongodb::client::common::WriteConcern;
-use mongodb::client::coll::error::{BulkWriteException, WriteConcernError, WriteError};
-use mongodb::client::Error;
+use mongodb::common::WriteConcern;
+use mongodb::coll::error::{BulkWriteException, WriteConcernError, WriteError};
+use mongodb::Error;
 
 #[test]
 fn validate_write_result() {

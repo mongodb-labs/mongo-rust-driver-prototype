@@ -1,26 +1,25 @@
 use bson;
 use bson::Bson;
 
-use client::MongoClient;
-use client::coll::Collection;
-use client::coll::options::FindOptions;
-use client::common::{ReadPreference, WriteConcern};
-use client::cursor::{Cursor, DEFAULT_BATCH_SIZE};
+use {Client, Result};
+use Error::OperationError;
 
-use client::Result;
-use client::Error::OperationError;
+use coll::Collection;
+use coll::options::FindOptions;
+use common::{ReadPreference, WriteConcern};
+use cursor::{Cursor, DEFAULT_BATCH_SIZE};
 
 /// Interfaces with a MongoDB database.
 pub struct Database<'a> {
     pub name: String,
-    pub client: &'a MongoClient,
+    pub client: &'a Client,
     pub read_preference: ReadPreference,
     pub write_concern: WriteConcern,
 }
 
 impl<'a> Database<'a> {
     /// Creates a database representation with optional read and write controls.
-    pub fn new(client: &'a MongoClient, name: &str,
+    pub fn new(client: &'a Client, name: &str,
                read_preference: Option<ReadPreference>, write_concern: Option<WriteConcern>) -> Database<'a> {
 
         let rp = read_preference.unwrap_or(client.read_preference.to_owned());

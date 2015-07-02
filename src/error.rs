@@ -1,7 +1,7 @@
 use bson;
 use byteorder;
 
-use client::coll::error::{WriteException, BulkWriteException};
+use coll::error::{WriteException, BulkWriteException};
 use std::{error, fmt, io, result, sync};
 
 use rustc_serialize::hex;

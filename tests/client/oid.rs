@@ -1,4 +1,4 @@
-use mongodb::client::oid::ObjectId;
+use mongodb::oid::ObjectId;
 use rustc_serialize::hex::ToHex;
 
 #[test]

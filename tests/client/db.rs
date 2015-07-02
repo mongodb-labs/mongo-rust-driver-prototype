@@ -1,6 +1,6 @@
 #[test]
 fn list_collections() {
-    let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
 
     db.drop_database().ok().expect("Failed to drop database");

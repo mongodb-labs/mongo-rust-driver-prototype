@@ -1,6 +1,6 @@
 use bson::Document;
-use client::coll::options::WriteModel;
-use client::coll::results::InsertManyResult;
+use super::options::WriteModel;
+use super::results::InsertManyResult;
 
 pub struct UpdateModel {
     pub filter: Document,
