@@ -1,4 +1,4 @@
-use bson::{Bson, Document};
+use bson::Bson;
 use mongodb::coll::options::WriteModel;
 use mongodb::Client;
 

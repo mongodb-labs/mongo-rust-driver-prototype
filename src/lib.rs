@@ -6,7 +6,6 @@ extern crate rand;
 extern crate rustc_serialize;
 extern crate time;
 
-pub mod macros;
 pub mod db;
 pub mod coll;
 pub mod common;

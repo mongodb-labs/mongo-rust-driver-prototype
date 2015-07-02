@@ -1,6 +1,3 @@
-use bson::Document as Document;
-use bson::Bson;
-
 use mongodb::common::WriteConcern;
 use mongodb::coll::error::{BulkWriteException, WriteConcernError, WriteError};
 use mongodb::Error;

@@ -1,4 +1,4 @@
-use bson::{Bson, Document};
+use bson::Bson;
 
 use mongodb::Client;
 use mongodb::coll::options::{FindOneAndUpdateOptions, ReturnDocument};
