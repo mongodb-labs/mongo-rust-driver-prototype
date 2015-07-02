@@ -16,4 +16,3 @@ time = "0.1"
 
 [dependencies.bson]
 git = "https://github.com/kyeah/bson-rs"
-ref = "216b90600477dd6ccc8c6743fd3786f214a335f9"

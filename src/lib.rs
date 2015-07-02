@@ -13,7 +13,6 @@ pub mod common;
 pub mod connstring;
 pub mod cursor;
 pub mod error;
-pub mod oid;
 pub mod pool;
 pub mod wire_protocol;
 

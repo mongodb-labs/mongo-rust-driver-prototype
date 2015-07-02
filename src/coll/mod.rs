@@ -3,7 +3,7 @@ pub mod error;
 pub mod options;
 pub mod results;
 
-use bson::{self, Bson};
+use bson::{self, Bson, oid};
 
 use self::batch::{Batch, DeleteModel, UpdateModel};
 use self::error::{BulkWriteException, WriteException};
@@ -13,7 +13,6 @@ use self::results::*;
 use common::{ReadPreference, WriteConcern};
 use cursor::Cursor;
 use db::Database;
-use oid;
 
 use Result;
 use Error::{ArgumentError, ResponseError,
@@ -364,7 +363,7 @@ impl<'a> Collection<'a> {
             match doc.get("_id") {
                 Some(id) => ids.push(id.clone()),
                 None => {
-                    let id = Bson::ObjectId(try!(oid::ObjectId::new()).bytes());
+                    let id = Bson::ObjectId(try!(oid::ObjectId::new()));
                     cdoc.insert("_id".to_owned(), id.clone());
                     ids.push(id);
                 }
