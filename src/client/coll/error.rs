@@ -305,24 +305,6 @@ impl BulkWriteException {
         false
     }
 
-    // pub fn add_write_exception(&mut self, exception: WriteException, i: i32,
-    //                            req: WriteModel) {
-    //     self.add_unproccessed_model(req.clone());
-    //
-    //     if exception.write_concern_error.is_some() {
-    //         self.write_concern_error = exception.write_concern_error;
-    //     };
-    //
-    //     if let Some(write_err) = exception.write_error {
-    //         let bulk_write_error = BulkWriteError::new(i, write_err.code,
-    //                                                    write_err.message,
-    //                                                    Some(req));
-    //         self.write_errors.push(bulk_write_error);
-    //     }
-    //
-    //     self.message.push_str(&exception.message);
-    // }
-
     /// Validates a bulk write result.
     pub fn validate_bulk_write_result(result: bson::Document, write_concern: WriteConcern) -> Result<()> {
 
