@@ -2,7 +2,7 @@
 name = "mongodb"
 version = "0.1.0"
 dependencies = [
- "bson 0.1.2 (git+https://github.com/kyeah/bson-rs?branch=macros)",
+ "bson 0.1.2 (git+https://github.com/zonyitoo/bson-rs)",
  "byteorder 0.3.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "nalgebra 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -15,7 +15,7 @@ dependencies = [
 [[package]]
 name = "bson"
 version = "0.1.2"
-source = "git+https://github.com/kyeah/bson-rs?branch=macros#1f843082371e6160804be78318710094d793f569"
+source = "git+https://github.com/zonyitoo/bson-rs#a62d7448682455642e759088138592a508c25150"
 dependencies = [
  "byteorder 0.3.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",

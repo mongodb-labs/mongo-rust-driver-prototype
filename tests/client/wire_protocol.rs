@@ -9,7 +9,7 @@ use std::net::TcpStream;
 fn insert_single_key_doc() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
-            let doc = doc! { "foo" => (42.0) };
+            let doc = doc! { "foo" => 42.0 };
 
             let docs = vec![doc];
             let flags = OpInsertFlags::no_flags();
@@ -71,8 +71,8 @@ fn insert_multi_key_doc() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
             let doc = doc! {
-                "foo" => (42.0),
-                "bar" => ("__z&")
+                "foo" => 42.0,
+                "bar" => "__z&"
             };
 
             let docs = vec![doc];
@@ -140,12 +140,12 @@ fn insert_docs() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
             let doc1 = doc! {
-                "foo" => (42.0),
-                "bar" => ("__z&")
+                "foo" => 42.0,
+                "bar" => "__z&"
             };
 
             let doc2 = doc! {
-                "booyah" => (23)
+                "booyah" => 23
             };
 
             let docs = vec![doc1, doc2];
@@ -219,7 +219,7 @@ fn insert_docs() {
 fn insert_update_then_query() {
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
-            let doc = doc! { "foo" => (42.0) };
+            let doc = doc! { "foo" => 42.0 };
 
             let docs = vec![doc];
             let flags = OpInsertFlags::no_flags();
@@ -238,7 +238,7 @@ fn insert_update_then_query() {
 
             let selector = Document::new();
 
-            let update = doc! { "foo" => ("bar") };
+            let update = doc! { "foo" => "bar" };
 
             let flags = OpUpdateFlags::no_flags();
             let name = "test.update".to_owned();
