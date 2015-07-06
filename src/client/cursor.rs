@@ -10,8 +10,6 @@ use client::wire_protocol::operations::Message;
 use std::collections::vec_deque::VecDeque;
 use std::io::{Read, Write};
 
-use std::ops::DerefMut;
-
 pub const DEFAULT_BATCH_SIZE: i32 = 20;
 
 /// Maintains a connection to the server and lazily returns documents from a
@@ -135,8 +133,7 @@ impl <'a> Cursor<'a> {
                                          query.clone(), return_field_selector);
 
         let stream = try!(client.acquire_stream());
-        let mut locked = try!(stream.socket.lock());
-        let mut socket = locked.deref_mut();
+        let mut socket = stream.get_socket();
 
         let message = try!(result);
         try!(message.write(&mut socket));
@@ -205,8 +202,7 @@ impl <'a> Cursor<'a> {
     /// Attempts to read another batch of BSON documents from the stream.
     fn get_from_stream(&mut self) -> Result<()> {
         let stream = try!(self.client.acquire_stream());
-        let mut locked = try!(stream.socket.lock());
-        let mut socket = locked.deref_mut();
+        let mut socket = stream.get_socket();
 
         let get_more = self.new_get_more_request();
         try!(get_more.write(&mut socket));
