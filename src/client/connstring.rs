@@ -1,8 +1,7 @@
-use std::ascii::AsciiExt;
-use std::collections::BTreeMap;
-
 use client::Result;
 use client::Error::ArgumentError;
+use std::ascii::AsciiExt;
+use std::collections::BTreeMap;
 
 pub const DEFAULT_PORT: u16 = 27017;
 pub const URI_SCHEME: &'static str = "mongodb://";
@@ -92,7 +91,7 @@ impl ConnectionString {
     }
 }
 
-/// Parses a MongoDB connection string URI as defined by 
+/// Parses a MongoDB connection string URI as defined by
 /// [the manual](http://docs.mongodb.org/manual/reference/connection-string/).
 pub fn parse(address: &str) -> Result<ConnectionString> {
     if !address.starts_with(URI_SCHEME) {

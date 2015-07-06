@@ -1,26 +1,25 @@
-pub mod db;
 pub mod coll;
 pub mod common;
 pub mod connstring;
 pub mod cursor;
+pub mod db;
 pub mod error;
 pub mod oid;
 pub mod pool;
 pub mod wire_protocol;
 
 pub use client::error::{Error, Result};
-use client::error::Error::ResponseError;
 
 use bson;
 use bson::Bson;
-
-use std::sync::Arc;
-use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
-
 use client::db::Database;
+use client::error::Error::ResponseError;
 use client::common::{ReadPreference, WriteConcern};
 use client::connstring::ConnectionString;
 use client::pool::{ConnectionPool, PooledStream};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
+
 
 /// Interfaces with a MongoDB server or replica set.
 #[derive(Clone)]

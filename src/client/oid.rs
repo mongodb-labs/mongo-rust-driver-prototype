@@ -1,17 +1,13 @@
-use libc;
-
+use byteorder::{ByteOrder, BigEndian, LittleEndian};
 use client::Result;
 use client::Error::{ArgumentError, DefaultError};
-
 use crypto::digest::Digest;
 use crypto::md5::Md5;
-
-use byteorder::{ByteOrder, BigEndian, LittleEndian};
+use libc;
 use rand::{Rng, OsRng};
 use rustc_serialize::hex::FromHex;
-use time;
-
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use time;
 
 const TIMESTAMP_SIZE: usize = 4;
 const MACHINE_ID_SIZE: usize = 3;

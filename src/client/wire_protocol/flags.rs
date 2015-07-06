@@ -2,9 +2,9 @@ use client::coll::options::{CursorType, FindOptions};
 
 /// Represents the bit vector of options for an OP_REPLY message.
 pub struct OpReplyFlags {
-    cursor_not_found: bool, // Bit 0
-    query_failure: bool,    // Bit 1
-    await_capable: bool,    // Bit 3
+    pub cursor_not_found: bool, // Bit 0
+    pub query_failure: bool,    // Bit 1
+    pub await_capable: bool,    // Bit 3
 
     // All bits remaining must be 0
 }
@@ -119,6 +119,16 @@ impl OpQueryFlags {
                        await_data: false, exhaust: false, partial: false }
     }
 
+    /// Constructs a new struct with flags based on a FindOptions struct.
+    ///
+    /// # Arguments
+    ///
+    /// options - Struct whose fields contain the flags to initialize the new
+    ///           OpQueryFlags with
+    ///
+    /// # Return value
+    ///
+    /// Returns the newly created OpQueryFlags struct.
     pub fn with_find_options<'a>(options: &'a FindOptions) -> OpQueryFlags {
         OpQueryFlags {
             tailable_cursor: options.cursor_type != CursorType::NonTailable,
@@ -130,7 +140,7 @@ impl OpQueryFlags {
             partial: options.allow_partial_results,
         }
     }
-    
+
     /// Gets the actual bit vector that the struct represents.
     ///
     /// # Return value

@@ -1,6 +1,5 @@
 use bson::Document as Document;
 use bson::Bson;
-
 use mongodb::client::common::WriteConcern;
 use mongodb::client::coll::error::{BulkWriteException, WriteConcernError, WriteError};
 use mongodb::client::Error;

@@ -1,12 +1,9 @@
 use bson;
 use bson::Bson;
-
-use client::MongoClient;
 use client::{Error, Result};
-
+use client::MongoClient;
 use client::wire_protocol::flags::OpQueryFlags;
 use client::wire_protocol::operations::Message;
-
 use std::collections::vec_deque::VecDeque;
 use std::io::{Read, Write};
 
@@ -21,6 +18,11 @@ pub const DEFAULT_BATCH_SIZE: i32 = 20;
 /// `namespace` - The namespace to read and write from.
 /// `batch_size` - How many documents to fetch at a given time from the server.
 /// `cursor_id` - Uniquely identifies the cursor being returned by the reply.
+/// `limit` - An upper bound on the total number of documents this cursor
+///           should return.
+/// `count` - How many documents have been returned so far.
+/// `buffer` - A cache for documents received from the query that have not
+///            yet been returned.
 pub struct Cursor<'a> {
     client: &'a MongoClient,
     namespace: String,
@@ -32,22 +34,24 @@ pub struct Cursor<'a> {
 }
 
 impl <'a> Cursor<'a> {
-
-    pub fn command_cursor(client: &'a MongoClient, db: &str, doc: bson::Document) -> Result<Cursor<'a>> {
+    /// Construcs a new Cursor for a database command.
+    ///
+    /// # Arguments
+    ///
+    /// `client` - Client making the request.
+    /// `db` - Which database the command is being sent to.
+    /// `doc` - Specifies the command that is being run.
+    ///
+    /// # Return value
+    ///
+    /// Returns the newly created Cursor on success, or an Error on failure.
+    pub fn command_cursor(client: &'a MongoClient, db: &str,
+                          doc: bson::Document) -> Result<Cursor<'a>> {
         Cursor::query_with_batch_size(client, format!("{}.$cmd", db),
                                       1, OpQueryFlags::no_flags(), 0, 0,
                                       doc, None, true)
     }
 
-    /// Gets the cursor id and BSON documents from a reply Message.
-    ///
-    /// # Arguments
-    ///
-    /// `message` - The reply message to get the documents from.
-    ///
-    /// # Return value.
-    ///
-    ///
     fn get_bson_and_cid_from_message(message: Message) -> Result<(VecDeque<bson::Document>, i64)> {
         match message {
             Message::OpReply { header: _, flags: _, cursor_id: cid,
@@ -113,24 +117,22 @@ impl <'a> Cursor<'a> {
     /// `return_field_selector - An optional projection of which fields should
     ///                          be present in the documents to be returned by
     ///                          the query.
+    /// `is_cmd_cursor` - Whether or not the Cursor is for a database command.
     ///
     /// # Return value
     ///
-    /// Returns the cursor for the query results on success, or an error string
-    /// on failure.
+    /// Returns the cursor for the query results on success, or an Error on
+    /// failure.
     pub fn query_with_batch_size<'b>(client: &'a MongoClient,
-                                     namespace: String,
-                                     batch_size: i32,
-                                     flags: OpQueryFlags,
-                                     number_to_skip: i32, number_to_return: i32,
-                                     query: bson::Document,
+                                     namespace: String, batch_size: i32,
+                                     flags: OpQueryFlags, number_to_skip: i32,
+                                     number_to_return: i32, query: bson::Document,
                                      return_field_selector: Option<bson::Document>,
                                      is_cmd_cursor: bool) -> Result<Cursor<'a>> {
-
-        let result = Message::with_query(client.get_req_id(), flags,
-                                         namespace.to_owned(),
-                                         number_to_skip, batch_size,
-                                         query.clone(), return_field_selector);
+        let result = Message::new_query(client.get_req_id(), flags,
+                                        namespace.to_owned(),
+                                        number_to_skip, batch_size,
+                                        query, return_field_selector);
 
         let stream = try!(client.acquire_stream());
         let mut socket = stream.get_socket();
@@ -146,15 +148,9 @@ impl <'a> Cursor<'a> {
             (buf, id, namespace)
         };
 
-        Ok(Cursor {
-            client: client,
-            namespace: namespace,
-            batch_size: batch_size,
-            cursor_id: cursor_id,
-            limit: number_to_return,
-            count: 0,
-            buffer: buf,
-        })
+        Ok(Cursor { client: client, namespace: namespace,
+                    batch_size: batch_size, cursor_id: cursor_id,
+                    limit: number_to_return, count: 0, buffer: buf, })
     }
 
     /// Executes a query with the default batch size.
@@ -172,16 +168,17 @@ impl <'a> Cursor<'a> {
     /// `return_field_selector - An optional projection of which fields should
     ///                          be present in the documents to be returned by
     ///                          the query.
+    /// `is_cmd_cursor` - Whether or not the Cursor is for a database command.
     ///
     /// # Return value
     ///
     /// Returns the cursor for the query results on success, or an error string
     /// on failure.
     pub fn query(client: &'a MongoClient, namespace: String,
-                 flags: OpQueryFlags, number_to_skip: i32, number_to_return: i32,
-                 query: bson::Document, return_field_selector: Option<bson::Document>,
+                 flags: OpQueryFlags, number_to_skip: i32,
+                 number_to_return: i32, query: bson::Document,
+                 return_field_selector: Option<bson::Document>,
                  is_cmd_cursor: bool) -> Result<Cursor<'a>> {
-
         Cursor::query_with_batch_size(client, namespace, DEFAULT_BATCH_SIZE, flags,
                                       number_to_skip,
                                       number_to_return, query,
@@ -194,12 +191,11 @@ impl <'a> Cursor<'a> {
     ///
     /// Returns the newly-created method.
     fn new_get_more_request(&mut self) -> Message {
-        Message::with_get_more(self.client.get_req_id(),
-                               self.namespace.to_owned(),
-                               self.batch_size, self.cursor_id)
+        Message::new_get_more(self.client.get_req_id(),
+                              self.namespace.to_owned(),
+                              self.batch_size, self.cursor_id)
     }
 
-    /// Attempts to read another batch of BSON documents from the stream.
     fn get_from_stream(&mut self) -> Result<()> {
         let stream = try!(self.client.acquire_stream());
         let mut socket = stream.get_socket();
@@ -211,17 +207,6 @@ impl <'a> Cursor<'a> {
         let (v, _) = try!(Cursor::get_bson_and_cid_from_message(reply));
         self.buffer.extend(v);
         Ok(())
-    }
-
-    /// Attempts to read another batch of BSON documents from the stream.
-    ///
-    /// # Return value
-    ///
-    /// Returns the first BSON document returned from the stream, or `None` if
-    /// there are no more documents to read.
-    fn next_from_stream(&mut self) -> Result<Option<bson::Document>> {
-        try!(self.get_from_stream());
-        Ok(self.buffer.pop_front())
     }
 
     /// Attempts to read a specified number of BSON documents from the cursor.
@@ -259,6 +244,11 @@ impl <'a> Cursor<'a> {
         self.next_n(n)
     }
 
+    /// Checks whether there are any more documents for the cursor to return.
+    ///
+    /// # Return value
+    ///
+    /// Returns `true` if the cursor is not yet exhausted, or `false` if it is.
     pub fn has_next(&mut self) -> Result<bool> {
         if self.limit > 0 && self.count >= self.limit {
             Ok(false)
@@ -278,8 +268,9 @@ impl <'a> Iterator for Cursor<'a> {
     ///
     /// # Return value
     ///
-    /// Returns the document that was read, or `None` if there are no more
-    /// documents to read.
+    /// Returns a BSON document if there is another one to return; `None` if
+    /// there are no more documents to return; or an Error if the request for
+    /// another document fails.
     fn next(&mut self) -> Option<Result<bson::Document>> {
         match self.has_next() {
             Ok(true) => {
