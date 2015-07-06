@@ -150,63 +150,24 @@ fn bulk_ordered_mix() {
     assert_eq!(result.upserted_count, 1);
     assert_eq!(result.upserted_ids.len() as i32, result.upserted_count);
 
-    match result.inserted_ids.get(&0).unwrap() {
-        &Bson::I32(1) => (),
-        &Bson::I64(1) => (),
-        id => panic!("Invalid inserted id at index 0: {:?}", id)
+    macro_rules! check_value_in_tree {
+        ($tree:expr, $key:expr, $value:expr) => {
+            match $tree.get(&$key).unwrap() {
+                &Bson::I32($value) => (),
+                &Bson::I64($value) => (),
+                id => panic!("Invalid inserted id at index {}: {:?}", $key, id)
+            }
+        };
     }
 
-    match result.inserted_ids.get(&1).unwrap() {
-        &Bson::I32(2) => (),
-        &Bson::I64(2) => (),
-        id => panic!("Invalid inserted id at index 1: {:?}", id)
-    }
-
-    match result.inserted_ids.get(&2).unwrap() {
-        &Bson::I32(3) => (),
-        &Bson::I64(3) => (),
-        id => panic!("Invalid inserted id at index 2: {:?}", id)
-    }
-
-    match result.inserted_ids.get(&3).unwrap() {
-        &Bson::I32(4) => (),
-        &Bson::I64(4) => (),
-        id => panic!("Invalid inserted id at index 3: {:?}", id)
-    }
-
-    match result.inserted_ids.get(&7).unwrap() {
-        &Bson::I32(5) => (),
-        &Bson::I64(5) => (),
-        id => panic!("Invalid inserted id at index 7: {:?}", id)
-    }
-
-    match result.inserted_ids.get(&9).unwrap() {
-        &Bson::I32(101) => (),
-        &Bson::I64(101) => (),
-        id => panic!("Invalid inserted id at index 9: {:?}", id)
-    }
-
-    match result.inserted_ids.get(&10).unwrap() {
-        &Bson::I32(102) => (),
-        &Bson::I64(102) => (),
-        id => panic!("Invalid inserted id at index 10: {:?}", id)
-    }
-
-    match result.inserted_ids.get(&11).unwrap() {
-        &Bson::I32(103) => (),
-        &Bson::I64(103) => (),
-        id => panic!("Invalid inserted id at index 11: {:?}", id)
-    }
-
-    match result.inserted_ids.get(&12).unwrap() {
-        &Bson::I32(104) => (),
-        &Bson::I64(104) => (),
-        id => panic!("Invalid inserted id at index 12: {:?}", id)
-    }
-
-    match result.upserted_ids.get(&8).unwrap() {
-        &Bson::I32(6) => (),
-        &Bson::I64(6) => (),
-        id => panic!("Invalid inserted id at index 8: {:?}", id)
-    }
+    check_value_in_tree!(result.inserted_ids, 0, 1);
+    check_value_in_tree!(result.inserted_ids, 1, 2);
+    check_value_in_tree!(result.inserted_ids, 2, 3);
+    check_value_in_tree!(result.inserted_ids, 3, 4);
+    check_value_in_tree!(result.inserted_ids, 7, 5);
+    check_value_in_tree!(result.inserted_ids, 9, 101);
+    check_value_in_tree!(result.inserted_ids, 10, 102);
+    check_value_in_tree!(result.inserted_ids, 11, 103);
+    check_value_in_tree!(result.inserted_ids, 12, 104);
+    check_value_in_tree!(result.upserted_ids, 8, 6);
 }
