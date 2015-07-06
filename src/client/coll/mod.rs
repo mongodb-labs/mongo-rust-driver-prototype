@@ -299,9 +299,9 @@ impl<'a> Collection<'a> {
         let mut batches = vec![Batch::from(first_model)];
 
         for model in requests {
-            let i = batches.len() - 1;
+            let last_index = batches.len() - 1;
 
-            match batches[i].merge_model(model) {
+            match batches[last_index].merge_model(model) {
                 Some(model) => batches.push(Batch::from(model)),
                 None => ()
             }
@@ -393,10 +393,10 @@ impl<'a> Collection<'a> {
     /// Sends a batch of writes to the server at the same time.
     pub fn bulk_write(&self, requests: Vec<WriteModel>, ordered: bool) -> BulkWriteResult {
         let batches = if ordered {
-                          Collection::get_ordered_batches(VecDeque::from_iter(requests.into_iter()))
-                      } else {
-                          Collection::get_unordered_batches(requests)
-                      };
+            Collection::get_ordered_batches(VecDeque::from_iter(requests.into_iter()))
+        } else {
+            Collection::get_unordered_batches(requests)
+        };
 
         let mut result = BulkWriteResult::new();
         let mut exception = BulkWriteException::new(vec![], vec![], vec![], None);
