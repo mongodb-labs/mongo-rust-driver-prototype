@@ -1,6 +1,6 @@
 use bson;
-use client::cursor;
-use client::common::{ReadPreference, WriteConcern};
+use cursor;
+use common::{ReadPreference, WriteConcern};
 
 /// Describes the type of cursor to return on collection queries.
 #[derive(Clone, PartialEq, Eq)]

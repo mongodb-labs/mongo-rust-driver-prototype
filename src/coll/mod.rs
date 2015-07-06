@@ -3,25 +3,22 @@ pub mod error;
 pub mod options;
 pub mod results;
 
-use bson::{self, Bson};
+use bson::{self, Bson, oid};
 
 use self::batch::{Batch, DeleteModel, UpdateModel};
+use self::error::{BulkWriteException, WriteException};
 use self::options::*;
 use self::results::*;
 
-use client::db::Database;
-use client::common::{ReadPreference, WriteConcern};
+use common::{ReadPreference, WriteConcern};
+use cursor::Cursor;
+use db::Database;
 
-use client::cursor::Cursor;
-use client::Result;
+use Result;
+use Error::{ArgumentError, ResponseError,
+            OperationError, BulkWriteError, WriteError};
 
-use client::oid;
-
-use client::coll::error::{BulkWriteException, WriteException};
-use client::Error::{ArgumentError, ResponseError,
-                    OperationError, BulkWriteError, WriteError};
-
-use client::wire_protocol::flags::OpQueryFlags;
+use wire_protocol::flags::OpQueryFlags;
 
 use std::collections::{BTreeMap, VecDeque};
 use std::iter::FromIterator;
@@ -437,7 +434,7 @@ impl<'a> Collection<'a> {
             match doc.get("_id") {
                 Some(id) => ids.push(id.clone()),
                 None => {
-                    let id = Bson::ObjectId(try!(oid::ObjectId::new()).bytes());
+                    let id = Bson::ObjectId(try!(oid::ObjectId::new()));
                     cdoc.insert("_id".to_owned(), id.clone());
                     ids.push(id);
                 }

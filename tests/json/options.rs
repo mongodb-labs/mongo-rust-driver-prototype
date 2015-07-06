@@ -1,5 +1,5 @@
 use bson::Bson;
-use mongodb::client::coll::options::{AggregateOptions, CountOptions,
+use mongodb::coll::options::{AggregateOptions, CountOptions,
     FindOneAndDeleteOptions, FindOneAndUpdateOptions, FindOptions,
     ReturnDocument};
 use rustc_serialize::json::{Object, Json};

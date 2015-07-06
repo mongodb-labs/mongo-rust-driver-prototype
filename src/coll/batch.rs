@@ -1,5 +1,6 @@
+use super::options::WriteModel;
+
 use bson::Document;
-use client::coll::options::WriteModel;
 use std::convert::From;
 
 #[derive(Debug)]

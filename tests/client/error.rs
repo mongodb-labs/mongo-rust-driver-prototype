@@ -1,16 +1,13 @@
-use bson::Document as Document;
-use bson::Bson;
-
-use mongodb::client::common::WriteConcern;
-use mongodb::client::coll::error::{BulkWriteException, WriteConcernError, WriteError};
-use mongodb::client::Error;
+use mongodb::common::WriteConcern;
+use mongodb::coll::error::{BulkWriteException, WriteConcernError, WriteError};
+use mongodb::Error;
 
 #[test]
 fn validate_write_result() {
     let doc = doc! {
-        "ok" => (1),
-        "n" => (5),
-        "nModified" => (5)
+        "ok" => 1,
+        "n" => 5,
+        "nModified" => 5
     };
 
     let result = BulkWriteException::validate_bulk_write_result(doc, WriteConcern::new());
@@ -20,24 +17,24 @@ fn validate_write_result() {
 #[test]
 fn invalidate_write_result() {
     let err1 = doc! {
-        "index" => (0),
-        "code" => (1054),
-        "errmsg" => ("Unreal error message.")
+        "index" => 0,
+        "code" => 1054,
+        "errmsg" => "Unreal error message."
     };
 
     let err2 = doc! {
-        "index" => (3),
-        "code" => (2105),
-        "errmsg" => ("Modestly real error message.")
+        "index" => 3,
+        "code" => 2105,
+        "errmsg" => "Modestly real error message."
     };
 
     let doc = doc! {
-        "ok" => (1),
-        "n" => (5),
-        "nModified" => (3),
+        "ok" => 1,
+        "n" => 5,
+        "nModified" => 3,
         "writeConcernError" => {
-            "code" => (1124),
-            "errmsg" => ("Real error message.")
+            "code" => 1124,
+            "errmsg" => "Real error message."
         },
         "writeErrors" => [err1, err2]
     };
@@ -73,8 +70,8 @@ fn invalidate_write_result() {
 #[test]
 fn parse_write_concern_error() {
     let doc = doc! {
-        "code" => (1124),
-        "errmsg" => ("Real error message.")
+        "code" => 1124,
+        "errmsg" => "Real error message."
     };
 
     let result = WriteConcernError::parse(doc, WriteConcern::new());
@@ -90,11 +87,11 @@ fn parse_write_concern_error() {
 
 #[test]
 fn parse_invalid_write_concern_error() {
-    let doc = doc! { "code" => (1124) };
+    let doc = doc! { "code" => 1124 };
     let result = WriteConcernError::parse(doc, WriteConcern::new());
     assert!(result.is_err());
 
-    let doc = doc! { "code" => ("string") };
+    let doc = doc! { "code" => "string" };
     let result = WriteConcernError::parse(doc, WriteConcern::new());
     assert!(result.is_err());
 }
@@ -102,8 +99,8 @@ fn parse_invalid_write_concern_error() {
 #[test]
 fn parse_write_error() {
     let doc = doc! {
-        "code" => (1054),
-        "errmsg" => ("Unreal error message.")
+        "code" => 1054,
+        "errmsg" => "Unreal error message."
     };
 
     let result = WriteError::parse(doc);
@@ -118,11 +115,11 @@ fn parse_write_error() {
 
 #[test]
 fn parse_invalid_write_error() {
-    let doc = doc! { "code" => (1124) };
+    let doc = doc! { "code" => 1124 };
     let result = WriteError::parse(doc);
     assert!(result.is_err());
 
-    let doc = doc! { "code" => ("string") };
+    let doc = doc! { "code" => "string" };
     let result = WriteError::parse(doc);
     assert!(result.is_err());
 }

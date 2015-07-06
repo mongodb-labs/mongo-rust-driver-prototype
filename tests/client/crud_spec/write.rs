@@ -2,7 +2,7 @@ use bson::Bson;
 use json::arguments::Arguments;
 use json::reader::SuiteContainer;
 use json::eq::{self, NumEq};
-use mongodb::client:: MongoClient;
+use mongodb:: Client;
 use rustc_serialize::json::Json;
 
 #[test]

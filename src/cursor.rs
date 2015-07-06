@@ -1,11 +1,9 @@
 use bson;
 use bson::Bson;
 
-use client::MongoClient;
-use client::{Error, Result};
-
-use client::wire_protocol::flags::OpQueryFlags;
-use client::wire_protocol::operations::Message;
+use {Error, Client, Result};
+use wire_protocol::flags::OpQueryFlags;
+use wire_protocol::operations::Message;
 
 use std::collections::vec_deque::VecDeque;
 use std::io::{Read, Write};
@@ -22,7 +20,7 @@ pub const DEFAULT_BATCH_SIZE: i32 = 20;
 /// `batch_size` - How many documents to fetch at a given time from the server.
 /// `cursor_id` - Uniquely identifies the cursor being returned by the reply.
 pub struct Cursor<'a> {
-    client: &'a MongoClient,
+    client: &'a Client,
     namespace: String,
     batch_size: i32,
     cursor_id: i64,
@@ -33,7 +31,7 @@ pub struct Cursor<'a> {
 
 impl <'a> Cursor<'a> {
 
-    pub fn command_cursor(client: &'a MongoClient, db: &str, doc: bson::Document) -> Result<Cursor<'a>> {
+    pub fn command_cursor(client: &'a Client, db: &str, doc: bson::Document) -> Result<Cursor<'a>> {
         Cursor::query_with_batch_size(client, format!("{}.$cmd", db),
                                       1, OpQueryFlags::no_flags(), 0, 0,
                                       doc, None, true)
@@ -118,7 +116,7 @@ impl <'a> Cursor<'a> {
     ///
     /// Returns the cursor for the query results on success, or an error string
     /// on failure.
-    pub fn query_with_batch_size<'b>(client: &'a MongoClient,
+    pub fn query_with_batch_size<'b>(client: &'a Client,
                                      namespace: String,
                                      batch_size: i32,
                                      flags: OpQueryFlags,
@@ -177,7 +175,7 @@ impl <'a> Cursor<'a> {
     ///
     /// Returns the cursor for the query results on success, or an error string
     /// on failure.
-    pub fn query(client: &'a MongoClient, namespace: String,
+    pub fn query(client: &'a Client, namespace: String,
                  flags: OpQueryFlags, number_to_skip: i32, number_to_return: i32,
                  query: bson::Document, return_field_selector: Option<bson::Document>,
                  is_cmd_cursor: bool) -> Result<Cursor<'a>> {

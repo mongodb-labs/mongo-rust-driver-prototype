@@ -2,8 +2,8 @@ use bson;
 use bson::Bson;
 
 use std::collections::BTreeMap;
-use client::coll::error::{BulkWriteException, WriteException};
-use client::coll::options::WriteModel;
+use super::error::{BulkWriteException, WriteException};
+use super::options::WriteModel;
 
 /// Results for a bulk write operation.
 #[derive(Clone)]

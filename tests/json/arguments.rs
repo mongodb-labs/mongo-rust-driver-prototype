@@ -1,6 +1,6 @@
 use bson::{Bson, Document};
 use json::options::FromJson;
-use mongodb::client::coll::options::{AggregateOptions, CountOptions,
+use mongodb::coll::options::{AggregateOptions, CountOptions,
     FindOneAndDeleteOptions, FindOneAndUpdateOptions, FindOptions};
 use rustc_serialize::json::Object;
 
