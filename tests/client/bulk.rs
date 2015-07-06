@@ -1,10 +1,10 @@
-use bson::{Bson, Document};
-use mongodb::client::coll::options::WriteModel;
-use mongodb::client::MongoClient;
+use bson::Bson;
+use mongodb::coll::options::WriteModel;
+use mongodb::Client;
 
 #[test]
 fn bulk_ordered_insert_only() {
-    let client = MongoClient::new("localhost", 27017).unwrap();
+    let client = Client::new("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("bulk_ordered_insert_only");
 
@@ -39,7 +39,7 @@ fn bulk_ordered_insert_only() {
 
 #[test]
 fn bulk_unordered_insert_only() {
-    let client = MongoClient::new("localhost", 27017).unwrap();
+    let client = Client::new("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("bulk_unordered_insert_only");
 
@@ -134,7 +134,7 @@ fn bulk_ordered_mix() {
         }},
     ];
 
-    let client = MongoClient::new("localhost", 27017).unwrap();
+    let client = Client::new("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("bulk_ordered_mix");
 

@@ -1,7 +1,7 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use client::Result;
-use client::Error::ResponseError;
 use std::io::{Read, Write};
+use Result;
+use Error::ResponseError;
 
 /// Represents an opcode in the MongoDB Wire Protocol.
 #[derive(Clone)]

@@ -1,4 +1,4 @@
-use mongodb::client::connstring;
+use mongodb::connstring;
 
 #[test]
 fn valid_uri() {

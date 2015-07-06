@@ -1,5 +1,5 @@
-use client::Result;
-use client::Error::ArgumentError;
+use Result;
+use Error::ArgumentError;
 use std::ascii::AsciiExt;
 use std::collections::BTreeMap;
 

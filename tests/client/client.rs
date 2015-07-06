@@ -1,11 +1,11 @@
 use bson;
-use mongodb::client::MongoClient;
+use mongodb::Client;
 use std::sync::Arc;
 use std::thread;
 
 #[test]
 fn database_names() {
-    let client = MongoClient::with_uri("mongodb://localhost:27018").unwrap();
+    let client = Client::with_uri("mongodb://localhost:27018").unwrap();
     let state_results = client.database_names().ok().expect("Failed to execute database_names.");
     for name in state_results {
         if name != "local" {
@@ -36,14 +36,14 @@ fn database_names() {
 
 #[test]
 fn is_master() {
-    let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
     let res = client.is_master().ok().expect("Failed to execute is_master.");
     assert!(res);
 }
 
 #[test]
 fn is_sync() {
-    let client = Arc::new(MongoClient::with_uri("mongodb://localhost:27018").unwrap());    
+    let client = Arc::new(Client::with_uri("mongodb://localhost:27018").unwrap());    
     let state_results = client.database_names().ok().expect("Failed to execute database_names.");
     for name in state_results {
         if name != "local" {

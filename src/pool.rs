@@ -1,12 +1,6 @@
-//! This module implements a client connection pool with a capped number
-//! of open connections. Connection streams are explicitly taken from the pool
-//! and returned once they drop out of scope. If all available connections are
-//! in use in an attempt to acquire a stream, the thread will release the pool lock
-//! until it is notified that a connection has been returned.
-
-use client::Error::{ArgumentError, OperationError};
-use client::Result;
-use client::connstring::ConnectionString;
+use Error::{ArgumentError, OperationError};
+use Result;
+use connstring::ConnectionString;
 
 use std::net::TcpStream;
 use std::sync::{Arc, Condvar, Mutex};

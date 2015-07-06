@@ -15,5 +15,5 @@ rustc-serialize = "0.3"
 time = "0.1"
 
 [dependencies.bson]
-git = "https://github.com/kyeah/bson-rs"
-ref = "216b90600477dd6ccc8c6743fd3786f214a335f9"
+git = "https://github.com/zonyitoo/bson-rs"
+ref = "a62d7448682455642e759088138592a508c25150"

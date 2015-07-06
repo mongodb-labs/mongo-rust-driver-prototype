@@ -1,10 +1,11 @@
 use bson;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use client::Error::{ArgumentError, ResponseError};
-use client::Result;
-use client::wire_protocol::header::{Header, OpCode};
-use client::wire_protocol::flags::{OpInsertFlags, OpQueryFlags,
-                                   OpReplyFlags, OpUpdateFlags};
+use Error::{ArgumentError, ResponseError};
+use Result;
+use wire_protocol::header::{Header, OpCode};
+use wire_protocol::flags::{OpInsertFlags, OpQueryFlags,
+                           OpReplyFlags, OpUpdateFlags};
+
 use std::io::{Read, Write};
 use std::mem;
 use std::result::Result::{Ok, Err};

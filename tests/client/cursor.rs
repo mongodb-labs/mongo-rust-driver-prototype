@@ -1,11 +1,11 @@
 use bson::{Bson, Document};
-use mongodb::client::MongoClient;
-use mongodb::client::cursor::Cursor;
-use mongodb::client::wire_protocol::flags::OpQueryFlags;
+use mongodb::Client;
+use mongodb::cursor::Cursor;
+use mongodb::wire_protocol::flags::OpQueryFlags;
 
 #[test]
 fn cursor_features() {
-    let client = MongoClient::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
     let db = client.db("test");
     let coll = db.collection("cursor_test");
 

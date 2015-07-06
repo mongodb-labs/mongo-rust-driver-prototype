@@ -1,7 +1,7 @@
 use bson::{self, Bson};
-use client::coll::options::WriteModel;
-use client::common::WriteConcern;
-use client::{Error, Result};
+use super::options::WriteModel;
+use common::WriteConcern;
+use {Error, Result};
 use std::{error, fmt};
 
 /// The error type for Write-related MongoDB operations.

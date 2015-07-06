@@ -1,6 +1,6 @@
-use bson;
+use bson::{self, oid};
 use byteorder;
-use client::coll::error::{WriteException, BulkWriteException};
+use coll::error::{WriteException, BulkWriteException};
 use rustc_serialize::hex;
 use std::{error, fmt, io, result, sync};
 
@@ -16,6 +16,8 @@ pub enum Error {
     EncoderError(bson::EncoderError),
     /// A BSON struct could not be decoded.
     DecoderError(bson::DecoderError),
+    /// An ObjectId could not be generated.
+    OIDError(oid::Error),
     /// A hexadecimal string could not be converted to bytes.
     FromHexError(hex::FromHexError),
     /// A single-write operation failed.
@@ -73,6 +75,12 @@ impl From<bson::DecoderError> for Error {
     }
 }
 
+impl From<oid::Error> for Error {
+    fn from(err: oid::Error) -> Error {
+        Error::OIDError(err)
+    }
+}
+
 impl From<hex::FromHexError> for Error {
     fn from(err: hex::FromHexError) -> Error {
         Error::FromHexError(err)
@@ -104,6 +112,7 @@ impl fmt::Display for Error {
             &Error::BulkWriteError(ref inner) => inner.fmt(fmt),
             &Error::EncoderError(ref inner) => inner.fmt(fmt),
             &Error::DecoderError(ref inner) => inner.fmt(fmt),
+            &Error::OIDError(ref inner) => inner.fmt(fmt),
             &Error::FromHexError(ref inner) => inner.fmt(fmt),
             &Error::IoError(ref inner) => inner.fmt(fmt),
             &Error::ArgumentError(ref inner) => inner.fmt(fmt),
@@ -123,6 +132,7 @@ impl error::Error for Error {
             &Error::BulkWriteError(ref inner) => inner.description(),
             &Error::EncoderError(ref inner) => inner.description(),
             &Error::DecoderError(ref inner) => inner.description(),
+            &Error::OIDError(ref inner) => inner.description(),
             &Error::FromHexError(ref inner) => inner.description(),
             &Error::IoError(ref inner) => inner.description(),
             &Error::ArgumentError(ref inner) => &inner,
@@ -140,6 +150,7 @@ impl error::Error for Error {
             &Error::BulkWriteError(ref inner) => Some(inner),
             &Error::EncoderError(ref inner) => Some(inner),
             &Error::DecoderError(ref inner) => Some(inner),
+            &Error::OIDError(ref inner) => Some(inner),
             &Error::FromHexError(ref inner) => Some(inner),
             &Error::IoError(ref inner) => Some(inner),
             &Error::ArgumentError(_) => None,

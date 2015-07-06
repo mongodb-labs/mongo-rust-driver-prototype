@@ -1,4 +1,4 @@
-use client::coll::options::{CursorType, FindOptions};
+use coll::options::{CursorType, FindOptions};
 
 /// Represents the bit vector of options for an OP_REPLY message.
 pub struct OpReplyFlags {
