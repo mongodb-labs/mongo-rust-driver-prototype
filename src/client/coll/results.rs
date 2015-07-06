@@ -33,7 +33,7 @@ pub struct BulkUpdateResult {
     pub acknowledged: bool,
     pub matched_count: i32,
     pub modified_count: i32,
-    pub upserted_id: Option<Bson>,
+    pub upserted_ids: Option<Bson>,
     pub write_exception: Option<BulkWriteException>,
 }
 
@@ -76,8 +76,8 @@ impl BulkWriteResult {
     pub fn new() -> BulkWriteResult {
         BulkWriteResult {
             acknowledged: true,
-            inserted_ids: BTreeMap::new(),
             inserted_count: 0,
+            inserted_ids: BTreeMap::new(),
             matched_count: 0,
             modified_count: 0,
             deleted_count: 0,
@@ -87,39 +87,81 @@ impl BulkWriteResult {
         }
     }
 
-    pub fn process_insert_one_result(&mut self, result: InsertOneResult, i: i64,
-                                     req: WriteModel,
-                                     exception: &mut BulkWriteException) {
-        match result.write_exception {
-            Some(write_exception) =>
-                exception.add_write_exception(write_exception, i as i32, req),
-            None => {
-                let id = result.inserted_id.expect("`inserted_id` should not be `None` \
-                                                    if there is no WriteException");
-                self.inserted_ids.insert(i, id);
-                self.inserted_count += 1;
+    pub fn process_bulk_delete_result(&mut self, result: BulkDeleteResult,
+                                      models: Vec<WriteModel>,
+                                      exception: &mut BulkWriteException) -> bool {
+        let ok = exception.add_bulk_write_exception(result.write_exception, models);
+        self.deleted_count += result.deleted_count;
 
-                exception.processed_requests.push(req)
-            }
-        };
+        ok
     }
 
     pub fn process_insert_many_result(&mut self, result: InsertManyResult,
-                                      models: Vec<WriteModel>,
-                                      exception: &mut BulkWriteException) {
-        match result.bulk_write_exception {
-            Some(new_exception) =>
-                exception.add_bulk_write_exception(new_exception),
-            None => for model in models {
-                exception.processed_requests.push(model);
-            }
-        }
+                                      models: Vec<WriteModel>, start_index: i64,
+                                      exception: &mut BulkWriteException) -> bool {
+        let ok = exception.add_bulk_write_exception(result.bulk_write_exception, models);
 
         if let Some(ids) = result.inserted_ids {
             for (i, id) in ids {
-                self.inserted_ids.insert(i, id);
+                self.inserted_ids.insert(start_index + i, id);
+                self.inserted_count += 1;
             }
         }
+
+        ok
+    }
+
+    fn parse_upserted_id(mut document: bson::Document, start_index: i64,
+                         upserted_ids: &mut BTreeMap<i64, Bson>) -> i32 {
+        let (index, id) = (document.remove("index"), document.remove("_id"));
+
+        match (index, id) {
+            (Some(Bson::I32(i)), Some(bson_id)) => {
+                let _ = upserted_ids.insert(start_index + i as i64, bson_id);
+                1
+            }
+            (Some(Bson::I64(i)), Some(bson_id)) => {
+                let _ = upserted_ids.insert(start_index + i, bson_id.clone());
+                1
+            }
+            _ => 0
+        }
+    }
+
+    fn parse_upserted_ids(bson: Bson, start_index: i64,
+                          upserted_ids: &mut BTreeMap<i64, Bson>) -> i32 {
+        match bson {
+            Bson::Document(doc) => BulkWriteResult::parse_upserted_id(doc, start_index, upserted_ids),
+            Bson::Array(vec) => {
+                let mut count = 0;
+
+                for bson in vec {
+                    if let Bson::Document(doc) = bson {
+                        count += BulkWriteResult::parse_upserted_id(doc, start_index, upserted_ids)
+                    }
+                }
+
+                count
+            },
+            _ => 0
+        }
+    }
+
+    pub fn process_bulk_update_result(&mut self, result: BulkUpdateResult,
+                                      models: Vec<WriteModel>, start_index: i64,
+                                      exception: &mut BulkWriteException) -> bool{
+        let ok = exception.add_bulk_write_exception(result.write_exception, models);
+
+        self.matched_count += result.matched_count;
+        self.modified_count += result.modified_count;
+
+        if let Some(upserted_ids) = result.upserted_ids {
+            self.upserted_count +=
+                BulkWriteResult::parse_upserted_ids(upserted_ids, start_index,
+                                                    &mut self.upserted_ids);
+        }
+
+        ok
     }
 }
 
@@ -163,7 +205,7 @@ impl BulkUpdateResult {
             acknowledged: true,
             matched_count: n_matched,
             modified_count: n_modified,
-            upserted_id: id,
+            upserted_ids: id,
             write_exception: exception,
         }
     }
@@ -254,12 +296,12 @@ impl UpdateResult {
             Some(bulk_exception) => Some(WriteException::with_bulk_exception(bulk_exception)),
             None => None,
         };
-        
+
         UpdateResult {
             acknowledged: result.acknowledged,
             matched_count: result.matched_count,
             modified_count: result.modified_count,
-            upserted_id: result.upserted_id,
+            upserted_id: result.upserted_ids,
             write_exception: exception,
         }
     }
