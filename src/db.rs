@@ -88,7 +88,7 @@ impl<'a> Database<'a> {
     /// Returns a list of collection names within the database.
     pub fn collection_names(&'a self, filter: Option<bson::Document>) -> Result<Vec<String>> {
         let mut cursor = try!(self.list_collections(filter));
-        let mut results = Vec::new();
+        let mut results = vec![];
         loop {
             match cursor.next() {
                 Some(Ok(doc)) => if let Some(&Bson::String(ref name)) = doc.get("name") {

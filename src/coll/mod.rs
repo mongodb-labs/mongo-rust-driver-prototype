@@ -20,7 +20,8 @@ use Error::{ArgumentError, ResponseError,
 
 use wire_protocol::flags::OpQueryFlags;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
+use std::iter::FromIterator;
 
 /// Interfaces with a MongoDB collection.
 pub struct Collection<'a> {
@@ -250,85 +251,146 @@ impl<'a> Collection<'a> {
                                             opts.upsert, opts.write_concern)
     }
 
-    pub fn get_unordered_batches(requests: Vec<WriteModel>) -> Vec<Batch> {
+    fn get_unordered_batches(requests: Vec<WriteModel>) -> Vec<Batch> {
         let mut inserts = vec![];
+        let mut deletes = vec![];
+        let mut updates = vec![];
 
         for req in requests {
             match req {
-                WriteModel::InsertOne { document }  => {
-                    inserts.push(document)
-                }
-                _ => ()
+                WriteModel::InsertOne { document } =>  inserts.push(document),
+                WriteModel::DeleteOne { filter } =>
+                    deletes.push(DeleteModel { filter: filter, multi: false }),
+                WriteModel::DeleteMany { filter } =>
+                    deletes.push(DeleteModel { filter: filter, multi: true }),
+                WriteModel::ReplaceOne { filter, replacement, upsert } =>
+                    updates.push(UpdateModel { filter: filter,
+                                               update: replacement,
+                                               upsert: upsert, multi: false,
+                                               is_replace: true }),
+                WriteModel::UpdateOne { filter, update, upsert } =>
+                    updates.push(UpdateModel { filter: filter,
+                                               update: update, upsert: upsert,
+                                               multi: false, is_replace: false }),
+                WriteModel::UpdateMany { filter, update, upsert } =>
+                    updates.push(UpdateModel { filter: filter,
+                                               update: update, upsert: upsert,
+                                               multi: true, is_replace: false }),
+
             }
         }
 
-        vec![Batch::Insert { documents: inserts }]
+        vec![
+            Batch::Insert(inserts),
+            Batch::Delete(deletes),
+            Batch::Update(updates),
+        ]
     }
 
-    pub fn get_ordered_batches(requests: Vec<WriteModel>) -> Vec<Batch> {
-        let mut inserts = vec![];
+    pub fn get_ordered_batches(mut requests: VecDeque<WriteModel>) -> Vec<Batch> {
+        let first_model = match requests.pop_front() {
+            Some(model) => model,
+            None => return vec![]
+        };
 
-        for req in requests {
-            match req {
-                WriteModel::InsertOne { document }  => {
-                    inserts.push(document)
-                }
-                _ => ()
+        let mut batches = vec![Batch::from(first_model)];
+
+        for model in requests {
+            let last_index = batches.len() - 1;
+
+            match batches[last_index].merge_model(model) {
+                Some(model) => batches.push(Batch::from(model)),
+                None => ()
             }
         }
 
-        vec![Batch::Insert { documents: inserts }]
+        batches
     }
 
-    fn execute_insert_one_batch(&self, document: bson::Document, i: i64,
-                                result: &mut BulkWriteResult,
-                                exception: &mut BulkWriteException) {
-        let model = WriteModel::InsertOne { document: document.clone() };
-
-        match self.insert_one(document, None) {
-            Ok(insert_result) => {
-
-                result.process_insert_one_result(insert_result, i, model,
-                                                 exception);
-            },
-            Err(err) => exception.add_unproccessed_model(model)
-        }
-    }
-
-    fn execute_insert_many_batch(&self, documents: Vec<bson::Document>,
-                                 ordered: bool, result: &mut BulkWriteResult,
-                                 exception: &mut BulkWriteException) {
-        let models = documents.iter().map(|doc| {
+    fn execute_insert_batch(&self, documents: Vec<bson::Document>,
+                            start_index: i64, ordered: bool,
+                            result: &mut BulkWriteResult,
+                            exception: &mut BulkWriteException) -> bool {
+        let models = documents.iter().map(|doc|
             WriteModel::InsertOne { document: doc.clone() }
-        }).collect();
+        ).collect();
 
         match self.insert_many(documents, ordered, None) {
             Ok(insert_result) =>
                 result.process_insert_many_result(insert_result, models,
-                                                  exception),
-            Err(err) => exception.add_unproccessed_models(models)
+                                                  start_index, exception),
+            Err(_) => {
+                exception.add_unproccessed_models(models);
+                false
+            }
         }
     }
 
-    fn execute_batch(&self, batch: Batch, ordered: bool, i: i64,
+    fn execute_delete_batch(&self, models: Vec<DeleteModel>, ordered: bool,
+                            result: &mut BulkWriteResult,
+                            exception: &mut BulkWriteException) -> bool {
+        let original_models = models.iter().map(|model|
+            if model.multi {
+                WriteModel::DeleteMany { filter: model.filter.clone() }
+            } else {
+                WriteModel::DeleteOne { filter: model.filter.clone() }
+            }
+        ).collect();
+
+        match self.bulk_delete(models, ordered, None) {
+            Ok(bulk_delete_result) =>
+                result.process_bulk_delete_result(bulk_delete_result,
+                                                  original_models, exception),
+            Err(_) => {
+                exception.add_unproccessed_models(original_models);
+                false
+            }
+        }
+    }
+
+    fn execute_update_batch(&self, models: Vec<UpdateModel>, start_index: i64,
+                            ordered: bool, result: &mut BulkWriteResult,
+                            exception: &mut BulkWriteException) -> bool{
+        let original_models = models.iter().map(|model|
+            if model.multi {
+                WriteModel::DeleteMany { filter: model.filter.clone() }
+            } else {
+                WriteModel::DeleteOne { filter: model.filter.clone() }
+            }
+        ).collect();
+
+        match self.bulk_update(models, ordered, None) {
+            Ok(bulk_update_result) =>
+                result.process_bulk_update_result(bulk_update_result,
+                                                  original_models, start_index,
+                                                  exception),
+            Err(_) =>  {
+                exception.add_unproccessed_models(original_models);
+                false
+            }
+        }
+    }
+
+    fn execute_batch(&self, batch: Batch, start_index: i64, ordered: bool,
                      result: &mut BulkWriteResult,
-                     exception: &mut BulkWriteException) {
+                     exception: &mut BulkWriteException) -> bool {
         match batch {
-            Batch::Insert { mut documents } =>
-                if documents.len() == 1 {
-                    self.execute_insert_one_batch(documents.pop().unwrap(), i, result,
-                                                  exception)
-                } else {
-                    self.execute_insert_many_batch(documents, ordered,
-                                                   result, exception)
-                }
+            Batch::Insert(docs) =>
+                self.execute_insert_batch(docs, start_index, ordered, result,
+                                          exception),
+            Batch::Delete(models) =>
+                self.execute_delete_batch(models, ordered, result,
+                                          exception),
+            Batch::Update(models) =>
+                self.execute_update_batch(models, start_index, ordered, result,
+                                          exception),
         }
     }
 
     /// Sends a batch of writes to the server at the same time.
     pub fn bulk_write(&self, requests: Vec<WriteModel>, ordered: bool) -> BulkWriteResult {
         let batches = if ordered {
-            Collection::get_ordered_batches(requests)
+            Collection::get_ordered_batches(VecDeque::from_iter(requests.into_iter()))
         } else {
             Collection::get_unordered_batches(requests)
         };
@@ -336,9 +398,18 @@ impl<'a> Collection<'a> {
         let mut result = BulkWriteResult::new();
         let mut exception = BulkWriteException::new(vec![], vec![], vec![], None);
 
-        for (i, batch) in batches.into_iter().enumerate() {
-            self.execute_batch(batch, ordered, i as i64, &mut result,
-                               &mut exception);
+        let mut start_index = 0;
+
+        for batch in batches {
+            let length = batch.len();
+            let success = self.execute_batch(batch, start_index, ordered,
+                                             &mut result, &mut exception);
+
+            if !success && ordered {
+                break;
+            }
+
+            start_index += length;
         }
 
         if exception.unprocessed_requests.len() == 0 {
