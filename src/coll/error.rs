@@ -1,9 +1,7 @@
 use bson::{self, Bson};
-
 use super::options::WriteModel;
 use common::WriteConcern;
 use {Error, Result};
-
 use std::{error, fmt};
 
 /// The error type for Write-related MongoDB operations.
@@ -265,17 +263,19 @@ impl BulkWriteException {
         }
     }
 
+    /// Adds a model to the vector of unprocessed models
     pub fn add_unproccessed_model(&mut self, model: WriteModel) {
         self.unprocessed_requests.push(model);
     }
 
+    /// Adds a vector of models to the vector of unprocessed models.
     pub fn add_unproccessed_models(&mut self, models: Vec<WriteModel>) {
-        for model in models {
-            self.add_unproccessed_model(model);
-        }
+        self.unprocessed_requests.extend(models.into_iter());
     }
 
-    pub fn add_bulk_write_exception(&mut self, exception_opt: Option<BulkWriteException>,
+    /// Adds the data contined by another BulkWriteException to this one.
+    pub fn add_bulk_write_exception(&mut self,
+                                    exception_opt: Option<BulkWriteException>,
                                     models: Vec<WriteModel>) -> bool {
         let exception = match exception_opt {
             Some(exception) => exception,

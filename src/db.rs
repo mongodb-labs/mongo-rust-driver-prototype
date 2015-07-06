@@ -1,9 +1,7 @@
 use bson;
 use bson::Bson;
-
 use {Client, Result};
 use Error::OperationError;
-
 use coll::Collection;
 use coll::options::FindOptions;
 use common::{ReadPreference, WriteConcern};
@@ -21,7 +19,6 @@ impl<'a> Database<'a> {
     /// Creates a database representation with optional read and write controls.
     pub fn new(client: &'a Client, name: &str,
                read_preference: Option<ReadPreference>, write_concern: Option<WriteConcern>) -> Database<'a> {
-
         let rp = read_preference.unwrap_or(client.read_preference.to_owned());
         let wc = write_concern.unwrap_or(client.write_concern.to_owned());
 

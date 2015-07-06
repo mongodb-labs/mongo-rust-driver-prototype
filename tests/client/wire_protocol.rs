@@ -14,7 +14,7 @@ fn insert_single_key_doc() {
             let docs = vec![doc];
             let flags = OpInsertFlags::no_flags();
             let name = "test.single_key".to_owned();
-            let res = Message::with_insert(1, flags, name, docs);
+            let res = Message::new_insert(1, flags, name, docs);
 
             let cm = match res {
                 Ok(message) => message,
@@ -29,7 +29,7 @@ fn insert_single_key_doc() {
             let doc = Document::new();
             let flags = OpQueryFlags::no_flags();
             let name = "test.single_key".to_owned();
-            let res = Message::with_query(1, flags, name, 0, 0, doc, None);
+            let res = Message::new_query(1, flags, name, 0, 0, doc, None);
 
             let cm = match res {
                 Ok(message) => message,
@@ -78,7 +78,7 @@ fn insert_multi_key_doc() {
             let docs = vec![doc];
             let flags = OpInsertFlags::no_flags();
             let name = "test.multi_key".to_owned();
-            let res = Message::with_insert(1, flags, name, docs);
+            let res = Message::new_insert(1, flags, name, docs);
 
             let cm = match res {
                 Ok(message) => message,
@@ -93,7 +93,7 @@ fn insert_multi_key_doc() {
             let doc = Document::new();
             let flags = OpQueryFlags::no_flags();
             let name = "test.multi_key".to_owned();
-            let res = Message::with_query(1, flags, name, 0, 0, doc, None);
+            let res = Message::new_query(1, flags, name, 0, 0, doc, None);
 
             let cm = match res {
                 Ok(message) => message,
@@ -151,7 +151,7 @@ fn insert_docs() {
             let docs = vec![doc1, doc2];
             let flags = OpInsertFlags::no_flags();
             let name = "test.multi_doc".to_owned();
-            let res = Message::with_insert(1, flags, name, docs);
+            let res = Message::new_insert(1, flags, name, docs);
 
             let cm = match res {
                 Ok(message) => message,
@@ -166,7 +166,7 @@ fn insert_docs() {
             let doc = Document::new();
             let flags = OpQueryFlags::no_flags();
             let name = "test.multi_doc".to_owned();
-            let res = Message::with_query(1, flags, name, 0, 0, doc, None);
+            let res = Message::new_query(1, flags, name, 0, 0, doc, None);
 
             let cm = match res {
                 Ok(message) => message,
@@ -224,7 +224,7 @@ fn insert_update_then_query() {
             let docs = vec![doc];
             let flags = OpInsertFlags::no_flags();
             let name = "test.update".to_owned();
-            let res = Message::with_insert(1, flags, name, docs);
+            let res = Message::new_insert(1, flags, name, docs);
 
             let cm = match res {
                 Ok(message) => message,
@@ -242,7 +242,7 @@ fn insert_update_then_query() {
 
             let flags = OpUpdateFlags::no_flags();
             let name = "test.update".to_owned();
-            let res = Message::with_update(2, name, flags, selector, update);
+            let res = Message::new_update(2, name, flags, selector, update);
 
             let cm = match res {
                 Ok(message) => message,
@@ -257,7 +257,7 @@ fn insert_update_then_query() {
             let doc = Document::new();
             let flags = OpQueryFlags::no_flags();
             let name = "test.update".to_owned();
-            let res = Message::with_query(3, flags, name, 0, 0, doc, None);
+            let res = Message::new_query(3, flags, name, 0, 0, doc, None);
 
             let cm = match res {
                 Ok(message) => message,

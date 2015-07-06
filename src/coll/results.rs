@@ -1,6 +1,5 @@
 use bson;
 use bson::Bson;
-
 use std::collections::BTreeMap;
 use super::error::{BulkWriteException, WriteException};
 use super::options::WriteModel;
@@ -87,6 +86,7 @@ impl BulkWriteResult {
         }
     }
 
+    /// Adds the data in a BulkDeleteResult to this result.
     pub fn process_bulk_delete_result(&mut self, result: BulkDeleteResult,
                                       models: Vec<WriteModel>,
                                       exception: &mut BulkWriteException) -> bool {
@@ -96,6 +96,7 @@ impl BulkWriteResult {
         ok
     }
 
+    /// Adds the data in an InsertManyResult to this result.
     pub fn process_insert_many_result(&mut self, result: InsertManyResult,
                                       models: Vec<WriteModel>, start_index: i64,
                                       exception: &mut BulkWriteException) -> bool {
@@ -111,6 +112,8 @@ impl BulkWriteResult {
         ok
     }
 
+    // Parses an index and id from a single BSON document and adds it to
+    // the tree of upserted ids.
     fn parse_upserted_id(mut document: bson::Document, start_index: i64,
                          upserted_ids: &mut BTreeMap<i64, Bson>) -> i32 {
         let (index, id) = (document.remove("index"), document.remove("_id"));
@@ -128,6 +131,8 @@ impl BulkWriteResult {
         }
     }
 
+    // Parses multiple indexes and ids from a single BSON document and adds
+    // them to the tree of upserted ids.
     fn parse_upserted_ids(bson: Bson, start_index: i64,
                           upserted_ids: &mut BTreeMap<i64, Bson>) -> i32 {
         match bson {
@@ -147,6 +152,7 @@ impl BulkWriteResult {
         }
     }
 
+    /// Adds the data in a BulkUpdateResult to this result.
     pub fn process_bulk_update_result(&mut self, result: BulkUpdateResult,
                                       models: Vec<WriteModel>, start_index: i64,
                                       exception: &mut BulkWriteException) -> bool{

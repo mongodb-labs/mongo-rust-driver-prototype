@@ -1,6 +1,5 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Read, Write};
-
 use Result;
 use Error::ResponseError;
 
@@ -110,23 +109,6 @@ impl Header {
         Header::new(message_length, request_id, 0, op_code)
     }
 
-    /// Construcs a new Header for a reply.
-    ///
-    /// # Arguments
-    ///
-    /// `message_length` - The length of the message in bytes.
-    /// `request_id` - Identifier for the request, or `0` if the the message
-    ///                is a response.
-    /// `op_code` - Identifies which type of message is being sent.
-    ///
-    /// # Return value
-    ///
-    /// Returns a new Header with `request_id` set to 0.
-    fn new_reply(message_length: i32, response_to: i32,
-                 op_code: OpCode) -> Header {
-        Header::new(message_length, 0, response_to, op_code)
-    }
-
     /// Constructs a new Header for an OP_UPDATE.
     ///
     /// # Arguments
@@ -138,7 +120,7 @@ impl Header {
     ///
     /// Returns a new Header with `response_to` set to 0 and `op_code`
     /// set to `Update`.
-    pub fn with_update(message_length: i32, request_id: i32) -> Header {
+    pub fn new_update(message_length: i32, request_id: i32) -> Header {
         Header::new_request(message_length, request_id, OpCode::Update)
     }
 
@@ -153,7 +135,7 @@ impl Header {
     ///
     /// Returns a new Header with `response_to` set to 0 and `op_code`
     /// set to `Insert`.
-    pub fn with_insert(message_length: i32, request_id: i32) -> Header {
+    pub fn new_insert(message_length: i32, request_id: i32) -> Header {
         Header::new_request(message_length, request_id, OpCode::Insert)
     }
 
@@ -168,7 +150,7 @@ impl Header {
     ///
     /// Returns a new Header with `response_to` set to 0 and `op_code`
     /// set to `Query`.
-    pub fn with_query(message_length: i32, request_id: i32) -> Header {
+    pub fn new_query(message_length: i32, request_id: i32) -> Header {
         Header::new_request(message_length, request_id, OpCode::Query)
     }
 
@@ -183,7 +165,7 @@ impl Header {
     ///
     /// Returns a new Header with `response_to` set to 0 and `op_code`
     /// set to `GetMore`.
-    pub fn with_get_more(message_length: i32, request_id: i32) -> Header {
+    pub fn new_get_more(message_length: i32, request_id: i32) -> Header {
         Header::new_request(message_length, request_id, OpCode::GetMore)
     }
 
@@ -195,7 +177,7 @@ impl Header {
     ///
     /// # Return value
     ///
-    /// Returns nothing on success, or an error string on failure.
+    /// Returns nothing on success, or an Error on failure.
     pub fn write(&self, buffer: &mut Write) -> Result<()> {
         try!(buffer.write_i32::<LittleEndian>(self.message_length));
         try!(buffer.write_i32::<LittleEndian>(self.request_id));
@@ -214,7 +196,7 @@ impl Header {
     ///
     /// # Return value
     ///
-    /// Returns the parsed Header on success, or an error string on failure.
+    /// Returns the parsed Header on success, or an Error on failure.
     pub fn read(buffer: &mut Read) -> Result<Header> {
         let message_length = try!(buffer.read_i32::<LittleEndian>());
         let request_id = try!(buffer.read_i32::<LittleEndian>());

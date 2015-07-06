@@ -84,6 +84,16 @@ impl Batch {
         length as i64
     }
 
+    /// Attempts to merge another model into this batch.
+    ///
+    /// # Arguments
+    ///
+    ///  `model` - The model to try to merge.
+    ///
+    /// # Return value
+    ///
+    /// Returns `None` on success, or the model that couldn't be merged on
+    /// failure.
     pub fn merge_model(&mut self, model: WriteModel) -> Option<WriteModel> {
         match self {
             &mut Batch::Insert(ref mut docs) => {

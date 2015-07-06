@@ -1,5 +1,4 @@
 use bson::{Bson, Document};
-
 use mongodb::Client;
 use mongodb::cursor::Cursor;
 use mongodb::wire_protocol::flags::OpQueryFlags;
