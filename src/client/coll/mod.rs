@@ -171,7 +171,7 @@ impl<'a> Collection<'a> {
 
     // Helper method for all findAndModify commands.
     fn find_and_modify(&self, cmd: &mut bson::Document,
-                       filter: bson::Document, _max_time_ms: Option<i64>,
+                       filter: bson::Document, max_time_ms: Option<i64>,
                        projection: Option<bson::Document>, sort: Option<bson::Document>,
                        write_concern: Option<WriteConcern>)
                        -> Result<Option<bson::Document>> {
