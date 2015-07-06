@@ -1,5 +1,7 @@
-extern crate byteorder;
+#[macro_use(bson, doc)]
 extern crate bson;
+extern crate byteorder;
+extern crate chrono;
 extern crate crypto;
 extern crate libc;
 extern crate rand;
@@ -12,6 +14,7 @@ pub mod common;
 pub mod connstring;
 pub mod cursor;
 pub mod error;
+pub mod gridfs;
 pub mod pool;
 pub mod wire_protocol;
 
