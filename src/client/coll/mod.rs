@@ -38,7 +38,7 @@ impl<'a> Collection<'a> {
     /// Creates a collection representation with optional read and write controls.
     ///
     /// If `create` is specified, the collection will be explicitly created in the database.
-    pub fn new(db: &'a Database<'a>, name: &str, _create: bool,
+    pub fn new(db: &'a Database<'a>, name: &str, create: bool,
                read_preference: Option<ReadPreference>, write_concern: Option<WriteConcern>) -> Collection<'a> {
 
         let rp = read_preference.unwrap_or(db.read_preference.to_owned());
@@ -127,7 +127,7 @@ impl<'a> Collection<'a> {
     /// Finds the distinct values for a specified field across a single collection.
     pub fn distinct(&self, field_name: &str, filter: Option<bson::Document>, options: Option<DistinctOptions>) -> Result<Vec<Bson>> {
 
-        let _opts = options.unwrap_or(DistinctOptions::new());
+        let opts = options.unwrap_or(DistinctOptions::new());
 
         let mut spec = bson::Document::new();
         spec.insert("distinct".to_owned(), Bson::String(self.name()));
