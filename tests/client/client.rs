@@ -1,5 +1,6 @@
 use bson;
-use mongodb::Client;
+use mongodb::{Client, ThreadedClient};
+use mongodb::db::ThreadedDatabase;
 use std::sync::Arc;
 use std::thread;
 
@@ -43,7 +44,7 @@ fn is_master() {
 
 #[test]
 fn is_sync() {
-    let client = Arc::new(Client::with_uri("mongodb://localhost:27018").unwrap());    
+    let client = Arc::new(Client::with_uri("mongodb://localhost:27018").unwrap());
     let state_results = client.database_names().ok().expect("Failed to execute database_names.");
     for name in state_results {
         if name != "local" {
@@ -53,7 +54,7 @@ fn is_sync() {
 
     let client1 = client.clone();
     let client2 = client.clone();
-    
+
     let base_results = client.database_names().ok().expect("Failed to execute database_names.");
     assert_eq!(1, base_results.len());
     assert_eq!("local", base_results[0]);
@@ -76,7 +77,7 @@ fn is_sync() {
 
     let _ = child1.join();
     let _ = child2.join();
-    
+
     // Check new dbs
     let results = client.database_names().ok().expect("Failed to execute database_names.");
     assert_eq!(3, results.len());

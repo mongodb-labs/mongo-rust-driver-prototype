@@ -10,9 +10,10 @@ use self::error::{BulkWriteException, WriteException};
 use self::options::*;
 use self::results::*;
 
+use {ThreadedClient};
 use common::{ReadPreference, WriteConcern};
 use cursor::Cursor;
-use db::Database;
+use db::{Database, ThreadedDatabase};
 
 use Result;
 use Error::{ArgumentError, ResponseError,OperationError, BulkWriteError};
@@ -22,25 +23,25 @@ use std::collections::{BTreeMap, VecDeque};
 use std::iter::FromIterator;
 
 /// Interfaces with a MongoDB collection.
-pub struct Collection<'a> {
-    pub db: &'a Database<'a>,
+pub struct Collection {
+    pub db: Database,
     pub namespace: String,
     read_preference: ReadPreference,
     write_concern: WriteConcern,
 }
 
-impl<'a> Collection<'a> {
+impl Collection {
     /// Creates a collection representation with optional read and write controls.
     ///
     /// If `create` is specified, the collection will be explicitly created in the database.
-    pub fn new(db: &'a Database<'a>, name: &str, _create: bool,
-               read_preference: Option<ReadPreference>, write_concern: Option<WriteConcern>) -> Collection<'a> {
+    pub fn new(db: Database, name: &str, _create: bool, read_preference: Option<ReadPreference>,
+               write_concern: Option<WriteConcern>) -> Collection {
 
         let rp = read_preference.unwrap_or(db.read_preference.to_owned());
         let wc = write_concern.unwrap_or(db.write_concern.to_owned());
 
         Collection {
-            db: db,
+            db: db.clone(),
             namespace: format!("{}.{}", db.name, name),
             read_preference: rp,
             write_concern: wc,
@@ -67,12 +68,13 @@ impl<'a> Collection<'a> {
     }
 
     /// Permanently deletes the collection from the database.
-    pub fn drop(&'a self) -> Result<()> {
+    pub fn drop(&self) -> Result<()> {
         self.db.drop_collection(&self.name()[..])
     }
 
     /// Runs an aggregation framework pipeline.
-    pub fn aggregate(&'a self, pipeline: Vec<bson::Document>, options: Option<AggregateOptions>) -> Result<Cursor<'a>> {
+    pub fn aggregate(&self, pipeline: Vec<bson::Document>,
+                     options: Option<AggregateOptions>) -> Result<Cursor> {
         let opts = options.unwrap_or(AggregateOptions::new());
 
         let pipeline_map = pipeline.iter().map(|bdoc| {
@@ -140,13 +142,13 @@ impl<'a> Collection<'a> {
 
     /// Returns a list of documents within the collection that match the filter.
     pub fn find(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
-                -> Result<Cursor<'a>> {
+                -> Result<Cursor> {
 
         let doc = filter.unwrap_or(bson::Document::new());
         let options = options.unwrap_or(FindOptions::new());
         let flags = OpQueryFlags::with_find_options(&options);
 
-        Cursor::query_with_batch_size(&self.db.client, self.namespace.to_owned(),
+        Cursor::query_with_batch_size(self.db.client.clone(), self.namespace.to_owned(),
                                       options.batch_size, flags, options.skip as i32,
                                       options.limit, doc, options.projection.clone(),
                                       false)

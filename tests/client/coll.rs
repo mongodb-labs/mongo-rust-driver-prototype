@@ -1,6 +1,7 @@
 use bson::Bson;
 
-use mongodb::Client;
+use mongodb::{Client, ThreadedClient};
+use mongodb::db::ThreadedDatabase;
 use mongodb::coll::options::{FindOneAndUpdateOptions, ReturnDocument};
 
 #[test]
