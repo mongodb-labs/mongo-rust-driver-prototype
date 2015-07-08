@@ -41,7 +41,7 @@ pub trait ThreadedDatabase {
 impl ThreadedDatabase for Database {
     /// Creates a database representation with optional read and write controls.
     fn open(client: Client, name: &str, read_preference: Option<ReadPreference>,
-               write_concern: Option<WriteConcern>) -> Database {
+            write_concern: Option<WriteConcern>) -> Database {
         let rp = read_preference.unwrap_or(client.read_preference.to_owned());
         let wc = write_concern.unwrap_or(client.write_concern.to_owned());
 
@@ -60,8 +60,8 @@ impl ThreadedDatabase for Database {
 
     /// Creates a collection representation with custom read and write controls.
     fn collection_with_prefs(&self, coll_name: &str, create: bool,
-                                 read_preference: Option<ReadPreference>,
-                                 write_concern: Option<WriteConcern>) -> Collection {
+                             read_preference: Option<ReadPreference>,
+                             write_concern: Option<WriteConcern>) -> Collection {
         Collection::new(self.clone(), coll_name, create, read_preference, write_concern)
     }
 
@@ -90,7 +90,7 @@ impl ThreadedDatabase for Database {
     }
 
     fn list_collections_with_batch_size(&self, filter: Option<bson::Document>,
-                                            batch_size: i32) -> Result<Cursor> {
+                                        batch_size: i32) -> Result<Cursor> {
 
         let mut spec = bson::Document::new();
         let mut cursor = bson::Document::new();

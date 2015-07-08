@@ -66,7 +66,7 @@ impl ThreadedClient for Client {
 
     /// `new` with custom read and write controls.
     fn with_prefs(host: &str, port: u16, read_pref: Option<ReadPreference>,
-                      write_concern: Option<WriteConcern>) -> Result<Client> {
+                  write_concern: Option<WriteConcern>) -> Result<Client> {
         let config = ConnectionString::new(host, port);
         Client::with_config(config, read_pref, write_concern)
     }
@@ -80,7 +80,7 @@ impl ThreadedClient for Client {
 
     /// `with_uri` with custom read and write controls.
     fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
-                              write_concern: Option<WriteConcern>) -> Result<Client> {
+                          write_concern: Option<WriteConcern>) -> Result<Client> {
         let config = try!(connstring::parse(uri));
         Client::with_config(config, read_pref, write_concern)
     }
@@ -113,7 +113,7 @@ impl ThreadedClient for Client {
 
     /// Creates a database representation with custom read and write controls.
     fn db_with_prefs(&self, db_name: &str, read_preference: Option<ReadPreference>,
-                             write_concern: Option<WriteConcern>) -> Database {
+                     write_concern: Option<WriteConcern>) -> Database {
         Database::open(self.clone(), db_name, read_preference, write_concern)
     }
 
