@@ -121,12 +121,12 @@ impl Cursor {
     ///
     /// Returns the cursor for the query results on success, or an Error on
     /// failure.
-    pub fn query_with_batch_size(client: Client,
-                                     namespace: String, batch_size: i32,
-                                     flags: OpQueryFlags, number_to_skip: i32,
-                                     number_to_return: i32, query: bson::Document,
-                                     return_field_selector: Option<bson::Document>,
-                                     is_cmd_cursor: bool) -> Result<Cursor> {
+    pub fn query_with_batch_size(client: Client, namespace: String,
+                                 batch_size: i32, flags: OpQueryFlags,
+                                 number_to_skip: i32, number_to_return: i32,
+                                 query: bson::Document,
+                                 return_field_selector: Option<bson::Document>,
+                                 is_cmd_cursor: bool) -> Result<Cursor> {
         let result = Message::new_query(client.get_req_id(), flags,
                                         namespace.to_owned(),
                                         number_to_skip, batch_size,

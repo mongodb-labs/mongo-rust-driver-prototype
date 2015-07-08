@@ -10,7 +10,7 @@ use self::error::{BulkWriteException, WriteException};
 use self::options::*;
 use self::results::*;
 
-use {ThreadedClient};
+use ThreadedClient;
 use common::{ReadPreference, WriteConcern};
 use cursor::Cursor;
 use db::{Database, ThreadedDatabase};
