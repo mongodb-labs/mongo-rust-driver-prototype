@@ -86,7 +86,7 @@ impl ThreadedClient for Client {
     }
 
     fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>,
-        write_concern: Option<WriteConcern>) -> Result<Client> {
+                   write_concern: Option<WriteConcern>) -> Result<Client> {
 
         let rp = match read_pref {
             Some(rp) => rp,
