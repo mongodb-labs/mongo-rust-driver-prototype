@@ -146,9 +146,20 @@ impl Collection {
     pub fn find(&self, filter: Option<bson::Document>,
                 options: Option<FindOptions>) -> Result<Cursor> {
 
-        let doc = filter.unwrap_or(bson::Document::new());
         let options = options.unwrap_or(FindOptions::new());
         let flags = OpQueryFlags::with_find_options(&options);
+
+        let doc = if options.sort.is_some() {
+            let mut doc = bson::Document::new();
+            doc.insert("$query".to_owned(),
+                       Bson::Document(filter.unwrap_or(bson::Document::new())));
+
+            doc.insert("$orderby".to_owned(),
+                       Bson::Document(options.sort.as_ref().unwrap().clone()));
+            doc
+        } else {
+            filter.unwrap_or(bson::Document::new())
+        };
 
         Cursor::query_with_batch_size(self.db.client.clone(), self.namespace.to_owned(),
                                       options.batch_size, flags, options.skip as i32,

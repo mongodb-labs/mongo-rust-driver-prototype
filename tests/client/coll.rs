@@ -2,7 +2,50 @@ use bson::Bson;
 
 use mongodb::{Client, ThreadedClient};
 use mongodb::db::ThreadedDatabase;
-use mongodb::coll::options::{FindOneAndUpdateOptions, ReturnDocument};
+use mongodb::coll::options::{FindOptions, FindOneAndUpdateOptions, ReturnDocument};
+
+#[test]
+fn find_sorted() {
+    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let db = client.db("test");
+    let coll = db.collection("find_sorted");
+
+    db.drop_database().ok().expect("Failed to drop database");
+
+    // Insert document
+    let doc1 = doc! { "title" => "Jaws" };
+    let doc2 = doc! { "title" => "Back to the Future" };
+    let doc3 = doc! { "title" => "Dobby" };
+
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
+        .ok().expect("Failed to insert documents.");
+
+    // Find document
+    let mut opts = FindOptions::new();
+    opts.sort = Some(doc! { "title" => 1 });
+
+    let mut cursor = coll.find(None, Some(opts)).ok().expect("Failed to execute find command.");
+    let results = cursor.next_n(3).ok().expect("Failed to retrieve documents.");
+
+    // Assert expected titles of documents
+    match results[0].get("title") {
+        Some(&Bson::String(ref title)) => assert_eq!("Back to the Future", title),
+        _ => panic!("Expected Bson::String!"),
+    };
+
+    match results[1].get("title") {
+        Some(&Bson::String(ref title)) => assert_eq!("Dobby", title),
+        _ => panic!("Expected Bson::String!"),
+    };
+
+    match results[2].get("title") {
+        Some(&Bson::String(ref title)) => assert_eq!("Jaws", title),
+        _ => panic!("Expected Bson::String!"),
+    };
+
+    
+    assert!(cursor.next().is_none());
+}
 
 #[test]
 fn find_and_insert() {
