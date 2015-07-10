@@ -1,8 +1,9 @@
 use bson::Bson;
 
 use mongodb::{Client, ThreadedClient};
+use mongodb::coll::options::FindOptions;
 use mongodb::db::ThreadedDatabase;
-use mongodb::gridfs::{Store, ThreadedStore};
+use mongodb::gridfs::{Store, ThreadedStore, DEFAULT_CHUNK_SIZE};
 
 use rand::{thread_rng, Rng};
 use std::io::{self, Read, Write};
@@ -13,25 +14,38 @@ fn put_get() {
     let db = client.db("grid_put");
     let fs = Store::with_db(db.clone());
 
+    let files = db.collection("fs.files");
+    let chunks = db.collection("fs.chunks");
+    files.drop().ok().expect("Failed to drop files collection.");
+    chunks.drop().ok().expect("Failed to drop chunks collection.");
+
     let name = "grid_put_file";
-    
-    let mut src = [0u8; 12800];
+
+    let src_len = (DEFAULT_CHUNK_SIZE as f32 * 2.5) as usize;
+    let mut src = Vec::with_capacity(src_len);
+    unsafe { src.set_len(src_len) };
     thread_rng().fill_bytes(&mut src);
+
     let mut grid_file = match fs.create(name.to_owned()) {
         Ok(file) => file,
         Err(err) => panic!(err),
     };
 
     let id = grid_file.id();
-    
+
     match grid_file.write(&mut src) {
         Ok(_) => (),
         Err(err) => panic!(err),
     }
 
-    grid_file.close();
+    println!("Closing file...");
+    
+    match grid_file.close() {
+        Ok(_) => (),
+        Err(err) => panic!(err),
+    }
 
-    // Check
+    // Check file
     let mut cursor = match fs.find(Some(doc!{"filename" => name}), None) {
         Ok(cursor) => cursor,
         Err(err) => panic!(err),
@@ -40,48 +54,55 @@ fn put_get() {
     match cursor.next() {
         Some(Ok(doc)) => {
             match doc.get("length") {
-                Some(&Bson::I64(len)) => assert_eq!(len as usize, src.len()),
+                Some(&Bson::I64(len)) => assert_eq!(len as usize, src_len),
                 _ => panic!("Expected i64 'length'"),
             }
         },
         _ => panic!("Expected to retrieve file from cursor."),
     }
 
-    let coll = db.collection("fs.chunks");
-    let mut cursor = match coll.find(Some(doc!{"files_id" => (id.clone())}), None) {
+    let fschunks = db.collection("fs.chunks");
+    let mut opts = FindOptions::new();
+    opts.sort = Some(doc!{ "n" => 1});
+
+    let mut cursor = match fschunks.find(Some(doc!{"files_id" => (id.clone())}), Some(opts)) {
         Ok(cursor) => cursor,
         Err(err) => panic!(err),
     };
 
-    match cursor.next() {
-        Some(Ok(doc)) => {
-            match doc.get("data") {
-                Some(&Bson::Binary(_, ref data)) => {
-                    for i in 0..12800 {
-                        assert_eq!(src[i], data[i]);
-                    }
-                },
-                _ => panic!("Failed serialization of data."),
+    let chunks = cursor.next_batch().ok().expect("Failed to get next batch");
+    assert_eq!(3, chunks.len());
+
+    for i in 0..3 {
+        if let Some(&Bson::I32(ref n)) = chunks[i].get("n") {
+            assert_eq!(i as i32, *n);
+        }
+        
+        if let Some(&Bson::Binary(_, ref data)) = chunks[i].get("data") {
+            for j in 0..data.len() {
+                assert_eq!(src[j + i*DEFAULT_CHUNK_SIZE as usize], data[j]);
             }
-        },
-        _ => panic!(""),
+        }
     }
-    
+
     // Get
-    let mut dest = [0u8; 12800];
+    let mut dest = Vec::with_capacity(src_len);
+    unsafe { dest.set_len(src_len) };
     let mut read_file = match fs.open(name.to_owned()) {
         Ok(file) => file,
         Err(err) => panic!(err),
     };
-    
-    match read_file.read(&mut dest) {
-        Ok(_) => (),
+
+    let n = match read_file.read(&mut dest) {
+        Ok(n) => n,
         Err(err) => panic!(err),
-    }
+    };
+
+    //assert_eq!(src_len, n);
 
     read_file.close();
-
-    for i in 0..12800 {
+    for i in 0..src_len {
+        println!("{}", i);
         assert_eq!(src[i], dest[i]);
     }
 }

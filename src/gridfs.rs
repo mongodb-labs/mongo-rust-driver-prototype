@@ -12,9 +12,10 @@ use super::cursor::Cursor;
 use super::Error::{self, ArgumentError, OperationError};
 use super::Result;
 
-use std::{cmp, io, fs};
-use std::io::{Read, Write};
-use std::sync::{Arc, Mutex};
+use std::{cmp, io, fs, thread};
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::atomic::{AtomicIsize, ATOMIC_ISIZE_INIT, Ordering};
 
 pub const DEFAULT_CHUNK_SIZE: i32 = 255 * 1024;
 pub const MEGABYTE: usize = 1024 * 1024;
@@ -33,15 +34,16 @@ pub struct StoreInner {
 
 pub struct File {
     mutex: Arc<Mutex<()>>,
+    condvar: Arc<Condvar>,
     mode: Mode,
     gfs: Store,
     chunk: i32,
     offset: i64,
-    wpending: i32,
+    wpending: Arc<AtomicIsize>,
     wbuf: Vec<u8>,
     wsum: String,
     rbuf: Vec<u8>,
-    rcache: Option<CachedChunk>,
+    rcache: Option<Arc<Mutex<CachedChunk>>>,
     doc: GfsFile,
     // err: Error,
 }
@@ -72,7 +74,7 @@ pub trait ThreadedStore {
     fn open(&self, name: String) -> Result<File>;
     fn open_id(&self, id: oid::ObjectId) -> Result<File>;
     fn find(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
-                -> Result<Cursor>;
+            -> Result<Cursor>;
     // TODO: Make a GridCursor wrapper for this?
     fn open_next(&self, cursor: &mut Cursor) -> Result<Option<File>>;
     fn remove(&self, name: String) -> Result<()>;
@@ -176,7 +178,7 @@ impl ThreadedStore for Store {
     }
 
     fn find(&self, filter: Option<bson::Document>, options: Option<FindOptions>)
-                -> Result<Cursor> {
+            -> Result<Cursor> {
         self.files.find(filter, options)
     }
 
@@ -231,11 +233,12 @@ impl File {
     pub fn new(gfs: Store, id: oid::ObjectId, mode: Mode) -> File {
         File {
             mutex: Arc::new(Mutex::new(())),
+            condvar: Arc::new(Condvar::new()),
             mode: mode,
             gfs: gfs,
             chunk: 0,
             offset: 0,
-            wpending: 0,
+            wpending: Arc::new(ATOMIC_ISIZE_INIT),
             wbuf: Vec::new(),
             wsum: String::new(),
             rbuf: Vec::new(),
@@ -247,11 +250,12 @@ impl File {
     pub fn with_name(gfs: Store, name: String, id: oid::ObjectId, mode: Mode) -> File {
         File {
             mutex: Arc::new(Mutex::new(())),
+            condvar: Arc::new(Condvar::new()),
             mode: mode,
             gfs: gfs,
             chunk: 0,
             offset: 0,
-            wpending: 0,
+            wpending: Arc::new(ATOMIC_ISIZE_INIT),
             wbuf: Vec::new(),
             wsum: String::new(),
             rbuf: Vec::new(),
@@ -263,11 +267,12 @@ impl File {
     pub fn with_doc(gfs: Store, doc: bson::Document) -> File {
         File {
             mutex: Arc::new(Mutex::new(())),
+            condvar: Arc::new(Condvar::new()),
             mode: Mode::Reading,
             gfs: gfs,
             chunk: 0,
             offset: 0,
-            wpending: 0,
+            wpending: Arc::new(ATOMIC_ISIZE_INIT),
             wbuf: Vec::new(),
             wsum: String::new(),
             rbuf: Vec::new(),
@@ -310,48 +315,51 @@ impl File {
     //    pub fn set_content_type set_metadata ...
 
     pub fn close(&mut self) -> Result<()> {
-        try!(self.mutex.lock());
+        let mut guard = try!(self.mutex.lock());
         if self.mode == Mode::Writing {
             if self.wbuf.len() > 0 /* && self.err.is_none() */ {
                 let chunk = self.wbuf.clone();
-                self.insert_chunk(&chunk);
+                let n = self.chunk;
+                self.chunk += 1;
+                //self.wsum.write(buf);
+                while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >= MEGABYTE as i32 {
+                    // Pending MB
+                    guard = try!(self.condvar.wait(guard));
+                    // if err return
+                }
+
+                self.insert_chunk(n, &chunk);
                 self.wbuf.clear();
             }
-            self.complete_write();
-        } /*else if self.mode == Mode::Reading && self.rcache {
-        rcache wait lock; set nil
-    }*/
+
+            while self.wpending.load(Ordering::SeqCst) > 0 {
+                guard = try!(self.condvar.wait(guard));
+            }
+
+            // Complete write
+            // if self.err == nil {
+            // let hexsum = ;
+            if self.doc.upload_date.is_none() {
+                self.doc.upload_date = Some(UTC::now());
+            }
+            // self.doc.md5 = hexsum;
+            self.gfs.files.insert_one(self.doc.to_bson(), None);
+            //self.gfs.chunks.ensure_index_key("files_id", "n");
+
+        } else if self.mode == Mode::Reading && self.rcache.is_some() {
+            {
+                let cache = self.rcache.as_ref().unwrap();
+                cache.lock();
+            }
+            self.rcache = None;
+        }
         self.mode = Mode::Closed;
         Ok(())
     }
 
-    fn complete_write(&mut self) -> Result<()> {
-        /*while self.wpending > 0 {
-        wait on cond
-    }*/
-
-        // if self.err == nil {
-        // let hexsum = ;
-        if self.doc.upload_date.is_none() {
-            self.doc.upload_date = Some(UTC::now());
-        }
-        // self.doc.md5 = hexsum;
-        self.gfs.files.insert_one(self.doc.to_bson(), None);
-        //self.gfs.chunks.ensure_index_key("files_id", "n");
-        Ok(())
-    }
-
-    fn insert_chunk(&mut self, buf: &[u8]) -> Result<()> {
-        let n = self.chunk;
-        self.chunk += 1;
-        //self.wsum.write(buf)
-        //while doc.chunk_size * self.wpending >= MEGABYTE {
-        // Pending MB
-        // self.cond.wait
-        // if err return
-        //}
-
-        self.wpending += 1;
+    fn insert_chunk(&self, n: i32, buf: &[u8]) -> Result<()> {
+        println!("inserting chunk: {}", n);
+        self.wpending.fetch_add(1, Ordering::SeqCst);
         let mut vec_buf = Vec::with_capacity(buf.len());
         vec_buf.extend(buf.iter().cloned());
 
@@ -362,66 +370,85 @@ impl File {
             "data" => (BinarySubtype::Generic, vec_buf)
         };
 
-        //thread::spawn(move || {
-        let result = self.gfs.chunks.insert_one(document, None);
-        //self.lock
-        self.wpending -= 1;
-        //    if result.is
-        //});
+        let arc_gfs = self.gfs.clone();
+        let arc_mutex = self.mutex.clone();
+        let arc_wpending = self.wpending.clone();
+        let cvar = self.condvar.clone();
+
+        thread::spawn(move || {
+            let result = arc_gfs.chunks.insert_one(document, None);
+            arc_mutex.lock();
+            arc_wpending.fetch_sub(1, Ordering::SeqCst);
+            cvar.notify_all();
+            //    if result.is
+        });
         Ok(())
     }
 
-    fn get_chunk(&mut self) -> Result<Vec<u8>> {
-        let data = match self.rcache.take() {
-            Some(cache) => {
-                if cache.n == self.chunk {
-                    try!(cache.wait.lock());
-                    cache.data
-                } else {
-                    match try!(self.gfs.chunks.find_one(
-                        Some(doc!{"files_id" => (self.doc.id.clone()), "n" => (self.chunk)}),
-                        None)) {
-                        Some(doc) => match doc.get("data") {
-                            Some(&Bson::Binary(_, ref buf)) => buf.clone(),
-                            _ => return Err(OperationError("Chunk contained no data".to_owned())),
-                        },
-                        None => return Err(OperationError("Chunk not found".to_owned())),
-                    }
-                }
+    fn find_chunk(&mut self, id: oid::ObjectId, chunk: i32) -> Result<Vec<u8>> {
+        match try!(self.gfs.chunks.find_one(
+            Some(doc!{"files_id" => id, "n" => chunk }),
+            None)) {
+            Some(doc) => match doc.get("data") {
+                Some(&Bson::Binary(_, ref buf)) => Ok(buf.clone()),
+                _ => return Err(OperationError("Chunk contained no data".to_owned())),
             },
-            None => {
-                match try!(
-                    self.gfs.chunks.find_one(
-                        Some(doc!{"files_id" => (self.doc.id.clone()), "n" => (self.chunk)}),
-                        None)) {
-                    Some(doc) => match doc.get("data") {
-                        Some(&Bson::Binary(_, ref buf)) => buf.clone(),
-                        _ => return Err(OperationError("Chunk contained no data".to_owned())),
-                    },
-                    None => return Err(OperationError("Chunk not found".to_owned())),
-                }
+            None => return Err(OperationError("Chunk not found".to_owned())),
+        }
+    }
+
+    fn get_chunk(&mut self) -> Result<Vec<u8>> {
+        println!("getting chunk {}", self.chunk);
+        let id = self.doc.id.clone();
+        let chunk = self.chunk;
+
+        let data = if let Some(lock) = self.rcache.take() {
+            let cache = try!(lock.lock());
+            if cache.n == self.chunk {
+                cache.data.clone()
+            } else {
+                try!(self.find_chunk(id, chunk))
             }
+        } else {
+            try!(self.find_chunk(id, chunk))
         };
 
         self.chunk += 1;
 
         if (self.chunk as i64) * (self.doc.chunk_size as i64) < self.doc.len {
-            let mut cache = CachedChunk::new(self.chunk);
+            let cache = Arc::new(Mutex::new(CachedChunk::new(self.chunk)));
 
-            cache.wait.lock();
-            //thread stuff
-            let result = self.gfs.chunks.find_one(
-                Some(doc!{"files_id" => (self.doc.id.clone()), "n" => (self.chunk)}),
-                None);
+            let mut arc_cache = cache.clone();
+            let arc_gfs = self.gfs.clone();
+            let id = self.doc.id.clone();
+            let chunk = self.chunk;
 
-            match result {
-                Ok(Some(doc)) => match doc.get("data") {
-                    Some(&Bson::Binary(_, ref buf)) => cache.data = buf.clone(),
-                    _ => cache.err = Some(OperationError("Chunk contained no data.".to_owned())),
-                },
-                Ok(None) => cache.err = Some(OperationError("Chunk not found.".to_owned())),
-                Err(err) => cache.err = Some(err),
-            }
+            thread::spawn(move || {
+                let mut cache = match arc_cache.lock() {
+                    Ok(cache) => cache,
+                    Err(err) => return,
+                    //cache.err = Some(err);
+                    //    return
+                    //}
+                };
+
+                println!("locked cache for chunk {}", chunk);
+
+                let result = arc_gfs.chunks.find_one(
+                    Some(doc!{"files_id" => (id), "n" => (chunk)}),
+                    None);
+
+                match result {
+                    Ok(Some(doc)) => match doc.get("data") {
+                        Some(&Bson::Binary(_, ref buf)) => cache.data = buf.clone(),
+                        _ => cache.err = Some(OperationError("Chunk contained no data.".to_owned())),
+                    },
+                    Ok(None) => cache.err = Some(OperationError("Chunk not found.".to_owned())),
+                    Err(err) => cache.err = Some(err),
+                }
+
+                println!("unlocking cache for chunk {}", chunk);
+            });
             // end thread stuff
             self.rcache = Some(cache);
         }
@@ -432,9 +459,10 @@ impl File {
 
 impl io::Write for File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        println!("writing {} bytes", buf.len());
         let result = self.assert_mode(Mode::Writing);
-        let _ = match self.mutex.lock() {
-            Ok(doc) => (),
+        let mut guard = match self.mutex.lock() {
+            Ok(guard) => guard,
             Err(_) => return Err(io::Error::new(
                 io::ErrorKind::BrokenPipe, ArgumentError("test".to_owned()))),
         };
@@ -459,14 +487,42 @@ impl io::Write for File {
             self.wbuf.extend(part1.iter().cloned());
             data = part2;
             let mut chunk = self.wbuf.clone();
-            let result = self.insert_chunk(&mut chunk);
+
+            let n = self.chunk;
+            self.chunk += 1;
+            //self.wsum.write(buf);
+            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >= MEGABYTE as i32 {
+                // Pending MB
+                guard = match self.condvar.wait(guard) {
+                    Ok(guard) => guard,
+                    Err(_) => return Err(io::Error::new(
+                        io::ErrorKind::BrokenPipe, ArgumentError("test".to_owned()))),
+                }
+                // if err return
+            }
+
+            let result = self.insert_chunk(n, &mut chunk);
             self.wbuf.clear();
         }
 
         while data.len() > chunk_size as usize {
             let size = cmp::min(chunk_size, data.len());
             let (part1, part2) = data.split_at(size);
-            let result = self.insert_chunk(part1);
+
+            let n = self.chunk;
+            self.chunk += 1;
+            //self.wsum.write(buf);
+            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >= MEGABYTE as i32 {
+                // Pending MB
+                guard = match self.condvar.wait(guard) {
+                    Ok(guard) => guard,
+                    Err(_) => return Err(io::Error::new(
+                        io::ErrorKind::BrokenPipe, ArgumentError("test".to_owned()))),
+                }
+                // if err return
+            }
+
+            let result = self.insert_chunk(n, part1);
             data = part2;
         }
 
@@ -490,39 +546,33 @@ impl io::Read for File {
 
         if self.offset == self.doc.len {
             return Ok(0);//Err(io::Error::new(
-                //io::ErrorKind::Other, ArgumentError("EOF".to_owned())));
+            //io::ErrorKind::Other, ArgumentError("EOF".to_owned())));
         }
 
         let mut err: Option<Error> = None;
         let mut n = 0;
 
-        let mut written = 0;
-        while err.is_none() {
-            let i = try!((&mut *buf).write(&mut self.rbuf));
-            n += i;
-            self.offset += i as i64;
-
-            let mut new_rbuf = Vec::with_capacity(self.rbuf.len() - i);
-            {
-                let (p1, p2) = self.rbuf.split_at(i);
-                let b: Vec<u8> = p2.iter().map(|&i| i).collect();
-                new_rbuf.extend(b);
-            }
-            self.rbuf = new_rbuf;
-
-            written += i;
-            if written >= buf.len() || self.offset == self.doc.len {
-                break;
-            }
-
-            self.rbuf = match self.get_chunk() {
-                Ok(buf) => buf,
+        while err.is_none() && self.rbuf.len() < buf.len() {
+            match self.get_chunk() {
+                Ok(buf) => self.rbuf.extend(buf),
                 Err(err) => return Err(io::Error::new(
                     io::ErrorKind::Other, OperationError("Unable to retrieve chunk.".to_owned()))),
             };
         }
 
-        Ok(n)
+        let i = try!((&mut *buf).write(&mut self.rbuf));
+        self.offset += i as i64;
+
+        let mut new_rbuf = Vec::with_capacity(self.rbuf.len() - i);
+        {
+            let (p1, p2) = self.rbuf.split_at(i);
+            let b: Vec<u8> = p2.iter().map(|&i| i).collect();
+            new_rbuf.extend(b);
+        }
+        self.rbuf = new_rbuf;
+
+
+        Ok(i)
     }
 }
 
@@ -582,7 +632,7 @@ impl GfsFile {
             file.upload_date = Some(datetime.to_owned());
         }
 
-        if let Some(&Bson::I64(ref length)) = doc.get("length") {            
+        if let Some(&Bson::I64(ref length)) = doc.get("length") {
             file.len = *length;
         }
 
