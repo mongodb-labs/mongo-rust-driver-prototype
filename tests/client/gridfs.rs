@@ -7,7 +7,7 @@ use mongodb::gridfs::{Store, ThreadedStore};
 use mongodb::gridfs::file::DEFAULT_CHUNK_SIZE;
 
 use rand::{thread_rng, Rng};
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 
 #[test]
 fn put_get() {
@@ -51,12 +51,7 @@ fn put_get() {
     };
 
     match cursor.next() {
-        Some(Ok(doc)) => {
-            match doc.get("length") {
-                Some(&Bson::I64(len)) => assert_eq!(len as usize, src_len),
-                _ => panic!("Expected i64 'length'"),
-            }
-        },
+        Some(file) => assert_eq!(file.len() as usize, src_len),
         _ => panic!("Expected to retrieve file from cursor."),
     }
 
@@ -97,9 +92,13 @@ fn put_get() {
         Err(err) => panic!(err),
     };
 
-    //assert_eq!(src_len, n);
+    assert_eq!(src_len, n);
 
-    read_file.close();
+    match read_file.close() {
+        Ok(_) => (),
+        Err(err) => panic!(err),
+    }
+
     for i in 0..src_len {
         assert_eq!(src[i], dest[i]);
     }

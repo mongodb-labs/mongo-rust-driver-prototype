@@ -28,6 +28,7 @@ pub enum Mode {
     Writing,
 }
 
+/// A writable or readable file stream within GridFS.
 pub struct File {
     mutex: Arc<Mutex<()>>,
     condvar: Arc<Condvar>,
@@ -39,11 +40,12 @@ pub struct File {
     wsum: Md5,
     rbuf: Vec<u8>,
     rcache: Option<Arc<Mutex<CachedChunk>>>,
-    pub mode: Mode,
+    mode: Mode,
     pub doc: GfsFile,
     pub err: Arc<Option<Error>>,
 }
 
+/// A one-to-one representation of a file document within GridFS.
 pub struct GfsFile {
     len: i64,
     md5: String,
@@ -56,6 +58,7 @@ pub struct GfsFile {
     pub metadata: Option<Vec<u8>>,
 }
 
+// A pre-loaded chunk.
 struct CachedChunk {
     n: i32,
     data: Vec<u8>,
@@ -77,18 +80,22 @@ impl DerefMut for File {
 }
 
 impl File {
+    /// A new file stream with an id-referenced GridFS file.
     pub fn new(gfs: Store, id: oid::ObjectId, mode: Mode) -> File {
         File::with_gfs_file(gfs, GfsFile::new(id), mode)
     }
 
+    /// A new file stream with a name-and-id-referenced GridFS file.
     pub fn with_name(gfs: Store, name: String, id: oid::ObjectId, mode: Mode) -> File {
         File::with_gfs_file(gfs, GfsFile::with_name(name, id), mode)
     }
 
+    /// A new file stream from a read file document.
     pub fn with_doc(gfs: Store, doc: bson::Document) -> File {
         File::with_gfs_file(gfs, GfsFile::with_doc(doc), Mode::Reading)
     }
 
+    // Generic new file stream.
     fn with_gfs_file(gfs: Store, file: GfsFile, mode: Mode) -> File {
         File {
             mutex: Arc::new(Mutex::new(())),
@@ -107,6 +114,11 @@ impl File {
         }
     }
 
+    pub fn len(&self) -> i64 {
+        self.len
+    }
+    
+    /// Ensures the file mode matches the desired mode.
     pub fn assert_mode(&self, mode: Mode) -> Result<()> {
         if self.mode != mode {
             return match self.mode {
@@ -122,13 +134,16 @@ impl File {
     /// file is dropped, but errors will be ignored. Therefore, this method should
     /// be called manually.
     pub fn close(&mut self) -> Result<()> {
+
+        // Flush chunks
         if self.mode == Mode::Writing {
             try!(self.flush());
         }
 
         let _ = try!(self.mutex.lock());
+
+        // Complete file write
         if self.mode  == Mode::Writing {
-            // Complete write
             if self.err.is_none() {
                 if self.doc.upload_date.is_none() {
                     self.doc.upload_date = Some(UTC::now());
@@ -141,6 +156,7 @@ impl File {
             }
         }
 
+        // Complete pending chunk pre-load and wipe cache
         if self.mode == Mode::Reading && self.rcache.is_some() {
             {
                 let cache = self.rcache.as_ref().unwrap();
@@ -158,7 +174,10 @@ impl File {
         }
     }
 
+    /// Inserts a file chunk into GridFS.
     fn insert_chunk(&self, n: i32, buf: &[u8]) -> Result<()> {
+
+        // Start a pending write and copy the buffer and metadata into a bson document
         self.wpending.fetch_add(1, Ordering::SeqCst);
         let mut vec_buf = Vec::with_capacity(buf.len());
         vec_buf.extend(buf.iter().cloned());
@@ -170,6 +189,7 @@ impl File {
             "data" => (BinarySubtype::Generic, vec_buf)
         };
 
+        // Insert chunk asynchronously into the database.
         let arc_gfs = self.gfs.clone();
         let arc_mutex = self.mutex.clone();
         let arc_wpending = self.wpending.clone();
@@ -178,10 +198,13 @@ impl File {
 
         thread::spawn(move || {
             let result = arc_gfs.chunks.insert_one(document, None);
+
+            // Complete pending write
             let _ = arc_mutex.lock();
             arc_wpending.fetch_sub(1, Ordering::SeqCst);
             if result.is_err() {
                 err = Arc::new(Some(result.err().unwrap()));
+                // This is not going to do anything...
             }
             cvar.notify_all();
         });
@@ -189,25 +212,27 @@ impl File {
         Ok(())
     }
 
+    // Retrieves a binary file chunk from GridFS.
     fn find_chunk(&mut self, id: oid::ObjectId, chunk: i32) -> Result<Vec<u8>> {
-        match try!(self.gfs.chunks.find_one(
-            Some(doc!{"files_id" => id, "n" => chunk }),
-            None)) {
+        let filter = doc!{"files_id" => id, "n" => chunk };
+        match try!(self.gfs.chunks.find_one(Some(filter), None)) {
             Some(doc) => match doc.get("data") {
                 Some(&Bson::Binary(_, ref buf)) => Ok(buf.clone()),
-                _ => return Err(OperationError("Chunk contained no data".to_owned())),
+                _ => Err(OperationError("Chunk contained no data".to_owned())),
             },
-            None => return Err(OperationError("Chunk not found".to_owned())),
+            None => Err(OperationError("Chunk not found".to_owned())),
         }
     }
 
+    // Retrieves a binary file chunk and asynchronously pre-loads the next chunk.
     fn get_chunk(&mut self) -> Result<Vec<u8>> {
         let id = self.doc.id.clone();
         let chunk = self.chunk;
 
+        // Find the file chunk from the cache or from GridFS.
         let data = if let Some(lock) = self.rcache.take() {
             let cache = try!(lock.lock());
-            if cache.n == self.chunk {
+            if cache.n == self.chunk && cache.err.is_none() {
                 cache.data.clone()
             } else {
                 try!(self.find_chunk(id, chunk))
@@ -218,6 +243,7 @@ impl File {
 
         self.chunk += 1;
 
+        // Pre-load the next file chunk for GridFS.
         if (self.chunk as i64) * (self.doc.chunk_size as i64) < self.doc.len {
             let cache = Arc::new(Mutex::new(CachedChunk::new(self.chunk)));
 
@@ -266,36 +292,41 @@ impl io::Write for File {
                 io::ErrorKind::Other, PoisonLockError)),
         };
 
-        let mut data = buf;
-
         if self.err.is_some() {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
                 OperationError(self.err.as_ref().unwrap().description().to_owned())));
         }
 
+        let mut data = buf;
         let n = data.len();
         let chunk_size = self.doc.chunk_size as usize;
+
         self.doc.len += data.len() as i64;
 
+        // If the total local buffer is below chunk_size, return.
         if self.wbuf.len() + data.len() < chunk_size {
             self.wbuf.extend(data.iter().cloned());
             return Ok(n);
         }
 
+        // Otherwise, form a chunk with the current buffer + data and flush to GridFS.
         if self.wbuf.len() > 0 {
+
+            // Split data
             let missing = cmp::min(chunk_size - self.wbuf.len(), data.len());
             let (part1, part2) = data.split_at(missing);
 
+            // Extend local buffer into a chunk
             self.wbuf.extend(part1.iter().cloned());
             data = part2;
-            let mut chunk = self.wbuf.clone();
 
             let n = self.chunk;
             self.chunk += 1;
             self.wsum.input(buf);
+
+            // If over a megabyte is being written at once, wait for the load to reduce.
             while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >= MEGABYTE as i32 {
-                // Pending MB
                 guard = match self.condvar.wait(guard) {
                     Ok(guard) => guard,
                     Err(_) => return Err(io::Error::new(
@@ -309,10 +340,13 @@ impl io::Write for File {
                 }
             }
 
+            // Flush chunk to GridFS
+            let mut chunk = self.wbuf.clone();
             try!(self.insert_chunk(n, &mut chunk));
             self.wbuf.clear();
         }
 
+        // Continuously write full chunks of data to GridFS.
         while data.len() > chunk_size as usize {
             let size = cmp::min(chunk_size, data.len());
             let (part1, part2) = data.split_at(size);
@@ -320,8 +354,9 @@ impl io::Write for File {
             let n = self.chunk;
             self.chunk += 1;
             self.wsum.input(buf);
+
+            // Pending megabyte
             while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >= MEGABYTE as i32 {
-                // Pending MB
                 guard = match self.condvar.wait(guard) {
                     Ok(guard) => guard,
                     Err(_) => return Err(io::Error::new(
@@ -341,6 +376,7 @@ impl io::Write for File {
             data = part2;
         }
 
+        // Store unfinished chunk to local buffer and return.
         self.wbuf.extend(data.iter().cloned());
         return Ok(n)
     }
@@ -354,14 +390,14 @@ impl io::Write for File {
                 io::ErrorKind::Other, PoisonLockError)),
         };
 
+        // Flush local buffer to GridFS
         if self.wbuf.len() > 0  && self.err.is_none() {
-            let chunk = self.wbuf.clone();
             let n = self.chunk;
             self.chunk += 1;
             self.wsum.input(&self.wbuf);
 
+            // Pending megabyte
             while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >= MEGABYTE as i32 {
-                // Pending MB
                 guard = match self.condvar.wait(guard) {
                     Ok(guard) => guard,
                     Err(_) => return Err(io::Error::new(
@@ -369,18 +405,27 @@ impl io::Write for File {
                 }
             }
 
+            // Flush and clear local buffer.
             if self.err.is_none() {
+                let chunk = self.wbuf.clone();
                 try!(self.insert_chunk(n, &chunk));
                 self.wbuf.clear();
             }
         }
 
+        // Block until all pending write ares complete.
         while self.wpending.load(Ordering::SeqCst) > 0 {
             guard = match self.condvar.wait(guard) {
                 Ok(guard) => guard,
                 Err(_) => return Err(io::Error::new(
                     io::ErrorKind::Other, PoisonLockError)),
             }
+        }
+
+        if self.err.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                OperationError(self.err.as_ref().unwrap().description().to_owned())))
         }
 
         Ok(())
@@ -397,18 +442,22 @@ impl io::Read for File {
                 io::ErrorKind::Other, PoisonLockError)),
         };
 
+        // End of File (EOF)
         if self.offset == self.doc.len {
             return Ok(0);
         }
 
+        // Read all required chunks into memory
         while self.rbuf.len() < buf.len() {
             let chunk = try!(self.get_chunk());
             self.rbuf.extend(chunk);
         }
 
+        // Write into buf
         let i = try!((&mut *buf).write(&mut self.rbuf));
         self.offset += i as i64;
 
+        // Save unread chunk portion into local read buffer
         let mut new_rbuf = Vec::with_capacity(self.rbuf.len() - i);
         {
             let (_, p2) = self.rbuf.split_at(i);
@@ -431,6 +480,7 @@ impl Drop for File {
 }
 
 impl GfsFile {
+    /// Create a new GfsFile by object id.
     pub fn new(id: oid::ObjectId) -> GfsFile {
         GfsFile {
             id: id,
@@ -445,6 +495,7 @@ impl GfsFile {
         }
     }
 
+    /// Create a new GfsFile by filename and object id.
     pub fn with_name(name: String, id: oid::ObjectId) -> GfsFile {
         GfsFile {
             id: id,
@@ -459,6 +510,7 @@ impl GfsFile {
         }
     }
 
+    /// Read a GridFS file document into a new GfsFile.
     pub fn with_doc(doc: bson::Document) -> GfsFile {
         let mut file: GfsFile;
 
@@ -499,6 +551,7 @@ impl GfsFile {
         file
     }
 
+    /// Converts a GfsFile into a bson document.
     pub fn to_bson(&self) -> bson::Document {
         let mut doc = doc! {
             "_id" => (self.id.clone()),
@@ -529,6 +582,7 @@ impl GfsFile {
 }
 
 impl CachedChunk {
+    // Create a new cached chunk to be post-populated with the binary data.
     pub fn new(n: i32) -> CachedChunk {
         CachedChunk {
             n: n,
