@@ -39,6 +39,12 @@ pub enum Error {
     DefaultError(String),
 }
 
+impl<'a> From<Error> for io::Error {
+    fn from(err: Error) -> io::Error {
+        io::Error::new(io::ErrorKind::Other, err)
+    }
+}
+
 impl<'a> From<&'a str> for Error {
     fn from(s: &str) -> Error {
         Error::DefaultError(s.to_owned())

@@ -3,7 +3,8 @@ use bson::Bson;
 use mongodb::{Client, ThreadedClient};
 use mongodb::coll::options::FindOptions;
 use mongodb::db::ThreadedDatabase;
-use mongodb::gridfs::{Store, ThreadedStore, DEFAULT_CHUNK_SIZE};
+use mongodb::gridfs::{Store, ThreadedStore};
+use mongodb::gridfs::file::DEFAULT_CHUNK_SIZE;
 
 use rand::{thread_rng, Rng};
 use std::io::{self, Read, Write};
@@ -31,15 +32,13 @@ fn put_get() {
         Err(err) => panic!(err),
     };
 
-    let id = grid_file.id();
+    let id = grid_file.id.clone();
 
     match grid_file.write(&mut src) {
         Ok(_) => (),
         Err(err) => panic!(err),
     }
 
-    println!("Closing file...");
-    
     match grid_file.close() {
         Ok(_) => (),
         Err(err) => panic!(err),
@@ -102,7 +101,6 @@ fn put_get() {
 
     read_file.close();
     for i in 0..src_len {
-        println!("{}", i);
         assert_eq!(src[i], dest[i]);
     }
 }
