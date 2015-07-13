@@ -35,38 +35,63 @@ struct InnerError {
 
 /// A writable or readable file stream within GridFS.
 pub struct File {
+    // The file lock.
     mutex: Arc<Mutex<()>>,
+    // A condition variable to coordinate asynchronous operations.
     condvar: Arc<Condvar>,
+    // The associated GridFS.
     gfs: Store,
+    // The current chunk index.
     chunk: i32,
+    // The current file byte offset.
     offset: i64,
+    // The number of writes in progress.
     wpending: Arc<AtomicIsize>,
+    // The write buffer.
     wbuf: Vec<u8>,
+    // The file md5 hash builder.
     wsum: Md5,
+    // The read buffer.
     rbuf: Vec<u8>,
+    // Holds a pre-cached chunk.
     rcache: Option<Arc<Mutex<CachedChunk>>>,
+    // The file read/write mode.
     mode: Mode,
+    // Holds an error, if one occurred during a threaded operation.
     err: Arc<RwLock<InnerError>>,
+    /// The file document associated with this stream.
     pub doc: GfsFile,
 }
 
 /// A one-to-one representation of a file document within GridFS.
 pub struct GfsFile {
+    // The byte length.
     len: i64,
+    // The md5 hash.
     md5: String,
+    // The unique object ID.
     pub id: oid::ObjectId,
+    // The chunk size.
     pub chunk_size: i32,
+    // An array of alias strings.
     pub aliases: Vec<String>,
+    // The filename of the document.
     pub name: Option<String>,
+    // The date the document was first stored in GridFS.
     pub upload_date: Option<DateTime<UTC>>,
+    // The content type of the file.
     pub content_type: Option<String>,
+    // Any additional metadata provided by the user.
     pub metadata: Option<Vec<u8>>,
 }
 
 // A pre-loaded chunk.
 struct CachedChunk {
+    // The file chunk index.
     n: i32,
+    // The binary chunk data.
     data: Vec<u8>,
+    // The error that occurred during reading, if any occurred.
     err: Option<Error>,
 }
 
@@ -496,8 +521,8 @@ impl io::Read for File {
 
 impl Drop for File {
     fn drop(&mut self) {
-        // This ignores errors during closing; should close explicitly and
-        // handle errors manually.
+        // This ignores errors during closing; instead, the close function should be
+        // used explicitly to handle errors.
         let _ = self.close();
     }
 }
