@@ -14,7 +14,7 @@ use std::{cmp, io, thread};
 use std::error::Error as ErrorTrait;
 use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::sync::atomic::{AtomicIsize, ATOMIC_ISIZE_INIT, Ordering};
 
 pub const DEFAULT_CHUNK_SIZE: i32 = 255 * 1024;
@@ -26,6 +26,11 @@ pub enum Mode {
     Closed,
     Reading,
     Writing,
+}
+
+// Helper class to implement a threaded mutable error.
+struct InnerError {
+    inner: Option<Error>,
 }
 
 /// A writable or readable file stream within GridFS.
@@ -41,8 +46,8 @@ pub struct File {
     rbuf: Vec<u8>,
     rcache: Option<Arc<Mutex<CachedChunk>>>,
     mode: Mode,
+    err: Arc<RwLock<InnerError>>,
     pub doc: GfsFile,
-    pub err: Arc<Option<Error>>,
 }
 
 /// A one-to-one representation of a file document within GridFS.
@@ -110,14 +115,26 @@ impl File {
             rbuf: Vec::new(),
             rcache: None,
             doc: file,
-            err: Arc::new(None),
+            err: Arc::new(RwLock::new(InnerError { inner: None })),
         }
     }
 
+    /// Returns the byte length of the file.
     pub fn len(&self) -> i64 {
         self.len
     }
-    
+
+    /// Retrieves the description of the threaded error, if one occurred.
+    pub fn err_description(&self) -> Result<Option<String>> {
+        let err = try!(self.err.read());
+        let ref inner = err.deref().inner;
+        let description = match inner {
+            &Some(ref err) => Some(err.description().to_owned()),
+            &None => None
+        };
+        Ok(description)
+    }
+
     /// Ensures the file mode matches the desired mode.
     pub fn assert_mode(&self, mode: Mode) -> Result<()> {
         if self.mode != mode {
@@ -144,7 +161,7 @@ impl File {
 
         // Complete file write
         if self.mode  == Mode::Writing {
-            if self.err.is_none() {
+            if try!(self.err_description()).is_none() {
                 if self.doc.upload_date.is_none() {
                     self.doc.upload_date = Some(UTC::now());
                 }
@@ -167,8 +184,9 @@ impl File {
 
         self.mode = Mode::Closed;
 
-        if self.err.is_some() {
-            Err(OperationError(self.err.as_ref().unwrap().description().to_owned()))
+        let description = try!(self.err_description());
+        if description.is_some() {
+            Err(OperationError(description.unwrap()))
         } else {
             Ok(())
         }
@@ -194,7 +212,7 @@ impl File {
         let arc_mutex = self.mutex.clone();
         let arc_wpending = self.wpending.clone();
         let cvar = self.condvar.clone();
-        let mut err = self.err.clone();
+        let err = self.err.clone();
 
         thread::spawn(move || {
             let result = arc_gfs.chunks.insert_one(document, None);
@@ -203,8 +221,9 @@ impl File {
             let _ = arc_mutex.lock();
             arc_wpending.fetch_sub(1, Ordering::SeqCst);
             if result.is_err() {
-                err = Arc::new(Some(result.err().unwrap()));
-                // This is not going to do anything...
+                if let Ok(mut err_mut) = err.write() {
+                    err_mut.inner = Some(result.err().unwrap());
+                }
             }
             cvar.notify_all();
         });
@@ -292,10 +311,11 @@ impl io::Write for File {
                 io::ErrorKind::Other, PoisonLockError)),
         };
 
-        if self.err.is_some() {
+        let description = try!(self.err_description());
+        if description.is_some() {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                OperationError(self.err.as_ref().unwrap().description().to_owned())));
+                OperationError(description.unwrap())));
         }
 
         let mut data = buf;
@@ -333,10 +353,11 @@ impl io::Write for File {
                         io::ErrorKind::Other, ArgumentError("test".to_owned())))
                 };
 
-                if self.err.is_some() {
+                let description = try!(self.err_description());
+                if description.is_some() {
                     return Err(io::Error::new(
                         io::ErrorKind::Other,
-                        OperationError(self.err.as_ref().unwrap().description().to_owned())))
+                        OperationError(description.unwrap())));
                 }
             }
 
@@ -365,10 +386,11 @@ impl io::Write for File {
                             ))
                 };
 
-                if self.err.is_some() {
+                let description = try!(self.err_description());
+                if description.is_some() {
                     return Err(io::Error::new(
                         io::ErrorKind::Other,
-                        OperationError(self.err.as_ref().unwrap().description().to_owned())))
+                        OperationError(description.unwrap())));
                 }
             }
 
@@ -391,7 +413,7 @@ impl io::Write for File {
         };
 
         // Flush local buffer to GridFS
-        if self.wbuf.len() > 0  && self.err.is_none() {
+        if self.wbuf.len() > 0  && try!(self.err_description()).is_none() {
             let n = self.chunk;
             self.chunk += 1;
             self.wsum.input(&self.wbuf);
@@ -406,7 +428,7 @@ impl io::Write for File {
             }
 
             // Flush and clear local buffer.
-            if self.err.is_none() {
+            if try!(self.err_description()).is_none() {
                 let chunk = self.wbuf.clone();
                 try!(self.insert_chunk(n, &chunk));
                 self.wbuf.clear();
@@ -422,10 +444,11 @@ impl io::Write for File {
             }
         }
 
-        if self.err.is_some() {
+        let description = try!(self.err_description());
+        if description.is_some() {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                OperationError(self.err.as_ref().unwrap().description().to_owned())))
+                OperationError(description.unwrap())));
         }
 
         Ok(())
