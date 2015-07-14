@@ -192,6 +192,7 @@ impl File {
                 }
                 self.doc.md5 = self.wsum.result_str();
                 try!(self.gfs.files.insert_one(self.doc.to_bson(), None));
+                try!(self.gfs.chunks.create_index(doc!{ "files_id" => 1, "n" => 1}, None));
             } else {
                 try!(self.gfs.chunks.delete_many(doc!{ "files_id" => (self.doc.id.clone()) }, None));
             }

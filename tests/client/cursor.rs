@@ -10,7 +10,7 @@ fn cursor_features() {
     let db = client.db("test");
     let coll = db.collection("cursor_test");
 
-    db.drop_database().ok().expect("Failed to drop database.");
+    coll.drop().ok().expect("Failed to drop database.");
 
     let docs = (0..10).map(|i| {
         doc! { "foo" => (i as i64) }
