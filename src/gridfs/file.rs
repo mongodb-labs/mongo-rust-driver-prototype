@@ -42,7 +42,7 @@ pub struct File {
     // The associated GridFS.
     gfs: Store,
     // The current chunk index.
-    chunk: i32,
+    chunk_num: i32,
     // The current file byte offset.
     offset: i64,
     // The number of writes in progress.
@@ -132,7 +132,7 @@ impl File {
             condvar: Arc::new(Condvar::new()),
             mode: mode,
             gfs: gfs,
-            chunk: 0,
+            chunk_num: 0,
             offset: 0,
             wpending: Arc::new(ATOMIC_ISIZE_INIT),
             wbuf: Vec::new(),
@@ -192,7 +192,6 @@ impl File {
                 }
                 self.doc.md5 = self.wsum.result_str();
                 try!(self.gfs.files.insert_one(self.doc.to_bson(), None));
-                //self.gfs.chunks.ensure_index_key("files_id", "n");
             } else {
                 try!(self.gfs.chunks.delete_many(doc!{ "files_id" => (self.doc.id.clone()) }, None));
             }
@@ -257,8 +256,8 @@ impl File {
     }
 
     // Retrieves a binary file chunk from GridFS.
-    fn find_chunk(&mut self, id: oid::ObjectId, chunk: i32) -> Result<Vec<u8>> {
-        let filter = doc!{"files_id" => id, "n" => chunk };
+    fn find_chunk(&mut self, id: oid::ObjectId, chunk_num: i32) -> Result<Vec<u8>> {
+        let filter = doc!{"files_id" => id, "n" => chunk_num };
         match try!(self.gfs.chunks.find_one(Some(filter), None)) {
             Some(doc) => match doc.get("data") {
                 Some(&Bson::Binary(_, ref buf)) => Ok(buf.clone()),
@@ -271,30 +270,30 @@ impl File {
     // Retrieves a binary file chunk and asynchronously pre-loads the next chunk.
     fn get_chunk(&mut self) -> Result<Vec<u8>> {
         let id = self.doc.id.clone();
-        let chunk = self.chunk;
+        let chunk_num = self.chunk_num;
 
         // Find the file chunk from the cache or from GridFS.
         let data = if let Some(lock) = self.rcache.take() {
             let cache = try!(lock.lock());
-            if cache.n == self.chunk && cache.err.is_none() {
+            if cache.n == chunk_num && cache.err.is_none() {
                 cache.data.clone()
             } else {
-                try!(self.find_chunk(id, chunk))
+                try!(self.find_chunk(id, chunk_num))
             }
         } else {
-            try!(self.find_chunk(id, chunk))
+            try!(self.find_chunk(id, chunk_num))
         };
 
-        self.chunk += 1;
+        self.chunk_num += 1;
 
         // Pre-load the next file chunk for GridFS.
-        if (self.chunk as i64) * (self.doc.chunk_size as i64) < self.doc.len {
-            let cache = Arc::new(Mutex::new(CachedChunk::new(self.chunk)));
+        if (self.chunk_num as i64) * (self.doc.chunk_size as i64) < self.doc.len {
+            let cache = Arc::new(Mutex::new(CachedChunk::new(self.chunk_num)));
 
             let arc_cache = cache.clone();
             let arc_gfs = self.gfs.clone();
             let id = self.doc.id.clone();
-            let chunk = self.chunk;
+            let chunk_num = self.chunk_num;
 
             thread::spawn(move || {
                 let mut cache = match arc_cache.lock() {
@@ -306,7 +305,7 @@ impl File {
                 };
 
                 let result = arc_gfs.chunks.find_one(
-                    Some(doc!{"files_id" => (id), "n" => (chunk)}),
+                    Some(doc!{"files_id" => (id), "n" => (chunk_num)}),
                     None);
 
                 match result {
@@ -366,8 +365,8 @@ impl io::Write for File {
             self.wbuf.extend(part1.iter().cloned());
             data = part2;
 
-            let n = self.chunk;
-            self.chunk += 1;
+            let chunk_num = self.chunk_num;
+            self.chunk_num += 1;
             self.wsum.input(buf);
 
             // If over a megabyte is being written at once, wait for the load to reduce.
@@ -388,7 +387,7 @@ impl io::Write for File {
 
             // Flush chunk to GridFS
             let mut chunk = self.wbuf.clone();
-            try!(self.insert_chunk(n, &mut chunk));
+            try!(self.insert_chunk(chunk_num, &mut chunk));
             self.wbuf.clear();
         }
 
@@ -397,8 +396,8 @@ impl io::Write for File {
             let size = cmp::min(chunk_size, data.len());
             let (part1, part2) = data.split_at(size);
 
-            let n = self.chunk;
-            self.chunk += 1;
+            let chunk_num = self.chunk_num;
+            self.chunk_num += 1;
             self.wsum.input(buf);
 
             // Pending megabyte
@@ -419,7 +418,7 @@ impl io::Write for File {
                 }
             }
 
-            try!(self.insert_chunk(n, part1));
+            try!(self.insert_chunk(chunk_num, part1));
             data = part2;
         }
 
@@ -439,8 +438,8 @@ impl io::Write for File {
 
         // Flush local buffer to GridFS
         if self.wbuf.len() > 0  && try!(self.err_description()).is_none() {
-            let n = self.chunk;
-            self.chunk += 1;
+            let chunk_num = self.chunk_num;
+            self.chunk_num += 1;
             self.wsum.input(&self.wbuf);
 
             // Pending megabyte
@@ -455,7 +454,7 @@ impl io::Write for File {
             // Flush and clear local buffer.
             if try!(self.err_description()).is_none() {
                 let chunk = self.wbuf.clone();
-                try!(self.insert_chunk(n, &chunk));
+                try!(self.insert_chunk(chunk_num, &chunk));
                 self.wbuf.clear();
             }
         }
