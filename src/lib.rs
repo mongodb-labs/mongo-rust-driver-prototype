@@ -18,7 +18,7 @@ pub mod gridfs;
 pub mod pool;
 pub mod wire_protocol;
 
-pub use error::{Error, Result};
+pub use error::{Error, ErrorCode, Result};
 
 use bson::Bson;
 
