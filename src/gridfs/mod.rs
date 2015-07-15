@@ -99,7 +99,7 @@ impl ThreadedStore for Store {
     }
 
     fn create(&self, name: String) -> Result<File> {
-        Ok(File::with_name(self.clone(), name, try!(oid::ObjectId::new()), Mode::Writing))
+        Ok(File::with_name(self.clone(), name, try!(oid::ObjectId::new()), Mode::Write))
     }
 
     fn open(&self, name: String) -> Result<File> {

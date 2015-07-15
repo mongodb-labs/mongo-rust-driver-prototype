@@ -24,8 +24,8 @@ pub const MEGABYTE: usize = 1024 * 1024;
 #[derive(Debug, PartialEq, Eq)]
 pub enum Mode {
     Closed,
-    Reading,
-    Writing,
+    Read,
+    Write,
 }
 
 // Helper class to implement a threaded mutable error.
@@ -69,7 +69,7 @@ pub struct GfsFile {
     len: i64,
     // The md5 hash.
     md5: String,
-    // The unique object ID.
+    // The unique object id.
     pub id: oid::ObjectId,
     // The chunk size.
     pub chunk_size: i32,
@@ -122,7 +122,7 @@ impl File {
 
     /// A new file stream from a read file document.
     pub fn with_doc(gfs: Store, doc: bson::Document) -> File {
-        File::with_gfs_file(gfs, GfsFile::with_doc(doc), Mode::Reading)
+        File::with_gfs_file(gfs, GfsFile::with_doc(doc), Mode::Read)
     }
 
     // Generic new file stream.
@@ -164,8 +164,8 @@ impl File {
     pub fn assert_mode(&self, mode: Mode) -> Result<()> {
         if self.mode != mode {
             return match self.mode {
-                Mode::Reading => Err(ArgumentError("File is open for reading.".to_owned())),
-                Mode::Writing => Err(ArgumentError("File is open for writing.".to_owned())),
+                Mode::Read => Err(ArgumentError("File is open for reading.".to_owned())),
+                Mode::Write => Err(ArgumentError("File is open for writing.".to_owned())),
                 Mode::Closed => Err(ArgumentError("File is closed.".to_owned())),
             }
         }
@@ -178,14 +178,14 @@ impl File {
     pub fn close(&mut self) -> Result<()> {
 
         // Flush chunks
-        if self.mode == Mode::Writing {
+        if self.mode == Mode::Write {
             try!(self.flush());
         }
 
         let _ = try!(self.mutex.lock());
 
         // Complete file write
-        if self.mode  == Mode::Writing {
+        if self.mode  == Mode::Write {
             if try!(self.err_description()).is_none() {
                 if self.doc.upload_date.is_none() {
                     self.doc.upload_date = Some(UTC::now());
@@ -198,7 +198,7 @@ impl File {
         }
 
         // Complete pending chunk pre-load and wipe cache
-        if self.mode == Mode::Reading && self.rcache.is_some() {
+        if self.mode == Mode::Read && self.rcache.is_some() {
             {
                 let cache = self.rcache.as_ref().unwrap();
                 let _ = try!(cache.lock());
@@ -327,7 +327,7 @@ impl File {
 
 impl io::Write for File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        try!(self.assert_mode(Mode::Writing));
+        try!(self.assert_mode(Mode::Write));
 
         let mut guard = match self.mutex.lock() {
             Ok(guard) => guard,
@@ -374,7 +374,7 @@ impl io::Write for File {
                 guard = match self.condvar.wait(guard) {
                     Ok(guard) => guard,
                     Err(_) => return Err(io::Error::new(
-                        io::ErrorKind::Other, ArgumentError("test".to_owned())))
+                        io::ErrorKind::Other, PoisonLockError)),
                 };
 
                 let description = try!(self.err_description());
@@ -405,9 +405,7 @@ impl io::Write for File {
                 guard = match self.condvar.wait(guard) {
                     Ok(guard) => guard,
                     Err(_) => return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        PoisonLockError
-                            ))
+                        io::ErrorKind::Other, PoisonLockError))
                 };
 
                 let description = try!(self.err_description());
@@ -428,7 +426,7 @@ impl io::Write for File {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        try!(self.assert_mode(Mode::Writing));
+        try!(self.assert_mode(Mode::Write));
 
         let mut guard = match self.mutex.lock() {
             Ok(guard) => guard,
@@ -481,7 +479,7 @@ impl io::Write for File {
 
 impl io::Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        try!(self.assert_mode(Mode::Reading));
+        try!(self.assert_mode(Mode::Read));
 
         let _ = match self.mutex.lock() {
             Ok(guard) => guard,
@@ -527,7 +525,7 @@ impl Drop for File {
 }
 
 impl GfsFile {
-    /// Create a new GfsFile by object id.
+    /// Create a new GfsFile by ObjectId.
     pub fn new(id: oid::ObjectId) -> GfsFile {
         GfsFile {
             id: id,
@@ -542,7 +540,7 @@ impl GfsFile {
         }
     }
 
-    /// Create a new GfsFile by filename and object id.
+    /// Create a new GfsFile by filename and ObjectId.
     pub fn with_name(name: String, id: oid::ObjectId) -> GfsFile {
         GfsFile {
             id: id,
