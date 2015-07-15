@@ -7,6 +7,7 @@ authors = ["Valeri Karpov <valkar207@gmail.com>",
 
 [dependencies]
 byteorder = "0.3"
+chrono = "0.2"
 libc = "0.1"
 nalgebra = "0.2"
 rand = "0.3"
