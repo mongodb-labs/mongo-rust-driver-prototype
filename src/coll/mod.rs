@@ -325,9 +325,9 @@ impl Collection {
                             start_index: i64, ordered: bool,
                             result: &mut BulkWriteResult,
                             exception: &mut BulkWriteException) -> bool {
-        let models = documents.iter().map(|doc|
+        let models = documents.iter().map(|doc| {
             WriteModel::InsertOne { document: doc.clone() }
-        ).collect();
+        }).collect();
 
         match self.insert_many(documents, ordered, None) {
             Ok(insert_result) =>
@@ -343,13 +343,13 @@ impl Collection {
     fn execute_delete_batch(&self, models: Vec<DeleteModel>, ordered: bool,
                             result: &mut BulkWriteResult,
                             exception: &mut BulkWriteException) -> bool {
-        let original_models = models.iter().map(|model|
+        let original_models = models.iter().map(|model| {
             if model.multi {
                 WriteModel::DeleteMany { filter: model.filter.clone() }
             } else {
                 WriteModel::DeleteOne { filter: model.filter.clone() }
             }
-        ).collect();
+        }).collect();
 
         match self.bulk_delete(models, ordered, None) {
             Ok(bulk_delete_result) =>
@@ -365,13 +365,13 @@ impl Collection {
     fn execute_update_batch(&self, models: Vec<UpdateModel>, start_index: i64,
                             ordered: bool, result: &mut BulkWriteResult,
                             exception: &mut BulkWriteException) -> bool{
-        let original_models = models.iter().map(|model|
+        let original_models = models.iter().map(|model| {
             if model.multi {
                 WriteModel::DeleteMany { filter: model.filter.clone() }
             } else {
                 WriteModel::DeleteOne { filter: model.filter.clone() }
             }
-        ).collect();
+        }).collect();
 
         match self.bulk_update(models, ordered, None) {
             Ok(bulk_update_result) =>
@@ -671,5 +671,82 @@ impl Collection {
             }
         }
         Ok(())
+    }
+
+    /// Create a single index.
+    pub fn create_index(&self, keys: bson::Document, options: Option<IndexOptions>) -> Result<String> {
+        let model = IndexModel::new(keys, options);
+        self.create_index_model(model)
+    }
+
+    /// Create a single index with an IndexModel.
+    pub fn create_index_model(&self, model: IndexModel) -> Result<String> {
+        let result = try!(self.create_indexes(vec!(model)));
+        Ok(result[0].to_owned())
+    }
+
+    /// Create multiple indexes.
+    pub fn create_indexes(&self, models: Vec<IndexModel>) -> Result<Vec<String>> {
+        let mut names = Vec::with_capacity(models.len());
+        let mut indexes = Vec::with_capacity(models.len());
+
+        for model in models.iter() {
+            names.push(try!(model.name()));
+            indexes.push(Bson::Document(try!(model.to_bson())));
+        }
+
+        let mut cmd = bson::Document::new();
+        cmd.insert("createIndexes".to_owned(), Bson::String(self.name()));
+        cmd.insert("indexes".to_owned(), Bson::Array(indexes));
+        let result = try!(self.db.command(cmd));
+
+        match result.get("errmsg") {
+            Some(&Bson::String(ref msg)) => return Err(OperationError(msg.to_owned())),
+            _ => Ok(names),
+        }
+    }
+
+    /// Drop an index.
+    pub fn drop_index(&self, keys: bson::Document, options: Option<IndexOptions>) -> Result<()> {
+        let model = IndexModel::new(keys, options);
+        self.drop_index_model(model)
+    }
+
+    /// Drop an index by name.
+    pub fn drop_index_string(&self, name: String) -> Result<()> {
+        let mut opts = IndexOptions::new();
+        opts.name = Some(name.to_owned());
+
+        let model = IndexModel::new(bson::Document::new(), Some(opts));
+        self.drop_index_model(model)
+    }
+
+    /// Drop an index by IndexModel.
+    pub fn drop_index_model(&self, model: IndexModel) -> Result<()> {
+        let mut cmd = bson::Document::new();
+        cmd.insert("dropIndexes".to_owned(), Bson::String(self.name()));
+        cmd.insert("index".to_owned(), Bson::String(try!(model.name())));
+
+        let result = try!(self.db.command(cmd));
+        match result.get("errmsg") {
+            Some(&Bson::String(ref msg)) => return Err(OperationError(msg.to_owned())),
+            _ => Ok(()),
+        }
+    }
+
+    /// Drop all indexes in the collection.
+    pub fn drop_indexes(&self) -> Result<()> {
+        let mut opts = IndexOptions::new();
+        opts.name = Some("*".to_owned());
+
+        let model = IndexModel::new(bson::Document::new(), Some(opts));
+        self.drop_index_model(model)
+    }
+
+    /// List all indexes in the collection.
+    pub fn list_indexes(&self) -> Result<Cursor> {
+        let mut cmd = bson::Document::new();
+        cmd.insert("listIndexes".to_owned(), Bson::String(self.name()));
+        self.db.command_cursor(cmd)
     }
 }

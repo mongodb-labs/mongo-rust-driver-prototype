@@ -2,7 +2,8 @@ use bson::Bson;
 
 use mongodb::{Client, ThreadedClient};
 use mongodb::db::ThreadedDatabase;
-use mongodb::coll::options::{FindOptions, FindOneAndUpdateOptions, ReturnDocument};
+use mongodb::coll::options::{FindOptions, FindOneAndUpdateOptions,
+                             IndexModel, IndexOptions, ReturnDocument};
 
 #[test]
 fn find_sorted() {
@@ -10,7 +11,7 @@ fn find_sorted() {
     let db = client.db("test");
     let coll = db.collection("find_sorted");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert document
     let doc1 = doc! { "title" => "Jaws" };
@@ -53,7 +54,7 @@ fn find_and_insert() {
     let db = client.db("test");
     let coll = db.collection("find_and_insert");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert document
     let doc = doc! { "title" => "Jaws" };
@@ -82,7 +83,7 @@ fn find_and_insert_one() {
     let db = client.db("test");
     let coll = db.collection("find_and_insert");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert document
     let doc = doc! { "title" => "Jaws" };
@@ -105,7 +106,7 @@ fn find_one_and_delete() {
     let db = client.db("test");
     let coll = db.collection("find_one_and_delete");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -145,7 +146,7 @@ fn find_one_and_replace() {
     let db = client.db("test");
     let coll = db.collection("find_one_and_replace");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -201,7 +202,7 @@ fn find_one_and_update() {
     let db = client.db("test");
     let coll = db.collection("find_one_and_update");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -242,7 +243,7 @@ fn aggregate() {
     let db = client.db("test");
     let coll = db.collection("aggregate");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "tags" => ["a", "b", "c"] };
@@ -288,7 +289,7 @@ fn count() {
     let db = client.db("test");
     let coll = db.collection("count");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -320,7 +321,7 @@ fn distinct_none() {
     let db = client.db("test");
     let coll = db.collection("distinct_none");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
     let distinct_titles = coll.distinct("title", None, None).ok().expect("Failed to execute 'distinct'.");
     assert_eq!(0, distinct_titles.len());
 }
@@ -331,7 +332,7 @@ fn distinct_one() {
     let db = client.db("test");
     let coll = db.collection("distinct_none");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
     let doc2 = doc! { "title" => "Back to the Future" };
     coll.insert_one(doc2, None).ok().expect("Failed to insert document.");
 
@@ -345,7 +346,7 @@ fn distinct() {
     let db = client.db("test");
     let coll = db.collection("distinct");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws",
@@ -403,7 +404,7 @@ fn insert_many() {
     let db = client.db("test");
     let coll = db.collection("insert_many");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -433,7 +434,7 @@ fn delete_one() {
     let db = client.db("test");
     let coll = db.collection("delete_one");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -465,7 +466,7 @@ fn delete_many() {
     let db = client.db("test");
     let coll = db.collection("delete_many");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -497,7 +498,7 @@ fn replace_one() {
     let db = client.db("test");
     let coll = db.collection("replace_one");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -534,7 +535,7 @@ fn update_one() {
     let db = client.db("test");
     let coll = db.collection("update_one");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -568,7 +569,7 @@ fn update_many() {
     let db = client.db("test");
     let coll = db.collection("update_many");
 
-    db.drop_database().ok().expect("Failed to drop database");
+    coll.drop().ok().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -600,4 +601,106 @@ fn update_many() {
         Some(&Bson::String(ref director)) => assert_eq!("Robert Zemeckis", director),
         _ => panic!("Expected Bson::String for director!"),
     }
+}
+
+#[test]
+fn create_list_drop_indexes() {
+    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let db = client.db("test");
+    let coll = db.collection("create_list_drop_indexes");
+
+    coll.drop().ok().expect("Failed to drop database.");
+
+    let mut opts1 = IndexOptions::new();
+    opts1.name = Some("nid".to_owned());
+
+    // Test name option
+    let index1 = IndexModel::new(doc!{ "n" => 1, "id" => 1}, Some(opts1));
+
+    // Test negative value and index name generation
+    let index2 = IndexModel::new(doc!{ "test" => (-1), "height" => 1}, None);
+
+    coll.create_indexes(vec![index1, index2]).unwrap();
+    let mut cursor = coll.list_indexes().unwrap();
+    let results = cursor.next_n(5).unwrap();
+    
+    assert_eq!(3, results.len());
+
+    // Assert first inserted index
+    match results[1].get("key") {
+        Some(&Bson::Document(ref keys)) => {
+            match keys.get("n") {
+                Some(&Bson::I32(ref i)) => assert_eq!(1, *i),
+                _ => panic!("Expected key 'n => 1'."),
+            }
+            match keys.get("id") {
+                Some(&Bson::I32(ref i)) => assert_eq!(1, *i),
+                _ => panic!("Expected key 'id => 1'."),
+            }
+        },
+        _ => panic!("keys not found for first index."),
+    }
+
+    match results[1].get("name") {
+        Some(&Bson::String(ref name)) => assert_eq!("nid", name),
+        _ => panic!("Expected first index to have a name."),
+    }
+
+    // Assert second inserted index
+    match results[2].get("key") {
+        Some(&Bson::Document(ref keys)) => {
+            match keys.get("test") {
+                Some(&Bson::I32(ref i)) => assert_eq!(-1, *i),
+                _ => panic!("Expected key 'test => -1'."),
+            }
+            match keys.get("height") {
+                Some(&Bson::I32(ref i)) => assert_eq!(1, *i),
+                _ => panic!("Expected key 'height => 1'."),
+            }
+        },
+        _ => panic!("keys not found for second index."),
+    }
+
+    match results[2].get("name") {
+        Some(&Bson::String(ref name)) => assert_eq!("test_-1_height_1", name),
+        _ => panic!("Expected first index to have a name."),
+    }
+
+    // Drop and ensure
+    coll.drop_index_string("nid".to_owned()).unwrap();
+    let mut cursor = coll.list_indexes().unwrap();
+    let results = cursor.next_n(5).unwrap();
+
+    assert_eq!(2, results.len());
+
+    coll.drop_index(doc!{ "test" => (-1), "height" => 1 }, None).unwrap();
+    let mut cursor = coll.list_indexes().unwrap();
+    let results = cursor.next_n(5).unwrap();
+
+    assert_eq!(1, results.len());
+}
+
+#[test]
+fn drop_all_indexes() {
+    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let db = client.db("test");
+    let coll = db.collection("drop_all_indexes");
+
+    coll.drop().ok().expect("Failed to drop database.");
+
+    let mut opts1 = IndexOptions::new();
+    opts1.name = Some("nid".to_owned());
+
+    // Test name option
+    let index1 = IndexModel::new(doc!{ "n" => 1, "id" => 1}, Some(opts1));
+
+    // Test negative value and index name generation
+    let index2 = IndexModel::new(doc!{ "test" => (-1), "height" => 1}, None);
+
+    coll.create_indexes(vec![index1, index2]).unwrap();
+    coll.drop_indexes().unwrap();
+    let mut cursor = coll.list_indexes().unwrap();
+    let results = cursor.next_n(5).unwrap();
+    
+    assert_eq!(1, results.len());
 }

@@ -9,6 +9,7 @@ use Error::{self, ArgumentError, OperationError, PoisonLockError};
 use Result;
 
 use super::Store;
+use coll::options::IndexOptions;
 
 use std::{cmp, io, thread};
 use std::error::Error as ErrorTrait;
@@ -192,6 +193,13 @@ impl File {
                 }
                 self.doc.md5 = self.wsum.result_str();
                 try!(self.gfs.files.insert_one(self.doc.to_bson(), None));
+
+                // Ensure indexes
+                try!(self.gfs.files.create_index(doc!{ "filename" => 1 }, None));
+
+                let mut opts = IndexOptions::new();
+                opts.unique = Some(true);
+                try!(self.gfs.chunks.create_index(doc!{ "files_id" => 1, "n" => 1}, Some(opts)));
             } else {
                 try!(self.gfs.chunks.delete_many(doc!{ "files_id" => (self.doc.id.clone()) }, None));
             }

@@ -2,7 +2,7 @@ use bson::Bson;
 
 use mongodb::{Client, ThreadedClient};
 use mongodb::coll::Collection;
-use mongodb::coll::options::FindOptions;
+use mongodb::coll::options::{FindOptions, IndexOptions};
 use mongodb::db::ThreadedDatabase;
 use mongodb::gridfs::{Store, ThreadedStore};
 use mongodb::gridfs::file::DEFAULT_CHUNK_SIZE;
@@ -53,6 +53,7 @@ fn put_get() {
     let mut opts = FindOptions::new();
     opts.sort = Some(doc!{ "n" => 1});
 
+    // Check chunks
     let mut cursor = fschunks.find(Some(doc!{"files_id" => (id.clone())}), Some(opts)).unwrap();
 
     let chunks = cursor.next_batch().ok().expect("Failed to get next batch");
@@ -70,6 +71,18 @@ fn put_get() {
         }
     }
 
+    // Ensure index
+    let mut cursor = fschunks.list_indexes().unwrap();
+    let results = cursor.next_n(10).unwrap();
+    assert_eq!(2, results.len());
+
+    let mut opts = IndexOptions::new();
+    opts.unique = Some(true);
+    fschunks.create_index(doc!{ "files_id" => 1, "n" => 1}, Some(opts)).unwrap();
+    let mut cursor = fschunks.list_indexes().unwrap();
+    let results = cursor.next_n(10).unwrap();
+    assert_eq!(2, results.len());
+    
     // Get
     let mut dest = Vec::with_capacity(src_len);
     unsafe { dest.set_len(src_len) };
