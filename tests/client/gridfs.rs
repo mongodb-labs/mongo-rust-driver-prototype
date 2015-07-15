@@ -2,7 +2,7 @@ use bson::Bson;
 
 use mongodb::{Client, ThreadedClient};
 use mongodb::coll::Collection;
-use mongodb::coll::options::FindOptions;
+use mongodb::coll::options::{FindOptions, IndexOptions};
 use mongodb::db::ThreadedDatabase;
 use mongodb::gridfs::{Store, ThreadedStore};
 use mongodb::gridfs::file::DEFAULT_CHUNK_SIZE;
@@ -76,7 +76,9 @@ fn put_get() {
     let results = cursor.next_n(10).unwrap();
     assert_eq!(2, results.len());
 
-    fschunks.create_index(doc!{ "files_id" => 1, "n" => 1}, None).unwrap();
+    let mut opts = IndexOptions::new();
+    opts.unique = Some(true);
+    fschunks.create_index(doc!{ "files_id" => 1, "n" => 1}, Some(opts)).unwrap();
     let mut cursor = fschunks.list_indexes().unwrap();
     let results = cursor.next_n(10).unwrap();
     assert_eq!(2, results.len());
