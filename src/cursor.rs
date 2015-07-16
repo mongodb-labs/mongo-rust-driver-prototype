@@ -1,5 +1,5 @@
 use bson::{self, Bson};
-use {Error, Client, ThreadedClient, Result};
+use {Client, Error, ErrorCode, Result, ThreadedClient};
 use wire_protocol::flags::OpQueryFlags;
 use wire_protocol::operations::Message;
 use std::collections::vec_deque::VecDeque;
@@ -56,6 +56,19 @@ impl Cursor {
                                starting_from: _, number_returned: _,
                                documents: docs } => {
                 let mut v = VecDeque::new();
+
+                if !docs.is_empty() {
+                    if let Some(&Bson::I32(ref code)) = docs[0].get("code") {                        
+                        // If command doesn't exist or namespace not found, return
+                        // an empty array instead of throwing an error.
+                        if *code == ErrorCode::CommandNotFound as i32 ||
+                           *code == ErrorCode::NamespaceNotFound as i32 {
+                            return Ok((v, cid));
+                        } else if let Some(&Bson::String(ref msg)) = docs[0].get("errmsg") {
+                            return Err(Error::OperationError(msg.to_owned()));
+                        }
+                    }
+                }
 
                 for doc in docs {
                     v.push_back(doc.clone());
