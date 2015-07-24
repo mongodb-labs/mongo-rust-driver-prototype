@@ -7,7 +7,7 @@ pub const DEFAULT_PORT: u16 = 27017;
 pub const URI_SCHEME: &'static str = "mongodb://";
 
 /// Encapsulates the hostname and port of a host.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Host {
     pub host_name: String,
     pub ipc: String,
@@ -201,7 +201,7 @@ fn parse_ipv6_literal_host(entity: &str) -> Result<Host> {
 
 // Parses a host entity of the form host or host:port, and redirects IPv6 entities.
 // All host names are lowercased.
-fn parse_host(entity: &str) -> Result<Host> {
+pub fn parse_host(entity: &str) -> Result<Host> {
     if entity.starts_with("[") {
         // IPv6 host
         parse_ipv6_literal_host(entity)

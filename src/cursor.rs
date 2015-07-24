@@ -1,7 +1,10 @@
-use bson::{self, Bson};
 use {Client, Error, ErrorCode, Result, ThreadedClient};
+
+use bson::{self, Bson};
+
 use wire_protocol::flags::OpQueryFlags;
 use wire_protocol::operations::Message;
+
 use std::collections::vec_deque::VecDeque;
 use std::io::{Read, Write};
 
@@ -22,7 +25,7 @@ pub const DEFAULT_BATCH_SIZE: i32 = 20;
 /// `buffer` - A cache for documents received from the query that have not
 ///            yet been returned.
 pub struct Cursor {
-    client: Client,
+    client: Option<Client>,
     namespace: String,
     batch_size: i32,
     cursor_id: i64,
@@ -140,17 +143,30 @@ impl Cursor {
                                  query: bson::Document,
                                  return_field_selector: Option<bson::Document>,
                                  is_cmd_cursor: bool) -> Result<Cursor> {
-        let result = Message::new_query(client.get_req_id(), flags,
+        let stream = try!(client.acquire_stream());
+        let mut socket = stream.get_socket();
+        Cursor::query_with_socket(&mut socket, Some(client.clone()), client.get_req_id(),
+                                  namespace, batch_size, flags,
+                                  number_to_skip, number_to_return, query,
+                                  return_field_selector, is_cmd_cursor)
+    }
+
+    pub fn query_with_socket<T: Read + Write>(socket: &mut T, client: Option<Client>,
+                                              req_id: i32, namespace: String,
+                                              batch_size: i32, flags: OpQueryFlags,
+                                              number_to_skip: i32, number_to_return: i32,
+                                              query: bson::Document,
+                                              return_field_selector: Option<bson::Document>,
+                                              is_cmd_cursor: bool) -> Result<Cursor> {
+
+        let result = Message::new_query(req_id, flags,
                                         namespace.to_owned(),
                                         number_to_skip, batch_size,
                                         query, return_field_selector);
 
-        let stream = try!(client.acquire_stream());
-        let mut socket = stream.get_socket();
-
         let message = try!(result);
-        try!(message.write(&mut socket));
-        let reply = try!(Message::read(&mut socket));
+        try!(message.write(socket));
+        let reply = try!(Message::read(socket));
 
         let (buf, cursor_id, namespace) = if is_cmd_cursor {
             try!(Cursor::get_bson_and_cursor_info_from_command_message(reply))
@@ -161,9 +177,9 @@ impl Cursor {
 
         Ok(Cursor { client: client, namespace: namespace,
                     batch_size: batch_size, cursor_id: cursor_id,
-                    limit: number_to_return, count: 0, buffer: buf, })
+                    limit: number_to_return, count: 0, buffer: buf, })        
     }
-
+    
     /// Executes a query with the default batch size.
     ///
     /// # Arguments
@@ -202,13 +218,17 @@ impl Cursor {
     ///
     /// Returns the newly-created method.
     fn new_get_more_request(&mut self) -> Message {
-        Message::new_get_more(self.client.get_req_id(),
+        Message::new_get_more(self.client.as_ref().unwrap().get_req_id(),
                               self.namespace.to_owned(),
                               self.batch_size, self.cursor_id)
     }
 
     fn get_from_stream(&mut self) -> Result<()> {
-        let stream = try!(self.client.acquire_stream());
+        if self.client.is_none() {
+            return Ok(())
+        }
+
+        let stream = try!(self.client.as_ref().unwrap().acquire_stream());
         let mut socket = stream.get_socket();
 
         let get_more = self.new_get_more_request();

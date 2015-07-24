@@ -1,6 +1,7 @@
 use Error::{ArgumentError, OperationError};
 use Result;
-use connstring::ConnectionString;
+
+use connstring::Host;
 
 use std::net::TcpStream;
 use std::sync::{Arc, Condvar, Mutex};
@@ -11,8 +12,8 @@ pub static DEFAULT_POOL_SIZE: usize = 5;
 /// Handles threaded connections to a MongoDB server.
 #[derive(Clone)]
 pub struct ConnectionPool {
-    /// The connection configuration.
-    pub config: ConnectionString,
+    /// The connection host.
+    pub host: Host,
     // The socket pool.
     inner: Arc<Mutex<Pool>>,
     // A condition variable used for threads waiting for the pool
@@ -70,14 +71,14 @@ impl Drop for PooledStream {
 impl ConnectionPool {
 
     /// Returns a connection pool with a default size.
-    pub fn new(config: ConnectionString) -> ConnectionPool {
-        ConnectionPool::with_size(config, DEFAULT_POOL_SIZE)
+    pub fn new(host: Host) -> ConnectionPool {
+        ConnectionPool::with_size(host, DEFAULT_POOL_SIZE)
     }
 
     /// Returns a connection pool with a specified capped size.
-    pub fn with_size(config: ConnectionString, size: usize) -> ConnectionPool {
+    pub fn with_size(host: Host, size: usize) -> ConnectionPool {
         ConnectionPool {
-            config: config,
+            host: host,
             wait_lock: Arc::new(Condvar::new()),
             inner: Arc::new(Mutex::new(Pool {
                 len: Arc::new(ATOMIC_USIZE_INIT),
@@ -137,8 +138,8 @@ impl ConnectionPool {
 
     // Connects to a MongoDB server as defined by the initial configuration.
     fn connect(&self) -> Result<TcpStream> {
-        let host_name = self.config.hosts[0].host_name.to_owned();
-        let port = self.config.hosts[0].port;
+        let ref host_name = self.host.host_name;
+        let port = self.host.port;
         let stream = try!(TcpStream::connect((&host_name[..], port)));
         Ok(stream)
     }

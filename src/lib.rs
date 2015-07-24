@@ -16,6 +16,7 @@ pub mod cursor;
 pub mod error;
 pub mod gridfs;
 pub mod pool;
+pub mod topology;
 pub mod wire_protocol;
 
 pub use error::{Error, ErrorCode, Result};
@@ -29,13 +30,14 @@ use common::{ReadPreference, WriteConcern};
 use connstring::ConnectionString;
 use db::{Database, ThreadedDatabase};
 use error::Error::ResponseError;
-use pool::{ConnectionPool, PooledStream};
+use pool::PooledStream;
+use topology::Topology;
 
 /// Interfaces with a MongoDB server or replica set.
 #[derive(Clone)]
 pub struct ClientInner {
     req_id: Arc<AtomicIsize>,
-    pool: ConnectionPool,
+    topology: Topology,
     pub read_preference: ReadPreference,
     pub write_concern: WriteConcern,
 }
@@ -101,9 +103,10 @@ impl ThreadedClient for Client {
             None => WriteConcern::new(),
         };
 
+        let req_id = Arc::new(ATOMIC_ISIZE_INIT);
         Ok(Arc::new(ClientInner {
-            req_id: Arc::new(ATOMIC_ISIZE_INIT),
-            pool: ConnectionPool::new(config),
+            req_id: req_id.clone(),
+            topology: try!(Topology::new(req_id, config, None)),
             read_preference: rp,
             write_concern: wc,
         }))
@@ -122,7 +125,7 @@ impl ThreadedClient for Client {
 
     /// Acquires a connection stream from the pool.
     fn acquire_stream(&self) -> Result<PooledStream> {
-        Ok(try!(self.pool.acquire_stream()))
+        self.topology.acquire_stream()
     }
 
     /// Returns a unique operational request id.
