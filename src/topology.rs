@@ -114,6 +114,8 @@ struct Monitor {
     host: Host,
     description: Arc<RwLock<ServerDescription>>,
     socket: TcpStream,
+    req_id: Arc<AtomicIsize>,
+    running: bool,
 }
 
 impl IsMasterResult {
@@ -317,7 +319,7 @@ impl ServerDescription {
         let hosts_empty = self.hosts.is_empty();
         let set_name_empty = self.set_name.is_empty();
         let msg_empty = ismaster.msg.is_empty();
-        
+
         self.stype = if msg_empty && set_name_empty && hosts_empty {
             ServerType::Standalone
         } else if !msg_empty {
@@ -344,11 +346,15 @@ impl ServerDescription {
 }
 
 impl Monitor {
-    pub fn new(host: Host, description: Arc<RwLock<ServerDescription>>) -> Result<Monitor> {
+    pub fn new(host: Host, description: Arc<RwLock<ServerDescription>>,
+               req_id: Arc<AtomicIsize>) -> Result<Monitor> {
+
         Ok(Monitor {
             socket: try!(TcpStream::connect((&host.host_name[..], host.port))),
+            req_id: req_id,
             host: host,
             description: description,
+            running: false,
         })
     }
 
@@ -357,6 +363,81 @@ impl Monitor {
         let port = self.host.port;
         self.socket = try!(TcpStream::connect((&host_name[..], port)));
         Ok(())
+    }
+
+    pub fn update_server_description(& self, doc: bson::Document) {
+        // Parse ismaster result and update server description.
+        let ismaster_result = IsMasterResult::new(doc);
+        let mut server_description = self.description.write().unwrap();
+        match ismaster_result {
+            Ok(ismaster) => server_description.update(ismaster),
+            Err(err) => server_description.set_err(err),
+        }
+    }
+
+    pub fn run(&mut self) {
+        if self.running {
+            return;
+        }
+
+        self.running = true;
+        // Call ismaster on socket at low level to avoid using client resources
+        let options = FindOptions::new().with_limit(1);
+        let flags = OpQueryFlags::with_find_options(&options);
+        let mut filter = bson::Document::new();
+        filter.insert("isMaster".to_owned(), Bson::I32(1));
+
+        loop {
+            if !self.running {
+                break;
+            }
+
+            let result = Cursor::query_with_socket(
+                &mut self.socket, None, self.req_id.fetch_add(1, Ordering::SeqCst) as i32,
+                "local.$cmd".to_owned(), options.batch_size, flags, options.skip as i32,
+                options.limit, filter.clone(), options.projection.clone(), false);
+
+            match result {
+                Ok(mut cursor) => {
+                    match cursor.next() {
+                        Some(Ok(doc)) => self.update_server_description(doc),
+                        Some(Err(err)) => panic!(err),
+                        None => panic!("ismaster returned no response."),
+                    }
+                    thread::sleep_ms(DEFAULT_HEARTBEAT_FREQUENCY_MS);
+                },
+                Err(err) => {
+                    // clear connection pool for server here
+
+                    if self.description.read().unwrap().stype == ServerType::Unknown {
+                        let mut server_description = self.description.write().unwrap();
+                        server_description.set_err(err);
+                    } else {
+                        // Retry once
+                        let result = Cursor::query_with_socket(
+                            &mut self.socket, None, self.req_id.fetch_add(1, Ordering::SeqCst) as i32,
+                            "local.$cmd".to_owned(), options.batch_size, flags, options.skip as i32,
+                            options.limit, filter.clone(), options.projection.clone(), false);
+
+                        match result {
+                            Ok(mut cursor) => {
+                                match cursor.next() {
+                                    Some(Ok(doc)) => self.update_server_description(doc),
+                                    Some(Err(err)) => panic!(err),
+                                    None => panic!("ismaster returned no response."),
+                                }
+                            },
+                            Err(err) => {
+                                let mut server_description = self.description.write().unwrap();
+                                server_description.set_err(err);
+                                server_description.stype = ServerType::Unknown;
+                            }
+                        }
+                    }
+                    thread::sleep_ms(DEFAULT_RETRY_FREQUENCY_MS);
+                }
+            }
+        }
     }
 }
 
@@ -368,51 +449,10 @@ impl Server {
         let host_clone = host.clone();
         let desc_clone = description.clone();
 
-        thread::spawn(move|| {
-            let mut monitor = Monitor::new(host_clone, desc_clone).ok().expect("Failed to connect monitor to server.");
+        let mut monitor = Monitor::new(host_clone, desc_clone, req_id).ok().expect("Failed to connect monitor to server.");
 
-            // Call ismaster on socket at low level to avoid using client resources
-            let options = FindOptions::new().with_limit(1);
-            let flags = OpQueryFlags::with_find_options(&options);
-            let mut filter = bson::Document::new();
-            filter.insert("isMaster".to_owned(), Bson::I32(1));
-
-            loop {
-                // break on some condition somehow
-
-                let result = Cursor::query_with_socket(
-                    &mut monitor.socket, None, req_id.fetch_add(1, Ordering::SeqCst) as i32,
-                    "local.$cmd".to_owned(), options.batch_size, flags, options.skip as i32,
-                    options.limit, filter.clone(), options.projection.clone(), false);
-
-                match result {
-                    Ok(mut cursor) => {     
-                        match cursor.next() {
-                            Some(Ok(doc)) => {
-                                // Parse ismaster result and update server description.
-                                let ismaster_result = IsMasterResult::new(doc);
-                                {
-                                    let mut server_description = monitor.description.write().unwrap();
-                                    match ismaster_result {
-                                        Ok(ismaster) => server_description.update(ismaster),
-                                        Err(err) => server_description.set_err(err),
-                                    }
-                                }
-                            },
-                            Some(Err(err)) => panic!(err),
-                            None => panic!("ismaster returned no response."),
-                        }
-                        thread::sleep_ms(DEFAULT_HEARTBEAT_FREQUENCY_MS);
-                    },
-                    Err(err) => {
-                        {
-                            let mut server_description = monitor.description.write().unwrap();
-                            server_description.set_err(err);
-                        }
-                        thread::sleep_ms(DEFAULT_RETRY_FREQUENCY_MS);
-                    }
-                }
-            }
+        thread::spawn(move || {
+            monitor.run();
         });
 
         Server {
