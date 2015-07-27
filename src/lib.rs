@@ -8,6 +8,7 @@ extern crate rand;
 extern crate rustc_serialize;
 extern crate time;
 
+mod apm;
 pub mod db;
 pub mod coll;
 pub mod common;
@@ -20,6 +21,7 @@ pub mod wire_protocol;
 
 pub use error::{Error, ErrorCode, Result};
 
+use apm::{CommandStarted, CommandResult, Listener};
 use bson::Bson;
 
 use std::sync::Arc;
@@ -32,10 +34,10 @@ use error::Error::ResponseError;
 use pool::{ConnectionPool, PooledStream};
 
 /// Interfaces with a MongoDB server or replica set.
-#[derive(Clone)]
 pub struct ClientInner {
     req_id: Arc<AtomicIsize>,
     pool: ConnectionPool,
+    listener: Listener,
     pub read_preference: ReadPreference,
     pub write_concern: WriteConcern,
 }
@@ -57,6 +59,10 @@ pub trait ThreadedClient: Sync {
     fn database_names(&self) -> Result<Vec<String>>;
     fn drop_database(&self, db_name: &str) -> Result<()>;
     fn is_master(&self) -> Result<bool>;
+    fn add_start_hook(&mut self, hook: fn(&CommandStarted)) -> Result<()>;
+    fn add_completion_hook(&mut self, hook: fn(&CommandResult)) -> Result<()>;
+    fn run_start_hooks(&self, hook: &CommandStarted) -> Result<()>;
+    fn run_completion_hooks(&self, hook: &CommandResult) -> Result<()>;
 }
 
 pub type Client = Arc<ClientInner>;
@@ -104,6 +110,7 @@ impl ThreadedClient for Client {
         Ok(Arc::new(ClientInner {
             req_id: Arc::new(ATOMIC_ISIZE_INIT),
             pool: ConnectionPool::new(config),
+            listener: Listener::new(),
             read_preference: rp,
             write_concern: wc,
         }))
@@ -172,5 +179,21 @@ impl ThreadedClient for Client {
             Some(&Bson::Boolean(is_master)) => Ok(is_master),
             _ => Err(ResponseError("Server reply does not contain 'ismaster'.".to_owned())),
         }
+    }
+
+    fn add_start_hook(&mut self, hook: fn(&CommandStarted)) -> Result<()> {
+        self.listener.add_start_hook(hook)
+    }
+
+    fn add_completion_hook(&mut self, hook: fn(&CommandResult)) -> Result<()> {
+        self.listener.add_completion_hook(hook)
+    }
+
+    fn run_start_hooks(&self, hook: &CommandStarted) -> Result<()> {
+        self.listener.run_start_hooks(hook)
+    }
+
+    fn run_completion_hooks(&self, hook: &CommandResult) -> Result<()> {
+        self.listener.run_completion_hooks(hook)
     }
 }

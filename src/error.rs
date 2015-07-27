@@ -32,8 +32,15 @@ pub enum Error {
     ResponseError(String),
     /// A cursor operation failed to return a cursor.
     CursorNotFoundError,
-    /// The application failed to secure the client connection socket due to a poisoned lock.
+    /// The application failed to secure a mutex due to a poisoned lock.
     PoisonLockError,
+    /// A server error with a given code.
+    CodedError(ErrorCode),
+    /// The client was unable to emit the events to the listeners due to a poisoned lock;
+    /// all event listeners were dropped, so they will have to be registered again. If the
+    /// client is unable to emit a failure result, the error it failed to report is bundled
+    /// into the `EventListenerError`.
+    EventListenerError(Option<Box<Error>>),
     /// A standard error with a string description;
     /// a more specific error should generally be used.
     DefaultError(String),
@@ -126,6 +133,13 @@ impl fmt::Display for Error {
             &Error::ResponseError(ref inner) => inner.fmt(fmt),
             &Error::CursorNotFoundError => write!(fmt, "No cursor found for cursor operation."),
             &Error::PoisonLockError => write!(fmt, "Socket lock poisoned while attempting to access."),
+            &Error::CodedError(ref err) => write!(fmt, "{}", stringify!(err)),
+            &Error::EventListenerError(ref err) => match err {
+                &Some(ref e) => write!(fmt, "Due to a poisoned lock on the \
+                                            listeners, unable to emit failure \
+                                            \"{}\"", e),
+                &None => write!(fmt, "Due to a poisoned lock on the listeners, unable to emit event")
+            },
             &Error::DefaultError(ref inner) => inner.fmt(fmt),
         }
     }
@@ -146,6 +160,11 @@ impl error::Error for Error {
             &Error::ResponseError(ref inner) => &inner,
             &Error::CursorNotFoundError => "No cursor found for cursor operation.",
             &Error::PoisonLockError => "Socket lock poisoned while attempting to access.",
+            &Error::CodedError(ref err) => &stringify!(err)[..],
+            &Error::EventListenerError(ref err) => match err {
+                &Some(_) => "Due to a poisoned lock on the listeners, unable to emit failure",
+                &None => "Due to a poisoned lock on the listeners, unable to emit event"
+            },
             &Error::DefaultError(ref inner) => &inner,
         }
     }
@@ -164,6 +183,8 @@ impl error::Error for Error {
             &Error::ResponseError(_) => None,
             &Error::CursorNotFoundError => None,
             &Error::PoisonLockError => None,
+            &Error::CodedError(_) => None,
+            &Error::EventListenerError(_) => None,
             &Error::DefaultError(_) => None,
         }
     }

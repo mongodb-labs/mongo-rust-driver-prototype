@@ -156,6 +156,7 @@ impl Collection {
 
             doc.insert("$orderby".to_owned(),
                        Bson::Document(options.sort.as_ref().unwrap().clone()));
+
             doc
         } else {
             filter.unwrap_or(bson::Document::new())
