@@ -20,6 +20,7 @@ const DEFAULT_HEARTBEAT_FREQUENCY_MS: u32 = 10000;
 const DEFAULT_MAX_BSON_OBJECT_SIZE: i64 = 16 * 1024 * 1024;
 const DEFAULT_MAX_MESSAGE_SIZE_BYTES: i64 = 48000000;
 
+/// Describes the type of topology for a server set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TopologyType {
     Single,
@@ -29,6 +30,7 @@ pub enum TopologyType {
     Unknown,
 }
 
+/// Describes the server role within a server set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ServerType {
     Standalone,
@@ -41,6 +43,7 @@ pub enum ServerType {
     Unknown,
 }
 
+/// The result of an isMaster operation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IsMasterResult {
     is_master: bool,
@@ -53,7 +56,7 @@ pub struct IsMasterResult {
     // Shards
     msg: String,
 
-    // RS
+    // Replica Sets
     is_replica_set: bool,
     is_secondary: bool,
     me: Option<Host>,
@@ -68,6 +71,7 @@ pub struct IsMasterResult {
     hidden: bool,
 }
 
+/// Holds status and connection information about a server set.
 #[derive(Clone)]
 pub struct Topology {
     config: ConnectionString,
@@ -77,6 +81,7 @@ pub struct Topology {
     compat_error: String,
 }
 
+/// Topology information gathered from server set monitoring.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TopologyDescription {
     ttype: TopologyType,
@@ -85,6 +90,7 @@ pub struct TopologyDescription {
     max_election_id: Option<oid::ObjectId>,
 }
 
+/// Holds status and connection information about a single server.
 #[derive(Clone)]
 pub struct Server {
     pub host: Host,
@@ -93,6 +99,7 @@ pub struct Server {
     monitor_running: Arc<AtomicBool>,
 }
 
+/// Server information gathered from server monitoring.
 #[derive(Clone, Debug)]
 pub struct ServerDescription {
     stype: ServerType,
@@ -110,6 +117,7 @@ pub struct ServerDescription {
     primary: Option<Host>,
 }
 
+/// Monitors and updates server and topology information.
 struct Monitor {
     host: Host,
     pool: Arc<ConnectionPool>,
@@ -120,6 +128,7 @@ struct Monitor {
 }
 
 impl IsMasterResult {
+    /// Parses an isMaster response document from the server.
     pub fn new(doc: bson::Document) -> Result<IsMasterResult> {
         let is_master = match doc.get("ismaster") {
             Some(&Bson::Boolean(ref b)) => *b,
@@ -233,6 +242,7 @@ impl IsMasterResult {
 }
 
 impl TopologyDescription {
+    /// Returns a default, unknown topology description.
     pub fn new() -> TopologyDescription {
         TopologyDescription {
             ttype: TopologyType::Unknown,
@@ -244,6 +254,7 @@ impl TopologyDescription {
 }
 
 impl Topology {
+    /// Returns a new topology with the given configuration and description.
     pub fn new(req_id: Arc<AtomicIsize>, config: ConnectionString,
                description: Option<TopologyDescription>) -> Result<Topology> {
 
@@ -277,6 +288,7 @@ impl Topology {
         })
     }
 
+    /// Returns a server stream.
     pub fn acquire_stream(&self) -> Result<PooledStream> {
         for (_, server) in self.servers.iter() {
             let read_server = try!(server.read());
@@ -287,7 +299,8 @@ impl Topology {
 }
 
 impl ServerDescription {
-    pub fn new() -> ServerDescription {
+    /// Returns a default, unknown server description.
+    fn new() -> ServerDescription {
         ServerDescription {
             stype: ServerType::Unknown,
             err: Arc::new(None),
@@ -305,7 +318,8 @@ impl ServerDescription {
         }
     }
 
-    pub fn update(&mut self, ismaster: IsMasterResult) {
+    // Updates the server description using an isMaster server response.
+    fn update(&mut self, ismaster: IsMasterResult) {
         self.min_wire_version = ismaster.min_wire_version;
         self.max_wire_version = ismaster.max_wire_version;
         self.me = ismaster.me;
@@ -340,13 +354,15 @@ impl ServerDescription {
         }
     }
 
-    pub fn set_err(&mut self, err: Error) {
+    // Sets an encountered error and reverts the server type to Unknown.
+    fn set_err(&mut self, err: Error) {
         self.err = Arc::new(Some(err));
         self.stype = ServerType::Unknown;
     }
 }
 
 impl Monitor {
+    /// Returns a new monitor connected to the server.
     pub fn new(host: Host, pool: Arc<ConnectionPool>,
                description: Arc<RwLock<ServerDescription>>,
                req_id: Arc<AtomicIsize>) -> Result<Monitor> {
@@ -361,6 +377,7 @@ impl Monitor {
         })
     }
 
+    /// Reconnects the monitor to the server.
     pub fn reconnect(&mut self) -> Result<()> {
         let ref host_name = self.host.host_name;
         let port = self.host.port;
@@ -368,8 +385,8 @@ impl Monitor {
         Ok(())
     }
 
-    pub fn update_server_description(&self, doc: bson::Document) {
-        // Parse ismaster result and update server description.
+    // Updates the server description associated with this monitor using an isMaster server response.
+    fn update_server_description(&self, doc: bson::Document) {
         let ismaster_result = IsMasterResult::new(doc);
         let mut server_description = self.description.write().unwrap();
         match ismaster_result {
@@ -378,14 +395,14 @@ impl Monitor {
         }
     }
 
-    pub fn set_err(&self, err: Error) {
+    // Set server description error field.
+    fn set_err(&self, err: Error) {
         let mut server_description = self.description.write().unwrap();
         server_description.set_err(err);
-        server_description.stype = ServerType::Unknown;
     }
 
+    /// Returns an isMaster server response using an owned monitor socket.
     pub fn is_master(&mut self) -> Result<Cursor> {
-        // Call ismaster on socket at low level to avoid using client resources
         let options = FindOptions::new().with_limit(1);
         let flags = OpQueryFlags::with_find_options(&options);
         let mut filter = bson::Document::new();
@@ -397,6 +414,7 @@ impl Monitor {
             options.limit, filter.clone(), options.projection.clone(), false)
     }
 
+    /// Starts server monitoring.
     pub fn run(&mut self) {
         if self.running.load(Ordering::SeqCst) {
             return;
@@ -450,6 +468,7 @@ impl Monitor {
 }
 
 impl Server {
+    /// Returns a new server with the given host, initializing a new connection pool and monitor.
     pub fn new(req_id: Arc<AtomicIsize>, host: Host) -> Server {
         let description = Arc::new(RwLock::new(ServerDescription::new()));
 
@@ -482,6 +501,7 @@ impl Server {
         }
     }
 
+    /// Returns a server stream from the connection pool.
     pub fn acquire_stream(&self) -> Result<PooledStream> {
         self.pool.acquire_stream()
     }
