@@ -243,12 +243,10 @@ macro_rules! run_update_test {
 macro_rules! run_suite {
     ( $file:expr, $coll:expr ) => {{
         let json = Json::from_file($file).unwrap();
-        let mut suite = json.get_suite().unwrap();
+        let suite = json.get_suite().unwrap();
         let client =  Client::connect("localhost", 27017).unwrap();
         let db = client.db("test");
         let coll = db.collection($coll);
-
-        suite.tests.remove(0);
 
         for test in suite.tests {
             coll.drop().unwrap();
