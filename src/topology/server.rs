@@ -48,8 +48,8 @@ pub struct ServerDescription {
 #[derive(Clone)]
 pub struct Server {
     pub host: Host,
+    pub description: Arc<RwLock<ServerDescription>>,
     pool: Arc<ConnectionPool>,
-    description: Arc<RwLock<ServerDescription>>,
     monitor_running: Arc<AtomicBool>,
 }
 

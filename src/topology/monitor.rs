@@ -1,4 +1,4 @@
-use Error::{self, ArgumentError};
+use Error::{self, ArgumentError, OperationError};
 use Result;
 
 use bson::{self, Bson, oid};
@@ -201,16 +201,6 @@ impl Monitor {
         Ok(())
     }
 
-    // Updates the server description associated with this monitor using an isMaster server response.
-    fn update_server_description(&self, doc: bson::Document) {
-        let ismaster_result = IsMasterResult::new(doc);
-        let mut server_description = self.server_description.write().unwrap();
-        match ismaster_result {
-            Ok(ismaster) => server_description.update(ismaster),
-            Err(err) => server_description.set_err(err),
-        }
-    }
-
     // Set server description error field.
     fn set_err(&self, err: Error) {
         let mut server_description = self.server_description.write().unwrap();
@@ -230,6 +220,47 @@ impl Monitor {
             options.limit, filter.clone(), options.projection.clone(), false)
     }
 
+    // Updates the server description associated with this monitor using an isMaster server response.
+    fn update_server_description(&self, doc: bson::Document) -> Result<ServerDescription> {
+        let ismaster_result = IsMasterResult::new(doc);
+        let mut server_description = self.server_description.write().unwrap();
+        match ismaster_result {
+            Ok(ismaster) => server_description.update(ismaster),
+            Err(err) => {
+                server_description.set_err(err);
+                return Err(OperationError("Failed to parse ismaster result.".to_owned()))
+            },
+        }
+
+        Ok(server_description.clone())
+    }
+
+    // Updates the topology description associated with this monitor using a new server description.
+    fn update_top_description(&self, description: ServerDescription) {
+        let mut top_description = self.top_description.write().unwrap();
+        top_description.update(self.host.clone(), description,
+                               self.req_id.clone(), self.top_description.clone());
+    }
+
+    // Updates server and topology descriptions using a successful isMaster cursor result.
+    fn update_with_is_master_cursor(&self, cursor: &mut Cursor) {
+        match cursor.next() {
+            Some(Ok(doc)) => {
+                if let Ok(description) = self.update_server_description(doc) {
+                    self.update_top_description(description);
+                }
+            },
+            Some(Err(err)) => {
+                let mut server_description = self.server_description.write().unwrap();
+                server_description.set_err(err);
+            },
+            None => {
+                let mut server_description = self.server_description.write().unwrap();
+                server_description.set_err(OperationError("ismaster returned no response.".to_owned()));
+            }
+        }
+    }
+
     /// Starts server monitoring.
     pub fn run(&mut self) {
         if self.running.load(Ordering::SeqCst) {
@@ -244,13 +275,7 @@ impl Monitor {
             }
 
             match self.is_master() {
-                Ok(mut cursor) => {
-                    match cursor.next() {
-                        Some(Ok(doc)) => self.update_server_description(doc),
-                        Some(Err(err)) => panic!(err),
-                        None => panic!("ismaster returned no response."),
-                    }
-                },
+                Ok(mut cursor) => self.update_with_is_master_cursor(&mut cursor),
                 Err(err) => {
                     // Refresh all connections
                     self.pool.clear();
@@ -266,13 +291,7 @@ impl Monitor {
                     } else {
                         // Retry once
                         match self.is_master() {
-                            Ok(mut cursor) => {
-                                match cursor.next() {
-                                    Some(Ok(doc)) => self.update_server_description(doc),
-                                    Some(Err(err)) => panic!(err),
-                                    None => panic!("ismaster returned no response."),
-                                }
-                            },
+                            Ok(mut cursor) => self.update_with_is_master_cursor(&mut cursor),
                             Err(err) => self.set_err(err),
                         }
                     }
