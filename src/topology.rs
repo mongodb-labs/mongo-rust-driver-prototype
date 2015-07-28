@@ -13,15 +13,14 @@ use wire_protocol::flags::OpQueryFlags;
 use std::collections::{BTreeMap, HashMap};
 use std::net::TcpStream;
 use std::sync::{Arc, RwLock};
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::thread;
 
 const DEFAULT_HEARTBEAT_FREQUENCY_MS: u32 = 10000;
-const DEFAULT_RETRY_FREQUENCY_MS: u32 = 1000;
 const DEFAULT_MAX_BSON_OBJECT_SIZE: i64 = 16 * 1024 * 1024;
 const DEFAULT_MAX_MESSAGE_SIZE_BYTES: i64 = 48000000;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TopologyType {
     Single,
     ReplicaSetNoPrimary,
@@ -30,7 +29,7 @@ pub enum TopologyType {
     Unknown,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ServerType {
     Standalone,
     Mongos,
@@ -89,8 +88,9 @@ pub struct TopologyDescription {
 #[derive(Clone)]
 pub struct Server {
     pub host: Host,
-    pool: ConnectionPool,
+    pool: Arc<ConnectionPool>,
     description: Arc<RwLock<ServerDescription>>,
+    monitor_running: Arc<AtomicBool>,
 }
 
 #[derive(Clone, Debug)]
@@ -112,10 +112,11 @@ pub struct ServerDescription {
 
 struct Monitor {
     host: Host,
+    pool: Arc<ConnectionPool>,
     description: Arc<RwLock<ServerDescription>>,
     socket: TcpStream,
     req_id: Arc<AtomicIsize>,
-    running: bool,
+    running: Arc<AtomicBool>,
 }
 
 impl IsMasterResult {
@@ -346,15 +347,17 @@ impl ServerDescription {
 }
 
 impl Monitor {
-    pub fn new(host: Host, description: Arc<RwLock<ServerDescription>>,
+    pub fn new(host: Host, pool: Arc<ConnectionPool>,
+               description: Arc<RwLock<ServerDescription>>,
                req_id: Arc<AtomicIsize>) -> Result<Monitor> {
 
         Ok(Monitor {
             socket: try!(TcpStream::connect((&host.host_name[..], host.port))),
             req_id: req_id,
             host: host,
+            pool: pool,
             description: description,
-            running: false,
+            running: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -365,7 +368,7 @@ impl Monitor {
         Ok(())
     }
 
-    pub fn update_server_description(& self, doc: bson::Document) {
+    pub fn update_server_description(&self, doc: bson::Document) {
         // Parse ismaster result and update server description.
         let ismaster_result = IsMasterResult::new(doc);
         let mut server_description = self.description.write().unwrap();
@@ -375,51 +378,60 @@ impl Monitor {
         }
     }
 
-    pub fn run(&mut self) {
-        if self.running {
-            return;
-        }
+    pub fn set_err(&self, err: Error) {
+        let mut server_description = self.description.write().unwrap();
+        server_description.set_err(err);
+        server_description.stype = ServerType::Unknown;
+    }
 
-        self.running = true;
+    pub fn is_master(&mut self) -> Result<Cursor> {
         // Call ismaster on socket at low level to avoid using client resources
         let options = FindOptions::new().with_limit(1);
         let flags = OpQueryFlags::with_find_options(&options);
         let mut filter = bson::Document::new();
         filter.insert("isMaster".to_owned(), Bson::I32(1));
 
+        Cursor::query_with_socket(
+            &mut self.socket, None, self.req_id.fetch_add(1, Ordering::SeqCst) as i32,
+            "local.$cmd".to_owned(), options.batch_size, flags, options.skip as i32,
+            options.limit, filter.clone(), options.projection.clone(), false)
+    }
+
+    pub fn run(&mut self) {
+        if self.running.load(Ordering::SeqCst) {
+            return;
+        }
+
+        self.running.store(true, Ordering::SeqCst);
+
         loop {
-            if !self.running {
+            if !self.running.load(Ordering::SeqCst) {
                 break;
             }
 
-            let result = Cursor::query_with_socket(
-                &mut self.socket, None, self.req_id.fetch_add(1, Ordering::SeqCst) as i32,
-                "local.$cmd".to_owned(), options.batch_size, flags, options.skip as i32,
-                options.limit, filter.clone(), options.projection.clone(), false);
-
-            match result {
+            match self.is_master() {
                 Ok(mut cursor) => {
                     match cursor.next() {
                         Some(Ok(doc)) => self.update_server_description(doc),
                         Some(Err(err)) => panic!(err),
                         None => panic!("ismaster returned no response."),
                     }
-                    thread::sleep_ms(DEFAULT_HEARTBEAT_FREQUENCY_MS);
                 },
                 Err(err) => {
-                    // clear connection pool for server here
+                    // Refresh all connections
+                    self.pool.clear();
+                    if let Err(err) = self.reconnect() {
+                        self.set_err(err);
+                        break;
+                    }
 
-                    if self.description.read().unwrap().stype == ServerType::Unknown {
-                        let mut server_description = self.description.write().unwrap();
-                        server_description.set_err(err);
+                    let stype = self.description.read().unwrap().stype;
+
+                    if stype == ServerType::Unknown {
+                        self.set_err(err);
                     } else {
                         // Retry once
-                        let result = Cursor::query_with_socket(
-                            &mut self.socket, None, self.req_id.fetch_add(1, Ordering::SeqCst) as i32,
-                            "local.$cmd".to_owned(), options.batch_size, flags, options.skip as i32,
-                            options.limit, filter.clone(), options.projection.clone(), false);
-
-                        match result {
+                        match self.is_master() {
                             Ok(mut cursor) => {
                                 match cursor.next() {
                                     Some(Ok(doc)) => self.update_server_description(doc),
@@ -427,16 +439,12 @@ impl Monitor {
                                     None => panic!("ismaster returned no response."),
                                 }
                             },
-                            Err(err) => {
-                                let mut server_description = self.description.write().unwrap();
-                                server_description.set_err(err);
-                                server_description.stype = ServerType::Unknown;
-                            }
+                            Err(err) => self.set_err(err),
                         }
                     }
-                    thread::sleep_ms(DEFAULT_RETRY_FREQUENCY_MS);
                 }
             }
+            thread::sleep_ms(DEFAULT_HEARTBEAT_FREQUENCY_MS);
         }
     }
 }
@@ -449,20 +457,38 @@ impl Server {
         let host_clone = host.clone();
         let desc_clone = description.clone();
 
-        let mut monitor = Monitor::new(host_clone, desc_clone, req_id).ok().expect("Failed to connect monitor to server.");
+        let pool = Arc::new(ConnectionPool::new(host.clone()));
 
-        thread::spawn(move || {
-            monitor.run();
-        });
+        // Fails silently
+        let monitor = Monitor::new(host_clone, pool.clone(), desc_clone, req_id);
+
+        let monitor_running = if monitor.is_ok() {
+            monitor.as_ref().unwrap().running.clone()
+        } else {
+            Arc::new(AtomicBool::new(false))
+        };
+
+        if monitor.is_ok() {
+            thread::spawn(move || {
+                monitor.unwrap().run();
+            });
+        }
 
         Server {
-            host: host.clone(),
-            pool: ConnectionPool::new(host),
+            host: host,
+            pool: pool,
             description: description.clone(),
+            monitor_running: monitor_running,
         }
     }
 
     pub fn acquire_stream(&self) -> Result<PooledStream> {
         self.pool.acquire_stream()
+    }
+}
+
+impl Drop for Server {
+    fn drop(&mut self) {
+        self.monitor_running.store(false, Ordering::SeqCst);
     }
 }

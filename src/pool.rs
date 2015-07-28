@@ -28,6 +28,9 @@ struct Pool {
     pub len: Arc<AtomicUsize>,
     // The idle socket pool.
     sockets: Vec<TcpStream>,
+    // The pool iteration. When a server monitor fails to execute ismaster,
+    // the connection pool is cleared and the iteration is incremented.
+    iteration: usize,
 }
 
 /// Holds an available socket, with logic to return the socket
@@ -40,6 +43,8 @@ pub struct PooledStream {
     pool: Arc<Mutex<Pool>>,
     // A reference to the waiting condvar associated with the pool.
     wait_lock: Arc<Condvar>,
+    // The pool iteration at the moment of extraction.
+    iteration: usize,
 }
 
 impl PooledStream {
@@ -54,15 +59,10 @@ impl Drop for PooledStream {
         // Attempt to lock and return the socket to the pool,
         // or give up if the pool lock has been poisoned.
         if let Ok(mut locked) = self.pool.lock() {
-            let len = locked.len.load(Ordering::SeqCst);
-            if len < locked.size {
+            if self.iteration == locked.iteration {
                 locked.sockets.push(self.socket.take().unwrap());
-                if len == 0 {
-                    // Notify waiting threads that the pool has been repopulated.
-                    self.wait_lock.notify_one();
-                }
-            } else {
-                let _ = locked.len.fetch_sub(1, Ordering::SeqCst);
+                // Notify waiting threads that the pool has been repopulated.
+                self.wait_lock.notify_one();
             }
         }
     }
@@ -84,6 +84,7 @@ impl ConnectionPool {
                 len: Arc::new(ATOMIC_USIZE_INIT),
                 size: size,
                 sockets: Vec::with_capacity(size),
+                iteration: 0,
             })),
         }
     }
@@ -96,6 +97,15 @@ impl ConnectionPool {
             let mut locked = try!(self.inner.lock());
             locked.size = size;
             Ok(())
+        }
+    }
+
+    // Clear all open socket connections.
+    pub fn clear(&self) {
+        if let Ok(mut locked) = self.inner.lock() {
+            locked.iteration += 1;
+            locked.sockets.clear();
+            locked.len.store(0, Ordering::SeqCst);
         }
     }
     
@@ -116,6 +126,7 @@ impl ConnectionPool {
                     socket: Some(stream),
                     pool: self.inner.clone(),
                     wait_lock: self.wait_lock.clone(),
+                    iteration: locked.iteration,
                 });
             }
 
@@ -128,6 +139,7 @@ impl ConnectionPool {
                     socket: Some(socket),
                     pool: self.inner.clone(),
                     wait_lock: self.wait_lock.clone(),
+                    iteration: locked.iteration,
                 });
             }
 
