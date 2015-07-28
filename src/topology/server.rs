@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::thread;
 
 use super::monitor::{IsMasterResult, Monitor};
+use super::TopologyDescription;
 
 /// Describes the server role within a server set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -123,7 +124,9 @@ impl Drop for Server {
 
 impl Server {
     /// Returns a new server with the given host, initializing a new connection pool and monitor.
-    pub fn new(req_id: Arc<AtomicIsize>, host: Host) -> Server {
+    pub fn new(req_id: Arc<AtomicIsize>, host: Host,
+               top_description: Arc<RwLock<TopologyDescription>>) -> Server {
+
         let description = Arc::new(RwLock::new(ServerDescription::new()));
 
         // Create new monitor thread
@@ -133,7 +136,7 @@ impl Server {
         let pool = Arc::new(ConnectionPool::new(host.clone()));
 
         // Fails silently
-        let monitor = Monitor::new(host_clone, pool.clone(), desc_clone, req_id);
+        let monitor = Monitor::new(host_clone, pool.clone(), top_description, desc_clone, req_id);
 
         let monitor_running = if monitor.is_ok() {
             monitor.as_ref().unwrap().running.clone()

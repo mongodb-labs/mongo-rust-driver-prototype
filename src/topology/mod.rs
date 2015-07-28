@@ -34,16 +34,16 @@ pub struct TopologyDescription {
     pub set_name: String,
     pub heartbeat_frequency_ms: u32,
     max_election_id: Option<oid::ObjectId>,
+    compatible: bool,
+    compat_error: String,
 }
 
 /// Holds status and connection information about a server set.
 #[derive(Clone)]
 pub struct Topology {
     config: ConnectionString,
-    description: TopologyDescription,
+    description: Arc<RwLock<TopologyDescription>>,
     servers: Arc<HashMap<Host, RwLock<Server>>>,
-    compatible: bool,
-    compat_error: String,
 }
 
 impl TopologyDescription {
@@ -54,6 +54,8 @@ impl TopologyDescription {
             set_name: String::new(),
             heartbeat_frequency_ms: DEFAULT_HEARTBEAT_FREQUENCY_MS,
             max_election_id: None,
+            compatible: true,
+            compat_error: String::new(),
         }
     }
 }
@@ -75,21 +77,18 @@ impl Topology {
                 "TopologyType must be ReplicaSetNoPrimary if set_name is provided.".to_owned()));
         }
 
-        // TODO: Determine driver's wire compatibility, and check overlap with
-        // all servers in topology.
+        let top_description = Arc::new(RwLock::new(options));
 
         let mut servers = HashMap::new();
         for host in config.hosts.iter() {
-            let server = Server::new(req_id.clone(), host.clone());
+            let server = Server::new(req_id.clone(), host.clone(), top_description.clone());
             servers.insert(host.clone(), RwLock::new(server));
         }
 
         Ok(Topology {
             config: config,
-            description: options,
+            description: top_description,
             servers: Arc::new(servers),
-            compatible: true,
-            compat_error: String::new(),
         })
     }
 

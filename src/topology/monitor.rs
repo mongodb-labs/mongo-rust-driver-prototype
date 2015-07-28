@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::thread;
 
 use super::server::{ServerDescription, ServerType};
-use super::DEFAULT_HEARTBEAT_FREQUENCY_MS;
+use super::{DEFAULT_HEARTBEAT_FREQUENCY_MS, TopologyDescription};
 
 const DEFAULT_MAX_BSON_OBJECT_SIZE: i64 = 16 * 1024 * 1024;
 const DEFAULT_MAX_MESSAGE_SIZE_BYTES: i64 = 48000000;
@@ -54,7 +54,8 @@ pub struct IsMasterResult {
 pub struct Monitor {
     host: Host,
     pool: Arc<ConnectionPool>,
-    description: Arc<RwLock<ServerDescription>>,
+    top_description: Arc<RwLock<TopologyDescription>>,
+    server_description: Arc<RwLock<ServerDescription>>,
     socket: TcpStream,
     req_id: Arc<AtomicIsize>,
     pub running: Arc<AtomicBool>,
@@ -177,7 +178,8 @@ impl IsMasterResult {
 impl Monitor {
     /// Returns a new monitor connected to the server.
     pub fn new(host: Host, pool: Arc<ConnectionPool>,
-               description: Arc<RwLock<ServerDescription>>,
+               top_description: Arc<RwLock<TopologyDescription>>,
+               server_description: Arc<RwLock<ServerDescription>>,
                req_id: Arc<AtomicIsize>) -> Result<Monitor> {
 
         Ok(Monitor {
@@ -185,7 +187,8 @@ impl Monitor {
             req_id: req_id,
             host: host,
             pool: pool,
-            description: description,
+            top_description: top_description,
+            server_description: server_description,
             running: Arc::new(AtomicBool::new(false)),
         })
     }
@@ -201,7 +204,7 @@ impl Monitor {
     // Updates the server description associated with this monitor using an isMaster server response.
     fn update_server_description(&self, doc: bson::Document) {
         let ismaster_result = IsMasterResult::new(doc);
-        let mut server_description = self.description.write().unwrap();
+        let mut server_description = self.server_description.write().unwrap();
         match ismaster_result {
             Ok(ismaster) => server_description.update(ismaster),
             Err(err) => server_description.set_err(err),
@@ -210,7 +213,7 @@ impl Monitor {
 
     // Set server description error field.
     fn set_err(&self, err: Error) {
-        let mut server_description = self.description.write().unwrap();
+        let mut server_description = self.server_description.write().unwrap();
         server_description.set_err(err);
     }
 
@@ -256,7 +259,7 @@ impl Monitor {
                         break;
                     }
 
-                    let stype = self.description.read().unwrap().stype;
+                    let stype = self.server_description.read().unwrap().stype;
 
                     if stype == ServerType::Unknown {
                         self.set_err(err);
@@ -275,7 +278,12 @@ impl Monitor {
                     }
                 }
             }
-            thread::sleep_ms(DEFAULT_HEARTBEAT_FREQUENCY_MS);
+
+            if let Ok(description) = self.top_description.read() {
+                thread::sleep_ms(description.heartbeat_frequency_ms);
+            } else {
+                thread::sleep_ms(DEFAULT_HEARTBEAT_FREQUENCY_MS);
+            }
         }
     }
 }
