@@ -1,0 +1,53 @@
+pub enum CommandType {
+    Aggregate,
+    Count,
+    CreateIndexes,
+    DeleteMany,
+    DeleteOne,
+    Distinct,
+    DropCollection,
+    DropDatabase,
+    DropIndexes,
+    Find,
+    FindOne,
+    FindOneAndDelete,
+    FindOneAndReplace,
+    FindOneAndUpdate,
+    InsertMany,
+    InsertOne,
+    IsMaster,
+    ListCollections,
+    ListDatabases,
+    ListIndexes,
+    UpdateMany,
+    UpdateOne,
+}
+
+impl CommandType {
+    pub fn to_str(&self) -> &str {
+        match self {
+            &CommandType::Aggregate => "aggregate",
+            &CommandType::Count => "count",
+            &CommandType::CreateIndexes => "create_indexes",
+            &CommandType::DeleteMany => "delete_many",
+            &CommandType::DeleteOne => "delete_one",
+            &CommandType::Distinct => "distinct",
+            &CommandType::DropCollection => "drop_collection",
+            &CommandType::DropDatabase => "drop_database",
+            &CommandType::DropIndexes => "drop_indexes",
+            &CommandType::Find => "find",
+            &CommandType::FindOne => "find_one",
+            &CommandType::FindOneAndDelete => "find_one_and_delete",
+            &CommandType::FindOneAndReplace => "find_one_and_replace",
+            &CommandType::FindOneAndUpdate => "find_one_and_update",
+            &CommandType::InsertMany => "insert_many",
+            &CommandType::InsertOne => "insert_one",
+            &CommandType::IsMaster => "is_master",
+            &CommandType::ListCollections => "list_collections",
+            &CommandType::ListDatabases => "list_databases",
+            &CommandType::ListIndexes => "list_indexes",
+            &CommandType::UpdateMany => "update_many",
+            &CommandType::UpdateOne => "update_one",
+        }
+    }
+}

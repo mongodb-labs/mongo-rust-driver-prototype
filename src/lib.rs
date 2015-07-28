@@ -8,9 +8,9 @@ extern crate rand;
 extern crate rustc_serialize;
 extern crate time;
 
-mod apm;
 pub mod db;
 pub mod coll;
+pub mod command_type;
 pub mod common;
 pub mod connstring;
 pub mod cursor;
@@ -19,15 +19,18 @@ pub mod gridfs;
 pub mod pool;
 pub mod wire_protocol;
 
+mod apm;
+
 pub use error::{Error, ErrorCode, Result};
 pub use apm::{CommandStarted, CommandResult};
 
-use apm::Listener;
-use bson::Bson;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 
+use apm::Listener;
+use bson::Bson;
+use command_type::CommandType;
 use common::{ReadPreference, WriteConcern};
 use connstring::ConnectionString;
 use db::{Database, ThreadedDatabase};
@@ -142,7 +145,7 @@ impl ThreadedClient for Client {
         doc.insert("listDatabases".to_owned(), Bson::I32(1));
 
         let db = self.db("admin");
-        let res = try!(db.command(doc));
+        let res = try!(db.command(doc, CommandType::ListDatabases));
         if let Some(&Bson::Array(ref batch)) = res.get("databases") {
             // Extract database names
             let map = batch.iter().filter_map(|bdoc| {
@@ -172,7 +175,7 @@ impl ThreadedClient for Client {
         doc.insert("isMaster".to_owned(), Bson::I32(1));
 
         let db = self.db("local");
-        let res = try!(db.command(doc));
+        let res = try!(db.command(doc, CommandType::IsMaster));
 
         match res.get("ismaster") {
             Some(&Bson::Boolean(is_master)) => Ok(is_master),

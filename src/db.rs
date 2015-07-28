@@ -1,5 +1,6 @@
 use bson;
 use bson::Bson;
+use command_type::CommandType;
 use {Client, ThreadedClient, Result};
 use Error::OperationError;
 use coll::Collection;
@@ -27,8 +28,8 @@ pub trait ThreadedDatabase {
                              read_preference: Option<ReadPreference>,
                              write_concern: Option<WriteConcern>) -> Collection;
     fn get_req_id(&self) -> i32;
-    fn command_cursor(&self, spec: bson::Document) -> Result<Cursor>;
-    fn command(&self, spec: bson::Document) -> Result<bson::Document>;
+    fn command_cursor(&self, spec: bson::Document, cmd_type: CommandType) -> Result<Cursor>;
+    fn command(&self, spec: bson::Document, cmd_type: CommandType) -> Result<bson::Document>;
     fn list_collections(&self, filter: Option<bson::Document>) -> Result<Cursor>;
     fn list_collections_with_batch_size(&self, filter: Option<bson::Document>,
                                         batch_size: i32) -> Result<Cursor>;
@@ -71,16 +72,17 @@ impl ThreadedDatabase for Database {
     }
 
     /// Generates a cursor for a relevant operational command.
-    fn command_cursor(&self, spec: bson::Document) -> Result<Cursor> {
-        Cursor::command_cursor(self.client.clone(), &self.name[..], spec)
+    fn command_cursor(&self, spec: bson::Document, cmd_type: CommandType) -> Result<Cursor> {
+        Cursor::command_cursor(self.client.clone(), &self.name[..], spec, cmd_type)
     }
 
     /// Sends an administrative command over find_one.
-    fn command(&self, spec: bson::Document) -> Result<bson::Document> {
+    fn command(&self, spec: bson::Document, cmd_type: CommandType) -> Result<bson::Document> {
         let coll = self.collection("$cmd");
         let mut options = FindOptions::new();
         options.batch_size = 1;
-        let res = try!(coll.find_one(Some(spec.clone()), Some(options)));
+        let res = try!(coll.find_one_with_command_type(Some(spec.clone()), Some(options),
+                                                       cmd_type));
         res.ok_or(OperationError(format!("Failed to execute command with spec {:?}.", spec)))
     }
 
@@ -102,7 +104,7 @@ impl ThreadedDatabase for Database {
             spec.insert("filter".to_owned(), Bson::Document(filter.unwrap()));
         }
 
-        self.command_cursor(spec)
+        self.command_cursor(spec, CommandType::ListCollections)
     }
 
 
@@ -133,7 +135,7 @@ impl ThreadedDatabase for Database {
     fn drop_database(&self) -> Result<()> {
         let mut spec = bson::Document::new();
         spec.insert("dropDatabase".to_owned(), Bson::I32(1));
-        try!(self.command(spec));
+        try!(self.command(spec, CommandType::DropDatabase));
         Ok(())
     }
 
@@ -141,7 +143,7 @@ impl ThreadedDatabase for Database {
     fn drop_collection(&self, name: &str) -> Result<()> {
         let mut spec = bson::Document::new();
         spec.insert("drop".to_owned(), Bson::String(name.to_owned()));
-        try!(self.command(spec));
+        try!(self.command(spec, CommandType::DropCollection));
         Ok(())
     }
 }

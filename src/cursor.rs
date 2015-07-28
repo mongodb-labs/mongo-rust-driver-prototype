@@ -1,5 +1,6 @@
-use apm::{CommandStarted, CommandResult};
+use apm::{CommandStarted, CommandResult, EventRunner};
 use bson::{self, Bson};
+use command_type::CommandType;
 use {Client, Error, ErrorCode, Result, ThreadedClient};
 use wire_protocol::flags::OpQueryFlags;
 use wire_protocol::operations::Message;
@@ -66,11 +67,11 @@ impl Cursor {
     /// # Return value
     ///
     /// Returns the newly created Cursor on success, or an Error on failure.
-    pub fn command_cursor(client: Client, db: &str,
-                          doc: bson::Document) -> Result<Cursor> {
+    pub fn command_cursor(client: Client, db: &str, doc: bson::Document,
+                          cmd_type: CommandType) -> Result<Cursor> {
         Cursor::query_with_batch_size(client.clone(), format!("{}.$cmd", db),
                                       1, OpQueryFlags::no_flags(), 0, 0,
-                                      doc, None, true)
+                                      doc, None, cmd_type, true)
     }
 
     fn get_bson_and_cid_from_message(message: Message) -> Result<(VecDeque<bson::Document>, i64, i32)> {
@@ -163,7 +164,7 @@ impl Cursor {
                                  number_to_skip: i32, number_to_return: i32,
                                  query: bson::Document,
                                  return_field_selector: Option<bson::Document>,
-                                 is_cmd_cursor: bool) -> Result<Cursor> {
+                                 cmd_type: CommandType, is_cmd_cursor: bool) -> Result<Cursor> {
 
         let req_id = client.get_req_id();
         let result = Message::new_query(req_id, flags,
@@ -178,16 +179,8 @@ impl Cursor {
 
         let index = namespace.rfind(".").unwrap_or(namespace.len());
         let db_name = namespace[..index].to_owned();
-        let mut cmd_name = match query.keys.first() {
-            Some(ref key) => (&key[..]),
-            None => return Err(Error::CodedError(ErrorCode::CommandNotFound)),
-        };
-
-        let is_command = namespace[index..].eq(".$cmd");
-
-        if !is_command {
-            cmd_name = "query";
-        }
+        let cmd_name = cmd_type.to_str();
+        // let is_command = namespace[index..].eq(".$cmd");
 
         let connstring = format!("{}", try!(socket.peer_addr()));
 
@@ -218,19 +211,19 @@ impl Cursor {
             (buf, id, namespace, n)
         };
 
-        let reply = if is_command {
-            buf.front().unwrap().to_owned()
-        } else {
-            doc! { "number_returned" => n }
-        };
-
-        let _hook_result = client.run_completion_hooks(&CommandResult::Success {
-            duration: 0,
-            reply: reply,
-            command_name: cmd_name.to_owned(),
-            request_id: req_id as i64,
-            connection_string: connstring,
-        });
+        // let reply = if is_command {
+        //     buf.front().unwrap().to_owned()
+        // } else {
+        //     doc! { "number_returned" => n }
+        // };
+        //
+        // let _hook_result = client.run_completion_hooks(&CommandResult::Success {
+        //     duration: 0,
+        //     reply: reply,
+        //     command_name: cmd_name.to_owned(),
+        //     request_id: req_id as i64,
+        //     connection_string: connstring,
+        // });
 
         Ok(Cursor { client: client, namespace: namespace,
                     batch_size: batch_size, cursor_id: cursor_id,
@@ -258,15 +251,12 @@ impl Cursor {
     ///
     /// Returns the cursor for the query results on success, or an error string
     /// on failure.
-    pub fn query(client: Client, namespace: String,
-                 flags: OpQueryFlags, number_to_skip: i32,
-                 number_to_return: i32, query: bson::Document,
-                 return_field_selector: Option<bson::Document>,
+    pub fn query(client: Client, namespace: String, flags: OpQueryFlags, number_to_skip: i32,
+                 number_to_return: i32, query: bson::Document, return_field_selector: Option<bson::Document>, cmd_type: CommandType,
                  is_cmd_cursor: bool) -> Result<Cursor> {
         Cursor::query_with_batch_size(client.clone(), namespace, DEFAULT_BATCH_SIZE, flags,
-                                      number_to_skip,
-                                      number_to_return, query,
-                                      return_field_selector, is_cmd_cursor)
+                                      number_to_skip, number_to_return, query,
+                                      return_field_selector, cmd_type, is_cmd_cursor)
     }
 
     fn get_from_stream(&mut self) -> Result<()> {
