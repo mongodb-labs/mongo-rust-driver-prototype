@@ -20,8 +20,9 @@ pub mod pool;
 pub mod wire_protocol;
 
 pub use error::{Error, ErrorCode, Result};
+pub use apm::{CommandStarted, CommandResult};
 
-use apm::{CommandStarted, CommandResult, Listener};
+use apm::Listener;
 use bson::Bson;
 
 use std::sync::Arc;
@@ -61,8 +62,6 @@ pub trait ThreadedClient: Sync {
     fn is_master(&self) -> Result<bool>;
     fn add_start_hook(&mut self, hook: fn(&CommandStarted)) -> Result<()>;
     fn add_completion_hook(&mut self, hook: fn(&CommandResult)) -> Result<()>;
-    fn run_start_hooks(&self, hook: &CommandStarted) -> Result<()>;
-    fn run_completion_hooks(&self, hook: &CommandResult) -> Result<()>;
 }
 
 pub type Client = Arc<ClientInner>;
@@ -187,13 +186,5 @@ impl ThreadedClient for Client {
 
     fn add_completion_hook(&mut self, hook: fn(&CommandResult)) -> Result<()> {
         self.listener.add_completion_hook(hook)
-    }
-
-    fn run_start_hooks(&self, hook: &CommandStarted) -> Result<()> {
-        self.listener.run_start_hooks(hook)
-    }
-
-    fn run_completion_hooks(&self, hook: &CommandResult) -> Result<()> {
-        self.listener.run_completion_hooks(hook)
     }
 }
