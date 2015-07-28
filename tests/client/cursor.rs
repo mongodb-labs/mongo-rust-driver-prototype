@@ -1,5 +1,6 @@
 use bson::{Bson, Document};
 use mongodb::{Client, ThreadedClient};
+use mongodb::command_type::CommandType;
 use mongodb::db::ThreadedDatabase;
 use mongodb::cursor::Cursor;
 use mongodb::wire_protocol::flags::OpQueryFlags;
@@ -22,8 +23,8 @@ fn cursor_features() {
     let flags = OpQueryFlags::no_flags();
 
     let result = Cursor::query_with_batch_size(client.clone(), "test.cursor_test".to_owned(),
-                                               3, flags,
-                                               0, 0, doc, None, false);
+                                               3, flags, 0, 0, doc, None, CommandType::Find,
+                                               false);
 
     let mut cursor = match result {
         Ok(c) => c,
