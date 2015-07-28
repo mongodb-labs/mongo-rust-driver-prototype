@@ -1,130 +1,63 @@
-use Error::{self, ArgumentError, OperationError};
+use Error::{self, ArgumentError};
 use Result;
 
 use bson::{self, Bson, oid};
 use chrono::{DateTime, UTC};
 
 use coll::options::FindOptions;
-use connstring::{self, ConnectionString, Host};
+use connstring::{self, Host};
 use cursor::Cursor;
-use pool::{ConnectionPool, PooledStream};
+use pool::ConnectionPool;
 use wire_protocol::flags::OpQueryFlags;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::net::TcpStream;
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::thread;
 
-const DEFAULT_HEARTBEAT_FREQUENCY_MS: u32 = 10000;
+use super::server::{ServerDescription, ServerType};
+use super::DEFAULT_HEARTBEAT_FREQUENCY_MS;
+
 const DEFAULT_MAX_BSON_OBJECT_SIZE: i64 = 16 * 1024 * 1024;
 const DEFAULT_MAX_MESSAGE_SIZE_BYTES: i64 = 48000000;
-
-/// Describes the type of topology for a server set.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TopologyType {
-    Single,
-    ReplicaSetNoPrimary,
-    ReplicaSetWithPrimary,
-    Sharded,
-    Unknown,
-}
-
-/// Describes the server role within a server set.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ServerType {
-    Standalone,
-    Mongos,
-    RSPrimary,
-    RSSecondary,
-    RSArbiter,
-    RSOther,
-    RSGhost,
-    Unknown,
-}
 
 /// The result of an isMaster operation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IsMasterResult {
-    is_master: bool,
-    max_bson_object_size: i64,
-    max_message_size_bytes: i64,
-    local_time: DateTime<UTC>,
-    min_wire_version: i64,
-    max_wire_version: i64,
+    pub is_master: bool,
+    pub max_bson_object_size: i64,
+    pub max_message_size_bytes: i64,
+    pub local_time: DateTime<UTC>,
+    pub min_wire_version: i64,
+    pub max_wire_version: i64,
 
     // Shards
-    msg: String,
+    pub msg: String,
 
     // Replica Sets
-    is_replica_set: bool,
-    is_secondary: bool,
-    me: Option<Host>,
-    hosts: Vec<Host>,
-    passives: Vec<Host>,
-    arbiters: Vec<Host>,
-    arbiter_only: bool,
-    tags: BTreeMap<String, String>,
-    set_name: String,
-    election_id: Option<oid::ObjectId>,
-    primary: Option<Host>,
-    hidden: bool,
-}
-
-/// Holds status and connection information about a server set.
-#[derive(Clone)]
-pub struct Topology {
-    config: ConnectionString,
-    description: TopologyDescription,
-    servers: Arc<HashMap<Host, RwLock<Server>>>,
-    compatible: bool,
-    compat_error: String,
-}
-
-/// Topology information gathered from server set monitoring.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TopologyDescription {
-    ttype: TopologyType,
-    set_name: String,
-    heartbeat_frequency_ms: u32,
-    max_election_id: Option<oid::ObjectId>,
-}
-
-/// Holds status and connection information about a single server.
-#[derive(Clone)]
-pub struct Server {
-    pub host: Host,
-    pool: Arc<ConnectionPool>,
-    description: Arc<RwLock<ServerDescription>>,
-    monitor_running: Arc<AtomicBool>,
-}
-
-/// Server information gathered from server monitoring.
-#[derive(Clone, Debug)]
-pub struct ServerDescription {
-    stype: ServerType,
-    err: Arc<Option<Error>>,
-    round_trip_time: Option<i64>,
-    min_wire_version: i64,
-    max_wire_version: i64,
-    me: Option<Host>,
-    hosts: Vec<Host>,
-    passives: Vec<Host>,
-    arbiters: Vec<Host>,
-    tags: BTreeMap<String, String>,
-    set_name: String,
-    election_id: Option<oid::ObjectId>,
-    primary: Option<Host>,
+    pub is_replica_set: bool,
+    pub is_secondary: bool,
+    pub me: Option<Host>,
+    pub hosts: Vec<Host>,
+    pub passives: Vec<Host>,
+    pub arbiters: Vec<Host>,
+    pub arbiter_only: bool,
+    pub tags: BTreeMap<String, String>,
+    pub set_name: String,
+    pub election_id: Option<oid::ObjectId>,
+    pub primary: Option<Host>,
+    pub hidden: bool,
 }
 
 /// Monitors and updates server and topology information.
-struct Monitor {
+pub struct Monitor {
     host: Host,
     pool: Arc<ConnectionPool>,
     description: Arc<RwLock<ServerDescription>>,
     socket: TcpStream,
     req_id: Arc<AtomicIsize>,
-    running: Arc<AtomicBool>,
+    pub running: Arc<AtomicBool>,
 }
 
 impl IsMasterResult {
@@ -241,126 +174,6 @@ impl IsMasterResult {
     }
 }
 
-impl TopologyDescription {
-    /// Returns a default, unknown topology description.
-    pub fn new() -> TopologyDescription {
-        TopologyDescription {
-            ttype: TopologyType::Unknown,
-            set_name: String::new(),
-            heartbeat_frequency_ms: DEFAULT_HEARTBEAT_FREQUENCY_MS,
-            max_election_id: None,
-        }
-    }
-}
-
-impl Topology {
-    /// Returns a new topology with the given configuration and description.
-    pub fn new(req_id: Arc<AtomicIsize>, config: ConnectionString,
-               description: Option<TopologyDescription>) -> Result<Topology> {
-
-        let options = description.unwrap_or(TopologyDescription::new());
-
-        if config.hosts.len() > 1 && options.ttype == TopologyType::Single {
-            return Err(ArgumentError(
-                "TopologyType::Single cannot be used with multiple seeds.".to_owned()));
-        }
-
-        if !options.set_name.is_empty() && options.ttype != TopologyType::ReplicaSetNoPrimary {
-            return Err(ArgumentError(
-                "TopologyType must be ReplicaSetNoPrimary if set_name is provided.".to_owned()));
-        }
-
-        // TODO: Determine driver's wire compatibility, and check overlap with
-        // all servers in topology.
-
-        let mut servers = HashMap::new();
-        for host in config.hosts.iter() {
-            let server = Server::new(req_id.clone(), host.clone());
-            servers.insert(host.clone(), RwLock::new(server));
-        }
-
-        Ok(Topology {
-            config: config,
-            description: options,
-            servers: Arc::new(servers),
-            compatible: true,
-            compat_error: String::new(),
-        })
-    }
-
-    /// Returns a server stream.
-    pub fn acquire_stream(&self) -> Result<PooledStream> {
-        for (_, server) in self.servers.iter() {
-            let read_server = try!(server.read());
-            return read_server.acquire_stream()
-        }
-        Err(OperationError("No servers found in configuration.".to_owned()))
-    }
-}
-
-impl ServerDescription {
-    /// Returns a default, unknown server description.
-    fn new() -> ServerDescription {
-        ServerDescription {
-            stype: ServerType::Unknown,
-            err: Arc::new(None),
-            round_trip_time: None,
-            min_wire_version: 0,
-            max_wire_version: 0,
-            me: None,
-            hosts: Vec::new(),
-            passives: Vec::new(),
-            arbiters: Vec::new(),
-            tags: BTreeMap::new(),
-            set_name: String::new(),
-            election_id: None,
-            primary: None,
-        }
-    }
-
-    // Updates the server description using an isMaster server response.
-    fn update(&mut self, ismaster: IsMasterResult) {
-        self.min_wire_version = ismaster.min_wire_version;
-        self.max_wire_version = ismaster.max_wire_version;
-        self.me = ismaster.me;
-        self.hosts = ismaster.hosts;
-        self.passives = ismaster.passives;
-        self.arbiters = ismaster.arbiters;
-        self.tags = ismaster.tags;
-        self.set_name = ismaster.set_name;
-        self.election_id = ismaster.election_id;
-        self.primary = ismaster.primary;
-
-        let hosts_empty = self.hosts.is_empty();
-        let set_name_empty = self.set_name.is_empty();
-        let msg_empty = ismaster.msg.is_empty();
-
-        self.stype = if msg_empty && set_name_empty && hosts_empty {
-            ServerType::Standalone
-        } else if !msg_empty {
-            ServerType::Mongos
-        } else if ismaster.is_master && !set_name_empty {
-            ServerType::RSPrimary
-        } else if ismaster.is_secondary && !set_name_empty {
-            ServerType::RSSecondary
-        } else if ismaster.arbiter_only && !set_name_empty {
-            ServerType::RSArbiter
-        } else if !set_name_empty {
-            ServerType::RSOther
-        } else if ismaster.is_replica_set {
-            ServerType::RSGhost
-        } else {
-            ServerType::Unknown
-        }
-    }
-
-    // Sets an encountered error and reverts the server type to Unknown.
-    fn set_err(&mut self, err: Error) {
-        self.err = Arc::new(Some(err));
-        self.stype = ServerType::Unknown;
-    }
-}
-
 impl Monitor {
     /// Returns a new monitor connected to the server.
     pub fn new(host: Host, pool: Arc<ConnectionPool>,
@@ -464,51 +277,5 @@ impl Monitor {
             }
             thread::sleep_ms(DEFAULT_HEARTBEAT_FREQUENCY_MS);
         }
-    }
-}
-
-impl Server {
-    /// Returns a new server with the given host, initializing a new connection pool and monitor.
-    pub fn new(req_id: Arc<AtomicIsize>, host: Host) -> Server {
-        let description = Arc::new(RwLock::new(ServerDescription::new()));
-
-        // Create new monitor thread
-        let host_clone = host.clone();
-        let desc_clone = description.clone();
-
-        let pool = Arc::new(ConnectionPool::new(host.clone()));
-
-        // Fails silently
-        let monitor = Monitor::new(host_clone, pool.clone(), desc_clone, req_id);
-
-        let monitor_running = if monitor.is_ok() {
-            monitor.as_ref().unwrap().running.clone()
-        } else {
-            Arc::new(AtomicBool::new(false))
-        };
-
-        if monitor.is_ok() {
-            thread::spawn(move || {
-                monitor.unwrap().run();
-            });
-        }
-
-        Server {
-            host: host,
-            pool: pool,
-            description: description.clone(),
-            monitor_running: monitor_running,
-        }
-    }
-
-    /// Returns a server stream from the connection pool.
-    pub fn acquire_stream(&self) -> Result<PooledStream> {
-        self.pool.acquire_stream()
-    }
-}
-
-impl Drop for Server {
-    fn drop(&mut self) {
-        self.monitor_running.store(false, Ordering::SeqCst);
     }
 }
