@@ -168,10 +168,9 @@ impl Collection {
             filter.unwrap_or(bson::Document::new())
         };
 
-        Cursor::query_with_batch_size(self.db.client.clone(), self.namespace.to_owned(),
-                                      options.batch_size, flags, options.skip as i32,
-                                      options.limit, doc, options.projection.clone(),
-                                      cmd_type, false)
+        Cursor::query(self.db.client.clone(), self.namespace.to_owned(), options.batch_size,
+                      flags, options.skip as i32, options.limit, doc,
+                      options.projection.clone(), cmd_type, false)
     }
 
 

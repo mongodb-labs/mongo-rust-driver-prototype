@@ -67,11 +67,10 @@ impl Cursor {
     /// # Return value
     ///
     /// Returns the newly created Cursor on success, or an Error on failure.
-    pub fn command_cursor(client: Client, db: &str, doc: bson::Document,
-                          cmd_type: CommandType) -> Result<Cursor> {
-        Cursor::query_with_batch_size(client.clone(), format!("{}.$cmd", db),
-                                      1, OpQueryFlags::no_flags(), 0, 0,
-                                      doc, None, cmd_type, true)
+    pub fn command_cursor(client: Client, db: &str,
+                          doc: bson::Document, cmd_type: CommandType) -> Result<Cursor> {
+        Cursor::query(client.clone(), format!("{}.$cmd", db), 1, OpQueryFlags::no_flags(), 0, 0,
+                      doc, None, cmd_type, true)
     }
 
     fn get_bson_and_cid_from_message(message: Message) -> Result<(VecDeque<bson::Document>, i64, i32)> {
@@ -159,7 +158,7 @@ impl Cursor {
     ///
     /// Returns the cursor for the query results on success, or an Error on
     /// failure.
-    pub fn query_with_batch_size(client: Client, namespace: String,
+    pub fn query(client: Client, namespace: String,
                                  batch_size: i32, flags: OpQueryFlags,
                                  number_to_skip: i32, number_to_return: i32,
                                  query: bson::Document,
@@ -230,33 +229,15 @@ impl Cursor {
                     limit: number_to_return, count: 0, buffer: buf, })
     }
 
-    /// Executes a query with the default batch size.
-    ///
-    /// # Arguments
-    ///
-    /// `client` - The client to read from.
-    /// `namespace` - The namespace to read and write from.
-    /// `flags` - Bit vector of query options.
-    /// `number_to_skip` - The number of initial documents to skip over in the
-    ///                    query results.
-    /// `number_to_return - The total number of documents that should be
-    ///                     returned by the query.
-    /// `query` - Specifies which documents to return.
-    /// `return_field_selector - An optional projection of which fields should
-    ///                          be present in the documents to be returned by
-    ///                          the query.
-    /// `is_cmd_cursor` - Whether or not the Cursor is for a database command.
+    /// Helper method to create a "get more" request.
     ///
     /// # Return value
     ///
-    /// Returns the cursor for the query results on success, or an error string
-    /// on failure.
-    pub fn query(client: Client, namespace: String, flags: OpQueryFlags, number_to_skip: i32,
-                 number_to_return: i32, query: bson::Document, return_field_selector: Option<bson::Document>, cmd_type: CommandType,
-                 is_cmd_cursor: bool) -> Result<Cursor> {
-        Cursor::query_with_batch_size(client.clone(), namespace, DEFAULT_BATCH_SIZE, flags,
-                                      number_to_skip, number_to_return, query,
-                                      return_field_selector, cmd_type, is_cmd_cursor)
+    /// Returns the newly-created method.
+    fn new_get_more_request(&mut self) -> Message {
+        Message::new_get_more(self.client.get_req_id(),
+                              self.namespace.to_owned(),
+                              self.batch_size, self.cursor_id)
     }
 
     fn get_from_stream(&mut self) -> Result<()> {
