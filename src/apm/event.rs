@@ -20,14 +20,14 @@ impl Display for CommandStarted {
 
 pub enum CommandResult<'a> {
     Success {
-        duration: i64,
+        duration: u64,
         reply: Document,
         command_name: String,
         request_id: i64,
         connection_string: String,
     },
     Failure {
-        duration: i64,
+        duration: u64,
         command_name: String,
         failure: &'a MongoError,
         request_id: i64,
