@@ -6,16 +6,21 @@ use Result;
 
 use bson::oid;
 
+use common::ReadPreference;
 use connstring::{ConnectionString, Host};
 use pool::PooledStream;
+
+use rand::{thread_rng, Rng};
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::AtomicIsize;
+use std::thread;
 
 use self::server::{Server, ServerDescription, ServerType};
 
 const DEFAULT_HEARTBEAT_FREQUENCY_MS: u32 = 10000;
+const MAX_SERVER_RETRY: usize = 3;
 
 /// Describes the type of topology for a server set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,12 +65,71 @@ impl TopologyDescription {
         }
     }
 
-    /// Returns a server stream.
-    pub fn acquire_stream(&self) -> Result<PooledStream> {
-        for (_, server) in self.servers.iter() {
-            return server.acquire_stream()
+    fn get_rand_server_stream(&self) -> Result<PooledStream> {
+        let len = self.servers.len();
+        let key = self.servers.keys().nth(thread_rng().gen_range(0, len)).unwrap();
+        self.servers.get(&key).unwrap().acquire_stream()
+    }
+
+    fn get_nearest_server_stream(&self) -> Result<PooledStream> {
+        self.get_rand_server_stream()
+    }
+    
+    fn get_rand_from_vec(&self, servers: &mut Vec<Host>) -> Result<PooledStream> {
+        while !servers.is_empty() {
+            let len = servers.len();
+            let index = thread_rng().gen_range(0, len);
+
+            if let Some(server) = self.servers.get(servers.get(index).unwrap()) {
+                if let Ok(stream) = server.acquire_stream() {
+                    return Ok(stream);
+                }                
+            }
+            servers.remove(index);
         }
-        Err(OperationError("No servers found in configuration.".to_owned()))
+        Err(OperationError("No servers available for the provided ReadPreference.".to_owned()))
+    }
+
+    /// Returns a server stream.
+    pub fn acquire_stream(&self, read_preference: ReadPreference) -> Result<PooledStream> {
+        if self.servers.is_empty() {
+            return Err(OperationError("No servers are available for the given topology.".to_owned()));
+        }
+
+        match self.ttype {
+            TopologyType::Unknown => Err(OperationError("Topology is not yet known.".to_owned())),
+            TopologyType::Single => self.get_rand_server_stream(),
+            TopologyType::Sharded => self.get_nearest_server_stream(),
+            _ => {
+
+                // Handle replica set server selection
+                let mut primaries = Vec::new();
+                let mut secondaries = Vec::new();
+
+                for (host, server) in self.servers.iter() {
+                    let stype = server.description.read().unwrap().stype;
+                    match stype {
+                        ServerType::RSPrimary => primaries.push(host.clone()),
+                        ServerType::RSSecondary => secondaries.push(host.clone()),
+                        _ => (),
+                    }
+                }
+
+                match read_preference {
+                    ReadPreference::Primary => self.get_rand_from_vec(&mut primaries),
+                    ReadPreference::PrimaryPreferred => {
+                        self.get_rand_from_vec(&mut primaries).or(
+                            self.get_rand_from_vec(&mut secondaries))
+                    },
+                    ReadPreference::Secondary => self.get_rand_from_vec(&mut secondaries),
+                    ReadPreference::SecondaryPreferred => {
+                        self.get_rand_from_vec(&mut secondaries).or(
+                            self.get_rand_from_vec(&mut primaries))
+                    },
+                    ReadPreference::Nearest => self.get_nearest_server_stream(),
+                }
+            }
+        }
     }
 
     /// Updates the topology description based on an updated server description.
@@ -299,6 +363,9 @@ impl Topology {
                 let server = Server::new(req_id.clone(), host.clone(), top_description.clone());
                 top.servers.insert(host.clone(), server);
             }
+            if top.servers.len() == 1 {
+                top.ttype = TopologyType::Single;
+            }
         }
 
         Ok(Topology {
@@ -308,8 +375,21 @@ impl Topology {
     }
 
     /// Returns a server stream.
-    pub fn acquire_stream(&self) -> Result<PooledStream> {
-        let description = try!(self.description.read());
-        description.acquire_stream()
+    pub fn acquire_stream(&self, read_preference: ReadPreference) -> Result<PooledStream> {
+        let mut retry = 0;
+        loop {
+            let description = try!(self.description.read());
+            let result = description.acquire_stream(read_preference);
+            match result {
+                Ok(stream) => return Ok(stream),
+                Err(err) => {
+                    if retry == MAX_SERVER_RETRY {
+                        return Err(err)
+                    }
+                    thread::sleep_ms(500);
+                },
+            }
+            retry += 1;
+        }
     }
 }

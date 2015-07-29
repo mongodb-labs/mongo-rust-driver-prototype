@@ -125,7 +125,7 @@ impl ThreadedClient for Client {
 
     /// Acquires a connection stream from the pool.
     fn acquire_stream(&self) -> Result<PooledStream> {
-        self.topology.acquire_stream()
+        self.topology.acquire_stream(self.read_preference)
     }
 
     /// Returns a unique operational request id.

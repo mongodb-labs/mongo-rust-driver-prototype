@@ -1,7 +1,7 @@
 use bson;
 use bson::Bson;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadPreference {
     Primary,
     PrimaryPreferred,
