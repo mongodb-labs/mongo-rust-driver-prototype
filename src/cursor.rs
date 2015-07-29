@@ -1,5 +1,6 @@
 use apm::{CommandStarted, CommandResult, EventRunner};
 use bson::{self, Bson};
+use time;
 use command_type::CommandType;
 use {Client, Error, ErrorCode, Result, ThreadedClient};
 use wire_protocol::flags::OpQueryFlags;
@@ -166,22 +167,25 @@ impl Cursor {
                                  cmd_type: CommandType, is_cmd_cursor: bool) -> Result<Cursor> {
 
         let req_id = client.get_req_id();
+
+        let stream = try!(client.acquire_stream());
+        let mut socket = stream.get_socket();
+
+
+        let index = namespace.rfind(".").unwrap_or(namespace.len());
+        let db_name = namespace[..index].to_owned();
+        let cmd_name = cmd_type.to_str();
+
+        let connstring = format!("{}", try!(socket.peer_addr()));
+
+        let init_time = time::precise_time_ns();
+
         let result = Message::new_query(req_id, flags,
                                         namespace.to_owned(),
                                         number_to_skip, batch_size,
                                         query.clone(), return_field_selector);
 
-        let stream = try!(client.acquire_stream());
-        let mut socket = stream.get_socket();
-
         let message = try!(result);
-
-        let index = namespace.rfind(".").unwrap_or(namespace.len());
-        let db_name = namespace[..index].to_owned();
-        let cmd_name = cmd_type.to_str();
-        // let is_command = namespace[index..].eq(".$cmd");
-
-        let connstring = format!("{}", try!(socket.peer_addr()));
 
         let hook_result = client.run_start_hooks(&CommandStarted {
             command: query.clone(),
@@ -200,6 +204,8 @@ impl Cursor {
         let reply = try_or_emit!(cmd_name, req_id, connstring, Message::read(&mut socket),
                                  client);
 
+        let fin_time = time::precise_time_ns();
+
         let (buf, cursor_id, namespace, n) = if is_cmd_cursor {
             try_or_emit!(cmd_name, req_id, connstring,
                          Cursor::get_bson_and_cursor_info_from_command_message(reply), client)
@@ -210,19 +216,14 @@ impl Cursor {
             (buf, id, namespace, n)
         };
 
-        // let reply = if is_command {
-        //     buf.front().unwrap().to_owned()
-        // } else {
-        //     doc! { "number_returned" => n }
-        // };
-        //
-        // let _hook_result = client.run_completion_hooks(&CommandResult::Success {
-        //     duration: 0,
-        //     reply: reply,
-        //     command_name: cmd_name.to_owned(),
-        //     request_id: req_id as i64,
-        //     connection_string: connstring,
-        // });
+
+        let _hook_result = client.run_completion_hooks(&CommandResult::Success {
+            duration: fin_time - init_time,
+            reply: doc! { },
+            command_name: cmd_name.to_owned(),
+            request_id: req_id as i64,
+            connection_string: connstring,
+        });
 
         Ok(Cursor { client: client, namespace: namespace,
                     batch_size: batch_size, cursor_id: cursor_id,
