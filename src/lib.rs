@@ -3,8 +3,6 @@ extern crate bson;
 extern crate byteorder;
 extern crate chrono;
 extern crate crypto;
-extern crate libc;
-extern crate rand;
 extern crate rustc_serialize;
 extern crate time;
 
