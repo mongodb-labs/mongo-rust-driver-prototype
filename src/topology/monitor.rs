@@ -28,7 +28,7 @@ pub struct IsMasterResult {
     pub is_master: bool,
     pub max_bson_object_size: i64,
     pub max_message_size_bytes: i64,
-    pub local_time: DateTime<UTC>,
+    pub local_time: Option<DateTime<UTC>>,
     pub min_wire_version: i64,
     pub max_wire_version: i64,
 
@@ -69,28 +69,13 @@ impl IsMasterResult {
             _ => return Err(ArgumentError("result does not contain 'ismaster'.".to_owned())),
         };
 
-        let local_time = match doc.get("localTime") {
-            Some(&Bson::UtcDatetime(ref datetime)) => datetime.clone(),
-            _ => return Err(ArgumentError("result does not contain 'localTime'.".to_owned())),
-        };
-
-        let min_version = match doc.get("minWireVersion") {
-            Some(&Bson::I64(ref v)) => *v,
-            _ => return Err(ArgumentError("result does not contain 'minWireVersion'.".to_owned())),
-        };
-
-        let max_version = match doc.get("maxWireVersion") {
-            Some(&Bson::I64(ref v)) => *v,
-            _ => return Err(ArgumentError("result does not contain 'maxWireVersion'.".to_owned())),
-        };
-
         let mut result = IsMasterResult {
             is_master: is_master,
             max_bson_object_size: DEFAULT_MAX_BSON_OBJECT_SIZE,
             max_message_size_bytes: DEFAULT_MAX_MESSAGE_SIZE_BYTES,
-            local_time: local_time,
-            min_wire_version: min_version,
-            max_wire_version: max_version,
+            local_time: None,
+            min_wire_version: -1,
+            max_wire_version: -1,
             msg: String::new(),
             is_secondary: false,
             is_replica_set: false,
@@ -105,6 +90,20 @@ impl IsMasterResult {
             primary: None,
             hidden: false,
         };
+
+
+        if let Some(&Bson::UtcDatetime(ref datetime)) = doc.get("localTime") {
+            result.local_time = Some(datetime.clone());
+        }
+
+
+        if let Some(&Bson::I64(v)) = doc.get("minWireVersion") {
+            result.min_wire_version = v;
+        }
+
+        if let Some(&Bson::I64(v)) = doc.get("maxWireVersion") {
+            result.max_wire_version = v;
+        }
 
         if let Some(&Bson::String(ref s)) = doc.get("msg") {
             result.msg = s.to_owned();

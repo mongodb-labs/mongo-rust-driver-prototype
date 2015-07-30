@@ -1,7 +1,7 @@
 pub mod server;
 pub mod monitor;
 
-use Error::{ArgumentError, OperationError};
+use Error::{self, ArgumentError, OperationError};
 use Result;
 
 use bson::oid;
@@ -13,6 +13,7 @@ use pool::PooledStream;
 use rand::{thread_rng, Rng};
 
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::AtomicIsize;
 use std::thread;
@@ -38,7 +39,7 @@ pub struct TopologyDescription {
     pub ttype: TopologyType,
     pub set_name: String,
     pub heartbeat_frequency_ms: u32,
-    servers: HashMap<Host, Server>,
+    pub servers: HashMap<Host, Server>,
     max_election_id: Option<oid::ObjectId>,
     compatible: bool,
     compat_error: String,
@@ -49,6 +50,19 @@ pub struct TopologyDescription {
 pub struct Topology {
     pub config: ConnectionString,
     pub description: Arc<RwLock<TopologyDescription>>,
+}
+
+impl FromStr for TopologyType {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        Ok(match s {
+            "Single" => TopologyType::Single,
+            "ReplicaSetNoPrimary" => TopologyType::ReplicaSetNoPrimary,
+            "ReplicaSetWithPrimary" => TopologyType::ReplicaSetWithPrimary,
+            "Sharded" => TopologyType::Sharded,
+            _ => TopologyType::Unknown,
+        })
+    }
 }
 
 impl TopologyDescription {

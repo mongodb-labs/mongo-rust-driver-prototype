@@ -1,6 +1,6 @@
 use bson::Bson;
-use json::arguments::Arguments;
-use json::reader::SuiteContainer;
+use json::crud::arguments::Arguments;
+use json::crud::reader::SuiteContainer;
 use json::eq::{self, NumEq};
 use mongodb::{Client, ThreadedClient};
 use mongodb::db::ThreadedDatabase;

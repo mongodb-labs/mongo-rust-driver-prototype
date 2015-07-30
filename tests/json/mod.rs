@@ -1,8 +1,12 @@
 #[macro_use]
 mod macros;
 
-pub mod arguments;
+pub mod crud;
 pub mod eq;
-mod options;
-pub mod outcome;
-pub mod reader;
+pub mod sdam;
+
+use rustc_serialize::json::Object;
+
+pub trait FromJson {
+    fn from_json(object: &Object) -> Self;
+}
