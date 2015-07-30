@@ -20,6 +20,7 @@ git = "https://github.com/zonyitoo/bson-rs"
 
 [dependencies.mongodb]
 git = "https://github.com/mongodbinc-interns/mongo-rust-driver-prototype"
+branch = "1.0"
 ```
 
 Then, import the bson and driver libraries within your code.

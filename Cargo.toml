@@ -8,13 +8,14 @@ authors = ["Valeri Karpov <valkar207@gmail.com>",
 [dependencies]
 byteorder = "0.3"
 chrono = "0.2"
-libc = "0.1"
-nalgebra = "0.2"
-rand = "0.3"
 rust-crypto = "0.2.31"
 rustc-serialize = "0.3"
 separator = "0.1.0"
 time = "0.1"
+
+[dev-dependencies]
+nalgebra = "0.2"
+rand = "0.3"
 
 [dependencies.bson]
 git = "https://github.com/zonyitoo/bson-rs"

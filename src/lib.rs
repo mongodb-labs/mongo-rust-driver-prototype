@@ -3,8 +3,6 @@ extern crate bson;
 extern crate byteorder;
 extern crate chrono;
 extern crate crypto;
-extern crate libc;
-extern crate rand;
 extern crate rustc_serialize;
 extern crate separator;
 extern crate time;
@@ -78,7 +76,7 @@ pub type Client = Arc<ClientInner>;
 impl ThreadedClient for Client {
     /// Creates a new Client connected to a single MongoDB server.
     fn connect(host: &str, port: u16) -> Result<Client> {
-        Client::with_prefs(host, port, None, None, Some("log.txt"))
+        Client::with_prefs(host, port, None, None, None)
     }
 
     fn connect_with_log_file(host: &str, port: u16, log_file: &str) -> Result<Client> {
