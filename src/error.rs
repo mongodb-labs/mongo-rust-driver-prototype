@@ -135,10 +135,8 @@ impl fmt::Display for Error {
             &Error::PoisonLockError => write!(fmt, "Socket lock poisoned while attempting to access."),
             &Error::CodedError(ref err) => write!(fmt, "{}", err),
             &Error::EventListenerError(ref err) => match err {
-                &Some(ref e) => write!(fmt, "Due to a poisoned lock on the \
-                                            listeners, unable to emit failure \
-                                            \"{}\"", e),
-                &None => write!(fmt, "Due to a poisoned lock on the listeners, unable to emit event")
+                &Some(ref e) => write!(fmt, "Unable to emit failure due to poisoned lock; failure: {}", e),
+                &None => write!(fmt, "Unable to emit failure due to poisoned lock")
             },
             &Error::DefaultError(ref inner) => inner.fmt(fmt),
         }
