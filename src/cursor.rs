@@ -74,20 +74,23 @@ impl Cursor {
                       doc, None, cmd_type, true)
     }
 
-    fn get_bson_and_cid_from_message(message: Message) -> Result<(VecDeque<bson::Document>, i64, i32)> {
+    fn get_bson_and_cid_from_message(message: Message) -> Result<(bson::Document, VecDeque<bson::Document>, i64)> {
         match message {
             Message::OpReply { header: _, flags: _, cursor_id: cid,
-                               starting_from: _, number_returned: n,
+                               starting_from: _, number_returned: _,
                                documents: docs } => {
                 let mut v = VecDeque::new();
 
+                let mut out_doc = doc! {};
+
                 if !docs.is_empty() {
+                    out_doc = docs[0].clone();
                     if let Some(&Bson::I32(ref code)) = docs[0].get("code") {
                         // If command doesn't exist or namespace not found, return
                         // an empty array instead of throwing an error.
                         if *code == ErrorCode::CommandNotFound as i32 ||
                            *code == ErrorCode::NamespaceNotFound as i32 {
-                            return Ok((v, cid, n));
+                            return Ok((docs[0].clone(), v, cid));
                         } else if let Some(&Bson::String(ref msg)) = docs[0].get("errmsg") {
                             return Err(Error::OperationError(msg.to_owned()));
                         }
@@ -98,15 +101,15 @@ impl Cursor {
                     v.push_back(doc.clone());
                 }
 
-                Ok((v, cid, n))
+                Ok((out_doc, v, cid))
             },
             _ => Err(Error::CursorNotFoundError)
         }
     }
 
     fn get_bson_and_cursor_info_from_command_message(message: Message) ->
-           Result<(VecDeque<bson::Document>, i64, String, i32)> {
-        let (v, _, n) = try!(Cursor::get_bson_and_cid_from_message(message));
+           Result<(bson::Document, VecDeque<bson::Document>, i64, String)> {
+        let (first, v, _) = try!(Cursor::get_bson_and_cid_from_message(message));
         if v.len() != 1 {
             return Err(Error::CursorNotFoundError);
         }
@@ -128,7 +131,7 @@ impl Cursor {
                             }
                         }).collect();
 
-                        return Ok((map, *id, ns.to_owned(), n))
+                        return Ok((first, map, *id, ns.to_owned()))
                     }
                 }
             }
@@ -206,20 +209,20 @@ impl Cursor {
 
         let fin_time = time::precise_time_ns();
 
-        let (buf, cursor_id, namespace, n) = if is_cmd_cursor {
+        let (doc, buf, cursor_id, namespace) = if is_cmd_cursor {
             try_or_emit!(cmd_name, req_id, connstring,
                          Cursor::get_bson_and_cursor_info_from_command_message(reply), client)
         } else {
-            let (buf, id, n) = try_or_emit!(cmd_name, req_id, connstring,
+            let (doc, buf, id) = try_or_emit!(cmd_name, req_id, connstring,
                                             Cursor::get_bson_and_cid_from_message(reply),
                                             client);
-            (buf, id, namespace, n)
+            (doc, buf, id, namespace)
         };
 
 
         let _hook_result = client.run_completion_hooks(&CommandResult::Success {
             duration: fin_time - init_time,
-            reply: doc! { },
+            reply: doc,
             command_name: cmd_name.to_owned(),
             request_id: req_id as i64,
             connection_string: connstring,
@@ -228,17 +231,6 @@ impl Cursor {
         Ok(Cursor { client: client, namespace: namespace,
                     batch_size: batch_size, cursor_id: cursor_id,
                     limit: number_to_return, count: 0, buffer: buf, })
-    }
-
-    /// Helper method to create a "get more" request.
-    ///
-    /// # Return value
-    ///
-    /// Returns the newly-created method.
-    fn new_get_more_request(&mut self) -> Message {
-        Message::new_get_more(self.client.get_req_id(),
-                              self.namespace.to_owned(),
-                              self.batch_size, self.cursor_id)
     }
 
     fn get_from_stream(&mut self) -> Result<()> {
@@ -274,7 +266,7 @@ impl Cursor {
         try_or_emit!(cmd_name, req_id, connstring, get_more.write(&mut socket), self.client);
         let reply = try!(Message::read(&mut socket));
 
-        let (v, _, _) = try!(Cursor::get_bson_and_cid_from_message(reply));
+        let (_, v, _) = try!(Cursor::get_bson_and_cid_from_message(reply));
         self.buffer.extend(v);
         Ok(())
     }

@@ -76,7 +76,7 @@ pub type Client = Arc<ClientInner>;
 impl ThreadedClient for Client {
     /// Creates a new Client connected to a single MongoDB server.
     fn connect(host: &str, port: u16) -> Result<Client> {
-        Client::with_prefs(host, port, None, None, None)
+        Client::with_prefs(host, port, None, None, Some("log.txt"))
     }
 
     /// Creates a new Client connected to a single MongoDB server that prints logging
