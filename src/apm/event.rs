@@ -2,6 +2,7 @@ use std::fmt::{Display, Error, Formatter};
 
 use bson::Document;
 use error::Error as MongoError;
+use separator::Separatable;
 
 pub struct CommandStarted {
     pub command: Document,
@@ -41,12 +42,14 @@ impl<'a> Display for CommandResult<'a> {
             &CommandResult::Success { duration, ref reply, ref command_name, request_id: _,
                                      ref connection_string } => {
                 fmt.write_fmt(format_args!("COMMAND.{} {} COMPLETED: {} ({} ns)", command_name,
-                                           connection_string, reply, duration))
+                                           connection_string, reply,
+                                           duration.separated_string()))
             },
             &CommandResult::Failure { duration, ref command_name, ref failure, request_id: _,
                                       ref connection_string } => {
-                fmt.write_fmt(format_args!("COMMAND.{} {} FAILURE: {} ({} NS)", command_name,
-                                           connection_string, failure, duration))
+                fmt.write_fmt(format_args!("COMMAND.{} {} FAILURE: {} ({} ns)", command_name,
+                                           connection_string, failure,
+                                           duration.separated_string()))
             }
         }
     }

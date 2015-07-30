@@ -4,6 +4,7 @@
 *.tmp
 *.o
 *~
+log.txt
 bin/
 target/
 test/
