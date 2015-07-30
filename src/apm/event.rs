@@ -4,6 +4,7 @@ use bson::Document;
 use error::Error as MongoError;
 use separator::Separatable;
 
+/// Contains the information about a given command that started.
 pub struct CommandStarted {
     pub command: Document,
     pub database_name: String,
@@ -19,6 +20,7 @@ impl Display for CommandStarted {
     }
 }
 
+/// Contains the information about a given command that completed.
 pub enum CommandResult<'a> {
     Success {
         duration: u64,

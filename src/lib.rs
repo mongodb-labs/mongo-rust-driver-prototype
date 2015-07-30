@@ -79,6 +79,8 @@ impl ThreadedClient for Client {
         Client::with_prefs(host, port, None, None, None)
     }
 
+    /// Creates a new Client connected to a single MongoDB server that prints logging
+    /// information to a specified file.
     fn connect_with_log_file(host: &str, port: u16, log_file: &str) -> Result<Client> {
         Client::with_prefs(host, port, None, None, Some(log_file))
     }
@@ -203,10 +205,12 @@ impl ThreadedClient for Client {
         }
     }
 
+    /// Sets a function to be run every time a command starts.
     fn add_start_hook(&mut self, hook: fn(Client, &CommandStarted)) -> Result<()> {
         self.listener.add_start_hook(hook)
     }
 
+    /// Sets a function to be run every time a command completes.
     fn add_completion_hook(&mut self, hook: fn(Client, &CommandResult)) -> Result<()> {
         self.listener.add_completion_hook(hook)
     }
