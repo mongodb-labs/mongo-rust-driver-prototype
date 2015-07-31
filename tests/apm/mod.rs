@@ -45,7 +45,6 @@ fn logging() {
         }
     }
 
-
     let client = Client::connect_with_log_file("localhost", 27017, "test_log.txt").unwrap();
     let db = client.db("test");
     let coll = db.collection("logging");
