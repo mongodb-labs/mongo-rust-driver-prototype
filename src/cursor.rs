@@ -80,7 +80,6 @@ impl Cursor {
                                starting_from: _, number_returned: _,
                                documents: docs } => {
                 let mut v = VecDeque::new();
-
                 let mut out_doc = doc! {};
 
                 if !docs.is_empty() {
@@ -162,27 +161,51 @@ impl Cursor {
     ///
     /// Returns the cursor for the query results on success, or an Error on
     /// failure.
-    pub fn query(client: Client, namespace: String,
-                                 batch_size: i32, flags: OpQueryFlags,
-                                 number_to_skip: i32, number_to_return: i32,
-                                 query: bson::Document,
-                                 return_field_selector: Option<bson::Document>,
-                                 cmd_type: CommandType, is_cmd_cursor: bool) -> Result<Cursor> {
-
+    pub fn query(client: Client, namespace: String, batch_size: i32, flags: OpQueryFlags,
+                 number_to_skip: i32, number_to_return: i32, query: bson::Document,
+                 return_field_selector: Option<bson::Document>, cmd_type: CommandType,
+                 is_cmd_cursor: bool) -> Result<Cursor> {
         let req_id = client.get_req_id();
 
         let stream = try!(client.acquire_stream());
         let mut socket = stream.get_socket();
 
-
         let index = namespace.rfind(".").unwrap_or(namespace.len());
         let db_name = namespace[..index].to_owned();
+        let coll_name = namespace[index + 1..].to_owned();
         let cmd_name = cmd_type.to_str();
-
         let connstring = format!("{}", try!(socket.peer_addr()));
 
-        let init_time = time::precise_time_ns();
+        let filter : bson::Document = match query.get("$query") {
+            Some(&Bson::Document(ref doc)) => doc.clone(),
+            _ => doc! {}
+        };
 
+        let projection = match return_field_selector {
+            Some(ref doc) => doc.clone(),
+            None => doc! {}
+        };
+
+        let sort = match query.get("$orderby") {
+            Some(&Bson::Document(ref doc)) => doc.clone(),
+            _ => doc! {}
+        };
+
+        let command = match cmd_type {
+            CommandType::Find => doc! {
+                "find" => coll_name,
+                "filter" => filter,
+                "projection" => projection,
+                "skip" => number_to_skip,
+                "limit" => number_to_return,
+                "batchSize" => batch_size,
+                "sort" => sort
+            },
+            _ => query.clone()
+        };
+
+
+        let init_time = time::precise_time_ns();
         let result = Message::new_query(req_id, flags,
                                         namespace.to_owned(),
                                         number_to_skip, batch_size,
@@ -191,7 +214,7 @@ impl Cursor {
         let message = try!(result);
 
         let hook_result = client.run_start_hooks(&CommandStarted {
-            command: query.clone(),
+            command: command,
             database_name: db_name,
             command_name: cmd_name.to_owned(),
             request_id: req_id as i64,

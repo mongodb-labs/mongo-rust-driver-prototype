@@ -177,7 +177,7 @@ impl Collection {
     /// Returns the first document within the collection that matches the filter, or None.
     pub fn find_one(&self, filter: Option<bson::Document>,
                     options: Option<FindOptions>) -> Result<Option<bson::Document>> {
-        self.find_one_with_command_type(filter, options, CommandType::FindOne)
+        self.find_one_with_command_type(filter, options, CommandType::Find)
     }
 
     pub fn find_one_with_command_type(&self, filter: Option<bson::Document>,
