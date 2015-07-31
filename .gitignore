@@ -4,7 +4,7 @@
 *.tmp
 *.o
 *~
-log.txt
+test_log.txt
 bin/
 target/
 test/
