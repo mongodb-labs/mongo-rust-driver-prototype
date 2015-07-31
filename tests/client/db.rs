@@ -1,6 +1,10 @@
+use bson::{self, Bson};
+use mongodb::{Client, ThreadedClient};
+use mongodb::db::ThreadedDatabase;
+
 #[test]
 fn list_collections() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("list_collections");
 
     db.drop_database().ok().expect("Failed to drop database");
@@ -15,7 +19,7 @@ fn list_collections() {
     let mut cursor = db.list_collections_with_batch_size(None, 1)
         .ok().expect("Failed to execute list_collections command.");;
 
-    let results = cursor.next_n(5);
+    let results = cursor.next_n(5).unwrap();
     assert_eq!(3, results.len());
 
     match results[0].get("name") {
