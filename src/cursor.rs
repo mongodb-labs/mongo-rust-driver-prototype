@@ -242,10 +242,23 @@ impl Cursor {
             (doc, buf, id, namespace)
         };
 
+        let vec : Vec<_> = buf.iter().map(|doc| Bson::Document(doc.clone())).collect();
+
+        let reply = match cmd_type {
+            CommandType::Find => doc! {
+                "cursor" => {
+                    "id" => cursor_id,
+                    "ns" => (&namespace[..]),
+                    "firstBatch" => (Bson::Array(vec))
+                },
+                "ok" => 1
+            },
+            _ => doc
+        };
 
         let _hook_result = client.run_completion_hooks(&CommandResult::Success {
             duration: fin_time - init_time,
-            reply: doc,
+            reply: reply,
             command_name: cmd_name.to_owned(),
             request_id: req_id as i64,
             connection_string: connstring,
