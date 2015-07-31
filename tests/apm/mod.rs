@@ -39,7 +39,13 @@ fn command_duration() {
 
 #[test]
 fn logging() {
-    fs::remove_file("test_log.txt").unwrap();
+    for file in fs::read_dir(".").unwrap() {
+        if file.unwrap().file_name().eq("test_log.txt") {
+            fs::remove_file("test_log.txt").unwrap();
+        }
+    }
+
+
     let client = Client::connect_with_log_file("localhost", 27017, "test_log.txt").unwrap();
     let db = client.db("test");
     let coll = db.collection("logging");
