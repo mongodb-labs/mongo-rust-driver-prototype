@@ -31,7 +31,7 @@ use connstring::ConnectionString;
 use db::{Database, ThreadedDatabase};
 use error::Error::ResponseError;
 use pool::PooledStream;
-use topology::Topology;
+use topology::{Topology, TopologyDescription, TopologyType};
 
 /// Interfaces with a MongoDB server or replica set.
 #[derive(Clone)]
@@ -50,7 +50,7 @@ pub trait ThreadedClient: Sync {
     fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
                               write_concern: Option<WriteConcern>) -> Result<Self>;
     fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>,
-                   write_concern: Option<WriteConcern>) -> Result<Self>;
+                   write_concern: Option<WriteConcern>, description: Option<TopologyDescription>) -> Result<Self>;
     fn db<'a>(&'a self, db_name: &str) -> Database;
     fn db_with_prefs(&self, db_name: &str, read_preference: Option<ReadPreference>,
                          write_concern: Option<WriteConcern>) -> Database;
@@ -73,7 +73,10 @@ impl ThreadedClient for Client {
     fn with_prefs(host: &str, port: u16, read_pref: Option<ReadPreference>,
                   write_concern: Option<WriteConcern>) -> Result<Client> {
         let config = ConnectionString::new(host, port);
-        Client::with_config(config, read_pref, write_concern)
+        let mut description = TopologyDescription::new();
+        description.ttype = TopologyType::Single;
+
+        Client::with_config(config, read_pref, write_concern, Some(description))
     }
 
     /// Creates a new Client connected to a server or replica set using
@@ -87,11 +90,12 @@ impl ThreadedClient for Client {
     fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
                           write_concern: Option<WriteConcern>) -> Result<Client> {
         let config = try!(connstring::parse(uri));
-        Client::with_config(config, read_pref, write_concern)
+        Client::with_config(config, read_pref, write_concern, None)
     }
 
     fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>,
-                   write_concern: Option<WriteConcern>) -> Result<Client> {
+                   write_concern: Option<WriteConcern>, 
+                   description: Option<TopologyDescription>) -> Result<Client> {
 
         let rp = match read_pref {
             Some(rp) => rp,
@@ -106,7 +110,7 @@ impl ThreadedClient for Client {
         let req_id = Arc::new(ATOMIC_ISIZE_INIT);
         Ok(Arc::new(ClientInner {
             req_id: req_id.clone(),
-            topology: try!(Topology::new(req_id, config, None)),
+            topology: try!(Topology::new(req_id, config, description)),
             read_preference: rp,
             write_concern: wc,
         }))

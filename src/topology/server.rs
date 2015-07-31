@@ -1,4 +1,4 @@
-use Error;
+use Error::{self, OperationError};
 use Result;
 
 use bson::oid;
@@ -92,6 +92,11 @@ impl ServerDescription {
 
     // Updates the server description using an isMaster server response.
     pub fn update(&mut self, ismaster: IsMasterResult) {
+        if !ismaster.ok {
+            self.set_err(OperationError("ismaster returned a not-ok response.".to_owned()));
+            return;
+        }
+
         self.min_wire_version = ismaster.min_wire_version;
         self.max_wire_version = ismaster.max_wire_version;
         self.me = ismaster.me;
@@ -103,11 +108,10 @@ impl ServerDescription {
         self.election_id = ismaster.election_id;
         self.primary = ismaster.primary;
 
-        let hosts_empty = self.hosts.is_empty();
         let set_name_empty = self.set_name.is_empty();
         let msg_empty = ismaster.msg.is_empty();
 
-        self.stype = if msg_empty && set_name_empty && hosts_empty {
+        self.stype = if msg_empty && set_name_empty && !ismaster.is_replica_set {
             ServerType::Standalone
         } else if !msg_empty {
             ServerType::Mongos
@@ -130,6 +134,8 @@ impl ServerDescription {
     pub fn set_err(&mut self, err: Error) {
         self.err = Arc::new(Some(err));
         self.stype = ServerType::Unknown;
+        self.set_name = String::new();
+        self.election_id = None;
     }
 }
 

@@ -88,7 +88,7 @@ impl TopologyDescription {
     fn get_nearest_server_stream(&self) -> Result<PooledStream> {
         self.get_rand_server_stream()
     }
-    
+
     fn get_rand_from_vec(&self, servers: &mut Vec<Host>) -> Result<PooledStream> {
         while !servers.is_empty() {
             let len = servers.len();
@@ -97,7 +97,7 @@ impl TopologyDescription {
             if let Some(server) = self.servers.get(servers.get(index).unwrap()) {
                 if let Ok(stream) = server.acquire_stream() {
                     return Ok(stream);
-                }                
+                }
             }
             servers.remove(index);
         }
@@ -172,18 +172,21 @@ impl TopologyDescription {
                     ServerType::RSPrimary => self.update_rs_from_primary(host, description, req_id, top_arc),
                     ServerType::RSSecondary |
                     ServerType::RSArbiter |
-                    ServerType::RSOther => self.update_rs_with_primary_from_member(host, description),
+                    ServerType::RSOther => self.update_rs_without_primary(host, description, req_id, top_arc),
                     _ => self.check_if_has_primary(),
                 }
             },
             TopologyType::ReplicaSetWithPrimary => {
                 match stype {
-                    ServerType::Standalone | ServerType::Mongos => { self.servers.remove(&host); },
+                    ServerType::Standalone | ServerType::Mongos => {
+                        self.servers.remove(&host);
+                        self.check_if_has_primary();
+                    },
                     ServerType::RSPrimary => self.update_rs_from_primary(host, description, req_id, top_arc),
                     ServerType::RSSecondary |
                     ServerType::RSArbiter |
-                    ServerType::RSOther => self.update_rs_without_primary(host, description, req_id, top_arc),
-                    _ => (),
+                    ServerType::RSOther => self.update_rs_with_primary_from_member(host, description),
+                    _ => self.check_if_has_primary(),
                 }
             },
             TopologyType::Sharded => {
@@ -207,6 +210,7 @@ impl TopologyDescription {
         }
         self.ttype = TopologyType::ReplicaSetNoPrimary;
     }
+
 
     // Updates an unknown topology with a new standalone server description.
     fn update_unknown_with_standalone(&mut self, host: Host) {
@@ -247,13 +251,15 @@ impl TopologyDescription {
                         {
                             let mut server_description = server.description.write().unwrap();
                             server_description.stype = ServerType::Unknown;
+                            server_description.set_name = String::new();
+                            server_description.election_id = None;
                         }
                     }
                     self.check_if_has_primary();
                     return;
+                } else {
+                    self.max_election_id = description.election_id.clone();
                 }
-
-            self.max_election_id = description.election_id.clone();
         }
 
         // Invalidate any old primaries
@@ -262,6 +268,8 @@ impl TopologyDescription {
                 let mut server_description = server.description.write().unwrap();
                 if server_description.stype == ServerType::RSPrimary {
                     server_description.stype = ServerType::Unknown;
+                    server_description.set_name = String::new();
+                    server_description.election_id = None;
                 }
             }
         }
@@ -281,6 +289,8 @@ impl TopologyDescription {
         for host in hosts_to_remove {
             self.servers.remove(&host);
         }
+
+        self.check_if_has_primary();
     }
 
     // Updates a replica set topology with a missing primary.
@@ -296,14 +306,17 @@ impl TopologyDescription {
             self.set_name = description.set_name.to_owned();
         } else if self.set_name != description.set_name {
             self.servers.remove(&host);
+            self.check_if_has_primary();
             return;
         }
 
         self.add_missing_hosts(&description, req_id, top_arc);
 
-        if host != description.me.unwrap() {
-            self.servers.remove(&host);
-            return;
+        if let Some(me) = description.me {
+            if host != me {
+                self.servers.remove(&host);
+                self.check_if_has_primary();
+            }
         }
     }
 
@@ -318,8 +331,10 @@ impl TopologyDescription {
             return;
         }
 
-        if host != description.me.unwrap() {
-            self.servers.remove(&host);
+        if let Some(me) = description.me {
+            if host != me {
+                self.servers.remove(&host);
+            }
         }
 
         self.check_if_has_primary();
@@ -357,11 +372,18 @@ impl Topology {
     pub fn new(req_id: Arc<AtomicIsize>, config: ConnectionString,
                description: Option<TopologyDescription>) -> Result<Topology> {
 
-        let options = description.unwrap_or(TopologyDescription::new());
+        let mut options = description.unwrap_or(TopologyDescription::new());
 
         if config.hosts.len() > 1 && options.ttype == TopologyType::Single {
             return Err(ArgumentError(
                 "TopologyType::Single cannot be used with multiple seeds.".to_owned()));
+        }
+
+        if let Some(ref config_opts) = config.options {
+            if let Some(name) = config_opts.options.get("replicaSet") {
+                options.set_name = name.to_owned();
+                options.ttype = TopologyType::ReplicaSetNoPrimary;
+            }
         }
 
         if !options.set_name.is_empty() && options.ttype != TopologyType::ReplicaSetNoPrimary {
@@ -376,9 +398,6 @@ impl Topology {
             for host in config.hosts.iter() {
                 let server = Server::new(req_id.clone(), host.clone(), top_description.clone());
                 top.servers.insert(host.clone(), server);
-            }
-            if top.servers.len() == 1 {
-                top.ttype = TopologyType::Single;
             }
         }
 

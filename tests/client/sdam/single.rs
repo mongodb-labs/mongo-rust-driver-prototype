@@ -1,7 +1,9 @@
-use super::framework::run_suite;
+use mongodb::topology::{TopologyDescription, TopologyType};
 
 use std::fs;
 use std::path::Path;
+
+use super::framework::run_suite;
 
 #[test]
 fn sdam_single() {
@@ -12,7 +14,9 @@ fn sdam_single() {
         let filename = path2.to_string_lossy();
         if filename.ends_with(".json") {
             println!("Running suite for {}", filename);
-            run_suite(&filename)
+            let mut description = TopologyDescription::new();
+            description.ttype = TopologyType::Single;
+            run_suite(&filename, Some(description))
         }
     }
 }
