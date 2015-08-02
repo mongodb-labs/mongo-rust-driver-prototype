@@ -427,7 +427,7 @@ impl Collection {
             start_index += length;
         }
 
-        if exception.unprocessed_requests.len() == 0 {
+        if exception.unprocessed_requests.is_empty() {
             result.bulk_write_exception = Some(exception);
         }
 
@@ -481,7 +481,7 @@ impl Collection {
                       write_concern: Option<WriteConcern>) -> Result<InsertOneResult> {
         let (ids, bulk_exception) = try!(self.insert(vec!(doc), true, write_concern.clone()));
 
-        if ids.len() == 0 {
+        if ids.is_empty() {
             return Err(OperationError("No ids returned for insert_one.".to_owned()));
         }
 
