@@ -1,11 +1,16 @@
+pub mod options;
+pub mod roles;
+
 use bson;
 use bson::Bson;
 use {Client, ThreadedClient, Result};
-use Error::OperationError;
+use Error::{CursorNotFoundError, OperationError};
 use coll::Collection;
 use coll::options::FindOptions;
 use common::{ReadPreference, WriteConcern};
 use cursor::{Cursor, DEFAULT_BATCH_SIZE};
+use self::options::{CreateCollectionOptions, CreateUserOptions, UserInfoOptions};
+use self::roles::Role;
 use std::sync::Arc;
 
 /// Interfaces with a MongoDB database.
@@ -33,9 +38,17 @@ pub trait ThreadedDatabase {
     fn list_collections_with_batch_size(&self, filter: Option<bson::Document>,
                                         batch_size: i32) -> Result<Cursor>;
     fn collection_names(&self, filter: Option<bson::Document>) -> Result<Vec<String>>;
-    fn create_collection(&self, name: &str) -> Result<()>;
+    fn create_collection(&self, name: &str,
+                         options: Option<CreateCollectionOptions>) -> Result<()>;
+    fn create_user(&self, name: &str, password: &str,
+                   options: Option<CreateUserOptions>) -> Result<()>;
     fn drop_database(&self) -> Result<()>;
     fn drop_collection(&self, name: &str) -> Result<()>;
+    fn get_all_users(&self, show_credentials: bool) -> Result<Vec<bson::Document>>;
+    fn get_user(&self, user: &str,
+                options: Option<UserInfoOptions>) -> Result<bson::Document>;
+    fn get_users(&self, users: Vec<&str>,
+                 options: Option<UserInfoOptions>) -> Result<Vec<bson::Document>>;
 }
 
 impl ThreadedDatabase for Database {
@@ -125,8 +138,50 @@ impl ThreadedDatabase for Database {
     ///
     /// Note that due to the implicit creation of collections during insertion, this
     /// method should only be used to instantiate capped collections.
-    fn create_collection(&self, name: &str) -> Result<()> {
-        unimplemented!()
+    fn create_collection(&self, name: &str,
+                         options: Option<CreateCollectionOptions>) -> Result<()> {
+        let coll_options = options.unwrap_or(CreateCollectionOptions::new());
+        let mut doc = doc! {
+            "create" => name,
+            "capped" => (coll_options.capped),
+            "auto_index_id" => (coll_options.auto_index_id)
+        };
+
+        if let Some(i) = coll_options.size {
+            doc.insert("size".to_owned(), Bson::I64(i));
+        }
+
+        if let Some(i) = coll_options.max {
+            doc.insert("max".to_owned(), Bson::I64(i));
+        }
+
+        let flag_one = if coll_options.use_power_of_two_sizes { 1 } else { 0 };
+        let flag_two = if coll_options.no_padding { 2 } else { 0 };
+
+        doc.insert("flags".to_owned(), Bson::I32(flag_one + flag_two));
+
+        self.command(doc).map(|_| ())
+    }
+
+    fn create_user(&self, name: &str, password: &str,
+                   options: Option<CreateUserOptions>) -> Result<()> {
+        let user_options = options.unwrap_or(CreateUserOptions::new());
+        let mut doc = doc! {
+            "createUser" => name,
+            "pwd" => password
+        };
+
+        if let Some(data) = user_options.custom_data {
+            doc.insert("customData".to_owned(), Bson::Document(data));
+        }
+
+        doc.insert("roles".to_owned(), Role::to_bson_array(user_options.roles));
+
+        if let Some(concern) = user_options.write_concern {
+            doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
+        }
+
+        self.command(doc).map(|_| ())
     }
 
     /// Permanently deletes the database from the server.
@@ -143,5 +198,87 @@ impl ThreadedDatabase for Database {
         spec.insert("drop".to_owned(), Bson::String(name.to_owned()));
         try!(self.command(spec));
         Ok(())
+    }
+
+    fn get_all_users(&self, show_credentials: bool) -> Result<Vec<bson::Document>> {
+        let doc = doc! {
+            "usersInfo" => 1,
+            "showCredentials" => show_credentials
+        };
+
+        let out = try!(self.command(doc));
+        let vec = match out.get("users") {
+            Some(&Bson::Array(ref vec)) => vec.clone(),
+            _ => return Err(CursorNotFoundError)
+        };
+
+        let mut users = vec![];
+
+        for bson in vec {
+            match bson {
+                Bson::Document(doc) => users.push(doc),
+                _ => return Err(CursorNotFoundError)
+            };
+        }
+
+        Ok(users)
+    }
+
+    fn get_user(&self, user: &str,
+                options: Option<UserInfoOptions>) -> Result<bson::Document> {
+        let info_options = options.unwrap_or(UserInfoOptions::new());
+
+        let doc = doc! {
+            "usersInfo" => { "user" => user, "db" => (Bson::String(self.name.to_owned())) },
+            "showCredentials" => (info_options.show_credentials),
+            "showPrivileges" => (info_options.show_privileges)
+        };
+
+        let out = match self.command(doc) {
+            Ok(doc) => doc,
+            Err(e) => return Err(e)
+        };
+
+        let users = match out.get("users") {
+            Some(&Bson::Array(ref v)) => v.clone(),
+            _ => return Err(CursorNotFoundError)
+        };
+
+        match users.first() {
+            Some(&Bson::Document(ref doc)) => Ok(doc.clone()),
+            _ => Err(CursorNotFoundError)
+        }
+    }
+
+    fn get_users(&self, users: Vec<&str>,
+                 options: Option<UserInfoOptions>) -> Result<Vec<bson::Document>> {
+        let info_options = options.unwrap_or(UserInfoOptions::new());
+        let vec = users.into_iter().map(|user| {
+            let doc = doc! { "user" => user, "db" => (Bson::String(self.name.to_owned())) };
+            Bson::Document(doc)
+        }).collect();
+
+        let doc = doc! {
+            "usersInfo" => (Bson::Array(vec)),
+            "showCredentials" => (info_options.show_credentials),
+            "showPrivileges" => (info_options.show_privileges)
+        };
+
+        let out = try!(self.command(doc));
+        let vec = match out.get("users") {
+            Some(&Bson::Array(ref vec)) => vec.clone(),
+            _ => return Err(CursorNotFoundError)
+        };
+
+        let mut users = vec![];
+
+        for bson in vec {
+            match bson {
+                Bson::Document(doc) => users.push(doc),
+                _ => return Err(CursorNotFoundError)
+            };
+        }
+
+        Ok(users)
     }
 }
