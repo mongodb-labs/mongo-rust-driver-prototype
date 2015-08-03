@@ -157,20 +157,29 @@ impl TopologyDescription {
         }
     }
 
+    pub fn update_without_monitor(&mut self, host: Host, description: ServerDescription,
+                                  client: Client, top_arc: Arc<RwLock<TopologyDescription>>) {
+        self.update_private(host, description, client, top_arc, false);
+    }
+    
     /// Updates the topology description based on an updated server description.
     pub fn update(&mut self, host: Host, description: ServerDescription,
                   client: Client, top_arc: Arc<RwLock<TopologyDescription>>) {
+        self.update_private(host, description, client, top_arc, true);
+    }
 
+    fn update_private(&mut self, host: Host, description: ServerDescription,
+                  client: Client, top_arc: Arc<RwLock<TopologyDescription>>, run_monitor: bool) {
         let stype = description.server_type;
         match self.topology_type {
             TopologyType::Unknown => {
                 match stype {
                     ServerType::Standalone => self.update_unknown_with_standalone(host),
                     ServerType::Mongos => self.topology_type = TopologyType::Sharded,
-                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, client, top_arc),
+                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, client, top_arc, run_monitor),
                     ServerType::RSSecondary |
                     ServerType::RSArbiter |
-                    ServerType::RSOther => self.update_rs_without_primary(host, description, client, top_arc),
+                    ServerType::RSOther => self.update_rs_without_primary(host, description, client, top_arc, run_monitor),
                     _ => (),
                 }
             },
@@ -180,10 +189,10 @@ impl TopologyDescription {
                         self.servers.remove(&host);
                         self.check_if_has_primary();
                     },
-                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, client, top_arc),
+                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, client, top_arc, run_monitor),
                     ServerType::RSSecondary |
                     ServerType::RSArbiter |
-                    ServerType::RSOther => self.update_rs_without_primary(host, description, client, top_arc),
+                    ServerType::RSOther => self.update_rs_without_primary(host, description, client, top_arc, run_monitor),
                     _ => self.check_if_has_primary(),
                 }
             },
@@ -193,7 +202,7 @@ impl TopologyDescription {
                         self.servers.remove(&host);
                         self.check_if_has_primary();
                     },
-                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, client, top_arc),
+                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, client, top_arc, run_monitor),
                     ServerType::RSSecondary |
                     ServerType::RSArbiter |
                     ServerType::RSOther => self.update_rs_with_primary_from_member(host, description),
@@ -238,7 +247,7 @@ impl TopologyDescription {
 
     // Updates a replica set topology with a new primary server description.
     fn update_rs_from_primary(&mut self, host: Host, description: ServerDescription,
-                              client: Client, top_arc: Arc<RwLock<TopologyDescription>>) {
+                              client: Client, top_arc: Arc<RwLock<TopologyDescription>>, run_monitor: bool) {
 
         if !self.servers.contains_key(&host) {
             return;
@@ -285,7 +294,7 @@ impl TopologyDescription {
             }
         }
 
-        self.add_missing_hosts(&description, client, top_arc);
+        self.add_missing_hosts(&description, client, top_arc, run_monitor);
 
         // Remove hosts that are not reported by the primary.
         let mut hosts_to_remove = Vec::new();
@@ -306,7 +315,7 @@ impl TopologyDescription {
 
     // Updates a replica set topology with a missing primary.
     fn update_rs_without_primary(&mut self, host: Host, description: ServerDescription,
-                                 client: Client, top_arc: Arc<RwLock<TopologyDescription>>) {
+                                 client: Client, top_arc: Arc<RwLock<TopologyDescription>>, run_monitor: bool) {
 
         self.topology_type = TopologyType::ReplicaSetNoPrimary;
         if !self.servers.contains_key(&host) {
@@ -321,7 +330,7 @@ impl TopologyDescription {
             return;
         }
 
-        self.add_missing_hosts(&description, client, top_arc);
+        self.add_missing_hosts(&description, client, top_arc, run_monitor);
 
         if let Some(me) = description.me {
             if host != me {
@@ -353,25 +362,25 @@ impl TopologyDescription {
 
     // Begins monitoring hosts that are not currently being monitored.
     fn add_missing_hosts(&mut self, description: &ServerDescription, client: Client,
-                         top_arc: Arc<RwLock<TopologyDescription>>) {
+                         top_arc: Arc<RwLock<TopologyDescription>>, run_monitor: bool) {
 
         for host in description.hosts.iter() {
             if !self.servers.contains_key(host) {
-                let server = Server::new(client.clone(), host.clone(), top_arc.clone());
+                let server = Server::new(client.clone(), host.clone(), top_arc.clone(), run_monitor);
                 self.servers.insert(host.clone(), server);
             }
         }
 
         for host in description.passives.iter() {
             if !self.servers.contains_key(host) {
-                let server = Server::new(client.clone(), host.clone(), top_arc.clone());
+                let server = Server::new(client.clone(), host.clone(), top_arc.clone(), run_monitor);
                 self.servers.insert(host.clone(), server);
             }
         }
 
         for host in description.arbiters.iter() {
             if !self.servers.contains_key(host) {
-                let server = Server::new(client.clone(), host.clone(), top_arc.clone());
+                let server = Server::new(client.clone(), host.clone(), top_arc.clone(), run_monitor);
                 self.servers.insert(host.clone(), server);
             }
         }

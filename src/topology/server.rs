@@ -174,7 +174,7 @@ impl Drop for Server {
 impl Server {
     /// Returns a new server with the given host, initializing a new connection pool and monitor.
     pub fn new(client: Client, host: Host,
-               top_description: Arc<RwLock<TopologyDescription>>) -> Server {
+               top_description: Arc<RwLock<TopologyDescription>>, run_monitor: bool) -> Server {
 
         let description = Arc::new(RwLock::new(ServerDescription::new()));
 
@@ -185,19 +185,16 @@ impl Server {
         let pool = Arc::new(ConnectionPool::new(host.clone()));
 
         // Fails silently
-        let monitor = Monitor::new(client, host_clone, pool.clone(), top_description, desc_clone);
-
-        let monitor_running = if monitor.is_ok() {
-            monitor.as_ref().unwrap().running.clone()
-        } else {
-            Arc::new(AtomicBool::new(false))
-        };
-
-        if monitor.is_ok() {
+        let monitor_running = if run_monitor {
+            let monitor = Monitor::new(client, host_clone, pool.clone(), top_description, desc_clone);
+            let atomic_val = monitor.as_ref().unwrap().running.clone();
             thread::spawn(move || {
                 monitor.unwrap().run();
             });
-        }
+            atomic_val
+        } else {
+            Arc::new(AtomicBool::new(false))
+        };
 
         Server {
             host: host,

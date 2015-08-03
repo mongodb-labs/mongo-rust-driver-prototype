@@ -22,8 +22,9 @@ pub mod wire_protocol;
 
 mod apm;
 
-pub use error::{Error, ErrorCode, Result};
 pub use apm::{CommandStarted, CommandResult};
+pub use command_type::CommandType;
+pub use error::{Error, ErrorCode, Result};
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -33,7 +34,6 @@ use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 
 use apm::Listener;
 use bson::Bson;
-use command_type::CommandType;
 use common::{ReadPreference, WriteConcern};
 use connstring::ConnectionString;
 use db::{Database, ThreadedDatabase};
@@ -151,7 +151,7 @@ impl ThreadedClient for Client {
             let ref top_description = client.topology.description;
             let mut top = try!(top_description.write());
             for host in config.hosts.iter() {
-                let server = Server::new(client.clone(), host.clone(), top_description.clone());
+                let server = Server::new(client.clone(), host.clone(), top_description.clone(), true);
                 top.servers.insert(host.clone(), server);
             }
         }
