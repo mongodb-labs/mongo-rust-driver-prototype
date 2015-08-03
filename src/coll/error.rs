@@ -338,7 +338,7 @@ impl BulkWriteException {
         };
 
         // Return a bulk-write error if any errors were found.
-        if wc_err.is_none() && w_errs.len() == 0 {
+        if wc_err.is_none() && w_errs.is_empty() {
             Ok(())
         } else {
             Err(Error::BulkWriteError(BulkWriteException::new(Vec::new(), Vec::new(), w_errs, wc_err)))
