@@ -76,6 +76,7 @@ fn create_and_get_users() {
     let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("create_and_get_users");
     db.drop_database().unwrap();
+    db.drop_all_users(None).unwrap();
 
     let saghm_options = CreateUserOptions {
         custom_data: Some(doc! { "foo" => "bar" }),

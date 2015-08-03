@@ -42,8 +42,10 @@ pub trait ThreadedDatabase {
                          options: Option<CreateCollectionOptions>) -> Result<()>;
     fn create_user(&self, name: &str, password: &str,
                    options: Option<CreateUserOptions>) -> Result<()>;
+    fn drop_all_users(&self, write_concern: Option<WriteConcern>) -> Result<(i32)>;
     fn drop_database(&self) -> Result<()>;
     fn drop_collection(&self, name: &str) -> Result<()>;
+    fn drop_user(&self, name: &str, Option<WriteConcern>) -> Result<()>;
     fn get_all_users(&self, show_credentials: bool) -> Result<Vec<bson::Document>>;
     fn get_user(&self, user: &str,
                 options: Option<UserInfoOptions>) -> Result<bson::Document>;
@@ -184,6 +186,22 @@ impl ThreadedDatabase for Database {
         self.command(doc).map(|_| ())
     }
 
+    fn drop_all_users(&self, write_concern: Option<WriteConcern>) -> Result<(i32)> {
+        let mut doc = doc! { "dropAllUsersFromDatabase" => 1 };
+
+        if let Some(concern) = write_concern {
+            doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
+        }
+
+        let response = try!(self.command(doc));
+
+        match response.get("n") {
+            Some(&Bson::I32(i)) => Ok(i),
+            Some(&Bson::I64(i)) => Ok(i as i32),
+            _ => Err(CursorNotFoundError)
+        }
+    }
+
     /// Permanently deletes the database from the server.
     fn drop_database(&self) -> Result<()> {
         let mut spec = bson::Document::new();
@@ -198,6 +216,16 @@ impl ThreadedDatabase for Database {
         spec.insert("drop".to_owned(), Bson::String(name.to_owned()));
         try!(self.command(spec));
         Ok(())
+    }
+
+    fn drop_user(&self, name: &str, write_concern: Option<WriteConcern>) -> Result<()> {
+        let mut doc = doc! { "dropUser" => name };
+
+        if let Some(concern) = write_concern {
+            doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
+        }
+
+        self.command(doc).map(|_| ())
     }
 
     fn get_all_users(&self, show_credentials: bool) -> Result<Vec<bson::Document>> {
