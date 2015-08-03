@@ -33,10 +33,11 @@ pub struct IsMasterResult {
     pub min_wire_version: i64,
     pub max_wire_version: i64,
 
-    // Shards
+    /// Shard-specific. mongos instances will add this field to the
+    /// isMaster reply, and it will contain the value "isdbgrid".
     pub msg: String,
 
-    // Replica Sets
+    // Replica Set specific
     pub is_replica_set: bool,
     pub is_secondary: bool,
     pub me: Option<Host>,
@@ -53,12 +54,20 @@ pub struct IsMasterResult {
 
 /// Monitors and updates server and topology information.
 pub struct Monitor {
+    // Host being monitored.
     host: Host,
+    // Connection pool for the host.
     pool: Arc<ConnectionPool>,
+    // Topology description to update.
     top_description: Arc<RwLock<TopologyDescription>>,
+    // Server description to update.
     server_description: Arc<RwLock<ServerDescription>>,
+    // Owned server connection for monitoring.
     socket: TcpStream,
+    // Client request id generator.
     req_id: Arc<AtomicIsize>,
+    /// While true, the monitor will check server connection health
+    /// at the topology's heartbeat frequency rate.
     pub running: Arc<AtomicBool>,
 }
 
@@ -290,7 +299,7 @@ impl Monitor {
                         break;
                     }
 
-                    let stype = self.server_description.read().unwrap().stype;
+                    let stype = self.server_description.read().unwrap().server_type;
 
                     if stype == ServerType::Unknown {
                         self.set_err(err);
@@ -304,10 +313,9 @@ impl Monitor {
                 }
             }
 
-            if let Ok(description) = self.top_description.read() {
-                thread::sleep_ms(description.heartbeat_frequency_ms);
-            } else {
-                thread::sleep_ms(DEFAULT_HEARTBEAT_FREQUENCY_MS);
+            match self.top_description.read() {
+                Ok(description) => thread::sleep_ms(description.heartbeat_frequency_ms),
+                Err(_) => thread::sleep_ms(DEFAULT_HEARTBEAT_FREQUENCY_MS),
             }
         }
     }

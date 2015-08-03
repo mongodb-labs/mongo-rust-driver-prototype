@@ -73,7 +73,7 @@ impl ThreadedClient for Client {
                   write_concern: Option<WriteConcern>) -> Result<Client> {
         let config = ConnectionString::new(host, port);
         let mut description = TopologyDescription::new();
-        description.ttype = TopologyType::Single;
+        description.topology_type = TopologyType::Single;
 
         Client::with_config(config, read_pref, write_concern, Some(description))
     }

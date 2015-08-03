@@ -15,7 +15,7 @@ fn sdam_single() {
         if filename.ends_with(".json") {
             println!("Running suite for {}", filename);
             let mut description = TopologyDescription::new();
-            description.ttype = TopologyType::Single;
+            description.topology_type = TopologyType::Single;
             run_suite(&filename, Some(description))
         }
     }

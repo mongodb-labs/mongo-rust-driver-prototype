@@ -17,40 +17,66 @@ use super::TopologyDescription;
 /// Describes the server role within a server set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ServerType {
+    /// Standalone server.
     Standalone,
+    /// Shard router.
     Mongos,
+    /// Replica set primary.
     RSPrimary,
+    /// Replica set secondary.
     RSSecondary,
+    /// Replica set arbiter.
     RSArbiter,
+    /// Replica set member of some other type.
     RSOther,
+    /// Replica set ghost member.
     RSGhost,
+    /// Server type is currently unknown.
     Unknown,
 }
 
 /// Server information gathered from server monitoring.
 #[derive(Clone, Debug)]
 pub struct ServerDescription {
-    pub stype: ServerType,
+    /// The server type.
+    pub server_type: ServerType,
+    /// Any error encountered while monitoring this server.
     pub err: Arc<Option<Error>>,
+    /// The average round-trip time over the last 5 monitoring checks.
     pub round_trip_time: Option<i64>,
+    /// The minimum wire version supported by this server.
     pub min_wire_version: i64,
+    /// The maximum wire version supported by this server.
     pub max_wire_version: i64,
+    /// The server's host information, if it is part of a replica set.
     pub me: Option<Host>,
+    /// All hosts in the replica set known by this server.
     pub hosts: Vec<Host>,
+    /// All passive members of the replica set known by this server.
     pub passives: Vec<Host>,
+    /// All arbiters in the replica set known by this server.
     pub arbiters: Vec<Host>,
+    /// Server tags for targeted read operations on specific replica set members.
     pub tags: BTreeMap<String, String>,
+    /// The replica set name.
     pub set_name: String,
+    /// The server's current election id, if it believes it is a primary.
     pub election_id: Option<oid::ObjectId>,
+    /// The server's opinion of who the primary is.
     pub primary: Option<Host>,
 }
 
 /// Holds status and connection information about a single server.
 #[derive(Clone)]
 pub struct Server {
+    /// Host connection details.
     pub host: Host,
+    /// Monitored server information.
     pub description: Arc<RwLock<ServerDescription>>,
+    /// The connection pool for this server.
     pool: Arc<ConnectionPool>,
+    /// A reference to the associated monitor's running bool.
+    /// When this server is dropped, the monitor will be stopped.
     monitor_running: Arc<AtomicBool>,
 }
 
@@ -74,7 +100,7 @@ impl ServerDescription {
     /// Returns a default, unknown server description.
     pub fn new() -> ServerDescription {
         ServerDescription {
-            stype: ServerType::Unknown,
+            server_type: ServerType::Unknown,
             err: Arc::new(None),
             round_trip_time: None,
             min_wire_version: 0,
@@ -111,7 +137,7 @@ impl ServerDescription {
         let set_name_empty = self.set_name.is_empty();
         let msg_empty = ismaster.msg.is_empty();
 
-        self.stype = if msg_empty && set_name_empty && !ismaster.is_replica_set {
+        self.server_type = if msg_empty && set_name_empty && !ismaster.is_replica_set {
             ServerType::Standalone
         } else if !msg_empty {
             ServerType::Mongos
@@ -133,7 +159,7 @@ impl ServerDescription {
     // Sets an encountered error and reverts the server type to Unknown.
     pub fn set_err(&mut self, err: Error) {
         self.err = Arc::new(Some(err));
-        self.stype = ServerType::Unknown;
+        self.server_type = ServerType::Unknown;
         self.set_name = String::new();
         self.election_id = None;
     }

@@ -36,11 +36,19 @@ pub enum TopologyType {
 /// Topology information gathered from server set monitoring.
 #[derive(Clone)]
 pub struct TopologyDescription {
-    pub ttype: TopologyType,
+    pub topology_type: TopologyType,
+    /// The set name for a replica set topology. If the topology
+    /// is not a replica set, this will be an empty string.
     pub set_name: String,
+    /// The server connection health check frequency.
+    /// The default is 10 seconds.
     pub heartbeat_frequency_ms: u32,
+    /// Known servers within the topology.
     pub servers: HashMap<Host, Server>,
+    // The largest election id seen from a server in the topology.
     max_election_id: Option<oid::ObjectId>,
+    // If true, all servers in the topology fall within the compatible
+    // mongodb version for this driver.
     compatible: bool,
     compat_error: String,
 }
@@ -48,7 +56,9 @@ pub struct TopologyDescription {
 /// Holds status and connection information about a server set.
 #[derive(Clone)]
 pub struct Topology {
+    /// The initial connection configuration.
     pub config: ConnectionString,
+    /// Monitored topology information.
     pub description: Arc<RwLock<TopologyDescription>>,
 }
 
@@ -69,7 +79,7 @@ impl TopologyDescription {
     /// Returns a default, unknown topology description.
     pub fn new() -> TopologyDescription {
         TopologyDescription {
-            ttype: TopologyType::Unknown,
+            topology_type: TopologyType::Unknown,
             set_name: String::new(),
             heartbeat_frequency_ms: DEFAULT_HEARTBEAT_FREQUENCY_MS,
             servers: HashMap::new(),
@@ -110,7 +120,7 @@ impl TopologyDescription {
             return Err(OperationError("No servers are available for the given topology.".to_owned()));
         }
 
-        match self.ttype {
+        match self.topology_type {
             TopologyType::Unknown => Err(OperationError("Topology is not yet known.".to_owned())),
             TopologyType::Single => self.get_rand_server_stream(),
             TopologyType::Sharded => self.get_nearest_server_stream(),
@@ -120,8 +130,9 @@ impl TopologyDescription {
                 let mut primaries = Vec::new();
                 let mut secondaries = Vec::new();
 
+                // Collect a list of primaries and secondaries in the set
                 for (host, server) in self.servers.iter() {
-                    let stype = server.description.read().unwrap().stype;
+                    let stype = server.description.read().unwrap().server_type;
                     match stype {
                         ServerType::RSPrimary => primaries.push(host.clone()),
                         ServerType::RSSecondary => secondaries.push(host.clone()),
@@ -129,6 +140,7 @@ impl TopologyDescription {
                     }
                 }
 
+                // Choose an appropriate server at random based on the read preference.
                 match read_preference {
                     ReadPreference::Primary => self.get_rand_from_vec(&mut primaries),
                     ReadPreference::PrimaryPreferred => {
@@ -150,12 +162,12 @@ impl TopologyDescription {
     pub fn update(&mut self, host: Host, description: ServerDescription,
                   req_id: Arc<AtomicIsize>, top_arc: Arc<RwLock<TopologyDescription>>) {
 
-        let stype = description.stype;
-        match self.ttype {
+        let stype = description.server_type;
+        match self.topology_type {
             TopologyType::Unknown => {
                 match stype {
                     ServerType::Standalone => self.update_unknown_with_standalone(host),
-                    ServerType::Mongos => self.ttype = TopologyType::Sharded,
+                    ServerType::Mongos => self.topology_type = TopologyType::Sharded,
                     ServerType::RSPrimary => self.update_rs_from_primary(host, description, req_id, top_arc),
                     ServerType::RSSecondary |
                     ServerType::RSArbiter |
@@ -202,13 +214,13 @@ impl TopologyDescription {
     // Sets the correct replica set topology type.
     fn check_if_has_primary(&mut self) {
         for (_, server) in self.servers.iter() {
-            let stype = server.description.read().unwrap().stype;
+            let stype = server.description.read().unwrap().server_type;
             if stype == ServerType::RSPrimary {
-                self.ttype = TopologyType::ReplicaSetWithPrimary;
+                self.topology_type = TopologyType::ReplicaSetWithPrimary;
                 return;
             }
         }
-        self.ttype = TopologyType::ReplicaSetNoPrimary;
+        self.topology_type = TopologyType::ReplicaSetNoPrimary;
     }
 
 
@@ -219,7 +231,7 @@ impl TopologyDescription {
         }
 
         if self.servers.len() == 1 {
-            self.ttype = TopologyType::Single;
+            self.topology_type = TopologyType::Single;
         } else {
             self.servers.remove(&host);
         }
@@ -250,7 +262,7 @@ impl TopologyDescription {
                     if let Some(server) = self.servers.get(&host) {
                         {
                             let mut server_description = server.description.write().unwrap();
-                            server_description.stype = ServerType::Unknown;
+                            server_description.server_type = ServerType::Unknown;
                             server_description.set_name = String::new();
                             server_description.election_id = None;
                         }
@@ -266,8 +278,8 @@ impl TopologyDescription {
         for (top_host, server) in self.servers.iter() {
             if *top_host != host {
                 let mut server_description = server.description.write().unwrap();
-                if server_description.stype == ServerType::RSPrimary {
-                    server_description.stype = ServerType::Unknown;
+                if server_description.server_type == ServerType::RSPrimary {
+                    server_description.server_type = ServerType::Unknown;
                     server_description.set_name = String::new();
                     server_description.election_id = None;
                 }
@@ -297,7 +309,7 @@ impl TopologyDescription {
     fn update_rs_without_primary(&mut self, host: Host, description: ServerDescription,
                                  req_id: Arc<AtomicIsize>, top_arc: Arc<RwLock<TopologyDescription>>) {
 
-        self.ttype = TopologyType::ReplicaSetNoPrimary;
+        self.topology_type = TopologyType::ReplicaSetNoPrimary;
         if !self.servers.contains_key(&host) {
             return;
         }
@@ -374,7 +386,7 @@ impl Topology {
 
         let mut options = description.unwrap_or(TopologyDescription::new());
 
-        if config.hosts.len() > 1 && options.ttype == TopologyType::Single {
+        if config.hosts.len() > 1 && options.topology_type == TopologyType::Single {
             return Err(ArgumentError(
                 "TopologyType::Single cannot be used with multiple seeds.".to_owned()));
         }
@@ -382,11 +394,11 @@ impl Topology {
         if let Some(ref config_opts) = config.options {
             if let Some(name) = config_opts.options.get("replicaSet") {
                 options.set_name = name.to_owned();
-                options.ttype = TopologyType::ReplicaSetNoPrimary;
+                options.topology_type = TopologyType::ReplicaSetNoPrimary;
             }
         }
 
-        if !options.set_name.is_empty() && options.ttype != TopologyType::ReplicaSetNoPrimary {
+        if !options.set_name.is_empty() && options.topology_type != TopologyType::ReplicaSetNoPrimary {
             return Err(ArgumentError(
                 "TopologyType must be ReplicaSetNoPrimary if set_name is provided.".to_owned()));
         }
