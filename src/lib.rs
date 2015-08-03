@@ -20,8 +20,9 @@ pub mod wire_protocol;
 
 mod apm;
 
-pub use error::{Error, ErrorCode, Result};
 pub use apm::{CommandStarted, CommandResult};
+pub use command_type::CommandType;
+pub use error::{Error, ErrorCode, Result};
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -31,7 +32,6 @@ use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 
 use apm::Listener;
 use bson::Bson;
-use command_type::CommandType;
 use common::{ReadPreference, WriteConcern};
 use connstring::ConnectionString;
 use db::{Database, ThreadedDatabase};

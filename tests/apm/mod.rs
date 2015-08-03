@@ -47,6 +47,7 @@ fn logging() {
 
     let client = Client::connect_with_log_file("localhost", 27017, "test_log.txt").unwrap();
     let db = client.db("test");
+    db.create_collection("logging", None).unwrap();
     let coll = db.collection("logging");
     coll.drop().unwrap();
 
@@ -68,16 +69,26 @@ fn logging() {
     let mut file = BufReader::new(&f);
     let mut line = String::new();
 
+    // Create collection started
+    file.read_line(&mut line).unwrap();
+    assert_eq!("COMMAND.create_collection 127.0.0.1:27017 STARTED: { create: \"logging\", capped: false, auto_index_id: true, flags: 1 }\n", &line);
+
+    // Create Collection completed
+    line.clear();
+    file.read_line(&mut line).unwrap();
+    assert!(line.starts_with("COMMAND.create_collection 127.0.0.1:27017 COMPLETED: { ok: 1 } ("));
+    assert!(line.ends_with(" ns)\n"));
+
     // Drop collection started
+    line.clear();
     file.read_line(&mut line).unwrap();
     assert_eq!("COMMAND.drop_collection 127.0.0.1:27017 STARTED: { drop: \"logging\" }\n", &line);
 
     // Drop collection completed
     line.clear();
     file.read_line(&mut line).unwrap();
-    // Can't assert the contents of the response until `create_collection` is implemented, otherwise
-    // the collection might not exist, so there might be an error message.
-    assert!(line.starts_with("COMMAND.drop_collection 127.0.0.1:27017 COMPLETED: {"));
+    assert!(line.starts_with("COMMAND.drop_collection 127.0.0.1:27017 COMPLETED: { ns: \"test.logging\", nIndexesWas: 1, ok: 1 } ("));
+    assert!(line.ends_with(" ns)\n"));
 
     // First insert started
     line.clear();
@@ -122,4 +133,6 @@ fn logging() {
     file.read_line(&mut line).unwrap();
     assert!(line.starts_with("COMMAND.find 127.0.0.1:27017 COMPLETED: { cursor: { id: 0, ns: \"test.logging\", firstBatch: [{ _id: 2 }, { _id: 3 }] }, ok: 1 } ("));
     assert!(line.ends_with(" ns)\n"));
+
+    coll.drop().unwrap();
 }
