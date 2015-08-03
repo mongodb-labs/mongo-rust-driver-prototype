@@ -75,8 +75,9 @@ fn logging() {
     // Drop collection completed
     line.clear();
     file.read_line(&mut line).unwrap();
-    assert!(line.starts_with("COMMAND.drop_collection 127.0.0.1:27017 COMPLETED: { ns: \"test.logging\", nIndexesWas: 1, ok: 1 } ("));
-    assert!(line.ends_with(" ns)\n"));
+    // Can't assert the contents of the response until `create_collection` is implemented, otherwise
+    // the collection might not exist, so there might be an error message.
+    assert!(line.starts_with("COMMAND.drop_collection 127.0.0.1:27017 COMPLETED: {"));
 
     // First insert started
     line.clear();
