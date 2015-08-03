@@ -4,10 +4,12 @@ extern crate byteorder;
 extern crate chrono;
 extern crate crypto;
 extern crate rustc_serialize;
+extern crate separator;
 extern crate time;
 
 pub mod db;
 pub mod coll;
+pub mod command_type;
 pub mod common;
 pub mod connstring;
 pub mod cursor;
@@ -16,13 +18,20 @@ pub mod gridfs;
 pub mod pool;
 pub mod wire_protocol;
 
+mod apm;
+
 pub use error::{Error, ErrorCode, Result};
+pub use apm::{CommandStarted, CommandResult};
 
-use bson::Bson;
-
-use std::sync::Arc;
+use std::fs::{File, OpenOptions};
+use std::io::Write;
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 
+use apm::Listener;
+use bson::Bson;
+use command_type::CommandType;
 use common::{ReadPreference, WriteConcern};
 use connstring::ConnectionString;
 use db::{Database, ThreadedDatabase};
@@ -30,23 +39,26 @@ use error::Error::ResponseError;
 use pool::{ConnectionPool, PooledStream};
 
 /// Interfaces with a MongoDB server or replica set.
-#[derive(Clone)]
 pub struct ClientInner {
     req_id: Arc<AtomicIsize>,
     pool: ConnectionPool,
+    listener: Listener,
     pub read_preference: ReadPreference,
     pub write_concern: WriteConcern,
+    log_file: Option<Mutex<File>>,
 }
 
-pub trait ThreadedClient: Sync {
+pub trait ThreadedClient: Sync + Sized {
     fn connect(host: &str, port: u16) -> Result<Self>;
+    fn connect_with_log_file(host: &str, port: u16, log_file: &str) -> Result<Client>;
     fn with_prefs(host: &str, port: u16, read_pref: Option<ReadPreference>,
-                      write_concern: Option<WriteConcern>) -> Result<Self>;
+                      write_concern: Option<WriteConcern>,
+                      log_file: Option<&str>) -> Result<Self>;
     fn with_uri(uri: &str) -> Result<Self>;
     fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
                               write_concern: Option<WriteConcern>) -> Result<Self>;
     fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>,
-                   write_concern: Option<WriteConcern>) -> Result<Self>;
+                   write_concern: Option<WriteConcern>, log_file: Option<&str>) -> Result<Self>;
     fn db<'a>(&'a self, db_name: &str) -> Database;
     fn db_with_prefs(&self, db_name: &str, read_preference: Option<ReadPreference>,
                          write_concern: Option<WriteConcern>) -> Database;
@@ -55,6 +67,8 @@ pub trait ThreadedClient: Sync {
     fn database_names(&self) -> Result<Vec<String>>;
     fn drop_database(&self, db_name: &str) -> Result<()>;
     fn is_master(&self) -> Result<bool>;
+    fn add_start_hook(&mut self, hook: fn(Client, &CommandStarted)) -> Result<()>;
+    fn add_completion_hook(&mut self, hook: fn(Client, &CommandResult)) -> Result<()>;
 }
 
 pub type Client = Arc<ClientInner>;
@@ -62,14 +76,20 @@ pub type Client = Arc<ClientInner>;
 impl ThreadedClient for Client {
     /// Creates a new Client connected to a single MongoDB server.
     fn connect(host: &str, port: u16) -> Result<Client> {
-        Client::with_prefs(host, port, None, None)
+        Client::with_prefs(host, port, None, None, None)
+    }
+
+    /// Creates a new Client connected to a single MongoDB server that prints logging
+    /// information to a specified file.
+    fn connect_with_log_file(host: &str, port: u16, log_file: &str) -> Result<Client> {
+        Client::with_prefs(host, port, None, None, Some(log_file))
     }
 
     /// `new` with custom read and write controls.
     fn with_prefs(host: &str, port: u16, read_pref: Option<ReadPreference>,
-                  write_concern: Option<WriteConcern>) -> Result<Client> {
+                  write_concern: Option<WriteConcern>, log_file: Option<&str>) -> Result<Client> {
         let config = ConnectionString::new(host, port);
-        Client::with_config(config, read_pref, write_concern)
+        Client::with_config(config, read_pref, write_concern, log_file)
     }
 
     /// Creates a new Client connected to a server or replica set using
@@ -83,11 +103,11 @@ impl ThreadedClient for Client {
     fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
                           write_concern: Option<WriteConcern>) -> Result<Client> {
         let config = try!(connstring::parse(uri));
-        Client::with_config(config, read_pref, write_concern)
+        Client::with_config(config, read_pref, write_concern, None)
     }
 
     fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>,
-                   write_concern: Option<WriteConcern>) -> Result<Client> {
+                   write_concern: Option<WriteConcern>, log_file: Option<&str>) -> Result<Client> {
 
         let rp = match read_pref {
             Some(rp) => rp,
@@ -99,11 +119,24 @@ impl ThreadedClient for Client {
             None => WriteConcern::new(),
         };
 
+        let listener = Listener::new();
+
+        let file = match log_file {
+            Some(string) => {
+                let _ = listener.add_start_hook(log_command_started);
+                let _ = listener.add_completion_hook(log_command_completed);
+                Some(Mutex::new(try!(OpenOptions::new().write(true).append(true).create(true).open(string))))
+            },
+            None => None,
+        };
+
         Ok(Arc::new(ClientInner {
             req_id: Arc::new(ATOMIC_ISIZE_INIT),
             pool: ConnectionPool::new(config),
+            listener: listener,
             read_preference: rp,
             write_concern: wc,
+            log_file: file,
         }))
     }
 
@@ -134,7 +167,7 @@ impl ThreadedClient for Client {
         doc.insert("listDatabases".to_owned(), Bson::I32(1));
 
         let db = self.db("admin");
-        let res = try!(db.command(doc));
+        let res = try!(db.command(doc, CommandType::ListDatabases));
         if let Some(&Bson::Array(ref batch)) = res.get("databases") {
             // Extract database names
             let map = batch.iter().filter_map(|bdoc| {
@@ -164,11 +197,49 @@ impl ThreadedClient for Client {
         doc.insert("isMaster".to_owned(), Bson::I32(1));
 
         let db = self.db("local");
-        let res = try!(db.command(doc));
+        let res = try!(db.command(doc, CommandType::IsMaster));
 
         match res.get("ismaster") {
             Some(&Bson::Boolean(is_master)) => Ok(is_master),
             _ => Err(ResponseError("Server reply does not contain 'ismaster'.".to_owned())),
         }
     }
+
+    /// Sets a function to be run every time a command starts.
+    fn add_start_hook(&mut self, hook: fn(Client, &CommandStarted)) -> Result<()> {
+        self.listener.add_start_hook(hook)
+    }
+
+    /// Sets a function to be run every time a command completes.
+    fn add_completion_hook(&mut self, hook: fn(Client, &CommandResult)) -> Result<()> {
+        self.listener.add_completion_hook(hook)
+    }
+}
+
+fn log_command_started(client: Client, command_started: &CommandStarted) {
+    let mutex = match client.log_file {
+        Some(ref mutex) => mutex,
+        None => return
+    };
+
+    let mut guard = match mutex.lock() {
+        Ok(guard) => guard,
+        Err(_) => return
+    };
+
+    let _ = writeln!(guard.deref_mut(), "{}", command_started);
+}
+
+fn log_command_completed(client: Client, command_result: &CommandResult) {
+    let mutex = match client.log_file {
+        Some(ref mutex) => mutex,
+        None => return
+    };
+
+    let mut guard = match mutex.lock() {
+        Ok(guard) => guard,
+        Err(_) => return
+    };
+
+    let _ = writeln!(guard.deref_mut(), "{}", command_result);
 }
