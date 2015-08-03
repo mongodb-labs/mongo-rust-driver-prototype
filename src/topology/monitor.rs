@@ -1,19 +1,19 @@
+use {Client, Result};
 use Error::{self, ArgumentError, OperationError};
-use Result;
 
 use bson::{self, Bson, oid};
 use chrono::{DateTime, UTC};
 
 use coll::options::FindOptions;
+use command_type::CommandType;
 use connstring::{self, Host};
 use cursor::Cursor;
 use pool::ConnectionPool;
 use wire_protocol::flags::OpQueryFlags;
 
 use std::collections::BTreeMap;
-use std::net::TcpStream;
 use std::sync::{Arc, RwLock};
-use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 use super::server::{ServerDescription, ServerType};
@@ -57,15 +57,15 @@ pub struct Monitor {
     // Host being monitored.
     host: Host,
     // Connection pool for the host.
-    pool: Arc<ConnectionPool>,
+    server_pool: Arc<ConnectionPool>,
     // Topology description to update.
     top_description: Arc<RwLock<TopologyDescription>>,
     // Server description to update.
     server_description: Arc<RwLock<ServerDescription>>,
-    // Owned server connection for monitoring.
-    socket: TcpStream,
-    // Client request id generator.
-    req_id: Arc<AtomicIsize>,
+    // Client reference.
+    client: Client,
+    // Owned, single-threaded pool.
+    personal_pool: Arc<ConnectionPool>,
     /// While true, the monitor will check server connection health
     /// at the topology's heartbeat frequency rate.
     pub running: Arc<AtomicBool>,
@@ -193,28 +193,19 @@ impl IsMasterResult {
 
 impl Monitor {
     /// Returns a new monitor connected to the server.
-    pub fn new(host: Host, pool: Arc<ConnectionPool>,
+    pub fn new(client: Client, host: Host, pool: Arc<ConnectionPool>,
                top_description: Arc<RwLock<TopologyDescription>>,
-               server_description: Arc<RwLock<ServerDescription>>,
-               req_id: Arc<AtomicIsize>) -> Result<Monitor> {
+               server_description: Arc<RwLock<ServerDescription>>) -> Result<Monitor> {
 
         Ok(Monitor {
-            socket: try!(TcpStream::connect((&host.host_name[..], host.port))),
-            req_id: req_id,
-            host: host,
-            pool: pool,
+            client: client,
+            host: host.clone(),
+            server_pool: pool,
+            personal_pool: Arc::new(ConnectionPool::with_size(host, 1)),
             top_description: top_description,
             server_description: server_description,
             running: Arc::new(AtomicBool::new(false)),
         })
-    }
-
-    /// Reconnects the monitor to the server.
-    pub fn reconnect(&mut self) -> Result<()> {
-        let ref host_name = self.host.host_name;
-        let port = self.host.port;
-        self.socket = try!(TcpStream::connect((&host_name[..], port)));
-        Ok(())
     }
 
     // Set server description error field.
@@ -231,10 +222,12 @@ impl Monitor {
         let mut filter = bson::Document::new();
         filter.insert("isMaster".to_owned(), Bson::I32(1));
 
-        Cursor::query_with_socket(
-            &mut self.socket, None, self.req_id.fetch_add(1, Ordering::SeqCst) as i32,
-            "local.$cmd".to_owned(), options.batch_size, flags, options.skip as i32,
-            options.limit, filter.clone(), options.projection.clone(), false)
+        let stream = try!(self.personal_pool.acquire_stream());
+        
+        Cursor::query_with_stream(
+            stream, self.client.clone(), "local.$cmd".to_owned(), 1,
+            flags, options.skip as i32, 1, filter.clone(), options.projection.clone(),
+            CommandType::IsMaster, false)
     }
 
     // Updates the server description associated with this monitor using an isMaster server response.
@@ -255,8 +248,8 @@ impl Monitor {
     // Updates the topology description associated with this monitor using a new server description.
     fn update_top_description(&self, description: ServerDescription) {
         let mut top_description = self.top_description.write().unwrap();
-        top_description.update(self.host.clone(), description,
-                               self.req_id.clone(), self.top_description.clone());
+        top_description.update(self.host.clone(), description, self.client.clone(),
+                               self.top_description.clone());
     }
 
     // Updates server and topology descriptions using a successful isMaster cursor result.
@@ -293,11 +286,8 @@ impl Monitor {
                 Ok(mut cursor) => self.update_with_is_master_cursor(&mut cursor),
                 Err(err) => {
                     // Refresh all connections
-                    self.pool.clear();
-                    if let Err(err) = self.reconnect() {
-                        self.set_err(err);
-                        break;
-                    }
+                    self.server_pool.clear();
+                    self.personal_pool.clear();
 
                     let stype = self.server_description.read().unwrap().server_type;
 

@@ -1,12 +1,16 @@
 use {Client, Error, ErrorCode, Result, ThreadedClient};
+use apm::{CommandStarted, CommandResult, EventRunner};
 
-use bson::{self, Bson};
-
+use command_type::CommandType;
+use pool::PooledStream;
 use wire_protocol::flags::OpQueryFlags;
 use wire_protocol::operations::Message;
 
+use bson::{self, Bson};
+
 use std::collections::vec_deque::VecDeque;
 use std::io::{Read, Write};
+use time;
 
 pub const DEFAULT_BATCH_SIZE: i32 = 20;
 
@@ -25,13 +29,35 @@ pub const DEFAULT_BATCH_SIZE: i32 = 20;
 /// `buffer` - A cache for documents received from the query that have not
 ///            yet been returned.
 pub struct Cursor {
-    client: Option<Client>,
+    client: Client,
     namespace: String,
     batch_size: i32,
     cursor_id: i64,
     limit: i32,
     count: i32,
     buffer: VecDeque<bson::Document>,
+}
+
+macro_rules! try_or_emit {
+    ($cmd_name:expr, $req_id:expr, $connstring:expr, $result:expr, $client:expr) => {
+        match $result {
+            Ok(val) => val,
+            Err(e) => {
+                let hook_result = $client.run_completion_hooks(&CommandResult::Failure {
+                    duration: 0,
+                    command_name: $cmd_name.to_owned(),
+                    failure: &e,
+                    request_id: $req_id as i64,
+                    connection_string: $connstring,
+                });
+
+                return match hook_result {
+                    Ok(_) => Err(e),
+                    Err(_) => Err(Error::EventListenerError(Some(Box::new(e))))
+                }
+            }
+        }
+    };
 }
 
 impl Cursor {
@@ -47,28 +73,30 @@ impl Cursor {
     ///
     /// Returns the newly created Cursor on success, or an Error on failure.
     pub fn command_cursor(client: Client, db: &str,
-                          doc: bson::Document) -> Result<Cursor> {
+                          doc: bson::Document, cmd_type: CommandType) -> Result<Cursor> {
         Cursor::query(client.clone(), format!("{}.$cmd", db), 1, OpQueryFlags::no_flags(), 0, 0,
-                      doc, None, true)
+                      doc, None, cmd_type, true)
     }
 
-    fn get_bson_and_cid_from_message(message: Message) -> Result<(VecDeque<bson::Document>, i64)> {
+    fn get_bson_and_cid_from_message(message: Message) -> Result<(bson::Document, VecDeque<bson::Document>, i64)> {
         match message {
             Message::OpReply { header: _, flags: _, cursor_id: cid,
                                starting_from: _, number_returned: _,
                                documents: docs } => {
                 let mut v = VecDeque::new();
+                let mut out_doc = doc! {};
 
                 if !docs.is_empty() {
+                    out_doc = docs[0].clone();
                     if let Some(&Bson::I32(ref code)) = docs[0].get("code") {
                         // If command doesn't exist or namespace not found, return
                         // an empty array instead of throwing an error.
                         if *code == ErrorCode::CommandNotFound as i32 ||
-                           *code == ErrorCode::NamespaceNotFound as i32 {
-                            return Ok((v, cid));
-                        } else if let Some(&Bson::String(ref msg)) = docs[0].get("errmsg") {
-                            return Err(Error::OperationError(msg.to_owned()));
-                        }
+                            *code == ErrorCode::NamespaceNotFound as i32 {
+                                return Ok((docs[0].clone(), v, cid));
+                            } else if let Some(&Bson::String(ref msg)) = docs[0].get("errmsg") {
+                                return Err(Error::OperationError(msg.to_owned()));
+                            }
                     }
                 }
 
@@ -76,43 +104,44 @@ impl Cursor {
                     v.push_back(doc.clone());
                 }
 
-                Ok((v, cid))
+                Ok((out_doc, v, cid))
             },
             _ => Err(Error::CursorNotFoundError)
         }
     }
 
-    fn get_bson_and_cursor_info_from_command_message(message: Message) -> Result<(VecDeque<bson::Document>, i64, String)> {
-        let (v, _) = try!(Cursor::get_bson_and_cid_from_message(message));
-        if v.len() != 1 {
-            return Err(Error::CursorNotFoundError);
-        }
+    fn get_bson_and_cursor_info_from_command_message(message: Message) ->
+        Result<(bson::Document, VecDeque<bson::Document>, i64, String)> {
+            let (first, v, _) = try!(Cursor::get_bson_and_cid_from_message(message));
+            if v.len() != 1 {
+                return Err(Error::CursorNotFoundError);
+            }
 
-        let ref doc = v[0];
+            let ref doc = v[0];
 
-        // Extract cursor information
-        if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
-            if let Some(&Bson::I64(ref id)) = cursor.get("id") {
-                if let Some(&Bson::String(ref ns)) = cursor.get("ns") {
-                    if let Some(&Bson::Array(ref batch)) = cursor.get("firstBatch") {
+            // Extract cursor information
+            if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
+                if let Some(&Bson::I64(ref id)) = cursor.get("id") {
+                    if let Some(&Bson::String(ref ns)) = cursor.get("ns") {
+                        if let Some(&Bson::Array(ref batch)) = cursor.get("firstBatch") {
 
-                        // Extract first batch documents
-                        let map = batch.iter().filter_map(|bdoc| {
-                            if let &Bson::Document(ref doc) = bdoc {
-                                Some(doc.clone())
-                            } else {
-                                None
-                            }
-                        }).collect();
+                            // Extract first batch documents
+                            let map = batch.iter().filter_map(|bdoc| {
+                                if let &Bson::Document(ref doc) = bdoc {
+                                    Some(doc.clone())
+                                } else {
+                                    None
+                                }
+                            }).collect();
 
-                        return Ok((map, *id, ns.to_owned()))
+                            return Ok((first, map, *id, ns.to_owned()))
+                        }
                     }
                 }
             }
-        }
 
-        Err(Error::CursorNotFoundError)
-    }
+            Err(Error::CursorNotFoundError)
+        }
 
     /// Executes a query where the batch size of the returned cursor is
     /// specified.
@@ -131,78 +160,165 @@ impl Cursor {
     ///                          be present in the documents to be returned by
     ///                          the query.
     /// `is_cmd_cursor` - Whether or not the Cursor is for a database command.
-    ///
+    /// `monitor_host` - The host being monitored, if this is a query from a server monitor.
     /// # Return value
     ///
     /// Returns the cursor for the query results on success, or an Error on
     /// failure.
-    pub fn query(client: Client, namespace: String,
-                 batch_size: i32, flags: OpQueryFlags,
-                 number_to_skip: i32, number_to_return: i32,
-                 query: bson::Document,
-                 return_field_selector: Option<bson::Document>,
+    pub fn query(client: Client, namespace: String, batch_size: i32, flags: OpQueryFlags,
+                 number_to_skip: i32, number_to_return: i32, query: bson::Document,
+                 return_field_selector: Option<bson::Document>, cmd_type: CommandType,
                  is_cmd_cursor: bool) -> Result<Cursor> {
+
         let stream = try!(client.acquire_stream());
-        let mut socket = stream.get_socket();
-        Cursor::query_with_socket(&mut socket, Some(client.clone()), client.get_req_id(),
-                                  namespace, batch_size, flags,
+        Cursor::query_with_stream(stream, client, namespace, batch_size, flags,
                                   number_to_skip, number_to_return, query,
-                                  return_field_selector, is_cmd_cursor)
+                                  return_field_selector, cmd_type, is_cmd_cursor)
     }
 
-    pub fn query_with_socket<T: Read + Write>(socket: &mut T, client: Option<Client>,
-                                              req_id: i32, namespace: String,
-                                              batch_size: i32, flags: OpQueryFlags,
-                                              number_to_skip: i32, number_to_return: i32,
-                                              query: bson::Document,
-                                              return_field_selector: Option<bson::Document>,
-                                              is_cmd_cursor: bool) -> Result<Cursor> {
+    pub fn query_with_stream(stream: PooledStream,
+                             client: Client, namespace: String,
+                             batch_size: i32, flags: OpQueryFlags,
+                             number_to_skip: i32, number_to_return: i32,
+                             query: bson::Document,
+                             return_field_selector: Option<bson::Document>,
+                             cmd_type: CommandType,
+                             is_cmd_cursor: bool) -> Result<Cursor> {
 
+        let mut socket = stream.get_socket();
+        let req_id = client.get_req_id();
+
+        let index = namespace.rfind(".").unwrap_or(namespace.len());
+        let db_name = namespace[..index].to_owned();
+        let coll_name = namespace[index + 1..].to_owned();
+        let cmd_name = cmd_type.to_str();
+        let connstring = format!("{}", try!(socket.peer_addr()));
+
+        let filter : bson::Document = match query.get("$query") {
+            Some(&Bson::Document(ref doc)) => doc.clone(),
+            _ => doc! {}
+        };
+
+        let projection = match return_field_selector {
+            Some(ref doc) => doc.clone(),
+            None => doc! {}
+        };
+
+        let sort = match query.get("$orderby") {
+            Some(&Bson::Document(ref doc)) => doc.clone(),
+            _ => doc! {}
+        };
+
+        let command = match cmd_type {
+            CommandType::Find => doc! {
+                "find" => coll_name,
+                "filter" => filter,
+                "projection" => projection,
+                "skip" => number_to_skip,
+                "limit" => number_to_return,
+                "batchSize" => batch_size,
+                "sort" => sort
+            },
+            _ => query.clone()
+        };
+
+
+        let init_time = time::precise_time_ns();
         let result = Message::new_query(req_id, flags,
                                         namespace.to_owned(),
                                         number_to_skip, batch_size,
-                                        query, return_field_selector);
+                                        query.clone(), return_field_selector);
 
         let message = try!(result);
-        try!(message.write(socket));
-        let reply = try!(Message::read(socket));
 
-        let (buf, cursor_id, namespace) = if is_cmd_cursor {
-            try!(Cursor::get_bson_and_cursor_info_from_command_message(reply))
-        } else {
-            let (buf, id) = try!(Cursor::get_bson_and_cid_from_message(reply));
-            (buf, id, namespace)
+        let hook_result = client.run_start_hooks(&CommandStarted {
+            command: command,
+            database_name: db_name,
+            command_name: cmd_name.to_owned(),
+            request_id: req_id as i64,
+            connection_string: connstring.clone(),
+        });
+
+        match hook_result {
+            Ok(_) => (),
+            Err(_) => return Err(Error::EventListenerError(None))
         };
+
+        try_or_emit!(cmd_name, req_id, connstring, message.write(&mut socket), client);
+        let reply = try_or_emit!(cmd_name, req_id, connstring, Message::read(&mut socket),
+                                 client);
+
+        let fin_time = time::precise_time_ns();
+
+        let (doc, buf, cursor_id, namespace) = if is_cmd_cursor {
+            try_or_emit!(cmd_name, req_id, connstring,
+                         Cursor::get_bson_and_cursor_info_from_command_message(reply), client)
+        } else {
+            let (doc, buf, id) = try_or_emit!(cmd_name, req_id, connstring,
+                                              Cursor::get_bson_and_cid_from_message(reply),
+                                              client);
+            (doc, buf, id, namespace)
+        };
+
+        let vec : Vec<_> = buf.iter().map(|doc| Bson::Document(doc.clone())).collect();
+
+        let reply = match cmd_type {
+            CommandType::Find => doc! {
+                "cursor" => {
+                    "id" => cursor_id,
+                    "ns" => (&namespace[..]),
+                    "firstBatch" => (Bson::Array(vec))
+                },
+                "ok" => 1
+            },
+            _ => doc
+        };
+
+        let _hook_result = client.run_completion_hooks(&CommandResult::Success {
+            duration: fin_time - init_time,
+            reply: reply,
+            command_name: cmd_name.to_owned(),
+            request_id: req_id as i64,
+            connection_string: connstring,
+        });
 
         Ok(Cursor { client: client, namespace: namespace,
                     batch_size: batch_size, cursor_id: cursor_id,
-                    limit: number_to_return, count: 0, buffer: buf, })        
-    }
-
-    /// Helper method to create a "get more" request.
-    ///
-    /// # Return value
-    ///
-    /// Returns the newly-created method.
-    fn new_get_more_request(&mut self) -> Message {
-        Message::new_get_more(self.client.as_ref().unwrap().get_req_id(),
-                              self.namespace.to_owned(),
-                              self.batch_size, self.cursor_id)
+                    limit: number_to_return, count: 0, buffer: buf, })
     }
 
     fn get_from_stream(&mut self) -> Result<()> {
-        if self.client.is_none() {
-            return Ok(())
-        }
-
-        let stream = try!(self.client.as_ref().unwrap().acquire_stream());
+        let stream = try!(self.client.acquire_stream());
         let mut socket = stream.get_socket();
 
-        let get_more = self.new_get_more_request();
-        try!(get_more.write(&mut socket));
+        let req_id = self.client.get_req_id();
+        let get_more = Message::new_get_more(req_id, self.namespace.to_owned(), self.batch_size,
+                                             self.cursor_id);
+
+
+        let index = self.namespace.rfind(".").unwrap_or(self.namespace.len());
+        let db_name = self.namespace[..index].to_owned();
+        let cmd_name = "get_more".to_owned();
+        let connstring = format!("{}", try!(socket.peer_addr()));
+
+
+        let hook_result = self.client.run_start_hooks(&CommandStarted {
+            command: doc! { "cursor_id" => (self.cursor_id) },
+            database_name: db_name,
+            command_name: cmd_name.clone(),
+            request_id: req_id as i64,
+            connection_string: connstring.clone(),
+        });
+
+        match hook_result {
+            Ok(_) => (),
+            Err(_) => return Err(Error::EventListenerError(None))
+        };
+
+        try_or_emit!(cmd_name, req_id, connstring, get_more.write(&mut socket), self.client);
         let reply = try!(Message::read(&mut socket));
 
-        let (v, _) = try!(Cursor::get_bson_and_cid_from_message(reply));
+        let (_, v, _) = try!(Cursor::get_bson_and_cid_from_message(reply));
         self.buffer.extend(v);
         Ok(())
     }

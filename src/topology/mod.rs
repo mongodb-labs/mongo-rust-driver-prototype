@@ -1,8 +1,8 @@
 pub mod server;
 pub mod monitor;
 
+use {Client, Result};
 use Error::{self, ArgumentError, OperationError};
-use Result;
 
 use bson::oid;
 
@@ -15,7 +15,6 @@ use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use std::sync::atomic::AtomicIsize;
 use std::thread;
 
 use self::server::{Server, ServerDescription, ServerType};
@@ -160,7 +159,7 @@ impl TopologyDescription {
 
     /// Updates the topology description based on an updated server description.
     pub fn update(&mut self, host: Host, description: ServerDescription,
-                  req_id: Arc<AtomicIsize>, top_arc: Arc<RwLock<TopologyDescription>>) {
+                  client: Client, top_arc: Arc<RwLock<TopologyDescription>>) {
 
         let stype = description.server_type;
         match self.topology_type {
@@ -168,10 +167,10 @@ impl TopologyDescription {
                 match stype {
                     ServerType::Standalone => self.update_unknown_with_standalone(host),
                     ServerType::Mongos => self.topology_type = TopologyType::Sharded,
-                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, req_id, top_arc),
+                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, client, top_arc),
                     ServerType::RSSecondary |
                     ServerType::RSArbiter |
-                    ServerType::RSOther => self.update_rs_without_primary(host, description, req_id, top_arc),
+                    ServerType::RSOther => self.update_rs_without_primary(host, description, client, top_arc),
                     _ => (),
                 }
             },
@@ -181,10 +180,10 @@ impl TopologyDescription {
                         self.servers.remove(&host);
                         self.check_if_has_primary();
                     },
-                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, req_id, top_arc),
+                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, client, top_arc),
                     ServerType::RSSecondary |
                     ServerType::RSArbiter |
-                    ServerType::RSOther => self.update_rs_without_primary(host, description, req_id, top_arc),
+                    ServerType::RSOther => self.update_rs_without_primary(host, description, client, top_arc),
                     _ => self.check_if_has_primary(),
                 }
             },
@@ -194,7 +193,7 @@ impl TopologyDescription {
                         self.servers.remove(&host);
                         self.check_if_has_primary();
                     },
-                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, req_id, top_arc),
+                    ServerType::RSPrimary => self.update_rs_from_primary(host, description, client, top_arc),
                     ServerType::RSSecondary |
                     ServerType::RSArbiter |
                     ServerType::RSOther => self.update_rs_with_primary_from_member(host, description),
@@ -239,7 +238,7 @@ impl TopologyDescription {
 
     // Updates a replica set topology with a new primary server description.
     fn update_rs_from_primary(&mut self, host: Host, description: ServerDescription,
-                              req_id: Arc<AtomicIsize>, top_arc: Arc<RwLock<TopologyDescription>>) {
+                              client: Client, top_arc: Arc<RwLock<TopologyDescription>>) {
 
         if !self.servers.contains_key(&host) {
             return;
@@ -286,7 +285,7 @@ impl TopologyDescription {
             }
         }
 
-        self.add_missing_hosts(&description, req_id, top_arc);
+        self.add_missing_hosts(&description, client, top_arc);
 
         // Remove hosts that are not reported by the primary.
         let mut hosts_to_remove = Vec::new();
@@ -307,7 +306,7 @@ impl TopologyDescription {
 
     // Updates a replica set topology with a missing primary.
     fn update_rs_without_primary(&mut self, host: Host, description: ServerDescription,
-                                 req_id: Arc<AtomicIsize>, top_arc: Arc<RwLock<TopologyDescription>>) {
+                                 client: Client, top_arc: Arc<RwLock<TopologyDescription>>) {
 
         self.topology_type = TopologyType::ReplicaSetNoPrimary;
         if !self.servers.contains_key(&host) {
@@ -322,7 +321,7 @@ impl TopologyDescription {
             return;
         }
 
-        self.add_missing_hosts(&description, req_id, top_arc);
+        self.add_missing_hosts(&description, client, top_arc);
 
         if let Some(me) = description.me {
             if host != me {
@@ -353,26 +352,26 @@ impl TopologyDescription {
     }
 
     // Begins monitoring hosts that are not currently being monitored.
-    fn add_missing_hosts(&mut self, description: &ServerDescription, req_id: Arc<AtomicIsize>,
+    fn add_missing_hosts(&mut self, description: &ServerDescription, client: Client,
                          top_arc: Arc<RwLock<TopologyDescription>>) {
 
         for host in description.hosts.iter() {
             if !self.servers.contains_key(host) {
-                let server = Server::new(req_id.clone(), host.clone(), top_arc.clone());
+                let server = Server::new(client.clone(), host.clone(), top_arc.clone());
                 self.servers.insert(host.clone(), server);
             }
         }
 
         for host in description.passives.iter() {
             if !self.servers.contains_key(host) {
-                let server = Server::new(req_id.clone(), host.clone(), top_arc.clone());
+                let server = Server::new(client.clone(), host.clone(), top_arc.clone());
                 self.servers.insert(host.clone(), server);
             }
         }
 
         for host in description.arbiters.iter() {
             if !self.servers.contains_key(host) {
-                let server = Server::new(req_id.clone(), host.clone(), top_arc.clone());
+                let server = Server::new(client.clone(), host.clone(), top_arc.clone());
                 self.servers.insert(host.clone(), server);
             }
         }
@@ -381,8 +380,7 @@ impl TopologyDescription {
 
 impl Topology {
     /// Returns a new topology with the given configuration and description.
-    pub fn new(req_id: Arc<AtomicIsize>, config: ConnectionString,
-               description: Option<TopologyDescription>) -> Result<Topology> {
+    pub fn new(config: ConnectionString, description: Option<TopologyDescription>) -> Result<Topology> {
 
         let mut options = description.unwrap_or(TopologyDescription::new());
 
@@ -404,15 +402,7 @@ impl Topology {
         }
 
         let top_description = Arc::new(RwLock::new(options));
-
-        {
-            let mut top = try!(top_description.write());
-            for host in config.hosts.iter() {
-                let server = Server::new(req_id.clone(), host.clone(), top_description.clone());
-                top.servers.insert(host.clone(), server);
-            }
-        }
-
+        
         Ok(Topology {
             config: config,
             description: top_description,

@@ -5,5 +5,6 @@ extern crate rand;
 extern crate rustc_serialize;
 extern crate nalgebra;
 
+mod apm;
 mod client;
 mod json;

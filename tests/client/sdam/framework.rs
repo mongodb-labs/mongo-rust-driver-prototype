@@ -1,20 +1,20 @@
+use mongodb::{Client, ThreadedClient};
 use mongodb::Error::OperationError;
 use mongodb::connstring;
 use mongodb::topology::{Topology, TopologyDescription, TopologyType};
 use mongodb::topology::monitor::IsMasterResult;
+use mongodb::topology::server::Server;
 
 use json::sdam::reader::SuiteContainer;
 use rustc_serialize::json::Json;
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::AtomicIsize;
 
 pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
     let json = Json::from_file(file).unwrap();
     let suite = json.get_suite().unwrap();
 
-    let dummy_req_id = Arc::new(AtomicIsize::new(0));
+    let dummy_client = Client::connect("localhost", 27017).unwrap();
     let connection_string = connstring::parse(&suite.uri).unwrap();
 
     // For a standalone topology with multiple startup servers, the user
@@ -27,15 +27,22 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
     };
 
     let topology = if should_ignore_description {
-        Topology::new(dummy_req_id.clone(), connection_string, None).unwrap()
+        Topology::new(connection_string.clone(), None).unwrap()
     } else {
-        Topology::new(dummy_req_id.clone(), connection_string, description).unwrap()
+        Topology::new(connection_string.clone(), description).unwrap()
     };
 
     let top_description_arc = topology.description.clone();
 
     let mut servers = HashMap::new();
 
+    // Fill servers array
+    for host in connection_string.hosts.iter() {
+        let mut topology_description = topology.description.write().unwrap();
+        let server = Server::new(dummy_client.clone(), host.clone(), top_description_arc.clone());
+        topology_description.servers.insert(host.clone(), server);
+    }
+    
     let mut i = 0;
     for phase in suite.phases {
         println!("Running phase {}", i);
@@ -53,7 +60,7 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
 
             let mut topology_description = topology.description.write().unwrap();
 
-            if response.is_empty() {
+            if response.is_empty() {                
                 let server = servers.get(&host).expect("Host not found.");
                 let mut server_description = server.description.write().unwrap();
                 server_description.set_err(OperationError("Simulated network error.".to_owned()));
@@ -74,7 +81,7 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
             };
 
             topology_description.update(host.clone(), server_description.clone(),
-                                        dummy_req_id.clone(), top_description_arc.clone());
+                                        dummy_client.clone(), top_description_arc.clone());
         }
 
         // Check server and topology descriptions.
