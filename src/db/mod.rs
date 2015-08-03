@@ -3,7 +3,7 @@ pub mod roles;
 
 use bson;
 use bson::Bson;
-use {Client, ThreadedClient, Result};
+use {Client, CommandType, ThreadedClient, Result};
 use Error::{CursorNotFoundError, OperationError};
 use coll::Collection;
 use coll::options::FindOptions;
@@ -32,19 +32,19 @@ pub trait ThreadedDatabase {
                              read_preference: Option<ReadPreference>,
                              write_concern: Option<WriteConcern>) -> Collection;
     fn get_req_id(&self) -> i32;
-    fn command_cursor(&self, spec: bson::Document) -> Result<Cursor>;
-    fn command(&self, spec: bson::Document) -> Result<bson::Document>;
+    fn command_cursor(&self, spec: bson::Document, cmd_type: CommandType) -> Result<Cursor>;
+    fn command(&self, spec: bson::Document, cmd_type: CommandType) -> Result<bson::Document>;
     fn list_collections(&self, filter: Option<bson::Document>) -> Result<Cursor>;
     fn list_collections_with_batch_size(&self, filter: Option<bson::Document>,
                                         batch_size: i32) -> Result<Cursor>;
     fn collection_names(&self, filter: Option<bson::Document>) -> Result<Vec<String>>;
     fn create_collection(&self, name: &str,
-                         options: Option<CreateCollectionOptions>) -> Result<()>;
+                        options: Option<CreateCollectionOptions>) -> Result<()>;
     fn create_user(&self, name: &str, password: &str,
-                   options: Option<CreateUserOptions>) -> Result<()>;
+                  options: Option<CreateUserOptions>) -> Result<()>;
     fn drop_all_users(&self, write_concern: Option<WriteConcern>) -> Result<(i32)>;
-    fn drop_database(&self) -> Result<()>;
     fn drop_collection(&self, name: &str) -> Result<()>;
+    fn drop_database(&self) -> Result<()>;
     fn drop_user(&self, name: &str, Option<WriteConcern>) -> Result<()>;
     fn get_all_users(&self, show_credentials: bool) -> Result<Vec<bson::Document>>;
     fn get_user(&self, user: &str,
@@ -86,16 +86,17 @@ impl ThreadedDatabase for Database {
     }
 
     /// Generates a cursor for a relevant operational command.
-    fn command_cursor(&self, spec: bson::Document) -> Result<Cursor> {
-        Cursor::command_cursor(self.client.clone(), &self.name[..], spec)
+    fn command_cursor(&self, spec: bson::Document, cmd_type: CommandType) -> Result<Cursor> {
+        Cursor::command_cursor(self.client.clone(), &self.name[..], spec, cmd_type)
     }
 
     /// Sends an administrative command over find_one.
-    fn command(&self, spec: bson::Document) -> Result<bson::Document> {
+    fn command(&self, spec: bson::Document, cmd_type: CommandType) -> Result<bson::Document> {
         let coll = self.collection("$cmd");
         let mut options = FindOptions::new();
         options.batch_size = 1;
-        let res = try!(coll.find_one(Some(spec.clone()), Some(options)));
+        let res = try!(coll.find_one_with_command_type(Some(spec.clone()), Some(options),
+                                                       cmd_type));
         res.ok_or(OperationError(format!("Failed to execute command with spec {:?}.", spec)))
     }
 
@@ -117,7 +118,7 @@ impl ThreadedDatabase for Database {
             spec.insert("filter".to_owned(), Bson::Document(filter.unwrap()));
         }
 
-        self.command_cursor(spec)
+        self.command_cursor(spec, CommandType::ListCollections)
     }
 
 
@@ -141,7 +142,7 @@ impl ThreadedDatabase for Database {
     /// Note that due to the implicit creation of collections during insertion, this
     /// method should only be used to instantiate capped collections.
     fn create_collection(&self, name: &str,
-                         options: Option<CreateCollectionOptions>) -> Result<()> {
+                        options: Option<CreateCollectionOptions>) -> Result<()> {
         let coll_options = options.unwrap_or(CreateCollectionOptions::new());
         let mut doc = doc! {
             "create" => name,
@@ -162,11 +163,12 @@ impl ThreadedDatabase for Database {
 
         doc.insert("flags".to_owned(), Bson::I32(flag_one + flag_two));
 
-        self.command(doc).map(|_| ())
+        self.command(doc, CommandType::CreateCollection).map(|_| ())
     }
 
+    /// Creates a new user.
     fn create_user(&self, name: &str, password: &str,
-                   options: Option<CreateUserOptions>) -> Result<()> {
+                  options: Option<CreateUserOptions>) -> Result<()> {
         let user_options = options.unwrap_or(CreateUserOptions::new());
         let mut doc = doc! {
             "createUser" => name,
@@ -183,9 +185,10 @@ impl ThreadedDatabase for Database {
             doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
         }
 
-        self.command(doc).map(|_| ())
+        self.command(doc, CommandType::CreateUser).map(|_| ())
     }
 
+    /// Permanently deletes all users from the database.
     fn drop_all_users(&self, write_concern: Option<WriteConcern>) -> Result<(i32)> {
         let mut doc = doc! { "dropAllUsersFromDatabase" => 1 };
 
@@ -193,7 +196,7 @@ impl ThreadedDatabase for Database {
             doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
         }
 
-        let response = try!(self.command(doc));
+        let response = try!(self.command(doc, CommandType::DropAllUsers));
 
         match response.get("n") {
             Some(&Bson::I32(i)) => Ok(i),
@@ -202,22 +205,24 @@ impl ThreadedDatabase for Database {
         }
     }
 
-    /// Permanently deletes the database from the server.
-    fn drop_database(&self) -> Result<()> {
-        let mut spec = bson::Document::new();
-        spec.insert("dropDatabase".to_owned(), Bson::I32(1));
-        try!(self.command(spec));
-        Ok(())
-    }
-
     /// Permanently deletes the collection from the database.
     fn drop_collection(&self, name: &str) -> Result<()> {
         let mut spec = bson::Document::new();
         spec.insert("drop".to_owned(), Bson::String(name.to_owned()));
-        try!(self.command(spec));
+        try!(self.command(spec, CommandType::DropCollection));
         Ok(())
     }
 
+
+    /// Permanently deletes the database from the server.
+    fn drop_database(&self) -> Result<()> {
+        let mut spec = bson::Document::new();
+        spec.insert("dropDatabase".to_owned(), Bson::I32(1));
+        try!(self.command(spec, CommandType::DropDatabase));
+        Ok(())
+    }
+
+    /// Permanently deletes the user from the database.
     fn drop_user(&self, name: &str, write_concern: Option<WriteConcern>) -> Result<()> {
         let mut doc = doc! { "dropUser" => name };
 
@@ -225,16 +230,17 @@ impl ThreadedDatabase for Database {
             doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
         }
 
-        self.command(doc).map(|_| ())
+        self.command(doc, CommandType::DropUser).map(|_| ())
     }
 
+    /// Retrieves information about all users in the database.
     fn get_all_users(&self, show_credentials: bool) -> Result<Vec<bson::Document>> {
         let doc = doc! {
             "usersInfo" => 1,
             "showCredentials" => show_credentials
         };
 
-        let out = try!(self.command(doc));
+        let out = try!(self.command(doc, CommandType::GetUsers));
         let vec = match out.get("users") {
             Some(&Bson::Array(ref vec)) => vec.clone(),
             _ => return Err(CursorNotFoundError)
@@ -252,6 +258,7 @@ impl ThreadedDatabase for Database {
         Ok(users)
     }
 
+    /// Retrives information about a given user from the database.
     fn get_user(&self, user: &str,
                 options: Option<UserInfoOptions>) -> Result<bson::Document> {
         let info_options = options.unwrap_or(UserInfoOptions::new());
@@ -262,7 +269,7 @@ impl ThreadedDatabase for Database {
             "showPrivileges" => (info_options.show_privileges)
         };
 
-        let out = match self.command(doc) {
+        let out = match self.command(doc, CommandType::GetUser) {
             Ok(doc) => doc,
             Err(e) => return Err(e)
         };
@@ -278,6 +285,7 @@ impl ThreadedDatabase for Database {
         }
     }
 
+    /// Retrives information about a given set of users from the database.
     fn get_users(&self, users: Vec<&str>,
                  options: Option<UserInfoOptions>) -> Result<Vec<bson::Document>> {
         let info_options = options.unwrap_or(UserInfoOptions::new());
@@ -292,7 +300,7 @@ impl ThreadedDatabase for Database {
             "showPrivileges" => (info_options.show_privileges)
         };
 
-        let out = try!(self.command(doc));
+        let out = try!(self.command(doc, CommandType::GetUsers));
         let vec = match out.get("users") {
             Some(&Bson::Array(ref vec)) => vec.clone(),
             _ => return Err(CursorNotFoundError)

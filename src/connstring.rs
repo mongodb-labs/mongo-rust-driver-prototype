@@ -122,7 +122,7 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
         partition(addr, "/")
     };
 
-    if path_str.len() == 0 && host_str.contains("?") {
+    if path_str.is_empty() && host_str.contains("?") {
         return Err(ArgumentError("A '/' is required between the host list and any options.".to_owned()));
     }
 
@@ -174,7 +174,7 @@ fn parse_user_info(user_info: &str) -> Result<(&str, &str)> {
     if user_info.contains("@") || user.contains(":") {
         return Err(ArgumentError("':' or '@' characters in a username or password must be escaped according to RFC 2396.".to_owned()))
     }
-    if user.len() == 0 {
+    if user.is_empty() {
         return Err(ArgumentError("The empty string is not a valid username.".to_owned()))
     }
     Ok((user, password))
@@ -230,7 +230,7 @@ fn parse_host(entity: &str) -> Result<Host> {
 fn split_hosts(host_str: &str) -> Result<Vec<Host>> {
     let mut hosts: Vec<Host> = Vec::new();
     for entity in host_str.split(",") {
-        if entity.len() == 0 {
+        if entity.is_empty() {
             return Err(ArgumentError("Empty host, or extra comma in host list.".to_owned()));
         }
         let host = try!(parse_host(entity));

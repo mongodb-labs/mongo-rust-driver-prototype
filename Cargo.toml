@@ -10,12 +10,13 @@ byteorder = "0.3"
 chrono = "0.2"
 rust-crypto = "0.2.31"
 rustc-serialize = "0.3"
+separator = "0.3.0"
 time = "0.1"
-
-[dependencies.bson]
-git = "https://github.com/zonyitoo/bson-rs"
-ref = "1c1fcca2781f6a8947bbf1abe7b4bcbfba9e7ee3"
 
 [dev-dependencies]
 nalgebra = "0.2"
 rand = "0.3"
+
+[dependencies.bson]
+git = "https://github.com/zonyitoo/bson-rs"
+ref = "1c1fcca2781f6a8947bbf1abe7b4bcbfba9e7ee3"
