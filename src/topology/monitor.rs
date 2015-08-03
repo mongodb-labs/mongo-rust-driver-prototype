@@ -227,7 +227,7 @@ impl Monitor {
         Cursor::query_with_stream(
             stream, self.client.clone(), "local.$cmd".to_owned(), 1,
             flags, options.skip as i32, 1, filter.clone(), options.projection.clone(),
-            CommandType::IsMaster, false)
+            CommandType::IsMaster, false, None)
     }
 
     // Updates the server description associated with this monitor using an isMaster server response.

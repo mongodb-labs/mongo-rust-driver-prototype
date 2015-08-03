@@ -93,7 +93,7 @@ impl Collection {
             spec.insert("allowDiskUse".to_owned(), Bson::Boolean(opts.allow_disk_use));
         }
 
-        self.db.command_cursor(spec, CommandType::Aggregate)
+        self.db.command_cursor(spec, CommandType::Aggregate, self.read_preference)
     }
 
     /// Gets the number of documents matching the filter.
@@ -170,7 +170,7 @@ impl Collection {
 
         Cursor::query(self.db.client.clone(), self.namespace.to_owned(), options.batch_size,
                       flags, options.skip as i32, options.limit, doc,
-                      options.projection.clone(), cmd_type, false)
+                      options.projection.clone(), cmd_type, false, self.read_preference)
     }
 
 
@@ -781,6 +781,6 @@ impl Collection {
     pub fn list_indexes(&self) -> Result<Cursor> {
         let mut cmd = bson::Document::new();
         cmd.insert("listIndexes".to_owned(), Bson::String(self.name()));
-        self.db.command_cursor(cmd, CommandType::ListIndexes)
+        self.db.command_cursor(cmd, CommandType::ListIndexes, self.read_preference)
     }
 }

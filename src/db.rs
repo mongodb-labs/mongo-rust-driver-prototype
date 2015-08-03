@@ -28,7 +28,8 @@ pub trait ThreadedDatabase {
                              read_preference: Option<ReadPreference>,
                              write_concern: Option<WriteConcern>) -> Collection;
     fn get_req_id(&self) -> i32;
-    fn command_cursor(&self, spec: bson::Document, cmd_type: CommandType) -> Result<Cursor>;
+    fn command_cursor(&self, spec: bson::Document, cmd_type: CommandType,
+                      read_pref: ReadPreference) -> Result<Cursor>;
     fn command(&self, spec: bson::Document, cmd_type: CommandType) -> Result<bson::Document>;
     fn list_collections(&self, filter: Option<bson::Document>) -> Result<Cursor>;
     fn list_collections_with_batch_size(&self, filter: Option<bson::Document>,
@@ -72,8 +73,9 @@ impl ThreadedDatabase for Database {
     }
 
     /// Generates a cursor for a relevant operational command.
-    fn command_cursor(&self, spec: bson::Document, cmd_type: CommandType) -> Result<Cursor> {
-        Cursor::command_cursor(self.client.clone(), &self.name[..], spec, cmd_type)
+    fn command_cursor(&self, spec: bson::Document, cmd_type: CommandType,
+                      read_pref: ReadPreference) -> Result<Cursor> {
+        Cursor::command_cursor(self.client.clone(), &self.name[..], spec, cmd_type, read_pref)
     }
 
     /// Sends an administrative command over find_one.
@@ -104,7 +106,7 @@ impl ThreadedDatabase for Database {
             spec.insert("filter".to_owned(), Bson::Document(filter.unwrap()));
         }
 
-        self.command_cursor(spec, CommandType::ListCollections)
+        self.command_cursor(spec, CommandType::ListCollections, self.read_preference)
     }
 
 
