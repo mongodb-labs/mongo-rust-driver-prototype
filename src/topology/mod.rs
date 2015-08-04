@@ -161,7 +161,7 @@ impl TopologyDescription {
                                   client: Client, top_arc: Arc<RwLock<TopologyDescription>>) {
         self.update_private(host, description, client, top_arc, false);
     }
-    
+
     /// Updates the topology description based on an updated server description.
     pub fn update(&mut self, host: Host, description: ServerDescription,
                   client: Client, top_arc: Arc<RwLock<TopologyDescription>>) {
@@ -169,7 +169,7 @@ impl TopologyDescription {
     }
 
     fn update_private(&mut self, host: Host, description: ServerDescription,
-                  client: Client, top_arc: Arc<RwLock<TopologyDescription>>, run_monitor: bool) {
+                      client: Client, top_arc: Arc<RwLock<TopologyDescription>>, run_monitor: bool) {
         let stype = description.server_type;
         match self.topology_type {
             TopologyType::Unknown => {
@@ -411,7 +411,7 @@ impl Topology {
         }
 
         let top_description = Arc::new(RwLock::new(options));
-        
+
         Ok(Topology {
             config: config,
             description: top_description,

@@ -14,7 +14,7 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
     let json = Json::from_file(file).unwrap();
     let suite = json.get_suite().unwrap();
 
-    let dummy_config = ConnectionString::new("i-dont-exist", 27017);    
+    let dummy_config = ConnectionString::new("i-dont-exist", 27017);
     let dummy_client = Client::with_config(dummy_config, None, None, None, None).unwrap();
     let connection_string = connstring::parse(&suite.uri).unwrap();
 
@@ -59,30 +59,30 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
                 }
             }
 
-                let mut topology_description = topology.description.write().unwrap();
+            let mut topology_description = topology.description.write().unwrap();
 
-                if response.is_empty() {
-                    let server = servers.get(&host).expect("Host not found.");
-                    let mut server_description = server.description.write().unwrap();
-                    server_description.set_err(OperationError("Simulated network error.".to_owned()));
-                } else {
-                    match IsMasterResult::new(response) {
-                        Ok(ismaster) => {
-                            let server = servers.get(&host).expect("Host not found.");
-                            let mut server_description = server.description.write().unwrap();
-                            server_description.update(ismaster)
-                        },
-                        Err(err) => panic!(err),
-                    }
+            if response.is_empty() {
+                let server = servers.get(&host).expect("Host not found.");
+                let mut server_description = server.description.write().unwrap();
+                server_description.set_err(OperationError("Simulated network error.".to_owned()));
+            } else {
+                match IsMasterResult::new(response) {
+                    Ok(ismaster) => {
+                        let server = servers.get(&host).expect("Host not found.");
+                        let mut server_description = server.description.write().unwrap();
+                        server_description.update(ismaster)
+                    },
+                    Err(err) => panic!(err),
                 }
+            }
 
-                let server_description = {
-                    let server = servers.get(&host).expect("Host not found.");
-                    server.description.read().unwrap().clone()
-                };
+            let server_description = {
+                let server = servers.get(&host).expect("Host not found.");
+                server.description.read().unwrap().clone()
+            };
 
-                topology_description.update_without_monitor(host.clone(), server_description.clone(),
-                                                            dummy_client.clone(), top_description_arc.clone());                
+            topology_description.update_without_monitor(host.clone(), server_description.clone(),
+                                                        dummy_client.clone(), top_description_arc.clone());
         }
 
         // Check server and topology descriptions.

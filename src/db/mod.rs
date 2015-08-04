@@ -26,7 +26,7 @@ pub type Database = Arc<DatabaseInner>;
 pub trait ThreadedDatabase {
     /// Creates a database representation with optional read and write controls.
     fn open(client: Client, name: &str, read_preference: Option<ReadPreference>,
-           write_concern: Option<WriteConcern>) -> Database;
+            write_concern: Option<WriteConcern>) -> Database;
     fn collection(&self, coll_name: &str) -> Collection;
     fn collection_with_prefs(&self, coll_name: &str, create: bool,
                              read_preference: Option<ReadPreference>,
@@ -40,9 +40,9 @@ pub trait ThreadedDatabase {
                                         batch_size: i32) -> Result<Cursor>;
     fn collection_names(&self, filter: Option<bson::Document>) -> Result<Vec<String>>;
     fn create_collection(&self, name: &str,
-                        options: Option<CreateCollectionOptions>) -> Result<()>;
+                         options: Option<CreateCollectionOptions>) -> Result<()>;
     fn create_user(&self, name: &str, password: &str,
-                  options: Option<CreateUserOptions>) -> Result<()>;
+                   options: Option<CreateUserOptions>) -> Result<()>;
     fn drop_all_users(&self, write_concern: Option<WriteConcern>) -> Result<(i32)>;
     fn drop_collection(&self, name: &str) -> Result<()>;
     fn drop_database(&self) -> Result<()>;
@@ -144,7 +144,7 @@ impl ThreadedDatabase for Database {
     /// Note that due to the implicit creation of collections during insertion, this
     /// method should only be used to instantiate capped collections.
     fn create_collection(&self, name: &str,
-                        options: Option<CreateCollectionOptions>) -> Result<()> {
+                         options: Option<CreateCollectionOptions>) -> Result<()> {
         let coll_options = options.unwrap_or(CreateCollectionOptions::new());
         let mut doc = doc! {
             "create" => name,
@@ -170,7 +170,7 @@ impl ThreadedDatabase for Database {
 
     /// Creates a new user.
     fn create_user(&self, name: &str, password: &str,
-                  options: Option<CreateUserOptions>) -> Result<()> {
+                   options: Option<CreateUserOptions>) -> Result<()> {
         let user_options = options.unwrap_or(CreateUserOptions::new());
         let mut doc = doc! {
             "createUser" => name,

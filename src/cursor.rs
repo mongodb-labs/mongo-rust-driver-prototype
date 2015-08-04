@@ -115,36 +115,37 @@ impl Cursor {
 
     fn get_bson_and_cursor_info_from_command_message(message: Message) ->
         Result<(bson::Document, VecDeque<bson::Document>, i64, String)> {
-            let (first, v, _) = try!(Cursor::get_bson_and_cid_from_message(message));
-            if v.len() != 1 {
-                return Err(Error::CursorNotFoundError);
-            }
 
-            let ref doc = v[0];
+        let (first, v, _) = try!(Cursor::get_bson_and_cid_from_message(message));
+        if v.len() != 1 {
+            return Err(Error::CursorNotFoundError);
+        }
 
-            // Extract cursor information
-            if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
-                if let Some(&Bson::I64(ref id)) = cursor.get("id") {
-                    if let Some(&Bson::String(ref ns)) = cursor.get("ns") {
-                        if let Some(&Bson::Array(ref batch)) = cursor.get("firstBatch") {
+        let ref doc = v[0];
 
-                            // Extract first batch documents
-                            let map = batch.iter().filter_map(|bdoc| {
-                                if let &Bson::Document(ref doc) = bdoc {
-                                    Some(doc.clone())
-                                } else {
-                                    None
-                                }
-                            }).collect();
+        // Extract cursor information
+        if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {
+            if let Some(&Bson::I64(ref id)) = cursor.get("id") {
+                if let Some(&Bson::String(ref ns)) = cursor.get("ns") {
+                    if let Some(&Bson::Array(ref batch)) = cursor.get("firstBatch") {
 
-                            return Ok((first, map, *id, ns.to_owned()))
-                        }
+                        // Extract first batch documents
+                        let map = batch.iter().filter_map(|bdoc| {
+                            if let &Bson::Document(ref doc) = bdoc {
+                                Some(doc.clone())
+                            } else {
+                                None
+                            }
+                        }).collect();
+
+                        return Ok((first, map, *id, ns.to_owned()))
                     }
                 }
             }
-
-            Err(Error::CursorNotFoundError)
         }
+
+        Err(Error::CursorNotFoundError)
+    }
 
     /// Executes a query where the batch size of the returned cursor is
     /// specified.

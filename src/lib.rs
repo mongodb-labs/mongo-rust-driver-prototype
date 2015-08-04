@@ -56,8 +56,8 @@ pub trait ThreadedClient: Sync + Sized {
     fn connect(host: &str, port: u16) -> Result<Self>;
     fn connect_with_log_file(host: &str, port: u16, log_file: &str) -> Result<Client>;
     fn with_prefs(host: &str, port: u16, read_pref: Option<ReadPreference>,
-                      write_concern: Option<WriteConcern>,
-                      log_file: Option<&str>) -> Result<Self>;
+                  write_concern: Option<WriteConcern>,
+                  log_file: Option<&str>) -> Result<Self>;
     fn with_uri(uri: &str) -> Result<Self>;
     fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
                           write_concern: Option<WriteConcern>,
@@ -66,7 +66,7 @@ pub trait ThreadedClient: Sync + Sized {
                    description: Option<TopologyDescription>, log_file: Option<&str>) -> Result<Self>;
     fn db<'a>(&'a self, db_name: &str) -> Database;
     fn db_with_prefs(&self, db_name: &str, read_preference: Option<ReadPreference>,
-                         write_concern: Option<WriteConcern>) -> Database;
+                     write_concern: Option<WriteConcern>) -> Database;
     fn acquire_stream(&self, read_pref: ReadPreference) -> Result<PooledStream>;
     fn get_req_id(&self) -> i32;
     fn database_names(&self) -> Result<Vec<String>>;
@@ -126,7 +126,7 @@ impl ThreadedClient for Client {
             Some(wc) => wc,
             None => WriteConcern::new(),
         };
-            
+
         let listener = Listener::new();
         let file = match log_file {
             Some(string) => {
@@ -155,7 +155,7 @@ impl ThreadedClient for Client {
                 top.servers.insert(host.clone(), server);
             }
         }
-        
+
         Ok(client)
     }
 

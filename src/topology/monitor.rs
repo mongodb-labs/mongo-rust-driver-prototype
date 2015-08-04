@@ -223,7 +223,7 @@ impl Monitor {
         filter.insert("isMaster".to_owned(), Bson::I32(1));
 
         let stream = try!(self.personal_pool.acquire_stream());
-        
+
         Cursor::query_with_stream(
             stream, self.client.clone(), "local.$cmd".to_owned(), 1,
             flags, options.skip as i32, 1, filter.clone(), options.projection.clone(),
