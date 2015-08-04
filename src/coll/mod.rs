@@ -93,7 +93,8 @@ impl Collection {
             spec.insert("allowDiskUse".to_owned(), Bson::Boolean(opts.allow_disk_use));
         }
 
-        self.db.command_cursor(spec, CommandType::Aggregate, self.read_preference.to_owned())
+        let read_pref = opts.read_preference.unwrap_or(self.read_preference.to_owned());
+        self.db.command_cursor(spec, CommandType::Aggregate, read_pref)
     }
 
     /// Gets the number of documents matching the filter.
@@ -116,7 +117,8 @@ impl Collection {
             spec.insert("hint".to_owned(), Bson::String(opts.hint.unwrap()));
         }
 
-        let result = try!(self.db.command(spec, CommandType::Count));
+        let read_pref = opts.read_preference.unwrap_or(self.read_preference.to_owned());
+        let result = try!(self.db.command(spec, CommandType::Count, Some(read_pref)));
         match result.get("n") {
             Some(&Bson::I32(ref n)) => Ok(*n as i64),
             Some(&Bson::I64(ref n)) => Ok(*n),
@@ -127,7 +129,8 @@ impl Collection {
     /// Finds the distinct values for a specified field across a single collection.
     pub fn distinct(&self, field_name: &str, filter: Option<bson::Document>,
                     options: Option<DistinctOptions>) -> Result<Vec<Bson>> {
-        let _opts = options.unwrap_or(DistinctOptions::new());
+
+        let opts = options.unwrap_or(DistinctOptions::new());
 
         let mut spec = bson::Document::new();
         spec.insert("distinct".to_owned(), Bson::String(self.name()));
@@ -136,7 +139,8 @@ impl Collection {
             spec.insert("query".to_owned(), Bson::Document(filter.unwrap()));
         }
 
-        let result = try!(self.db.command(spec, CommandType::Distinct));
+        let read_pref = opts.read_preference.unwrap_or(self.read_preference.to_owned());
+        let result = try!(self.db.command(spec, CommandType::Distinct, Some(read_pref)));
         match result.get("values") {
             Some(&Bson::Array(ref vals)) => Ok(vals.to_owned()),
             _ => Err(ResponseError("No values received from server.".to_owned()))
@@ -168,11 +172,12 @@ impl Collection {
             filter.unwrap_or(bson::Document::new())
         };
 
+        let read_pref = options.read_preference.unwrap_or(self.read_preference.to_owned());
+
         Cursor::query(self.db.client.clone(), self.namespace.to_owned(), options.batch_size,
                       flags, options.skip as i32, options.limit, doc,
-                      options.projection.clone(), cmd_type, false, self.read_preference.to_owned())
+                      options.projection.clone(), cmd_type, false, read_pref)
     }
-
 
     /// Returns the first document within the collection that matches the filter, or None.
     pub fn find_one(&self, filter: Option<bson::Document>,
@@ -218,7 +223,7 @@ impl Collection {
             new_cmd.insert(key.to_owned(), val.to_owned());
         }
 
-        let res = try!(self.db.command(new_cmd, cmd_type));
+        let res = try!(self.db.command(new_cmd, cmd_type, None));
         try!(WriteException::validate_write_result(res.clone(), wc));
         let doc = match res.get("value") {
             Some(&Bson::Document(ref nested_doc)) => Some(nested_doc.to_owned()),
@@ -481,7 +486,7 @@ impl Collection {
         cmd.insert("ordered".to_owned(), Bson::Boolean(ordered));
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
-        let result = try!(self.db.command(cmd, cmd_type));
+        let result = try!(self.db.command(cmd, cmd_type, None));
 
         // Intercept bulk write exceptions and insert into the result
         let exception_res = BulkWriteException::validate_bulk_write_result(result.clone(), wc);
@@ -568,7 +573,7 @@ impl Collection {
         }
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
-        let result = try!(self.db.command(cmd, cmd_type));
+        let result = try!(self.db.command(cmd, cmd_type, None));
 
         // Intercept write exceptions and insert into the result
         let exception_res = BulkWriteException::validate_bulk_write_result(result.clone(), wc);
@@ -634,7 +639,7 @@ impl Collection {
         cmd.insert("updates".to_owned(), Bson::Array(updates));
         cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
 
-        let result = try!(self.db.command(cmd, cmd_type));
+        let result = try!(self.db.command(cmd, cmd_type, None));
 
         // Intercept write exceptions and insert into the result
         let exception_res = BulkWriteException::validate_bulk_write_result(result.clone(), wc);
@@ -732,7 +737,7 @@ impl Collection {
         let mut cmd = bson::Document::new();
         cmd.insert("createIndexes".to_owned(), Bson::String(self.name()));
         cmd.insert("indexes".to_owned(), Bson::Array(indexes));
-        let result = try!(self.db.command(cmd, CommandType::CreateIndexes));
+        let result = try!(self.db.command(cmd, CommandType::CreateIndexes, None));
 
         match result.get("errmsg") {
             Some(&Bson::String(ref msg)) => return Err(OperationError(msg.to_owned())),
@@ -761,7 +766,7 @@ impl Collection {
         cmd.insert("dropIndexes".to_owned(), Bson::String(self.name()));
         cmd.insert("index".to_owned(), Bson::String(try!(model.name())));
 
-        let result = try!(self.db.command(cmd, CommandType::DropIndexes));
+        let result = try!(self.db.command(cmd, CommandType::DropIndexes, None));
         match result.get("errmsg") {
             Some(&Bson::String(ref msg)) => return Err(OperationError(msg.to_owned())),
             _ => Ok(()),

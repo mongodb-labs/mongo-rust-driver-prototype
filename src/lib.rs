@@ -186,7 +186,7 @@ impl ThreadedClient for Client {
         doc.insert("listDatabases".to_owned(), Bson::I32(1));
 
         let db = self.db("admin");
-        let res = try!(db.command(doc, CommandType::ListDatabases));
+        let res = try!(db.command(doc, CommandType::ListDatabases, None));
         if let Some(&Bson::Array(ref batch)) = res.get("databases") {
             // Extract database names
             let map = batch.iter().filter_map(|bdoc| {
@@ -216,7 +216,7 @@ impl ThreadedClient for Client {
         doc.insert("isMaster".to_owned(), Bson::I32(1));
 
         let db = self.db("local");
-        let res = try!(db.command(doc, CommandType::IsMaster));
+        let res = try!(db.command(doc, CommandType::IsMaster, None));
 
         match res.get("ismaster") {
             Some(&Bson::Boolean(is_master)) => Ok(is_master),

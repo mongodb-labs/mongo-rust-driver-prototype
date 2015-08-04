@@ -34,7 +34,8 @@ pub trait ThreadedDatabase {
     fn get_req_id(&self) -> i32;
     fn command_cursor(&self, spec: bson::Document, cmd_type: CommandType,
                       read_pref: ReadPreference) -> Result<Cursor>;
-    fn command(&self, spec: bson::Document, cmd_type: CommandType) -> Result<bson::Document>;
+    fn command(&self, spec: bson::Document, cmd_type: CommandType,
+               read_preference: Option<ReadPreference>) -> Result<bson::Document>;
     fn list_collections(&self, filter: Option<bson::Document>) -> Result<Cursor>;
     fn list_collections_with_batch_size(&self, filter: Option<bson::Document>,
                                         batch_size: i32) -> Result<Cursor>;
@@ -93,10 +94,13 @@ impl ThreadedDatabase for Database {
     }
 
     /// Sends an administrative command over find_one.
-    fn command(&self, spec: bson::Document, cmd_type: CommandType) -> Result<bson::Document> {
+    fn command(&self, spec: bson::Document, cmd_type: CommandType,
+               read_preference: Option<ReadPreference>) -> Result<bson::Document> {
+
         let coll = self.collection("$cmd");
         let mut options = FindOptions::new();
         options.batch_size = 1;
+        options.read_preference = read_preference;
         let res = try!(coll.find_one_with_command_type(Some(spec.clone()), Some(options),
                                                        cmd_type));
         res.ok_or(OperationError(format!("Failed to execute command with spec {:?}.", spec)))
@@ -165,7 +169,7 @@ impl ThreadedDatabase for Database {
 
         doc.insert("flags".to_owned(), Bson::I32(flag_one + flag_two));
 
-        self.command(doc, CommandType::CreateCollection).map(|_| ())
+        self.command(doc, CommandType::CreateCollection, None).map(|_| ())
     }
 
     /// Creates a new user.
@@ -187,7 +191,7 @@ impl ThreadedDatabase for Database {
             doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
         }
 
-        self.command(doc, CommandType::CreateUser).map(|_| ())
+        self.command(doc, CommandType::CreateUser, None).map(|_| ())
     }
 
     /// Permanently deletes all users from the database.
@@ -198,7 +202,7 @@ impl ThreadedDatabase for Database {
             doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
         }
 
-        let response = try!(self.command(doc, CommandType::DropAllUsers));
+        let response = try!(self.command(doc, CommandType::DropAllUsers, None));
 
         match response.get("n") {
             Some(&Bson::I32(i)) => Ok(i),
@@ -211,7 +215,7 @@ impl ThreadedDatabase for Database {
     fn drop_collection(&self, name: &str) -> Result<()> {
         let mut spec = bson::Document::new();
         spec.insert("drop".to_owned(), Bson::String(name.to_owned()));
-        try!(self.command(spec, CommandType::DropCollection));
+        try!(self.command(spec, CommandType::DropCollection, None));
         Ok(())
     }
 
@@ -220,7 +224,7 @@ impl ThreadedDatabase for Database {
     fn drop_database(&self) -> Result<()> {
         let mut spec = bson::Document::new();
         spec.insert("dropDatabase".to_owned(), Bson::I32(1));
-        try!(self.command(spec, CommandType::DropDatabase));
+        try!(self.command(spec, CommandType::DropDatabase, None));
         Ok(())
     }
 
@@ -232,7 +236,7 @@ impl ThreadedDatabase for Database {
             doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
         }
 
-        self.command(doc, CommandType::DropUser).map(|_| ())
+        self.command(doc, CommandType::DropUser, None).map(|_| ())
     }
 
     /// Retrieves information about all users in the database.
@@ -242,7 +246,7 @@ impl ThreadedDatabase for Database {
             "showCredentials" => show_credentials
         };
 
-        let out = try!(self.command(doc, CommandType::GetUsers));
+        let out = try!(self.command(doc, CommandType::GetUsers, None));
         let vec = match out.get("users") {
             Some(&Bson::Array(ref vec)) => vec.clone(),
             _ => return Err(CursorNotFoundError)
@@ -271,7 +275,7 @@ impl ThreadedDatabase for Database {
             "showPrivileges" => (info_options.show_privileges)
         };
 
-        let out = match self.command(doc, CommandType::GetUser) {
+        let out = match self.command(doc, CommandType::GetUser, None) {
             Ok(doc) => doc,
             Err(e) => return Err(e)
         };
@@ -302,7 +306,7 @@ impl ThreadedDatabase for Database {
             "showPrivileges" => (info_options.show_privileges)
         };
 
-        let out = try!(self.command(doc, CommandType::GetUsers));
+        let out = try!(self.command(doc, CommandType::GetUsers, None));
         let vec = match out.get("users") {
             Some(&Bson::Array(ref vec)) => vec.clone(),
             _ => return Err(CursorNotFoundError)
