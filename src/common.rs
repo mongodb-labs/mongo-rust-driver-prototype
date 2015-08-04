@@ -1,13 +1,27 @@
-use bson;
-use bson::Bson;
+use bson::{self, Bson};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReadPreference {
+pub enum ReadMode {
     Primary,
     PrimaryPreferred,
     Secondary,
     SecondaryPreferred,
     Nearest,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReadPreference {
+    pub mode: ReadMode,
+    pub tags: Vec<bson::Document>,
+}
+
+impl ReadPreference {
+    pub fn new(mode: ReadMode, tags: Option<Vec<bson::Document>>) -> ReadPreference {
+        ReadPreference {
+            mode: mode,
+            tags: tags.unwrap_or(Vec::new()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

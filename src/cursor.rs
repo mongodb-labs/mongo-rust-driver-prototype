@@ -2,7 +2,7 @@ use {Client, Error, ErrorCode, Result, ThreadedClient};
 use apm::{CommandStarted, CommandResult, EventRunner};
 
 use command_type::CommandType;
-use common::ReadPreference;
+use common::{ReadMode, ReadPreference};
 use pool::PooledStream;
 use wire_protocol::flags::OpQueryFlags;
 use wire_protocol::operations::Message;
@@ -174,7 +174,7 @@ impl Cursor {
                  return_field_selector: Option<bson::Document>, cmd_type: CommandType,
                  is_cmd_cursor: bool, read_pref: ReadPreference) -> Result<Cursor> {
 
-        let stream = try!(client.acquire_stream(read_pref));
+        let stream = try!(client.acquire_stream(read_pref.to_owned()));
         Cursor::query_with_stream(stream, client, namespace, batch_size, flags,
                                   number_to_skip, number_to_return, query,
                                   return_field_selector, cmd_type, is_cmd_cursor, Some(read_pref))
@@ -287,7 +287,7 @@ impl Cursor {
             connection_string: connstring,
         });
 
-        let read_preference = read_pref.unwrap_or(ReadPreference::Primary);
+        let read_preference = read_pref.unwrap_or(ReadPreference::new(ReadMode::Primary, None));
 
         Ok(Cursor { client: client, namespace: namespace,
                     batch_size: batch_size, cursor_id: cursor_id,
@@ -296,7 +296,7 @@ impl Cursor {
     }
 
     fn get_from_stream(&mut self) -> Result<()> {
-        let stream = try!(self.client.acquire_stream(self.read_preference));
+        let stream = try!(self.client.acquire_stream(self.read_preference.to_owned()));
         let mut socket = stream.get_socket();
 
         let req_id = self.client.get_req_id();

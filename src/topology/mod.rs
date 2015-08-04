@@ -6,7 +6,7 @@ use Error::{self, ArgumentError, OperationError};
 
 use bson::oid;
 
-use common::ReadPreference;
+use common::{ReadPreference, ReadMode};
 use connstring::{ConnectionString, Host};
 use pool::PooledStream;
 
@@ -140,18 +140,18 @@ impl TopologyDescription {
                 }
 
                 // Choose an appropriate server at random based on the read preference.
-                match read_preference {
-                    ReadPreference::Primary => self.get_rand_from_vec(&mut primaries),
-                    ReadPreference::PrimaryPreferred => {
+                match read_preference.mode {
+                    ReadMode::Primary => self.get_rand_from_vec(&mut primaries),
+                    ReadMode::PrimaryPreferred => {
                         self.get_rand_from_vec(&mut primaries).or(
                             self.get_rand_from_vec(&mut secondaries))
                     },
-                    ReadPreference::Secondary => self.get_rand_from_vec(&mut secondaries),
-                    ReadPreference::SecondaryPreferred => {
+                    ReadMode::Secondary => self.get_rand_from_vec(&mut secondaries),
+                    ReadMode::SecondaryPreferred => {
                         self.get_rand_from_vec(&mut secondaries).or(
                             self.get_rand_from_vec(&mut primaries))
                     },
-                    ReadPreference::Nearest => self.get_nearest_server_stream(),
+                    ReadMode::Nearest => self.get_nearest_server_stream(),
                 }
             }
         }
@@ -423,7 +423,7 @@ impl Topology {
         let mut retry = 0;
         loop {
             let description = try!(self.description.read());
-            let result = description.acquire_stream(read_preference);
+            let result = description.acquire_stream(read_preference.to_owned());
             match result {
                 Ok(stream) => return Ok(stream),
                 Err(err) => {

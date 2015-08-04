@@ -34,7 +34,7 @@ use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 
 use apm::Listener;
 use bson::Bson;
-use common::{ReadPreference, WriteConcern};
+use common::{ReadPreference, ReadMode, WriteConcern};
 use connstring::ConnectionString;
 use db::{Database, ThreadedDatabase};
 use error::Error::ResponseError;
@@ -119,7 +119,7 @@ impl ThreadedClient for Client {
 
         let rp = match read_pref {
             Some(rp) => rp,
-            None => ReadPreference::Primary,
+            None => ReadPreference::new(ReadMode::Primary, None),
         };
 
         let wc = match write_concern {

@@ -120,7 +120,7 @@ impl ThreadedDatabase for Database {
             spec.insert("filter".to_owned(), Bson::Document(filter.unwrap()));
         }
 
-        self.command_cursor(spec, CommandType::ListCollections, self.read_preference)
+        self.command_cursor(spec, CommandType::ListCollections, self.read_preference.to_owned())
     }
 
 
