@@ -12,9 +12,8 @@ use pool::ConnectionPool;
 use wire_protocol::flags::OpQueryFlags;
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::thread;
 
 use super::server::{ServerDescription, ServerType};
 use super::{DEFAULT_HEARTBEAT_FREQUENCY_MS, TopologyDescription};
@@ -67,6 +66,8 @@ pub struct Monitor {
     // Owned, single-threaded pool.
     personal_pool: Arc<ConnectionPool>,
     heartbeat_frequency_ms: AtomicUsize,
+    dummy_lock: Mutex<()>,
+    condvar: Condvar,
     /// While true, the monitor will check server connection health
     /// at the topology's heartbeat frequency rate.
     pub running: Arc<AtomicBool>,
@@ -206,6 +207,8 @@ impl Monitor {
             top_description: top_description,
             server_description: server_description,
             heartbeat_frequency_ms: AtomicUsize::new(DEFAULT_HEARTBEAT_FREQUENCY_MS as usize),
+            dummy_lock: Mutex::new(()),
+            condvar: Condvar::new(),
             running: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -272,7 +275,7 @@ impl Monitor {
     }
 
     /// Execute isMaster and update the server and topology.
-    pub fn execute_update(&self) {
+    fn execute_update(&self) {
         match self.is_master() {
             Ok(mut cursor) => self.update_with_is_master_cursor(&mut cursor),
             Err(err) => {
@@ -303,6 +306,8 @@ impl Monitor {
 
         self.running.store(true, Ordering::SeqCst);
 
+        let mut guard = self.dummy_lock.lock().unwrap();
+
         loop {
             if !self.running.load(Ordering::SeqCst) {
                 break;
@@ -315,7 +320,8 @@ impl Monitor {
                                                   Ordering::SeqCst);
             }
 
-            thread::sleep_ms(self.heartbeat_frequency_ms.load(Ordering::SeqCst) as u32);
+            let frequency = self.heartbeat_frequency_ms.load(Ordering::SeqCst) as u32;
+            guard = self.condvar.wait_timeout_ms(guard, frequency).unwrap().0;
         }
     }
 }
