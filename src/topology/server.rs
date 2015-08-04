@@ -8,7 +8,7 @@ use pool::{ConnectionPool, PooledStream};
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 use std::thread;
 
 use super::monitor::{IsMasterResult, Monitor};
@@ -75,9 +75,8 @@ pub struct Server {
     pub description: Arc<RwLock<ServerDescription>>,
     /// The connection pool for this server.
     pool: Arc<ConnectionPool>,
-    /// A reference to the associated monitor's running bool.
-    /// When this server is dropped, the monitor will be stopped.
-    monitor_running: Arc<AtomicBool>,
+    /// A reference to the associated server monitor.
+    monitor: Arc<Monitor>,
 }
 
 impl FromStr for ServerType {
@@ -167,7 +166,7 @@ impl ServerDescription {
 
 impl Drop for Server {
     fn drop(&mut self) {
-        self.monitor_running.store(false, Ordering::SeqCst);
+        self.monitor.running.store(false, Ordering::SeqCst);
     }
 }
 
@@ -185,22 +184,21 @@ impl Server {
         let pool = Arc::new(ConnectionPool::new(host.clone()));
 
         // Fails silently
-        let monitor_running = if run_monitor {
-            let monitor = Monitor::new(client, host_clone, pool.clone(), top_description, desc_clone);
-            let atomic_val = monitor.as_ref().unwrap().running.clone();
+        let monitor = Arc::new(Monitor::new(client, host_clone, pool.clone(),
+                                            top_description, desc_clone));
+
+        if run_monitor {
+            let monitor_clone = monitor.clone();
             thread::spawn(move || {
-                monitor.unwrap().run();
+                monitor_clone.run();
             });
-            atomic_val
-        } else {
-            Arc::new(AtomicBool::new(false))
-        };
+        }
 
         Server {
             host: host,
             pool: pool,
             description: description.clone(),
-            monitor_running: monitor_running,
+            monitor: monitor,
         }
     }
 

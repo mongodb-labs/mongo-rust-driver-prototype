@@ -13,7 +13,7 @@ use wire_protocol::flags::OpQueryFlags;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread;
 
 use super::server::{ServerDescription, ServerType};
@@ -66,6 +66,7 @@ pub struct Monitor {
     client: Client,
     // Owned, single-threaded pool.
     personal_pool: Arc<ConnectionPool>,
+    heartbeat_frequency_ms: AtomicUsize,
     /// While true, the monitor will check server connection health
     /// at the topology's heartbeat frequency rate.
     pub running: Arc<AtomicBool>,
@@ -195,17 +196,18 @@ impl Monitor {
     /// Returns a new monitor connected to the server.
     pub fn new(client: Client, host: Host, pool: Arc<ConnectionPool>,
                top_description: Arc<RwLock<TopologyDescription>>,
-               server_description: Arc<RwLock<ServerDescription>>) -> Result<Monitor> {
+               server_description: Arc<RwLock<ServerDescription>>) -> Monitor {
 
-        Ok(Monitor {
+        Monitor {
             client: client,
             host: host.clone(),
             server_pool: pool,
             personal_pool: Arc::new(ConnectionPool::with_size(host, 1)),
             top_description: top_description,
             server_description: server_description,
+            heartbeat_frequency_ms: AtomicUsize::new(DEFAULT_HEARTBEAT_FREQUENCY_MS as usize),
             running: Arc::new(AtomicBool::new(false)),
-        })
+        }
     }
 
     // Set server description error field.
@@ -216,7 +218,7 @@ impl Monitor {
     }
 
     /// Returns an isMaster server response using an owned monitor socket.
-    pub fn is_master(&mut self) -> Result<Cursor> {
+    pub fn is_master(&self) -> Result<Cursor> {
         let options = FindOptions::new().with_limit(1);
         let flags = OpQueryFlags::with_find_options(&options);
         let mut filter = bson::Document::new();
@@ -269,8 +271,32 @@ impl Monitor {
         }
     }
 
+    /// Execute isMaster and update the server and topology.
+    pub fn execute_update(&self) {
+        match self.is_master() {
+            Ok(mut cursor) => self.update_with_is_master_cursor(&mut cursor),
+            Err(err) => {
+                // Refresh all connections
+                self.server_pool.clear();
+                self.personal_pool.clear();
+
+                let stype = self.server_description.read().unwrap().server_type;
+
+                if stype == ServerType::Unknown {
+                    self.set_err(err);
+                } else {
+                    // Retry once
+                    match self.is_master() {
+                        Ok(mut cursor) => self.update_with_is_master_cursor(&mut cursor),
+                        Err(err) => self.set_err(err),
+                    }
+                }
+            }
+        }
+    }
+
     /// Starts server monitoring.
-    pub fn run(&mut self) {
+    pub fn run(&self) {
         if self.running.load(Ordering::SeqCst) {
             return;
         }
@@ -282,31 +308,14 @@ impl Monitor {
                 break;
             }
 
-            match self.is_master() {
-                Ok(mut cursor) => self.update_with_is_master_cursor(&mut cursor),
-                Err(err) => {
-                    // Refresh all connections
-                    self.server_pool.clear();
-                    self.personal_pool.clear();
+            self.execute_update();
 
-                    let stype = self.server_description.read().unwrap().server_type;
-
-                    if stype == ServerType::Unknown {
-                        self.set_err(err);
-                    } else {
-                        // Retry once
-                        match self.is_master() {
-                            Ok(mut cursor) => self.update_with_is_master_cursor(&mut cursor),
-                            Err(err) => self.set_err(err),
-                        }
-                    }
-                }
+            if let Ok(description) = self.top_description.read() {
+                self.heartbeat_frequency_ms.store(description.heartbeat_frequency_ms as usize,
+                                                  Ordering::SeqCst);
             }
 
-            match self.top_description.read() {
-                Ok(description) => thread::sleep_ms(description.heartbeat_frequency_ms),
-                Err(_) => thread::sleep_ms(DEFAULT_HEARTBEAT_FREQUENCY_MS),
-            }
+            thread::sleep_ms(self.heartbeat_frequency_ms.load(Ordering::SeqCst) as u32);
         }
     }
 }
