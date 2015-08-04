@@ -88,14 +88,8 @@ impl TopologyDescription {
         }
     }
 
-    fn get_rand_server_stream(&self) -> Result<PooledStream> {
-        let len = self.servers.len();
-        let key = self.servers.keys().nth(thread_rng().gen_range(0, len)).unwrap();
-        self.servers.get(&key).unwrap().acquire_stream()
-    }
-
-    fn get_nearest_server_stream(&self) -> Result<PooledStream> {
-        self.get_rand_server_stream()
+    fn get_nearest_from_vec(&self, servers: &mut Vec<Host>) -> Result<PooledStream> {
+        self.get_rand_from_vec(servers)
     }
 
     fn get_rand_from_vec(&self, servers: &mut Vec<Host>) -> Result<PooledStream> {
@@ -115,17 +109,86 @@ impl TopologyDescription {
 
     /// Returns a server stream.
     pub fn acquire_stream(&self, read_preference: ReadPreference) -> Result<PooledStream> {
+        let (mut hosts, rand) = try!(self.choose_hosts(&read_preference));
+        self.filter_hosts(&mut hosts, &read_preference);
+        if rand {
+            self.get_rand_from_vec(&mut hosts)
+        } else {
+            self.get_nearest_from_vec(&mut hosts)
+        }
+    }
+
+    pub fn filter_hosts(&self, hosts: &mut Vec<Host>, read_preference: &ReadPreference) {
+        let mut tag_filter = None;
+
+        if read_preference.tag_sets.is_empty() {
+            return;
+        }
+
+        for tags in read_preference.tag_sets.iter() {
+            for ref host in hosts.iter() {
+                if let Some(server) = self.servers.get(host) {
+                    let description = server.description.read().unwrap();
+
+                    let mut valid = true;
+                    for (key, ref val) in tags.iter() {
+                        match description.tags.get(key) {
+                            Some(ref v) => if val != v { valid = false; break },
+                            None => { valid = false; break },
+                        }
+                    }
+
+                    if valid {
+                        tag_filter = Some(tags);
+                        break;
+                    }
+                }
+            }
+            if tag_filter.is_some() {
+                break;
+            }
+        }
+
+        match tag_filter {
+            None => hosts.clear(),
+            Some(tag_filter) => {
+                hosts.retain(|host| {
+                    if let Some(server) = self.servers.get(host) {
+                        let description = server.description.read().unwrap();
+
+                        for (key, ref val) in tag_filter.iter() {
+                            match description.tags.get(key) {
+                                Some(ref v) => if val != v { return false; },
+                                None => return false,
+                            }
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                });
+            }
+        }
+    }
+
+    // Returns suitable servers and whether to take a random element.
+    pub fn choose_hosts(&self, read_preference: &ReadPreference) -> Result<(Vec<Host>, bool)> {
         if self.servers.is_empty() {
             return Err(OperationError("No servers are available for the given topology.".to_owned()));
         }
 
         match self.topology_type {
             TopologyType::Unknown => Err(OperationError("Topology is not yet known.".to_owned())),
-            TopologyType::Single => self.get_rand_server_stream(),
-            TopologyType::Sharded => self.get_nearest_server_stream(),
+            TopologyType::Single => Ok((self.servers.keys().map(|host| host.clone()).collect(), true)),
+            TopologyType::Sharded => Ok((self.servers.keys().map(|host| host.clone()).collect(), false)),
             _ => {
 
                 // Handle replica set server selection
+                // Short circuit if nearest
+                if read_preference.mode == ReadMode::Nearest {
+                    return Ok((self.servers.keys().map(|host| host.clone()).collect(), false));
+                }
+
                 let mut primaries = Vec::new();
                 let mut secondaries = Vec::new();
 
@@ -141,17 +204,17 @@ impl TopologyDescription {
 
                 // Choose an appropriate server at random based on the read preference.
                 match read_preference.mode {
-                    ReadMode::Primary => self.get_rand_from_vec(&mut primaries),
+                    ReadMode::Primary => Ok((primaries, true)),
                     ReadMode::PrimaryPreferred => {
-                        self.get_rand_from_vec(&mut primaries).or(
-                            self.get_rand_from_vec(&mut secondaries))
+                        let servers = if !primaries.is_empty() { primaries } else { secondaries };
+                        Ok((servers, true))
                     },
-                    ReadMode::Secondary => self.get_rand_from_vec(&mut secondaries),
+                    ReadMode::Secondary => Ok((secondaries, true)),
                     ReadMode::SecondaryPreferred => {
-                        self.get_rand_from_vec(&mut secondaries).or(
-                            self.get_rand_from_vec(&mut primaries))
+                        let servers = if !secondaries.is_empty() { secondaries } else { primaries };
+                        Ok((servers, true))
                     },
-                    ReadMode::Nearest => self.get_nearest_server_stream(),
+                    ReadMode::Nearest => Ok((self.servers.keys().map(|host| host.clone()).collect(), false)),
                 }
             }
         }

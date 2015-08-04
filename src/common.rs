@@ -1,4 +1,5 @@
 use bson::{self, Bson};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadMode {
@@ -12,14 +13,14 @@ pub enum ReadMode {
 #[derive(Debug, Clone)]
 pub struct ReadPreference {
     pub mode: ReadMode,
-    pub tags: Vec<bson::Document>,
+    pub tag_sets: Vec<BTreeMap<String, String>>,
 }
 
 impl ReadPreference {
-    pub fn new(mode: ReadMode, tags: Option<Vec<bson::Document>>) -> ReadPreference {
+    pub fn new(mode: ReadMode, tag_sets: Option<Vec<BTreeMap<String, String>>>) -> ReadPreference {
         ReadPreference {
             mode: mode,
-            tags: tags.unwrap_or(Vec::new()),
+            tag_sets: tag_sets.unwrap_or(Vec::new()),
         }
     }
 }
