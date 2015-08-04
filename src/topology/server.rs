@@ -14,6 +14,12 @@ use std::thread;
 use super::monitor::{IsMasterResult, Monitor};
 use super::TopologyDescription;
 
+/// Server round trip time is calculated as an exponentially-weighted moving
+/// averaging formula with a weighting factor. A factor of 0.2 places approximately
+/// 85% of the RTT weight on the 9 most recent observations. Using a divisor instead
+/// of a floating point provides the closest integer accuracy.
+pub const ROUND_TRIP_DIVISOR: i64 = 5;
+
 /// Describes the server role within a server set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ServerType {
@@ -116,7 +122,7 @@ impl ServerDescription {
     }
 
     // Updates the server description using an isMaster server response.
-    pub fn update(&mut self, ismaster: IsMasterResult) {
+    pub fn update(&mut self, ismaster: IsMasterResult, round_trip_time: i64) {
         if !ismaster.ok {
             self.set_err(OperationError("ismaster returned a not-ok response.".to_owned()));
             return;
@@ -132,6 +138,14 @@ impl ServerDescription {
         self.set_name = ismaster.set_name;
         self.election_id = ismaster.election_id;
         self.primary = ismaster.primary;
+        self.round_trip_time = match self.round_trip_time {
+            Some(old_rtt) => {
+                // (rtt / div) + (old_rtt * (div-1)/div)
+                Some(round_trip_time / ROUND_TRIP_DIVISOR +
+                     (old_rtt / (ROUND_TRIP_DIVISOR)) * (ROUND_TRIP_DIVISOR - 1))
+            },
+            None => Some(round_trip_time),
+        };
 
         let set_name_empty = self.set_name.is_empty();
         let msg_empty = ismaster.msg.is_empty();
@@ -158,9 +172,15 @@ impl ServerDescription {
     // Sets an encountered error and reverts the server type to Unknown.
     pub fn set_err(&mut self, err: Error) {
         self.err = Arc::new(Some(err));
+        self.clear();
+    }
+
+    // Reset the server type to unknown.
+    pub fn clear(&mut self) {
+        self.election_id = None;
+        self.round_trip_time = None;
         self.server_type = ServerType::Unknown;
         self.set_name = String::new();
-        self.election_id = None;
     }
 }
 
