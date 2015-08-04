@@ -11,7 +11,7 @@ use rand::{thread_rng, Rng};
 use std::io::{Read, Write};
 
 fn init_gridfs(name: &str) -> (Store, Collection, Collection) {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db(name);
     let fs = Store::with_db(db.clone());
 

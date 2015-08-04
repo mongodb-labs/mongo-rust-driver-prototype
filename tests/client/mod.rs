@@ -7,5 +7,6 @@ mod db;
 mod cursor;
 mod error;
 mod gridfs;
+mod sdam;
 mod wire_protocol;
 

@@ -1,13 +1,14 @@
 use bson::{Bson, Document};
 use mongodb::{Client, ThreadedClient};
 use mongodb::command_type::CommandType;
+use mongodb::common::ReadPreference;
 use mongodb::db::ThreadedDatabase;
 use mongodb::cursor::Cursor;
 use mongodb::wire_protocol::flags::OpQueryFlags;
 
 #[test]
 fn cursor_features() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("cursor_test");
 
@@ -24,7 +25,7 @@ fn cursor_features() {
 
     let result = Cursor::query(client.clone(), "test.cursor_test".to_owned(),
                                3, flags, 0, 0, doc, None, CommandType::Find,
-                               false);
+                               false, ReadPreference::Primary);
 
     let mut cursor = match result {
         Ok(c) => c,

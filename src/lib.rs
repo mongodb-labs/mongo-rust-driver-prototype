@@ -3,6 +3,7 @@ extern crate bson;
 extern crate byteorder;
 extern crate chrono;
 extern crate crypto;
+extern crate rand;
 extern crate rustc_serialize;
 extern crate separator;
 extern crate time;
@@ -16,6 +17,7 @@ pub mod cursor;
 pub mod error;
 pub mod gridfs;
 pub mod pool;
+pub mod topology;
 pub mod wire_protocol;
 
 mod apm;
@@ -36,12 +38,14 @@ use common::{ReadPreference, WriteConcern};
 use connstring::ConnectionString;
 use db::{Database, ThreadedDatabase};
 use error::Error::ResponseError;
-use pool::{ConnectionPool, PooledStream};
+use pool::PooledStream;
+use topology::{Topology, TopologyDescription, TopologyType};
+use topology::server::Server;
 
 /// Interfaces with a MongoDB server or replica set.
 pub struct ClientInner {
     req_id: Arc<AtomicIsize>,
-    pool: ConnectionPool,
+    topology: Topology,
     listener: Listener,
     pub read_preference: ReadPreference,
     pub write_concern: WriteConcern,
@@ -52,17 +56,18 @@ pub trait ThreadedClient: Sync + Sized {
     fn connect(host: &str, port: u16) -> Result<Self>;
     fn connect_with_log_file(host: &str, port: u16, log_file: &str) -> Result<Client>;
     fn with_prefs(host: &str, port: u16, read_pref: Option<ReadPreference>,
-                      write_concern: Option<WriteConcern>,
-                      log_file: Option<&str>) -> Result<Self>;
+                  write_concern: Option<WriteConcern>,
+                  log_file: Option<&str>) -> Result<Self>;
     fn with_uri(uri: &str) -> Result<Self>;
     fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
-                              write_concern: Option<WriteConcern>) -> Result<Self>;
-    fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>,
-                   write_concern: Option<WriteConcern>, log_file: Option<&str>) -> Result<Self>;
+                          write_concern: Option<WriteConcern>,
+                          log_file: Option<&str>) -> Result<Self>;
+    fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>, write_concern: Option<WriteConcern>,
+                   description: Option<TopologyDescription>, log_file: Option<&str>) -> Result<Self>;
     fn db<'a>(&'a self, db_name: &str) -> Database;
     fn db_with_prefs(&self, db_name: &str, read_preference: Option<ReadPreference>,
-                         write_concern: Option<WriteConcern>) -> Database;
-    fn acquire_stream(&self) -> Result<PooledStream>;
+                     write_concern: Option<WriteConcern>) -> Database;
+    fn acquire_stream(&self, read_pref: ReadPreference) -> Result<PooledStream>;
     fn get_req_id(&self) -> i32;
     fn database_names(&self) -> Result<Vec<String>>;
     fn drop_database(&self, db_name: &str) -> Result<()>;
@@ -89,25 +94,28 @@ impl ThreadedClient for Client {
     fn with_prefs(host: &str, port: u16, read_pref: Option<ReadPreference>,
                   write_concern: Option<WriteConcern>, log_file: Option<&str>) -> Result<Client> {
         let config = ConnectionString::new(host, port);
-        Client::with_config(config, read_pref, write_concern, log_file)
+        let mut description = TopologyDescription::new();
+        description.topology_type = TopologyType::Single;
+
+        Client::with_config(config, read_pref, write_concern, Some(description), log_file)
     }
 
     /// Creates a new Client connected to a server or replica set using
     /// a MongoDB connection string URI as defined by
     /// [the manual](http://docs.mongodb.org/manual/reference/connection-string/).
     fn with_uri(uri: &str) -> Result<Client> {
-        Client::with_uri_and_prefs(uri, None, None)
+        Client::with_uri_and_prefs(uri, None, None, None)
     }
 
     /// `with_uri` with custom read and write controls.
     fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
-                          write_concern: Option<WriteConcern>) -> Result<Client> {
+                          write_concern: Option<WriteConcern>, log_file: Option<&str>) -> Result<Client> {
         let config = try!(connstring::parse(uri));
-        Client::with_config(config, read_pref, write_concern, None)
+        Client::with_config(config, read_pref, write_concern, None, log_file)
     }
 
-    fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>,
-                   write_concern: Option<WriteConcern>, log_file: Option<&str>) -> Result<Client> {
+    fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>, write_concern: Option<WriteConcern>,
+                   description: Option<TopologyDescription>, log_file: Option<&str>) -> Result<Client> {
 
         let rp = match read_pref {
             Some(rp) => rp,
@@ -120,7 +128,6 @@ impl ThreadedClient for Client {
         };
 
         let listener = Listener::new();
-
         let file = match log_file {
             Some(string) => {
                 let _ = listener.add_start_hook(log_command_started);
@@ -130,14 +137,26 @@ impl ThreadedClient for Client {
             None => None,
         };
 
-        Ok(Arc::new(ClientInner {
+        let client = Arc::new(ClientInner {
             req_id: Arc::new(ATOMIC_ISIZE_INIT),
-            pool: ConnectionPool::new(config),
+            topology: try!(Topology::new(config.clone(), description)),
             listener: listener,
             read_preference: rp,
             write_concern: wc,
             log_file: file,
-        }))
+        });
+
+        // Fill servers array
+        {
+            let ref top_description = client.topology.description;
+            let mut top = try!(top_description.write());
+            for host in config.hosts.iter() {
+                let server = Server::new(client.clone(), host.clone(), top_description.clone(), true);
+                top.servers.insert(host.clone(), server);
+            }
+        }
+
+        Ok(client)
     }
 
     /// Creates a database representation with default read and write controls.
@@ -152,8 +171,8 @@ impl ThreadedClient for Client {
     }
 
     /// Acquires a connection stream from the pool.
-    fn acquire_stream(&self) -> Result<PooledStream> {
-        Ok(try!(self.pool.acquire_stream()))
+    fn acquire_stream(&self, read_preference: ReadPreference) -> Result<PooledStream> {
+        self.topology.acquire_stream(read_preference)
     }
 
     /// Returns a unique operational request id.

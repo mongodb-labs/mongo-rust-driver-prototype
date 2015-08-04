@@ -7,7 +7,7 @@ use mongodb::coll::options::{FindOptions, FindOneAndUpdateOptions,
 
 #[test]
 fn find_sorted() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("find_sorted");
 
@@ -50,7 +50,7 @@ fn find_sorted() {
 
 #[test]
 fn find_and_insert() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("find_and_insert");
 
@@ -79,7 +79,7 @@ fn find_and_insert() {
 
 #[test]
 fn find_and_insert_one() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("find_and_insert");
 
@@ -102,7 +102,7 @@ fn find_and_insert_one() {
 
 #[test]
 fn find_one_and_delete() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("find_one_and_delete");
 
@@ -142,7 +142,7 @@ fn find_one_and_delete() {
 
 #[test]
 fn find_one_and_replace() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("find_one_and_replace");
 
@@ -198,7 +198,7 @@ fn find_one_and_replace() {
 
 #[test]
 fn find_one_and_update() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("find_one_and_update");
 
@@ -239,7 +239,7 @@ fn find_one_and_update() {
 
 #[test]
 fn aggregate() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("aggregate");
 
@@ -285,7 +285,7 @@ fn aggregate() {
 
 #[test]
 fn count() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("count");
 
@@ -317,7 +317,7 @@ fn count() {
 
 #[test]
 fn distinct_none() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("distinct_none");
 
@@ -328,7 +328,7 @@ fn distinct_none() {
 
 #[test]
 fn distinct_one() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("distinct_none");
 
@@ -342,7 +342,7 @@ fn distinct_one() {
 
 #[test]
 fn distinct() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("distinct");
 
@@ -400,7 +400,7 @@ fn distinct() {
 
 #[test]
 fn insert_many() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("insert_many");
 
@@ -430,7 +430,7 @@ fn insert_many() {
 
 #[test]
 fn delete_one() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("delete_one");
 
@@ -462,7 +462,7 @@ fn delete_one() {
 
 #[test]
 fn delete_many() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("delete_many");
 
@@ -494,7 +494,7 @@ fn delete_many() {
 
 #[test]
 fn replace_one() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("replace_one");
 
@@ -531,7 +531,7 @@ fn replace_one() {
 
 #[test]
 fn update_one() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("update_one");
 
@@ -565,7 +565,7 @@ fn update_one() {
 
 #[test]
 fn update_many() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("update_many");
 
@@ -605,7 +605,7 @@ fn update_many() {
 
 #[test]
 fn create_list_drop_indexes() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("create_list_drop_indexes");
 
@@ -682,7 +682,7 @@ fn create_list_drop_indexes() {
 
 #[test]
 fn drop_all_indexes() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test");
     let coll = db.collection("drop_all_indexes");
 

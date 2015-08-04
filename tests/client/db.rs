@@ -37,7 +37,7 @@ fn create_collection() {
 
 #[test]
 fn list_collections() {
-    let client = Client::with_uri("mongodb://localhost:27017").unwrap();
+    let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("list_collections");
 
     db.drop_database().ok().expect("Failed to drop database");

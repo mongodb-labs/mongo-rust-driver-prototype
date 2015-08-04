@@ -1,6 +1,7 @@
 use coll::options::{CursorType, FindOptions};
 
 /// Represents the bit vector of options for an OP_REPLY message.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpReplyFlags {
     pub cursor_not_found: bool, // Bit 0
     pub query_failure: bool,    // Bit 1
@@ -27,6 +28,7 @@ impl OpReplyFlags {
 }
 
 /// Represents the bit vector of options for an OP_UPDATE message.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpUpdateFlags {
     pub upsert: bool,        // Bit 0
     pub multi_update: bool,  // Bit 1
@@ -35,6 +37,7 @@ pub struct OpUpdateFlags {
 }
 
 /// Represents the bit vector of flags for an OP_INSERT message.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpInsertFlags {
     pub continue_on_error: bool,  // Bit 0
 
@@ -42,6 +45,7 @@ pub struct OpInsertFlags {
 }
 
 /// Represents the bit vector of flags for an OP_QUERY message.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpQueryFlags {
     pub tailable_cursor: bool,    // Bit 1
     pub slave_ok: bool,           // Bit 2

@@ -1,8 +1,9 @@
 use bson::{Bson, Document};
-use json::arguments::Arguments;
-use json::outcome::Outcome;
 use rustc_serialize::json::{Json, Object};
 use std::fs::File;
+
+use super::arguments::Arguments;
+use super::outcome::Outcome;
 
 pub struct Test {
     pub operation: Arguments,

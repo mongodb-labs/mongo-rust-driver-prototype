@@ -1,12 +1,11 @@
 use bson::Bson;
+use json::FromJson;
+
 use mongodb::coll::options::{AggregateOptions, CountOptions,
     FindOneAndDeleteOptions, FindOneAndUpdateOptions, FindOptions,
     ReturnDocument};
-use rustc_serialize::json::{Object, Json};
 
-pub trait FromJson {
-    fn from_json(object: &Object) -> Self;
-}
+use rustc_serialize::json::{Object, Json};
 
 impl FromJson for AggregateOptions {
     fn from_json(object: &Object) -> AggregateOptions {
