@@ -110,7 +110,37 @@ impl TopologyDescription {
     /// Returns a server stream.
     pub fn acquire_stream(&self, read_preference: ReadPreference) -> Result<PooledStream> {
         let (mut hosts, rand) = try!(self.choose_hosts(&read_preference));
-        self.filter_hosts(&mut hosts, &read_preference);
+        if self.topology_type != TopologyType::Sharded {
+            self.filter_hosts(&mut hosts, &read_preference);
+        }
+        if rand {
+            self.get_rand_from_vec(&mut hosts)
+        } else {
+            self.get_nearest_from_vec(&mut hosts)
+        }
+    }
+
+    pub fn acquire_write_stream(&self) -> Result<PooledStream> {
+        if self.servers.is_empty() {
+            return Err(OperationError("No servers are available for the given topology.".to_owned()));
+        }
+
+        let (mut hosts, rand) = match self.topology_type {
+            TopologyType::Unknown => return Err(OperationError("Topology is not yet known.".to_owned())),
+            TopologyType::Single => (self.servers.keys().map(|host| host.clone()).collect(), true),
+            TopologyType::Sharded => (self.servers.keys().map(|host| host.clone()).collect(), false),
+            _ => (self.servers.keys().filter_map(|host| {
+                if let Some(server) = self.servers.get(host) {
+                    if let Ok(description) = server.description.read() {
+                        if description.server_type == ServerType::RSPrimary {
+                            return Some(host.clone());
+                        }
+                    }
+                }
+                None
+            }).collect(), true)
+        };
+
         if rand {
             self.get_rand_from_vec(&mut hosts)
         } else {
@@ -482,11 +512,16 @@ impl Topology {
     }
 
     /// Returns a server stream.
-    pub fn acquire_stream(&self, read_preference: ReadPreference) -> Result<PooledStream> {
+    pub fn acquire_stream(&self, read_preference: Option<ReadPreference>, write: bool) -> Result<PooledStream> {
         let mut retry = 0;
         loop {
             let description = try!(self.description.read());
-            let result = description.acquire_stream(read_preference.to_owned());
+            let result = if write {
+                description.acquire_write_stream()
+            } else {
+                description.acquire_stream(read_preference.as_ref().unwrap().to_owned())
+            };
+
             match result {
                 Ok(stream) => return Ok(stream),
                 Err(err) => {

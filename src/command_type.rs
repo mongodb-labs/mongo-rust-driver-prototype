@@ -60,4 +60,36 @@ impl CommandType {
             &CommandType::UpdateOne => "update_one",
         }
     }
+
+    pub fn is_write_command(&self) -> bool {
+        match self {
+            &CommandType::Aggregate => false,
+            &CommandType::Count => false,
+            &CommandType::CreateCollection => true,
+            &CommandType::CreateIndexes => true,
+            &CommandType::CreateUser => true,
+            &CommandType::DeleteMany => true,
+            &CommandType::DeleteOne => true,
+            &CommandType::Distinct => false,
+            &CommandType::DropAllUsers => true,
+            &CommandType::DropCollection => true,
+            &CommandType::DropDatabase => true,
+            &CommandType::DropIndexes => true,
+            &CommandType::DropUser => true,
+            &CommandType::Find => false,
+            &CommandType::FindOneAndDelete => true,
+            &CommandType::FindOneAndReplace => true,
+            &CommandType::FindOneAndUpdate => true,
+            &CommandType::GetUser => false,
+            &CommandType::GetUsers => false,
+            &CommandType::InsertMany => true,
+            &CommandType::InsertOne => true,
+            &CommandType::IsMaster => false,
+            &CommandType::ListCollections => false,
+            &CommandType::ListDatabases => false,
+            &CommandType::ListIndexes => false,
+            &CommandType::UpdateMany => true,
+            &CommandType::UpdateOne => true,
+        }
+    }
 }

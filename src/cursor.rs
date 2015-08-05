@@ -174,12 +174,17 @@ impl Cursor {
                  return_field_selector: Option<bson::Document>, cmd_type: CommandType,
                  is_cmd_cursor: bool, read_pref: ReadPreference) -> Result<Cursor> {
 
-        let stream = try!(client.acquire_stream(read_pref.to_owned()));
+        let stream = if cmd_type.is_write_command() {
+            try!(client.acquire_write_stream())
+        } else {
+            try!(client.acquire_stream(read_pref.to_owned()))
+        };
+
         Cursor::query_with_stream(stream, client, namespace, batch_size, flags,
                                   number_to_skip, number_to_return, query,
                                   return_field_selector, cmd_type, is_cmd_cursor, Some(read_pref))
     }
-
+    
     pub fn query_with_stream(stream: PooledStream,
                              client: Client, namespace: String,
                              batch_size: i32, flags: OpQueryFlags,
