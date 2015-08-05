@@ -13,6 +13,7 @@ use pool::PooledStream;
 use rand::{thread_rng, Rng};
 
 use std::collections::HashMap;
+use std::i64;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::thread;
@@ -89,7 +90,35 @@ impl TopologyDescription {
     }
 
     fn get_nearest_from_vec(&self, servers: &mut Vec<Host>) -> Result<PooledStream> {
-        self.get_rand_from_vec(servers)
+        servers.sort_by(|a, b| {
+            let mut a_rtt = i64::MAX;
+            let mut b_rtt = i64::MAX;
+            if let Some(server) = self.servers.get(a) {
+                if let Ok(a_description) = server.description.read() {
+                    a_rtt = a_description.round_trip_time.unwrap_or(i64::MAX);
+                }
+            }
+            if let Some(server) = self.servers.get(b) {
+                if let Ok(b_description) = server.description.read() {
+                    b_rtt = b_description.round_trip_time.unwrap_or(i64::MAX);
+                }
+            }
+
+            a_rtt.cmp(&b_rtt)
+        });
+
+        for host in servers.iter() {
+            if let Some(server) = self.servers.get(host) {
+                if let Ok(description) = server.description.read() {
+                    if description.round_trip_time.is_none() {
+                        break;
+                    } else if let Ok(stream) = server.acquire_stream() {
+                        return Ok(stream);
+                    }
+                }
+            }
+        }
+        Err(OperationError("No servers available for the provided ReadPreference.".to_owned()))
     }
 
     fn get_rand_from_vec(&self, servers: &mut Vec<Host>) -> Result<PooledStream> {

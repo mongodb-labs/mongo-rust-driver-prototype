@@ -308,7 +308,6 @@ impl Cursor {
         let get_more = Message::new_get_more(req_id, self.namespace.to_owned(), self.batch_size,
                                              self.cursor_id);
 
-
         let index = self.namespace.rfind(".").unwrap_or(self.namespace.len());
         let db_name = self.namespace[..index].to_owned();
         let cmd_name = "get_more".to_owned();
