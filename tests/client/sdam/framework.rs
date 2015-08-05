@@ -44,10 +44,7 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
         topology_description.servers.insert(host.clone(), server);
     }
 
-    let mut i = 0;
     for phase in suite.phases {
-        i += 1;
-
         for (host, response) in phase.operation.data {
             {
                 // Save each seen server to replicate monitors for servers
