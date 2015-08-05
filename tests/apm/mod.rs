@@ -7,16 +7,18 @@ use mongodb::db::ThreadedDatabase;
 use rand;
 
 fn timed_query(_client: Client, command_result: &CommandResult) {
-    let duration = match command_result {
-        &CommandResult::Success { duration, .. } => duration,
+    let (command_name, duration) = match command_result {
+        &CommandResult::Success { ref command_name, duration, .. } => (command_name.clone(), duration),
         _ => panic!("Command failed!")
     };
 
-    // Sanity check
-    assert!(duration >= 500000000);
+    if command_name.eq("find") {
+        // Sanity check
+        assert!(duration >= 1500000000);
 
-    // Technically not guaranteed, but since the query is running locally, it shouldn't even be close
-    assert!(duration < 2000000000);
+        // Technically not guaranteed, but since the query is running locally, it shouldn't even be close
+        assert!(duration < 2000000000);
+    }
 }
 
 #[test]
