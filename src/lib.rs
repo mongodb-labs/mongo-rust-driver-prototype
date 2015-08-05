@@ -25,7 +25,6 @@ mod auth;
 mod command_type;
 
 pub use apm::{CommandStarted, CommandResult};
-pub use auth::Authenticator;
 pub use command_type::CommandType;
 pub use error::{Error, ErrorCode, Result};
 

@@ -1,6 +1,7 @@
 pub mod options;
 pub mod roles;
 
+use auth::Authenticator;
 use bson;
 use bson::Bson;
 use {Client, CommandType, ThreadedClient, Result};
@@ -27,6 +28,7 @@ pub trait ThreadedDatabase {
     /// Creates a database representation with optional read and write controls.
     fn open(client: Client, name: &str, read_preference: Option<ReadPreference>,
             write_concern: Option<WriteConcern>) -> Database;
+    fn auth(&self, user: &str, password: &str) -> Result<()>;
     fn collection(&self, coll_name: &str) -> Collection;
     fn collection_with_prefs(&self, coll_name: &str, create: bool,
                              read_preference: Option<ReadPreference>,
@@ -67,6 +69,11 @@ impl ThreadedDatabase for Database {
             read_preference: rp,
             write_concern: wc,
         })
+    }
+
+    fn auth(&self, user: &str, password: &str) -> Result<()> {
+        let authenticator = Authenticator::new(self.clone());
+        authenticator.auth(user, password)
     }
 
     /// Creates a collection representation with inherited read and write controls.

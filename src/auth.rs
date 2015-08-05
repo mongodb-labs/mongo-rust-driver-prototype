@@ -1,4 +1,5 @@
 use bson::Bson::{self, Binary};
+use bson::Document;
 use bson::spec::BinarySubtype::Generic;
 use CommandType::Suppressed;
 use crypto::digest::Digest;
@@ -18,19 +19,45 @@ const B64_CONFIG : base64::Config = base64::Config { char_set: base64::Character
                                                      newline: base64::Newline::LF,
                                                      pad: true, line_length: None };
 
-pub trait Authenticator {
-    fn auth(&self, user: &str, password: &str) -> Result<()>;
+pub struct Authenticator {
+    db: Database,
 }
 
-macro_rules! start {
-    ($db:expr, $user:expr) => {{
+struct InitialData {
+    message: String,
+    response: String,
+    nonce: String,
+    conversation_id: Bson,
+}
+
+struct AuthData {
+    salted_password: Vec<u8>,
+    message: String,
+    response: Document,
+}
+
+impl Authenticator {
+    pub fn new(db: Database) -> Authenticator {
+        Authenticator { db: db }
+    }
+
+    pub fn auth(self, user: &str, password: &str) -> Result<()> {
+        let initial_data = try!(self.start(user));
+        let conversation_id = initial_data.conversation_id.clone();
+        let full_password = format!("{}:mongo:{}", user, password);
+        let auth_data = try!(self.next(full_password, initial_data));
+
+        self.finish(conversation_id, auth_data)
+    }
+
+    fn start(&self, user: &str) -> Result<InitialData> {
         let text_nonce = match TextNonce::sized(64) {
             Ok(text_nonce) => text_nonce,
             Err(string) => return Err(DefaultError(string))
         };
 
         let nonce = format!("{}", text_nonce);
-        let message = format!("n={},r={}", $user, nonce);
+        let message = format!("n={},r={}", user, nonce);
         let bytes = format!("n,,{}", message).into_bytes();
         let binary = Binary(Generic, bytes);
 
@@ -41,7 +68,7 @@ macro_rules! start {
             "mechanism" => "SCRAM-SHA-1"
         };
 
-        let doc = try!($db.command(start_doc, Suppressed));
+        let doc = try!(self.db.command(start_doc, Suppressed));
 
         let data = match doc.get("payload") {
             Some(&Binary(_, ref payload)) => payload.to_owned(),
@@ -53,23 +80,26 @@ macro_rules! start {
             None => return Err(ResponseError("No conversationId returned".to_owned()))
         };
 
-        match String::from_utf8(data) {
-            Ok(string) => (message, string, nonce, id),
+        let response = match String::from_utf8(data) {
+            Ok(string) => string,
             Err(_) => return Err(ResponseError("Invalid UTF-8 payload returned".to_owned()))
-        }
-    }};
-}
+        };
 
-macro_rules! next {
-    ($db:expr, $message:expr, $response:expr, $password:expr, $nonce:expr, $id:expr) => {{
-        let (rnonce_opt, salt_opt, i_opt) = scan_fmt!($response, "r={},s={},i={}", String, String, u32);
+        Ok(InitialData { message: message, response: response, nonce: nonce,
+                          conversation_id: id })
+    }
+
+    fn next(&self, password: String, initial_data: InitialData) -> Result<AuthData> {
+        // Parse out rnonce, salt, and iteration count
+        let (rnonce_opt, salt_opt, i_opt) = scan_fmt!(&initial_data.response[..], "r={},s={},i={}", String, String, u32);
 
         let rnonce_b64 = match rnonce_opt {
             Some(val) => val,
             None => return Err(ResponseError("Invalid rnonce returned".to_owned()))
         };
 
-        if !rnonce_b64.starts_with(&$nonce) {
+        // Validate rnonce to make sure server isn't malicious
+        if !rnonce_b64.starts_with(&initial_data.nonce[..]) {
             return Err(MaliciousServerError(MaliciousServerErrorType::InvalidRnonce))
         }
 
@@ -89,47 +119,49 @@ macro_rules! next {
             None => return Err(ResponseError("Invalid iteration count returned".to_owned()))
         };
 
-        // let password_bytes = $password.into_bytes();
+        // Hash password
         let mut md5 = Md5::new();
-        md5.input_str(&$password[..]);
+        md5.input_str(&password[..]);
         let hashed_password = md5.result_str();
 
+        // Salt password
         let mut hmac = Hmac::new(Sha1::new(), hashed_password.as_bytes());
         let mut salted_password : Vec<_> = (0..hmac.output_bytes()).map(|_| 0).collect();
         pbkdf2::pbkdf2(&mut hmac, &salt[..], i, &mut salted_password);
 
-        let mut server_key_hmac = Hmac::new(Sha1::new(), &salted_password[..]);
-        let server_key_bytes = "Server Key".as_bytes();
-        server_key_hmac.input(server_key_bytes);
-        let server_key = server_key_hmac.result().code().to_owned();
-
+        // Compute client key
         let mut client_key_hmac = Hmac::new(Sha1::new(), &salted_password[..]);
         let client_key_bytes = "Client Key".as_bytes();
         client_key_hmac.input(client_key_bytes);
         let client_key = client_key_hmac.result().code().to_owned();
 
+        // Hash into stored key
         let mut stored_key_sha1 = Sha1::new();
         stored_key_sha1.input(&client_key[..]);
-
         let mut stored_key : Vec<_> = (0..stored_key_sha1.output_bytes()).map(|_| 0).collect();
         stored_key_sha1.result(&mut stored_key);
 
+        // Create auth message
         let without_proof = format!("c=biws,r={}", rnonce_b64);
-        let auth_message = format!("{},{},{}", $message, $response, without_proof);
+        let auth_message = format!("{},{},{}", initial_data.message, initial_data.response, without_proof);
 
-        let mut signature_hmac = Hmac::new(Sha1::new(), &stored_key[..]);
-        signature_hmac.input(auth_message.as_bytes());
-        let signature = signature_hmac.result().code().to_owned();
+        // Compute client signature
+        let mut client_signature_hmac = Hmac::new(Sha1::new(), &stored_key[..]);
+        client_signature_hmac.input(auth_message.as_bytes());
+        let client_signature = client_signature_hmac.result().code().to_owned();
 
-        if client_key.len() != signature.len() {
-            return Err(DefaultError("Generated client and/or server key is invalid".to_owned()));
+        // Sanity check
+        if client_key.len() != client_signature.len() {
+            return Err(DefaultError("Generated client key and/or client signature is invalid".to_owned()));
         }
 
+        // Compute proof by xor'ing key and signature
         let mut proof = vec![];
         for i in 0..client_key.len() {
-            proof.push(client_key[i] ^ signature[i]);
+            proof.push(client_key[i] ^ client_signature[i]);
         }
 
+        // Encode proof and produce the message to send to the server
         let b64_proof = proof.to_base64(B64_CONFIG);
         let final_message = format!("{},p={}", without_proof, b64_proof);
         let binary = Binary(Generic, final_message.into_bytes());
@@ -137,48 +169,60 @@ macro_rules! next {
         let next_doc = doc! {
             "saslContinue" => 1,
             "payload" => binary,
-            "conversationId" => ($id.clone())
+            "conversationId" => (initial_data.conversation_id.clone())
         };
 
-        let mut doc = try!($db.command(next_doc, Suppressed));
+        let response = try!(self.db.command(next_doc, Suppressed));
 
+        Ok(AuthData { salted_password: salted_password, message: auth_message,
+                      response: response })
+    }
+
+    fn finish(&self, conversation_id: Bson, auth_data: AuthData) -> Result<()> {
         let final_doc = doc! {
             "saslContinue" => 1,
             "payload" => (Binary(Generic, vec![])),
-            "conversationId" => $id
+            "conversationId" => conversation_id
         };
 
+        // Compute server key
+        let mut server_key_hmac = Hmac::new(Sha1::new(), &auth_data.salted_password[..]);
+        let server_key_bytes = "Server Key".as_bytes();
+        server_key_hmac.input(server_key_bytes);
+        let server_key = server_key_hmac.result().code().to_owned();
+
+        // Compute server signature
         let mut server_signature_hmac = Hmac::new(Sha1::new(), &server_key[..]);
-        server_signature_hmac.input(auth_message.as_bytes());
+        server_signature_hmac.input(auth_data.message.as_bytes());
         let server_signature = server_signature_hmac.result().code().to_owned();
 
-        loop {
-            if let Some(&Bson::Boolean(true)) = doc.get("done") {
-                break;
-            }
+        let mut doc = auth_data.response;
 
+        loop {
+            // Verify server signature
             if let Some(&Binary(_, ref payload)) = doc.get("payload") {
-                let payload_str = String::from_utf8_lossy(payload);
+                let payload_str = match String::from_utf8(payload.to_owned()) {
+                    Ok(string) => string,
+                    Err(_) => return Err(ResponseError("Invalid UTF-8 payload returned".to_owned()))
+                };
+
+                // Check that the signature exists
                 let verifier = match scan_fmt!(&payload_str[..], "v={}", String) {
                     Some(string) => string,
                     None => return Err(MaliciousServerError(MaliciousServerErrorType::NoServerSignature)),
                 };
 
+                // Check that the signature is valid
                 if verifier.ne(&server_signature.to_base64(B64_CONFIG)[..]) {
                     return Err(MaliciousServerError(MaliciousServerErrorType::InvalidServerSignature));
                 }
             }
 
-            doc = try!($db.command(final_doc.clone(), Suppressed));
-        }
-    }};
-}
+            doc = try!(self.db.command(final_doc.clone(), Suppressed));
 
-impl Authenticator for Database {
-    fn auth(&self, user: &str, password: &str) -> Result<()> {
-        let (message, response, nonce, id) = start!(self, user);
-        let full_password = format!("{}:mongo:{}", user, password);
-        next!(self, message, &response[..], full_password, nonce, id);
-        Ok(())
+            if let Some(&Bson::Boolean(true)) = doc.get("done") {
+                return Ok(())
+            }
+        }
     }
 }
