@@ -1,5 +1,7 @@
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::fmt;
 use std::io::{Read, Write};
+
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use Result;
 use Error::ResponseError;
 
@@ -36,19 +38,19 @@ impl OpCode {
     }
 }
 
-impl ToString for OpCode {
+impl fmt::Display for OpCode {
     /// Gets the string representation of an opcode.
     ///
     /// # Return value
     ///
     /// Returns the string represetnation of the opcode.
-    fn to_string(&self) -> String {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &OpCode::Reply => "OP_REPLY".to_owned(),
-            &OpCode::Update => "OP_UPDATE".to_owned(),
-            &OpCode::Insert => "OP_INSERT".to_owned(),
-            &OpCode::Query => "OP_QUERY".to_owned(),
-            &OpCode::GetMore => "OP_GET_MORE".to_owned(),
+            &OpCode::Reply => write!(fmt, "OP_REPLY"),
+            &OpCode::Update => write!(fmt, "OP_UPDATE"),
+            &OpCode::Insert => write!(fmt, "OP_INSERT"),
+            &OpCode::Query => write!(fmt, "OP_QUERY"),
+            &OpCode::GetMore => write!(fmt, "OP_GET_MORE"),
         }
     }
 }
