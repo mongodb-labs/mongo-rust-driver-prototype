@@ -532,8 +532,8 @@ impl Message {
             OpCode::Reply => Message::read_reply(buffer, header),
             opcode => Err(ResponseError(format!("Expected to read \
                                                  OpCode::Reply but \
-                                                 instead found opcode {}.",
-                                                 opcode.to_string())))
+                                                 instead found opcode {}",
+                                                 opcode)))
         }
     }
 }
