@@ -71,6 +71,7 @@ impl ThreadedDatabase for Database {
         })
     }
 
+    /// Logs in a user using the SCRAM-SHA-1 mechanism
     fn auth(&self, user: &str, password: &str) -> Result<()> {
         let authenticator = Authenticator::new(self.clone());
         authenticator.auth(user, password)
