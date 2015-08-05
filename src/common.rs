@@ -1,5 +1,9 @@
+use Error::{self, ArgumentError};
+use Result;
+
 use bson::{self, Bson};
 use std::collections::BTreeMap;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadMode {
@@ -8,6 +12,20 @@ pub enum ReadMode {
     Secondary,
     SecondaryPreferred,
     Nearest,
+}
+
+impl FromStr for ReadMode {   
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        Ok(match s {
+            "Primary" => ReadMode::Primary,
+            "PrimaryPreferred" => ReadMode::PrimaryPreferred,
+            "Secondary" => ReadMode::Secondary,
+            "SecondaryPreferred" => ReadMode::SecondaryPreferred,
+            "Nearest" => ReadMode::Nearest,
+            _ => return Err(ArgumentError(format!("Could not convert '{}' to ReadMode.", s))),
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
