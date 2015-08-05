@@ -46,7 +46,6 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
 
     let mut i = 0;
     for phase in suite.phases {
-        println!("Running phase {}", i);
         i += 1;
 
         for (host, response) in phase.operation.data {
