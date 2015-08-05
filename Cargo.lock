@@ -9,7 +9,9 @@ dependencies = [
  "rand 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.31 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "scan_fmt 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "separator 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "textnonce 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.32 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -25,7 +27,7 @@ dependencies = [
 [[package]]
 name = "bson"
 version = "0.1.2"
-source = "git+https://github.com/zonyitoo/bson-rs#1c1fcca2781f6a8947bbf1abe7b4bcbfba9e7ee3"
+source = "git+https://github.com/zonyitoo/bson-rs#41501ff9e8fa83d6c9b34fb4fa9b91f8a282c7e5"
 dependencies = [
  "byteorder 0.3.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -120,9 +122,24 @@ version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "scan_fmt"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "separator"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "textnonce"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "rand 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-serialize 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "time 0.1.32 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "time"

@@ -1,16 +1,16 @@
-#[macro_use(bson, doc)]
-extern crate bson;
+#[macro_use(bson, doc)] extern crate bson;
 extern crate byteorder;
 extern crate chrono;
 extern crate crypto;
 extern crate rand;
 extern crate rustc_serialize;
+#[macro_use] extern crate scan_fmt;
 extern crate separator;
+extern crate textnonce;
 extern crate time;
 
 pub mod db;
 pub mod coll;
-pub mod command_type;
 pub mod common;
 pub mod connstring;
 pub mod cursor;
@@ -21,8 +21,11 @@ pub mod topology;
 pub mod wire_protocol;
 
 mod apm;
+mod auth;
+mod command_type;
 
 pub use apm::{CommandStarted, CommandResult};
+pub use auth::Authenticator;
 pub use command_type::CommandType;
 pub use error::{Error, ErrorCode, Result};
 
