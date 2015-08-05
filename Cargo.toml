@@ -4,8 +4,14 @@ version = "0.1.0"
 authors = ["Valeri Karpov <valkar207@gmail.com>",
            "Saghm Rossi <saghmrossi@gmail.com>",
            "Kevin Yeh <kevinyeah@utexas.edu>"]
+description = "An experimental MongoDB driver written by MongoDB interns."
+repository = "https://github.com/mongodbinc-interns/mongo-rust-driver-prototype"
+readme = "README.md"
+keywords = ["mongo", "mongodb", "database", "bson", "nosql"]
+license = "apache"
 
 [dependencies]
+bson = "0.1.3"
 byteorder = "0.3"
 chrono = "0.2"
 rand = "0.3"
@@ -18,7 +24,3 @@ time = "0.1"
 
 [dev-dependencies]
 nalgebra = "0.2"
-
-[dependencies.bson]
-git = "https://github.com/zonyitoo/bson-rs"
-ref = "1c1fcca2781f6a8947bbf1abe7b4bcbfba9e7ee3"

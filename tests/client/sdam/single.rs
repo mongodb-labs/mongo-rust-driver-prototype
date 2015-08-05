@@ -13,7 +13,6 @@ fn sdam_single() {
         let path2 = path.unwrap().path();
         let filename = path2.to_string_lossy();
         if filename.ends_with(".json") {
-            println!("Running suite for {}", filename);
             let mut description = TopologyDescription::new();
             description.topology_type = TopologyType::Single;
             run_suite(&filename, Some(description))
