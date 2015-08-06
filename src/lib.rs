@@ -67,7 +67,7 @@ pub trait ThreadedClient: Sync + Sized {
     fn db<'a>(&'a self, db_name: &str) -> Database;
     fn db_with_prefs(&self, db_name: &str, read_preference: Option<ReadPreference>,
                      write_concern: Option<WriteConcern>) -> Database;
-    fn acquire_stream(&self, read_pref: ReadPreference) -> Result<PooledStream>;
+    fn acquire_stream(&self, read_pref: ReadPreference) -> Result<(PooledStream, bool, bool)>;
     fn acquire_write_stream(&self) -> Result<PooledStream>;
     fn get_req_id(&self) -> i32;
     fn database_names(&self) -> Result<Vec<String>>;
@@ -171,14 +171,14 @@ impl ThreadedClient for Client {
         Database::open(self.clone(), db_name, read_preference, write_concern)
     }
 
-    /// Acquires a connection stream from the pool.
-    fn acquire_stream(&self, read_preference: ReadPreference) -> Result<PooledStream> {
-        self.topology.acquire_stream(Some(read_preference), false)
+    /// Acquires a connection stream from the pool, along with slave_ok and should_send_read_pref.
+    fn acquire_stream(&self, read_preference: ReadPreference) -> Result<(PooledStream, bool, bool)> {
+        self.topology.acquire_stream(read_preference)
     }
 
     /// Acquires a connection stream from the pool for write operations.
     fn acquire_write_stream(&self) -> Result<PooledStream> {
-        self.topology.acquire_stream(None, true)
+        self.topology.acquire_write_stream()
     }
     
     /// Returns a unique operational request id.

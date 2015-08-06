@@ -174,14 +174,37 @@ impl Cursor {
                  return_field_selector: Option<bson::Document>, cmd_type: CommandType,
                  is_cmd_cursor: bool, read_pref: ReadPreference) -> Result<Cursor> {
 
-        let stream = if cmd_type.is_write_command() {
-            try!(client.acquire_write_stream())
+        let (stream, slave_ok, send_read_pref) = if cmd_type.is_write_command() {
+            (try!(client.acquire_write_stream()), false, false)
         } else {
             try!(client.acquire_stream(read_pref.to_owned()))
         };
 
-        Cursor::query_with_stream(stream, client, namespace, batch_size, flags,
-                                  number_to_skip, number_to_return, query,
+        let new_flags = if !slave_ok {
+            flags
+        } else {
+            OpQueryFlags { slave_ok: true, .. flags }
+        };
+
+        let new_query = if !send_read_pref {
+            query
+        } else {
+            match query.get("$query") {
+                Some(_) => {
+                    let mut nq = query.clone();
+                    nq.insert("read_preference".to_owned(), Bson::Document(read_pref.to_document()));
+                    nq
+                },
+                None => {
+                    let mut nq = doc! { "$query" => query };
+                    nq.insert("read_preference".to_owned(), Bson::Document(read_pref.to_document()));
+                    nq
+                }
+            }
+        };
+
+        Cursor::query_with_stream(stream, client, namespace, batch_size, new_flags,
+                                  number_to_skip, number_to_return, new_query,
                                   return_field_selector, cmd_type, is_cmd_cursor, Some(read_pref))
     }
     
@@ -301,7 +324,7 @@ impl Cursor {
     }
 
     fn get_from_stream(&mut self) -> Result<()> {
-        let stream = try!(self.client.acquire_stream(self.read_preference.to_owned()));
+        let (stream, _, _) = try!(self.client.acquire_stream(self.read_preference.to_owned()));
         let mut socket = stream.get_socket();
 
         let req_id = self.client.get_req_id();

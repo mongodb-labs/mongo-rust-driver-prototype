@@ -89,7 +89,7 @@ impl TopologyDescription {
         }
     }
 
-    fn get_nearest_from_vec(&self, servers: &mut Vec<Host>) -> Result<PooledStream> {
+    fn get_nearest_from_vec(&self, servers: &mut Vec<Host>) -> Result<(PooledStream, ServerType)> {
         servers.sort_by(|a, b| {
             let mut a_rtt = i64::MAX;
             let mut b_rtt = i64::MAX;
@@ -113,7 +113,7 @@ impl TopologyDescription {
                     if description.round_trip_time.is_none() {
                         break;
                     } else if let Ok(stream) = server.acquire_stream() {
-                        return Ok(stream);
+                        return Ok((stream, description.server_type));
                     }
                 }
             }
@@ -121,14 +121,16 @@ impl TopologyDescription {
         Err(OperationError("No servers available for the provided ReadPreference.".to_owned()))
     }
 
-    fn get_rand_from_vec(&self, servers: &mut Vec<Host>) -> Result<PooledStream> {
+    fn get_rand_from_vec(&self, servers: &mut Vec<Host>) -> Result<(PooledStream, ServerType)> {
         while !servers.is_empty() {
             let len = servers.len();
             let index = thread_rng().gen_range(0, len);
 
             if let Some(server) = self.servers.get(servers.get(index).unwrap()) {
                 if let Ok(stream) = server.acquire_stream() {
-                    return Ok(stream);
+                    if let Ok(description) = server.description.read() {
+                        return Ok((stream, description.server_type));
+                    }
                 }
             }
             servers.remove(index);
@@ -137,25 +139,58 @@ impl TopologyDescription {
     }
 
     /// Returns a server stream.
-    pub fn acquire_stream(&self, read_preference: ReadPreference) -> Result<PooledStream> {
+    pub fn acquire_stream(&self, read_preference: &ReadPreference) -> Result<(PooledStream, bool, bool)> {
         let (mut hosts, rand) = self.choose_hosts(&read_preference);
         // check no hosts
 
         if self.topology_type != TopologyType::Sharded && self.topology_type != TopologyType::Single {
-            self.filter_hosts(&mut hosts, &read_preference);
+            self.filter_hosts(&mut hosts, read_preference);
         }
 
         if hosts.is_empty() && read_preference.mode == ReadMode::SecondaryPreferred {
             let mut read_pref = read_preference.clone();
             read_pref.mode = ReadMode::PrimaryPreferred;
-            return self.acquire_stream(read_pref);
+            return self.acquire_stream(&read_pref);
         }
-        
-        if rand {
-            self.get_rand_from_vec(&mut hosts)
+
+        let (pooled_stream, server_type) = if rand {
+            try!(self.get_rand_from_vec(&mut hosts))
         } else {
-            self.get_nearest_from_vec(&mut hosts)
-        }
+            try!(self.get_nearest_from_vec(&mut hosts))
+        };
+
+        let (slave_ok, send_read_pref) = match self.topology_type {
+            TopologyType::Unknown => (false, false),
+            TopologyType::Single => match server_type {
+                ServerType::Mongos => {
+                    match read_preference.mode {
+                        ReadMode::Primary => (false, false),
+                        ReadMode::Secondary => (true, true),
+                        ReadMode::PrimaryPreferred => (true, true),
+                        ReadMode::SecondaryPreferred => (true, !read_preference.tag_sets.is_empty()),
+                        ReadMode::Nearest => (true, true),
+                    }
+                },
+                _ => (true, false),
+            },
+            TopologyType::ReplicaSetWithPrimary | TopologyType::ReplicaSetNoPrimary => {
+                match read_preference.mode {
+                    ReadMode::Primary => (false, false),
+                    _ => (true, false),
+                }
+            },
+            TopologyType::Sharded => {
+                match read_preference.mode {
+                    ReadMode::Primary => (false, false),
+                    ReadMode::Secondary => (true, true),
+                    ReadMode::PrimaryPreferred => (true, true),
+                    ReadMode::SecondaryPreferred => (true, !read_preference.tag_sets.is_empty()),
+                    ReadMode::Nearest => (true, true),
+                }
+            }
+        };
+
+        Ok((pooled_stream, slave_ok, send_read_pref))
     }
 
     pub fn acquire_write_stream(&self) -> Result<PooledStream> {
@@ -163,9 +198,9 @@ impl TopologyDescription {
         // check no hosts
 
         if rand {
-            self.get_rand_from_vec(&mut hosts)
+            Ok(try!(self.get_rand_from_vec(&mut hosts)).0)
         } else {
-            self.get_nearest_from_vec(&mut hosts)
+            Ok(try!(self.get_nearest_from_vec(&mut hosts)).0)
         }
     }
 
@@ -199,7 +234,7 @@ impl TopologyDescription {
                 break;
             }
         }
-        
+
         match tag_filter {
             None => {
                 if self.topology_type == TopologyType::ReplicaSetWithPrimary &&
@@ -569,15 +604,31 @@ impl Topology {
     }
 
     /// Returns a server stream.
-    pub fn acquire_stream(&self, read_preference: Option<ReadPreference>, write: bool) -> Result<PooledStream> {
+    pub fn acquire_stream(&self, read_preference: ReadPreference) -> Result<(PooledStream, bool, bool)> {
         let mut retry = 0;
         loop {
             let description = try!(self.description.read());
-            let result = if write {
-                description.acquire_write_stream()
-            } else {
-                description.acquire_stream(read_preference.as_ref().unwrap().to_owned())
-            };
+            let result = description.acquire_stream(&read_preference);
+
+            match result {
+                Ok(stream) => return Ok(stream),
+                Err(err) => {
+                    if retry == MAX_SERVER_RETRY {
+                        return Err(err)
+                    }
+                    thread::sleep_ms(500);
+                },
+            }
+            retry += 1;
+        }
+    }
+
+    /// Returns a server stream.
+    pub fn acquire_write_stream(&self) -> Result<PooledStream> {
+        let mut retry = 0;
+        loop {
+            let description = try!(self.description.read());
+            let result = description.acquire_write_stream();
 
             match result {
                 Ok(stream) => return Ok(stream),

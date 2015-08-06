@@ -2,6 +2,7 @@ use Error::{self, ArgumentError};
 use Result;
 
 use bson::{self, Bson};
+use std::ascii::AsciiExt;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
@@ -40,6 +41,20 @@ impl ReadPreference {
             mode: mode,
             tag_sets: tag_sets.unwrap_or(Vec::new()),
         }
+    }
+
+    pub fn to_document(&self) -> bson::Document {
+        let mut doc = doc! { "mode" => (stringify!(self.mode).to_ascii_lowercase()) };
+        let bson_tag_sets: Vec<_> = self.tag_sets.iter().map(|map| {
+            let mut bson_map = bson::Document::new();
+            for (key, val) in map.iter() {
+                bson_map.insert(key.to_owned(), Bson::String(val.to_owned()));
+            }
+            Bson::Document(bson_map)
+        }).collect();
+
+        doc.insert("tag_sets".to_owned(), Bson::Array(bson_tag_sets));
+        doc
     }
 }
 
