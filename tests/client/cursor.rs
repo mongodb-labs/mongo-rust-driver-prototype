@@ -1,6 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::{Client, ThreadedClient};
-use mongodb::command_type::CommandType;
+use mongodb::{Client, CommandType, ThreadedClient};
 use mongodb::common::ReadPreference;
 use mongodb::db::ThreadedDatabase;
 use mongodb::cursor::Cursor;

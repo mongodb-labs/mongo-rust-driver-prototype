@@ -17,7 +17,9 @@ chrono = "0.2"
 rand = "0.3"
 rust-crypto = "0.2.31"
 rustc-serialize = "0.3"
+scan_fmt = "0.1.0"
 separator = "0.3.0"
+textnonce = "0.1.1"
 time = "0.1"
 
 [dev-dependencies]
