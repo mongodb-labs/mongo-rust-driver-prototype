@@ -202,12 +202,12 @@ macro_rules! run_replace_one_test {
 }
 
 macro_rules! run_update_test {
-    ( $db:expr, $coll:expr, $filter:expr, $update:expr, $upsert:expr,
+    ( $db:expr, $coll:expr, $filter:expr, $update:expr, $options:expr,
       $many:expr, $outcome:expr ) => {{
           let result = if $many {
-                           $coll.update_many($filter, $update, $upsert, None)
+                           $coll.update_many($filter, $update, $options)
                        } else {
-                           $coll.update_one($filter, $update, $upsert, None)
+                           $coll.update_one($filter, $update, $options)
                        };
 
           let actual = result.unwrap();
@@ -283,7 +283,8 @@ macro_rules! run_suite {
                     run_replace_one_test!(db, coll, filter, replacement, upsert,
                                           test.outcome),
                 Arguments::Update { filter, update, upsert, many } =>
-                    run_update_test!(db, coll, filter, update, upsert, many,
+                    run_update_test!(db, coll, filter, update,
+                                     Some(UpdateOptions::new(upsert, None)), many,
                                      test.outcome),
             };
         }

@@ -3,7 +3,7 @@ use json::crud::arguments::Arguments;
 use json::crud::reader::SuiteContainer;
 use json::eq::{self, NumEq};
 use mongodb::{Client, ThreadedClient};
-use mongodb::coll::options::InsertManyOptions;
+use mongodb::coll::options::{InsertManyOptions, UpdateOptions};
 use mongodb::db::ThreadedDatabase;
 use rustc_serialize::json::Json;
 

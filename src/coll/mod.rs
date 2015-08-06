@@ -675,19 +675,17 @@ impl Collection {
     }
 
     /// Updates a single document.
-    pub fn update_one(&self, filter: bson::Document, update: bson::Document, upsert: bool,
-                      write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
-
+    pub fn update_one(&self, filter: bson::Document, update: bson::Document, options: Option<UpdateOptions>) -> Result<UpdateResult> {
+        let options = options.unwrap_or(UpdateOptions::new(false, None));
         let _ = try!(Collection::validate_update(&update));
-        self.update(filter, update, upsert, false, write_concern)
+        self.update(filter, update, options.upsert, false, options.write_concern)
     }
 
     /// Updates multiple documents.
-    pub fn update_many(&self, filter: bson::Document, update: bson::Document, upsert: bool,
-                       write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
-
+    pub fn update_many(&self, filter: bson::Document, update: bson::Document, options: Option<UpdateOptions>) -> Result<UpdateResult> {
+        let options = options.unwrap_or(UpdateOptions::new(false, None));
         let _ = try!(Collection::validate_update(&update));
-        self.update(filter, update, upsert, true, write_concern)
+        self.update(filter, update, options.upsert, true, options.write_concern)
     }
 
     fn validate_replace(replacement: &bson::Document) -> Result<()> {

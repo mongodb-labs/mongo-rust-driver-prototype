@@ -548,7 +548,7 @@ fn update_one() {
     // Update single document
     let update = doc! { "$set" => { "director" => "Robert Zemeckis" } };
 
-    coll.update_one(doc2.clone(), update, false, None).ok().expect("Failed to update document.");
+    coll.update_one(doc2.clone(), update, None).ok().expect("Failed to update document.");
 
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
     let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
@@ -582,7 +582,7 @@ fn update_many() {
     // Update single document
     let update = doc! { "$set" => { "director" => "Robert Zemeckis" } };
 
-    coll.update_many(doc2.clone(), update, false, None).ok().expect("Failed to update documents.");
+    coll.update_many(doc2.clone(), update, None).ok().expect("Failed to update documents.");
 
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
     let results = cursor.next_n(4).ok().expect("Failed to get next 4 from cursor.");

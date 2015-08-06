@@ -150,6 +150,12 @@ pub struct InsertManyOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
+#[derive(Clone)]
+pub struct UpdateOptions {
+    pub upsert: bool,
+    pub write_concern: Option<WriteConcern>,
+}
+
 impl AggregateOptions {
     pub fn new() -> AggregateOptions {
         AggregateOptions {
@@ -367,5 +373,11 @@ impl ReturnDocument {
             &ReturnDocument::Before => false,
             &ReturnDocument::After => true,
         }
+    }
+}
+
+impl UpdateOptions {
+    pub fn new(upsert: bool, write_concern: Option<WriteConcern>) -> UpdateOptions {
+        UpdateOptions { upsert: upsert, write_concern: write_concern }
     }
 }
