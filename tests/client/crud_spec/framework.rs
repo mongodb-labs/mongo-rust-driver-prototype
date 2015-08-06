@@ -132,7 +132,8 @@ macro_rules! run_find_test {
 
 macro_rules! run_insert_many_test {
     ( $db:expr, $coll:expr, $docs:expr, $outcome:expr ) => {{
-        let inserted = $coll.insert_many($docs, true, None).unwrap().inserted_ids.unwrap();
+        let options = Some(InsertManyOptions::new(true, None));
+        let inserted = $coll.insert_many($docs, options).unwrap().inserted_ids.unwrap();
         let ids_bson = match $outcome.result {
             Bson::Document(ref doc) => doc.get("insertedIds").unwrap(),
             _ => panic!("`insert_many` test result should be a document")
@@ -250,7 +251,8 @@ macro_rules! run_suite {
 
         for test in suite.tests {
             coll.drop().unwrap();
-            coll.insert_many(suite.data.clone(), true, None).unwrap();
+            let options = Some(InsertManyOptions::new(true, None));
+            coll.insert_many(suite.data.clone(), options).unwrap();
 
             match test.operation {
                 Arguments::Aggregate { pipeline, options, out } =>

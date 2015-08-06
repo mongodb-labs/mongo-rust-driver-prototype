@@ -347,7 +347,9 @@ impl Collection {
             WriteModel::InsertOne { document: doc.clone() }
         }).collect();
 
-        match self.insert_many(documents, ordered, None) {
+        let options = Some(InsertManyOptions::new(ordered, None));
+
+        match self.insert_many(documents, options) {
             Ok(insert_result) =>
                 result.process_insert_many_result(insert_result, models,
                                                   start_index, exception),
@@ -524,10 +526,9 @@ impl Collection {
 
     /// Inserts the provided documents. If any documents are missing an identifier,
     /// the driver should generate them.
-    pub fn insert_many(&self, docs: Vec<bson::Document>, ordered: bool,
-                       write_concern: Option<WriteConcern>) -> Result<InsertManyResult> {
-
-        let (ids, exception) = try!(self.insert(docs, ordered, write_concern,
+    pub fn insert_many(&self, docs: Vec<bson::Document>, options: Option<InsertManyOptions>) -> Result<InsertManyResult> {
+        let options = options.unwrap_or(InsertManyOptions::new(false, None));
+        let (ids, exception) = try!(self.insert(docs, options.ordered, options.write_concern,
                                                 CommandType::InsertMany));
 
         let mut map = BTreeMap::new();

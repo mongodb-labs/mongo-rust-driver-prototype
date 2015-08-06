@@ -17,7 +17,7 @@ fn cursor_features() {
         doc! { "foo" => (i as i64) }
     }).collect();
 
-    assert!(coll.insert_many(docs, false, None).is_ok());
+    assert!(coll.insert_many(docs, None).is_ok());
 
     let doc = Document::new();
     let flags = OpQueryFlags::no_flags();

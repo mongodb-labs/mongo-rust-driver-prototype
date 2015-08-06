@@ -1,7 +1,6 @@
 use bson::{self, Bson};
 use cursor;
 use common::{ReadPreference, WriteConcern};
-
 use Error::ArgumentError;
 use Result;
 
@@ -145,6 +144,12 @@ pub struct IndexModel {
     pub options: IndexOptions,
 }
 
+#[derive(Clone)]
+pub struct InsertManyOptions {
+    pub ordered: bool,
+    pub write_concern: Option<WriteConcern>,
+}
+
 impl AggregateOptions {
     pub fn new() -> AggregateOptions {
         AggregateOptions {
@@ -270,7 +275,7 @@ impl IndexModel {
             None => try!(self.generate_index_name()),
         })
     }
-    
+
     /// Generates the index name from keys.
     /// Auto-generated names have the form "key1_val1_key2_val2..."
     pub fn generate_index_name(&self) -> Result<String> {
@@ -347,6 +352,12 @@ impl IndexModel {
         }
 
         Ok(doc)
+    }
+}
+
+impl InsertManyOptions {
+    pub fn new(ordered: bool, write_concern: Option<WriteConcern>) -> InsertManyOptions {
+        InsertManyOptions { ordered: ordered, write_concern: write_concern }
     }
 }
 
