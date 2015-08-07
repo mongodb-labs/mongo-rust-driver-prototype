@@ -174,28 +174,33 @@ impl Cursor {
                  return_field_selector: Option<bson::Document>, cmd_type: CommandType,
                  is_cmd_cursor: bool, read_pref: ReadPreference) -> Result<Cursor> {
 
+        // Select a server stream from the topology.
         let (stream, slave_ok, send_read_pref) = if cmd_type.is_write_command() {
             (try!(client.acquire_write_stream()), false, false)
         } else {
             try!(client.acquire_stream(read_pref.to_owned()))
         };
 
+        // Set slave_ok flag based on the result from server selection.
         let new_flags = if !slave_ok {
             flags
         } else {
             OpQueryFlags { slave_ok: true, .. flags }
         };
 
+        // Send read_preference to the server based on the result from server selection.
         let new_query = if !send_read_pref {
             query
         } else {
             match query.get("$query") {
                 Some(_) => {
+                    // Query is already formatted as a $query document; add onto it.
                     let mut nq = query.clone();
                     nq.insert("read_preference".to_owned(), Bson::Document(read_pref.to_document()));
                     nq
                 },
                 None => {
+                    // Convert the query to a $query document.
                     let mut nq = doc! { "$query" => query };
                     nq.insert("read_preference".to_owned(), Bson::Document(read_pref.to_document()));
                     nq
@@ -207,7 +212,7 @@ impl Cursor {
                                   number_to_skip, number_to_return, new_query,
                                   return_field_selector, cmd_type, is_cmd_cursor, Some(read_pref))
     }
-    
+
     pub fn query_with_stream(stream: PooledStream,
                              client: Client, namespace: String,
                              batch_size: i32, flags: OpQueryFlags,

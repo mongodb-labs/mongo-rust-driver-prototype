@@ -47,7 +47,11 @@ pub struct TopologyDescription {
     /// The server connection health check frequency.
     /// The default is 10 seconds.
     pub heartbeat_frequency_ms: u32,
+    /// The size of the latency window for selecting suitable servers.
+    /// The default is 15 milliseconds.
     pub local_threshold_ms: i64,
+    /// This defines how long to block for server selection before
+    /// returning an error. The default is 30 seconds.
     pub server_selection_timeout_ms: i64,
     // The largest election id seen from a server in the topology.
     max_election_id: Option<oid::ObjectId>,
@@ -95,6 +99,7 @@ impl TopologyDescription {
         }
     }
 
+    /// Returns the nearest server stream, calculated by round trip time.
     fn get_nearest_from_vec(&self, servers: &mut Vec<Host>) -> Result<(PooledStream, ServerType)> {
         servers.sort_by(|a, b| {
             let mut a_rtt = i64::MAX;
@@ -113,6 +118,7 @@ impl TopologyDescription {
             a_rtt.cmp(&b_rtt)
         });
 
+        // Iterate over each host until one's stream can be acquired.
         for host in servers.iter() {
             if let Some(server) = self.servers.get(host) {
                 if let Ok(description) = server.description.read() {
@@ -127,6 +133,7 @@ impl TopologyDescription {
         Err(OperationError("No servers available for the provided ReadPreference.".to_owned()))
     }
 
+    /// Returns a random server stream from the vector.
     fn get_rand_from_vec(&self, servers: &mut Vec<Host>) -> Result<(PooledStream, ServerType)> {
         while !servers.is_empty() {
             let len = servers.len();
@@ -144,34 +151,41 @@ impl TopologyDescription {
         Err(OperationError("No servers available for the provided ReadPreference.".to_owned()))
     }
 
-    /// Returns a server stream.
+    /// Returns a server stream for read operations.
     pub fn acquire_stream(&self, read_preference: &ReadPreference) -> Result<(PooledStream, bool, bool)> {
         let (mut hosts, rand) = self.choose_hosts(&read_preference);
 
+        // Filter hosts by tagsets
         if self.topology_type != TopologyType::Sharded && self.topology_type != TopologyType::Single {
             self.filter_hosts(&mut hosts, read_preference);
         }
 
+        // Special case - If secondaries are found, by are filtered out by tag sets,
+        // the topology should return any available primaries instead.
         if hosts.is_empty() && read_preference.mode == ReadMode::SecondaryPreferred {
             let mut read_pref = read_preference.clone();
             read_pref.mode = ReadMode::PrimaryPreferred;
             return self.acquire_stream(&read_pref);
         }
 
+        // If no servers are available, request an update from all monitors.
         if hosts.is_empty() {
             for (_, server) in self.servers.iter() {
                 server.request_update();
             }
         }
 
+        // Filter hosts by round trip times within the latency window.
         self.filter_latency_hosts(&mut hosts);
 
+        // Retrieve a server stream from the list of acceptable hosts.
         let (pooled_stream, server_type) = if rand {
             try!(self.get_rand_from_vec(&mut hosts))
         } else {
             try!(self.get_nearest_from_vec(&mut hosts))
         };
 
+        // Determine how to handle server-side logic based on ReadMode and TopologyType.
         let (slave_ok, send_read_pref) = match self.topology_type {
             TopologyType::Unknown => (false, false),
             TopologyType::Single => match server_type {
@@ -206,9 +220,16 @@ impl TopologyDescription {
         Ok((pooled_stream, slave_ok, send_read_pref))
     }
 
+    /// Returns a server stream for write operations.
     pub fn acquire_write_stream(&self) -> Result<PooledStream> {
         let (mut hosts, rand) = self.choose_write_hosts();
-        // check no hosts
+
+        // If no servers are available, request an update from all monitors.
+        if hosts.is_empty() {
+            for (_, server) in self.servers.iter() {
+                server.request_update();
+            }
+        }
 
         if rand {
             Ok(try!(self.get_rand_from_vec(&mut hosts)).0)
@@ -217,6 +238,7 @@ impl TopologyDescription {
         }
     }
 
+    /// Filters a given set of hosts based on the provided read preference tag sets.
     pub fn filter_hosts(&self, hosts: &mut Vec<Host>, read_preference: &ReadPreference) {
         let mut tag_filter = None;
 
@@ -224,11 +246,14 @@ impl TopologyDescription {
             return;
         }
 
+        // Set the tag_filter to the first tag set that matches at least one server in the set.
         for tags in read_preference.tag_sets.iter() {
             for ref host in hosts.iter() {
                 if let Some(server) = self.servers.get(host) {
                     let description = server.description.read().unwrap();
 
+                    // Check whether the read preference tags are contained
+                    // within the server description tags.
                     let mut valid = true;
                     for (key, ref val) in tags.iter() {
                         match description.tags.get(key) {
@@ -243,6 +268,8 @@ impl TopologyDescription {
                     }
                 }
             }
+
+            // Short-circuit if tag filter has been found.
             if tag_filter.is_some() {
                 break;
             }
@@ -250,9 +277,12 @@ impl TopologyDescription {
 
         match tag_filter {
             None => {
+                // If no tags match but the replica set has a primary that is returnable with
+                // the given ReadMode, return that primary server.
                 if self.topology_type == TopologyType::ReplicaSetWithPrimary &&
                     (read_preference.mode == ReadMode::Primary ||
                      read_preference.mode == ReadMode::PrimaryPreferred) {
+                        // Retain primaries.
                         hosts.retain(|host| {
                             if let Some(server) = self.servers.get(host) {
                                 let description = server.description.read().unwrap();
@@ -262,13 +292,18 @@ impl TopologyDescription {
                             }
                         });
                     } else {
+                        // If no tags match and the above case does not occur,
+                        // filter out all provided servers.
                         hosts.clear();
                     }
             },
             Some(tag_filter) => {
+                // Filter out hosts by the discovered matching tagset.
                 hosts.retain(|host| {
                     if let Some(server) = self.servers.get(host) {
                         let description = server.description.read().unwrap();
+
+                        // Validate tag sets.
                         for (key, ref val) in tag_filter.iter() {
                             match description.tags.get(key) {
                                 Some(ref v) => if val != v { return false; },
@@ -284,48 +319,70 @@ impl TopologyDescription {
         }
     }
 
+    /// Filter out provided hosts by creating a latency window around
+    /// the server with the lowest round-trip time.
     pub fn filter_latency_hosts(&self, hosts: &mut Vec<Host>) {
         if hosts.len() <= 1 {
             return;
         }
 
+        // Find the shortest round-trip time.
         let shortest_rtt = hosts.iter().fold({
-            let server = self.servers.get(hosts.get(0).unwrap()).unwrap();
-            let description = server.description.read().unwrap();
-            description.round_trip_time.unwrap_or(i64::MAX)
-        }, |acc, host| {
-            let server = self.servers.get(&host).unwrap();
-            let description = server.description.read().unwrap();
-            let item_rtt = description.round_trip_time.unwrap_or(i64::MAX);
-            if acc < item_rtt {
-                acc
+            // Initialize the value to the first server's round-trip-time, or i64::MAX.
+            if let server = self.servers.get(hosts.get(0).unwrap()) {
+                if let description = server.description.read() {
+                    description.round_trip_time.unwrap_or(i64::MAX)
+                }
             } else {
-                item_rtt
+                i64::MAX
             }
+        }, |acc, host| {
+            // Compare the previous shortest rtt with the host rtt.
+            if let server = self.servers.get(&host) {
+                if let description = server.description.read() {
+                    let item_rtt = description.round_trip_time.unwrap_or(i64::MAX);
+                    if acc < item_rtt {
+                        return acc;
+                    } else {
+                        return item_rtt;
+                    }
+                }
+            }
+            acc
         });
 
+        // If the shortest rtt is i64::MAX, all server rtts are None or could not be read.
         if shortest_rtt == i64::MAX {
             return;
         }
 
         let high_rtt = shortest_rtt + self.local_threshold_ms;
+
+        // Filter hosts by the latency window [shortest_rtt, high_rtt].
         hosts.retain(|host| {
-            let server = self.servers.get(&host).unwrap();
-            let description = server.description.read().unwrap();
-            let rtt = description.round_trip_time.unwrap_or(i64::MAX);
-            shortest_rtt <= rtt && rtt <= high_rtt
+            if let server = self.servers.get(&host) {
+                if let description = server.description.read() {
+                    let rtt = description.round_trip_time.unwrap_or(i64::MAX);
+                    return shortest_rtt <= rtt && rtt <= high_rtt;
+                }
+            }
+            false
         });
     }
 
+    /// Returns suitable servers for write operations and whether to take a random element.
     pub fn choose_write_hosts(&self) -> (Vec<Host>, bool) {
         if self.servers.is_empty() {
             return (Vec::new(), true);
         }
 
         match self.topology_type {
+            // No servers are suitable.
             TopologyType::Unknown => (Vec::new(), true),
+            // All servers are suitable.
             TopologyType::Single => (self.servers.keys().map(|host| host.clone()).collect(), true),
             TopologyType::Sharded => (self.servers.keys().map(|host| host.clone()).collect(), false),
+            // Only primary replica set members are suitable.
             _ => (self.servers.keys().filter_map(|host| {
                 if let Some(server) = self.servers.get(host) {
                     if let Ok(description) = server.description.read() {
@@ -339,14 +396,16 @@ impl TopologyDescription {
         }
     }
 
-    // Returns suitable servers and whether to take a random element.
+    /// Returns suitable servers for read operations and whether to take a random element.
     pub fn choose_hosts(&self, read_preference: &ReadPreference) -> (Vec<Host>, bool) {
         if self.servers.is_empty() {
             return (Vec::new(), true);
         }
 
         match self.topology_type {
+            // No servers are suitable.
             TopologyType::Unknown => (Vec::new(), true),
+            // All servers are suitable.
             TopologyType::Single => (self.servers.keys().map(|host| host.clone()).collect(), true),
             TopologyType::Sharded => (self.servers.keys().map(|host| host.clone()).collect(), false),
             _ => {
@@ -388,6 +447,7 @@ impl TopologyDescription {
         }
     }
 
+    /// Update the topology description, but don't start any monitors for new servers.
     pub fn update_without_monitor(&mut self, host: Host, description: ServerDescription,
                                   client: Client, top_arc: Arc<RwLock<TopologyDescription>>) {
         self.update_private(host, description, client, top_arc, false);
@@ -399,8 +459,10 @@ impl TopologyDescription {
         self.update_private(host, description, client, top_arc, true);
     }
 
+    // Internal topology description update helper.
     fn update_private(&mut self, host: Host, description: ServerDescription,
                       client: Client, top_arc: Arc<RwLock<TopologyDescription>>, run_monitor: bool) {
+
         let stype = description.server_type;
         match self.topology_type {
             TopologyType::Unknown => {
@@ -649,47 +711,44 @@ impl Topology {
         })
     }
 
-    /// Returns a server stream.
-    pub fn acquire_stream(&self, read_preference: ReadPreference) -> Result<(PooledStream, bool, bool)> {
+    // Private server stream acquisition helper.
+    fn acquire_stream_private(&self, read_preference: Option<ReadPreference>, write: bool) -> Result<(PooledStream, bool, bool)> {
+        // Note start of server selection.
         let time = time::get_time();
         let start_ms = time.sec * 1000 + (time.nsec as i64) / 1000000;
+
         loop {
             let description = try!(self.description.read());
-            let result = description.acquire_stream(&read_preference);
+            let result = if write {
+                description.acquire_write_stream()
+            } else {
+                description.acquire_stream(read_preference.as_ref().unwrap())
+            };
 
             match result {
                 Ok(stream) => return Ok(stream),
                 Err(err) => {
+                    // Check duration of current server selection and return an error if overdue.
                     let end_time = time::get_time();
                     let end_ms = end_time.sec * 1000 + (end_time.nsec as i64) / 1000000;
                     if end_ms - start_ms >= description.server_selection_timeout_ms {
                         return Err(err)
                     }
+                    // Otherwise, sleep for a little while.
                     thread::sleep_ms(500);
                 },
             }
-        }
+        }        
+    }
+    
+    /// Returns a server stream for read operations.
+    pub fn acquire_stream(&self, read_preference: ReadPreference) -> Result<(PooledStream, bool, bool)> {
+        self.acquire_stream_private(Some(read_preference), false)
     }
 
-    /// Returns a server stream.
+    /// Returns a server stream for write operations.
     pub fn acquire_write_stream(&self) -> Result<PooledStream> {
-        let time = time::get_time();
-        let start_ms = time.sec * 1000 + (time.nsec as i64) / 1000000;
-        loop {
-            let description = try!(self.description.read());
-            let result = description.acquire_write_stream();
-
-            match result {
-                Ok(stream) => return Ok(stream),
-                Err(err) => {
-                    let end_time = time::get_time();
-                    let end_ms = end_time.sec * 1000 + (end_time.nsec as i64) / 1000000;
-                    if end_ms - start_ms >= description.server_selection_timeout_ms {
-                        return Err(err)
-                    }
-                    thread::sleep_ms(500);
-                },
-            }
-        }
+        let (stream, _, _) = try!(self.acquire_stream_private(None, true));
+        Ok(stream)
     }
 }

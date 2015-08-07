@@ -6,6 +6,7 @@ use std::ascii::AsciiExt;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
+/// Indicates how a server should be selected during read operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadMode {
     Primary,
@@ -31,7 +32,9 @@ impl FromStr for ReadMode {
 
 #[derive(Debug, Clone)]
 pub struct ReadPreference {
+    /// Indicates how a server should be selected during read operations.
     pub mode: ReadMode,
+    /// Filters servers based on the first tag set that matches at least one server.
     pub tag_sets: Vec<BTreeMap<String, String>>,
 }
 
