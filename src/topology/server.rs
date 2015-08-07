@@ -226,4 +226,9 @@ impl Server {
     pub fn acquire_stream(&self) -> Result<PooledStream> {
         self.pool.acquire_stream()
     }
+
+    /// Request an update from the monitor on the server status.
+    pub fn request_update(&self) {
+        self.monitor.request_update();
+    }
 }

@@ -17,11 +17,13 @@ use std::i64;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::thread;
+use time;
 
 use self::server::{Server, ServerDescription, ServerType};
 
 const DEFAULT_HEARTBEAT_FREQUENCY_MS: u32 = 10000;
-const MAX_SERVER_RETRY: usize = 3;
+const DEFAULT_LOCAL_THRESHOLD_MS: i64 = 15;
+const DEFAULT_SERVER_SELECTION_TIMEOUT_MS: i64 = 30000;
 
 /// Describes the type of topology for a server set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,11 +42,13 @@ pub struct TopologyDescription {
     /// The set name for a replica set topology. If the topology
     /// is not a replica set, this will be an empty string.
     pub set_name: String,
+    /// Known servers within the topology.
+    pub servers: HashMap<Host, Server>,
     /// The server connection health check frequency.
     /// The default is 10 seconds.
     pub heartbeat_frequency_ms: u32,
-    /// Known servers within the topology.
-    pub servers: HashMap<Host, Server>,
+    pub local_threshold_ms: i64,
+    pub server_selection_timeout_ms: i64,
     // The largest election id seen from a server in the topology.
     max_election_id: Option<oid::ObjectId>,
     // If true, all servers in the topology fall within the compatible
@@ -82,6 +86,8 @@ impl TopologyDescription {
             topology_type: TopologyType::Unknown,
             set_name: String::new(),
             heartbeat_frequency_ms: DEFAULT_HEARTBEAT_FREQUENCY_MS,
+            server_selection_timeout_ms: DEFAULT_SERVER_SELECTION_TIMEOUT_MS,
+            local_threshold_ms: DEFAULT_LOCAL_THRESHOLD_MS,
             servers: HashMap::new(),
             max_election_id: None,
             compatible: true,
@@ -141,7 +147,6 @@ impl TopologyDescription {
     /// Returns a server stream.
     pub fn acquire_stream(&self, read_preference: &ReadPreference) -> Result<(PooledStream, bool, bool)> {
         let (mut hosts, rand) = self.choose_hosts(&read_preference);
-        // check no hosts
 
         if self.topology_type != TopologyType::Sharded && self.topology_type != TopologyType::Single {
             self.filter_hosts(&mut hosts, read_preference);
@@ -152,6 +157,14 @@ impl TopologyDescription {
             read_pref.mode = ReadMode::PrimaryPreferred;
             return self.acquire_stream(&read_pref);
         }
+
+        if hosts.is_empty() {
+            for (_, server) in self.servers.iter() {
+                server.request_update();
+            }
+        }
+
+        self.filter_latency_hosts(&mut hosts);
 
         let (pooled_stream, server_type) = if rand {
             try!(self.get_rand_from_vec(&mut hosts))
@@ -269,6 +282,39 @@ impl TopologyDescription {
                 });
             }
         }
+    }
+
+    pub fn filter_latency_hosts(&self, hosts: &mut Vec<Host>) {
+        if hosts.len() <= 1 {
+            return;
+        }
+
+        let shortest_rtt = hosts.iter().fold({
+            let server = self.servers.get(hosts.get(0).unwrap()).unwrap();
+            let description = server.description.read().unwrap();
+            description.round_trip_time.unwrap_or(i64::MAX)
+        }, |acc, host| {
+            let server = self.servers.get(&host).unwrap();
+            let description = server.description.read().unwrap();
+            let item_rtt = description.round_trip_time.unwrap_or(i64::MAX);
+            if acc < item_rtt {
+                acc
+            } else {
+                item_rtt
+            }
+        });
+
+        if shortest_rtt == i64::MAX {
+            return;
+        }
+
+        let high_rtt = shortest_rtt + self.local_threshold_ms;
+        hosts.retain(|host| {
+            let server = self.servers.get(&host).unwrap();
+            let description = server.description.read().unwrap();
+            let rtt = description.round_trip_time.unwrap_or(i64::MAX);
+            shortest_rtt <= rtt && rtt <= high_rtt
+        });
     }
 
     pub fn choose_write_hosts(&self) -> (Vec<Host>, bool) {
@@ -605,7 +651,8 @@ impl Topology {
 
     /// Returns a server stream.
     pub fn acquire_stream(&self, read_preference: ReadPreference) -> Result<(PooledStream, bool, bool)> {
-        let mut retry = 0;
+        let time = time::get_time();
+        let start_ms = time.sec * 1000 + (time.nsec as i64) / 1000000;
         loop {
             let description = try!(self.description.read());
             let result = description.acquire_stream(&read_preference);
@@ -613,19 +660,21 @@ impl Topology {
             match result {
                 Ok(stream) => return Ok(stream),
                 Err(err) => {
-                    if retry == MAX_SERVER_RETRY {
+                    let end_time = time::get_time();
+                    let end_ms = end_time.sec * 1000 + (end_time.nsec as i64) / 1000000;
+                    if end_ms - start_ms >= description.server_selection_timeout_ms {
                         return Err(err)
                     }
                     thread::sleep_ms(500);
                 },
             }
-            retry += 1;
         }
     }
 
     /// Returns a server stream.
     pub fn acquire_write_stream(&self) -> Result<PooledStream> {
-        let mut retry = 0;
+        let time = time::get_time();
+        let start_ms = time.sec * 1000 + (time.nsec as i64) / 1000000;
         loop {
             let description = try!(self.description.read());
             let result = description.acquire_write_stream();
@@ -633,13 +682,14 @@ impl Topology {
             match result {
                 Ok(stream) => return Ok(stream),
                 Err(err) => {
-                    if retry == MAX_SERVER_RETRY {
+                    let end_time = time::get_time();
+                    let end_ms = end_time.sec * 1000 + (end_time.nsec as i64) / 1000000;
+                    if end_ms - start_ms >= description.server_selection_timeout_ms {
                         return Err(err)
                     }
                     thread::sleep_ms(500);
                 },
             }
-            retry += 1;
         }
     }
 }

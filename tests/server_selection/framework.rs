@@ -59,4 +59,10 @@ pub fn run_suite(file: &str) {
     for server in suite.suitable_servers.iter() {
         assert!(suitable_hosts.contains(&server.host));
     }
+
+    topology_description.filter_latency_hosts(&mut suitable_hosts);
+    assert_eq!(suite.in_latency_window.len(), suitable_hosts.len());
+    for server in suite.in_latency_window.iter() {
+        assert!(suitable_hosts.contains(&server.host));
+    }
 }

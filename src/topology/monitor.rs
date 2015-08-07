@@ -254,6 +254,10 @@ impl Monitor {
         Ok((cursor, round_trip_time))
     }
 
+    pub fn request_update(&self) {
+        self.condvar.notify_one();
+    }
+
     // Updates the server description associated with this monitor using an isMaster server response.
     fn update_server_description(&self, doc: bson::Document,
                                  round_trip_time: i64) -> Result<ServerDescription> {
