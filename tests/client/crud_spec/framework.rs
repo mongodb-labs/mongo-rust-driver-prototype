@@ -170,8 +170,8 @@ macro_rules! run_insert_one_test {
 macro_rules! run_replace_one_test {
     ( $db:expr, $coll:expr, $filter:expr, $replacement:expr, $upsert:expr,
         $outcome:expr ) => {{
-            let actual = $coll.replace_one($filter, $replacement, $upsert,
-                                           None).unwrap();
+            let options = ReplaceOptions::new($upsert, None);
+            let actual = $coll.replace_one($filter, $replacement, Some(options)).unwrap();
 
             let (matched, modified, upserted) = match $outcome.result {
                 Bson::Document(ref doc) => (

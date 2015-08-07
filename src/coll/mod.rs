@@ -666,12 +666,11 @@ impl Collection {
     }
 
     /// Replaces a single document.
-    pub fn replace_one(&self, filter: bson::Document,
-                       replacement: bson::Document, upsert: bool,
-                       write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
-
+    pub fn replace_one(&self, filter: bson::Document, replacement: bson::Document,
+                       options: Option<ReplaceOptions>) -> Result<UpdateResult> {
+        let options = options.unwrap_or(ReplaceOptions::new(false, None));
         let _ = try!(Collection::validate_replace(&replacement));
-        self.update(filter, replacement, upsert, false, write_concern)
+        self.update(filter, replacement, options.upsert, false, options.write_concern)
     }
 
     /// Updates a single document.

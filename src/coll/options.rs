@@ -156,6 +156,8 @@ pub struct UpdateOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
+pub type ReplaceOptions = UpdateOptions;
+
 impl AggregateOptions {
     pub fn new() -> AggregateOptions {
         AggregateOptions {

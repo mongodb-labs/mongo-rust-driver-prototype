@@ -509,7 +509,7 @@ fn replace_one() {
         .ok().expect("Failed to insert documents into collection.");
 
     // Replace single document
-    coll.replace_one(doc2.clone(), doc3.clone(), false, None).ok().expect("Failed to replace document.");
+    coll.replace_one(doc2.clone(), doc3.clone(), None).ok().expect("Failed to replace document.");
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
     let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
     assert_eq!(3, results.len());
