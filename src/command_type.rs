@@ -1,3 +1,4 @@
+#[derive(PartialEq, Eq, Clone)]
 pub enum CommandType {
     Aggregate,
     Count,
@@ -24,6 +25,7 @@ pub enum CommandType {
     ListCollections,
     ListDatabases,
     ListIndexes,
+    Suppressed,
     UpdateMany,
     UpdateOne,
 }
@@ -56,6 +58,7 @@ impl CommandType {
             &CommandType::ListCollections => "list_collections",
             &CommandType::ListDatabases => "list_databases",
             &CommandType::ListIndexes => "list_indexes",
+            &CommandType::Suppressed => "suppressed",
             &CommandType::UpdateMany => "update_many",
             &CommandType::UpdateOne => "update_one",
         }
@@ -88,8 +91,9 @@ impl CommandType {
             &CommandType::ListCollections => false,
             &CommandType::ListDatabases => false,
             &CommandType::ListIndexes => false,
+            &CommandType::Suppressed => false,
             &CommandType::UpdateMany => true,
-            &CommandType::UpdateOne => true,
+            &CommandType::UpdateOne => true,           
         }
     }
 }

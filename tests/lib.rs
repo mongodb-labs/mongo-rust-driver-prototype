@@ -6,6 +6,7 @@ extern crate rustc_serialize;
 extern crate nalgebra;
 
 mod apm;
+mod auth;
 mod client;
 mod json;
 mod sdam;

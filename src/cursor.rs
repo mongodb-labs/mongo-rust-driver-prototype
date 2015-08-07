@@ -1,17 +1,15 @@
-use {Client, Error, ErrorCode, Result, ThreadedClient};
+use {Client, CommandType, Error, ErrorCode, Result, ThreadedClient};
 use apm::{CommandStarted, CommandResult, EventRunner};
 
-use command_type::CommandType;
+use bson::{self, Bson};
 use common::{ReadMode, ReadPreference};
 use pool::PooledStream;
+use time;
 use wire_protocol::flags::OpQueryFlags;
 use wire_protocol::operations::Message;
 
-use bson::{self, Bson};
-
 use std::collections::vec_deque::VecDeque;
 use std::io::{Read, Write};
-use time;
 
 pub const DEFAULT_BATCH_SIZE: i32 = 20;
 
@@ -38,25 +36,29 @@ pub struct Cursor {
     count: i32,
     buffer: VecDeque<bson::Document>,
     read_preference: ReadPreference,
+    cmd_type: CommandType,
 }
 
 macro_rules! try_or_emit {
-    ($cmd_name:expr, $req_id:expr, $connstring:expr, $result:expr, $client:expr) => {
+    ($cmd_type:expr, $cmd_name:expr, $req_id:expr, $connstring:expr, $result:expr, $client:expr) => {
         match $result {
             Ok(val) => val,
             Err(e) => {
-                let hook_result = $client.run_completion_hooks(&CommandResult::Failure {
-                    duration: 0,
-                    command_name: $cmd_name.to_owned(),
-                    failure: &e,
-                    request_id: $req_id as i64,
-                    connection_string: $connstring,
-                });
+                if $cmd_type != CommandType::Suppressed {
+                    let hook_result = $client.run_completion_hooks(&CommandResult::Failure {
+                        duration: 0,
+                        command_name: $cmd_name.to_owned(),
+                        failure: &e,
+                        request_id: $req_id as i64,
+                        connection_string: $connstring,
+                    });
 
-                return match hook_result {
-                    Ok(_) => Err(e),
-                    Err(_) => Err(Error::EventListenerError(Some(Box::new(e))))
+                    if let Err(_) = hook_result {
+                        return Err(Error::EventListenerError(Some(Box::new(e))));
+                    }
                 }
+
+                return Err(e)
             }
         }
     };
@@ -269,32 +271,33 @@ impl Cursor {
 
         let message = try!(result);
 
-        let hook_result = client.run_start_hooks(&CommandStarted {
-            command: command,
-            database_name: db_name,
-            command_name: cmd_name.to_owned(),
-            request_id: req_id as i64,
-            connection_string: connstring.clone(),
-        });
+        if cmd_type != CommandType::Suppressed {
+            let hook_result = client.run_start_hooks(&CommandStarted {
+                command: command,
+                database_name: db_name,
+                command_name: cmd_name.to_owned(),
+                request_id: req_id as i64,
+                connection_string: connstring.clone(),
+            });
 
-        match hook_result {
-            Ok(_) => (),
-            Err(_) => return Err(Error::EventListenerError(None))
-        };
+            if let Err(_) = hook_result {
+                return Err(Error::EventListenerError(None));
+            }
+        }
 
-        try_or_emit!(cmd_name, req_id, connstring, message.write(&mut socket), client);
-        let reply = try_or_emit!(cmd_name, req_id, connstring, Message::read(&mut socket),
+        try_or_emit!(cmd_type, cmd_name, req_id, connstring, message.write(&mut socket), client);
+        let reply = try_or_emit!(cmd_type, cmd_name, req_id, connstring, Message::read(&mut socket),
                                  client);
 
         let fin_time = time::precise_time_ns();
 
         let (doc, buf, cursor_id, namespace) = if is_cmd_cursor {
-            try_or_emit!(cmd_name, req_id, connstring,
+            try_or_emit!(cmd_type, cmd_name, req_id, connstring,
                          Cursor::get_bson_and_cursor_info_from_command_message(reply), client)
         } else {
-            let (doc, buf, id) = try_or_emit!(cmd_name, req_id, connstring,
-                                              Cursor::get_bson_and_cid_from_message(reply),
-                                              client);
+            let (doc, buf, id) = try_or_emit!(cmd_type, cmd_name, req_id, connstring,
+                                            Cursor::get_bson_and_cid_from_message(reply),
+                                            client);
             (doc, buf, id, namespace)
         };
 
@@ -312,20 +315,23 @@ impl Cursor {
             _ => doc
         };
 
-        let _hook_result = client.run_completion_hooks(&CommandResult::Success {
-            duration: fin_time - init_time,
-            reply: reply,
-            command_name: cmd_name.to_owned(),
-            request_id: req_id as i64,
-            connection_string: connstring,
-        });
+        if cmd_type != CommandType::Suppressed {
+            let _hook_result = client.run_completion_hooks(&CommandResult::Success {
+                duration: fin_time - init_time,
+                reply: reply,
+                command_name: cmd_name.to_owned(),
+                request_id: req_id as i64,
+                connection_string: connstring,
+            });
+        }
 
         let read_preference = read_pref.unwrap_or(ReadPreference::new(ReadMode::Primary, None));
 
         Ok(Cursor { client: client, namespace: namespace,
                     batch_size: batch_size, cursor_id: cursor_id,
                     limit: number_to_return, count: 0, buffer: buf,
-                    read_preference: read_preference, })
+                    read_preference: read_preference,
+                    cmd_type: cmd_type.clone(), })
     }
 
     fn get_from_stream(&mut self) -> Result<()> {
@@ -341,21 +347,21 @@ impl Cursor {
         let cmd_name = "get_more".to_owned();
         let connstring = format!("{}", try!(socket.peer_addr()));
 
+        if self.cmd_type != CommandType::Suppressed {
+            let hook_result = self.client.run_start_hooks(&CommandStarted {
+                command: doc! { "cursor_id" => (self.cursor_id) },
+                database_name: db_name,
+                command_name: cmd_name.clone(),
+                request_id: req_id as i64,
+                connection_string: connstring.clone(),
+            });
 
-        let hook_result = self.client.run_start_hooks(&CommandStarted {
-            command: doc! { "cursor_id" => (self.cursor_id) },
-            database_name: db_name,
-            command_name: cmd_name.clone(),
-            request_id: req_id as i64,
-            connection_string: connstring.clone(),
-        });
+            if let Err(_) = hook_result {
+                return Err(Error::EventListenerError(None));
+            }
+        }
 
-        match hook_result {
-            Ok(_) => (),
-            Err(_) => return Err(Error::EventListenerError(None))
-        };
-
-        try_or_emit!(cmd_name, req_id, connstring, get_more.write(&mut socket), self.client);
+        try_or_emit!(self.cmd_type, cmd_name, req_id, connstring, get_more.write(&mut socket), self.client);
         let reply = try!(Message::read(&mut socket));
 
         let (_, v, _) = try!(Cursor::get_bson_and_cid_from_message(reply));

@@ -329,17 +329,19 @@ impl TopologyDescription {
         // Find the shortest round-trip time.
         let shortest_rtt = hosts.iter().fold({
             // Initialize the value to the first server's round-trip-time, or i64::MAX.
-            if let server = self.servers.get(hosts.get(0).unwrap()) {
-                if let description = server.description.read() {
+            if let Some(server) = self.servers.get(hosts.get(0).unwrap()) {
+                if let Ok(description) = server.description.read() {
                     description.round_trip_time.unwrap_or(i64::MAX)
+                } else {
+                    i64::MAX
                 }
             } else {
                 i64::MAX
             }
         }, |acc, host| {
             // Compare the previous shortest rtt with the host rtt.
-            if let server = self.servers.get(&host) {
-                if let description = server.description.read() {
+            if let Some(server) = self.servers.get(&host) {
+                if let Ok(description) = server.description.read() {
                     let item_rtt = description.round_trip_time.unwrap_or(i64::MAX);
                     if acc < item_rtt {
                         return acc;
@@ -360,8 +362,8 @@ impl TopologyDescription {
 
         // Filter hosts by the latency window [shortest_rtt, high_rtt].
         hosts.retain(|host| {
-            if let server = self.servers.get(&host) {
-                if let description = server.description.read() {
+            if let Some(server) = self.servers.get(&host) {
+                if let Ok(description) = server.description.read() {
                     let rtt = description.round_trip_time.unwrap_or(i64::MAX);
                     return shortest_rtt <= rtt && rtt <= high_rtt;
                 }
@@ -720,7 +722,7 @@ impl Topology {
         loop {
             let description = try!(self.description.read());
             let result = if write {
-                description.acquire_write_stream()
+                Ok((try!(description.acquire_write_stream()), false, false))
             } else {
                 description.acquire_stream(read_preference.as_ref().unwrap())
             };
