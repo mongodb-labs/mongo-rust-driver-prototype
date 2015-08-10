@@ -132,7 +132,8 @@ macro_rules! run_find_test {
 
 macro_rules! run_insert_many_test {
     ( $db:expr, $coll:expr, $docs:expr, $outcome:expr ) => {{
-        let inserted = $coll.insert_many($docs, true, None).unwrap().inserted_ids.unwrap();
+        let options = Some(InsertManyOptions::new(true, None));
+        let inserted = $coll.insert_many($docs, options).unwrap().inserted_ids.unwrap();
         let ids_bson = match $outcome.result {
             Bson::Document(ref doc) => doc.get("insertedIds").unwrap(),
             _ => panic!("`insert_many` test result should be a document")
@@ -169,8 +170,8 @@ macro_rules! run_insert_one_test {
 macro_rules! run_replace_one_test {
     ( $db:expr, $coll:expr, $filter:expr, $replacement:expr, $upsert:expr,
         $outcome:expr ) => {{
-            let actual = $coll.replace_one($filter, $replacement, $upsert,
-                                           None).unwrap();
+            let options = ReplaceOptions::new($upsert, None);
+            let actual = $coll.replace_one($filter, $replacement, Some(options)).unwrap();
 
             let (matched, modified, upserted) = match $outcome.result {
                 Bson::Document(ref doc) => (
@@ -201,12 +202,12 @@ macro_rules! run_replace_one_test {
 }
 
 macro_rules! run_update_test {
-    ( $db:expr, $coll:expr, $filter:expr, $update:expr, $upsert:expr,
+    ( $db:expr, $coll:expr, $filter:expr, $update:expr, $options:expr,
       $many:expr, $outcome:expr ) => {{
           let result = if $many {
-                           $coll.update_many($filter, $update, $upsert, None)
+                           $coll.update_many($filter, $update, $options)
                        } else {
-                           $coll.update_one($filter, $update, $upsert, None)
+                           $coll.update_one($filter, $update, $options)
                        };
 
           let actual = result.unwrap();
@@ -250,7 +251,8 @@ macro_rules! run_suite {
 
         for test in suite.tests {
             coll.drop().unwrap();
-            coll.insert_many(suite.data.clone(), true, None).unwrap();
+            let options = Some(InsertManyOptions::new(true, None));
+            coll.insert_many(suite.data.clone(), options).unwrap();
 
             match test.operation {
                 Arguments::Aggregate { pipeline, options, out } =>
@@ -281,7 +283,8 @@ macro_rules! run_suite {
                     run_replace_one_test!(db, coll, filter, replacement, upsert,
                                           test.outcome),
                 Arguments::Update { filter, update, upsert, many } =>
-                    run_update_test!(db, coll, filter, update, upsert, many,
+                    run_update_test!(db, coll, filter, update,
+                                     Some(UpdateOptions::new(upsert, None)), many,
                                      test.outcome),
             };
         }

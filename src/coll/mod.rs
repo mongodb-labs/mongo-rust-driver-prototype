@@ -352,7 +352,9 @@ impl Collection {
             WriteModel::InsertOne { document: doc.clone() }
         }).collect();
 
-        match self.insert_many(documents, ordered, None) {
+        let options = Some(InsertManyOptions::new(ordered, None));
+
+        match self.insert_many(documents, options) {
             Ok(insert_result) =>
                 result.process_insert_many_result(insert_result, models,
                                                   start_index, exception),
@@ -529,10 +531,9 @@ impl Collection {
 
     /// Inserts the provided documents. If any documents are missing an identifier,
     /// the driver should generate them.
-    pub fn insert_many(&self, docs: Vec<bson::Document>, ordered: bool,
-                       write_concern: Option<WriteConcern>) -> Result<InsertManyResult> {
-
-        let (ids, exception) = try!(self.insert(docs, ordered, write_concern,
+    pub fn insert_many(&self, docs: Vec<bson::Document>, options: Option<InsertManyOptions>) -> Result<InsertManyResult> {
+        let options = options.unwrap_or(InsertManyOptions::new(false, None));
+        let (ids, exception) = try!(self.insert(docs, options.ordered, options.write_concern,
                                                 CommandType::InsertMany));
 
         let mut map = BTreeMap::new();
@@ -670,28 +671,25 @@ impl Collection {
     }
 
     /// Replaces a single document.
-    pub fn replace_one(&self, filter: bson::Document,
-                       replacement: bson::Document, upsert: bool,
-                       write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
-
+    pub fn replace_one(&self, filter: bson::Document, replacement: bson::Document,
+                       options: Option<ReplaceOptions>) -> Result<UpdateResult> {
+        let options = options.unwrap_or(ReplaceOptions::new(false, None));
         let _ = try!(Collection::validate_replace(&replacement));
-        self.update(filter, replacement, upsert, false, write_concern)
+        self.update(filter, replacement, options.upsert, false, options.write_concern)
     }
 
     /// Updates a single document.
-    pub fn update_one(&self, filter: bson::Document, update: bson::Document, upsert: bool,
-                      write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
-
+    pub fn update_one(&self, filter: bson::Document, update: bson::Document, options: Option<UpdateOptions>) -> Result<UpdateResult> {
+        let options = options.unwrap_or(UpdateOptions::new(false, None));
         let _ = try!(Collection::validate_update(&update));
-        self.update(filter, update, upsert, false, write_concern)
+        self.update(filter, update, options.upsert, false, options.write_concern)
     }
 
     /// Updates multiple documents.
-    pub fn update_many(&self, filter: bson::Document, update: bson::Document, upsert: bool,
-                       write_concern: Option<WriteConcern>) -> Result<UpdateResult> {
-
+    pub fn update_many(&self, filter: bson::Document, update: bson::Document, options: Option<UpdateOptions>) -> Result<UpdateResult> {
+        let options = options.unwrap_or(UpdateOptions::new(false, None));
         let _ = try!(Collection::validate_update(&update));
-        self.update(filter, update, upsert, true, write_concern)
+        self.update(filter, update, options.upsert, true, options.write_concern)
     }
 
     fn validate_replace(replacement: &bson::Document) -> Result<()> {

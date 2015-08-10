@@ -29,7 +29,7 @@ fn command_duration() {
     coll.drop().unwrap();
 
     let docs = (1..4).map(|i| doc! { "_id" => i, "x" => (rand::random::<u8>() as u32) }).collect();
-    coll.insert_many(docs, false, None).unwrap();
+    coll.insert_many(docs, None).unwrap();
     client.add_completion_hook(timed_query).unwrap();
 
     let doc = doc! {

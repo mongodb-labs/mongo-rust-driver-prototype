@@ -18,7 +18,7 @@ fn find_sorted() {
     let doc2 = doc! { "title" => "Back to the Future" };
     let doc3 = doc! { "title" => "Dobby" };
 
-    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
         .ok().expect("Failed to insert documents.");
 
     // Find document
@@ -44,7 +44,7 @@ fn find_sorted() {
         _ => panic!("Expected Bson::String!"),
     };
 
-    
+
     assert!(cursor.next().is_none());
 }
 
@@ -112,7 +112,7 @@ fn find_one_and_delete() {
     let doc1 = doc! { "title" => "Jaws" };
     let doc2 = doc! { "title" => "Back to the Future" };
 
-    coll.insert_many(vec![doc1.clone(), doc2.clone()], false, None)
+    coll.insert_many(vec![doc1.clone(), doc2.clone()], None)
         .ok().expect("Failed to insert documents.");
 
     // Find and Delete document
@@ -153,7 +153,7 @@ fn find_one_and_replace() {
     let doc2 = doc! { "title" => "Back to the Future" };
     let doc3 = doc! { "title" => "12 Angry Men" };
 
-    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Replace single document
@@ -209,7 +209,7 @@ fn find_one_and_update() {
     let doc2 = doc! { "title" => "Back to the Future" };
     let doc3 = doc! { "title" => "12 Angry Men" };
 
-    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Update single document
@@ -250,7 +250,7 @@ fn aggregate() {
     let doc2 = doc! { "tags" => ["a", "b", "d"] };
     let doc3 = doc! { "tags" => ["d", "e", "f"] };
 
-    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
         .ok().expect("Failed to execute insert_many command.");
 
     // Build aggregation pipeline to unwind tag arrays and group distinct tags
@@ -300,7 +300,7 @@ fn count() {
         vec.push(doc2.clone());
     }
 
-    coll.insert_many(vec, false, None).ok().expect("Failed to insert documents.");
+    coll.insert_many(vec, None).ok().expect("Failed to insert documents.");
     let count_doc1 = coll.count(Some(doc1), None).ok().expect("Failed to execute count.");
     assert_eq!(1, count_doc1);
 
@@ -365,7 +365,7 @@ fn distinct() {
         vec.push(doc3.clone());
     }
 
-    coll.insert_many(vec, false, None).ok().expect("Failed to insert documents.");
+    coll.insert_many(vec, None).ok().expect("Failed to insert documents.");
 
     // Distinct titles over all documents
     let distinct_titles = coll.distinct("title", None, None).ok().expect("Failed to execute 'distinct'.");
@@ -410,7 +410,7 @@ fn insert_many() {
     let doc1 = doc! { "title" => "Jaws" };
     let doc2 = doc! { "title" => "Back to the Future" };
 
-    coll.insert_many(vec![doc1, doc2], false, None).ok().expect("Failed to insert documents.");
+    coll.insert_many(vec![doc1, doc2], None).ok().expect("Failed to insert documents.");
 
     // Find documents
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
@@ -440,7 +440,7 @@ fn delete_one() {
     let doc1 = doc! { "title" => "Jaws" };
     let doc2 = doc! { "title" => "Back to the Future" };
 
-    coll.insert_many(vec![doc1.clone(), doc2.clone()], false, None)
+    coll.insert_many(vec![doc1.clone(), doc2.clone()], None)
         .ok().expect("Failed to insert documents.");
 
     // Delete document
@@ -472,7 +472,7 @@ fn delete_many() {
     let doc1 = doc! { "title" => "Jaws" };
     let doc2 = doc! { "title" => "Back to the Future" };
 
-    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc2.clone()], false, None)
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc2.clone()], None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Delete document
@@ -505,11 +505,11 @@ fn replace_one() {
     let doc2 = doc! { "title" => "Back to the Future" };
     let doc3 = doc! { "title" => "12 Angry Men" };
 
-    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Replace single document
-    coll.replace_one(doc2.clone(), doc3.clone(), false, None).ok().expect("Failed to replace document.");
+    coll.replace_one(doc2.clone(), doc3.clone(), None).ok().expect("Failed to replace document.");
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
     let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
     assert_eq!(3, results.len());
@@ -542,13 +542,13 @@ fn update_one() {
     let doc2 = doc! { "title" => "Back to the Future" };
     let doc3 = doc! { "title" => "12 Angry Men" };
 
-    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], false, None)
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Update single document
     let update = doc! { "$set" => { "director" => "Robert Zemeckis" } };
 
-    coll.update_one(doc2.clone(), update, false, None).ok().expect("Failed to update document.");
+    coll.update_one(doc2.clone(), update, None).ok().expect("Failed to update document.");
 
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
     let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
@@ -576,13 +576,13 @@ fn update_many() {
     let doc2 = doc! { "title" => "Back to the Future" };
     let doc3 = doc! { "title" => "12 Angry Men" };
 
-    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone(), doc2.clone()], false, None)
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone(), doc2.clone()], None)
         .ok().expect("Failed to insert documents into collection.");
 
     // Update single document
     let update = doc! { "$set" => { "director" => "Robert Zemeckis" } };
 
-    coll.update_many(doc2.clone(), update, false, None).ok().expect("Failed to update documents.");
+    coll.update_many(doc2.clone(), update, None).ok().expect("Failed to update documents.");
 
     let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
     let results = cursor.next_n(4).ok().expect("Failed to get next 4 from cursor.");
@@ -623,7 +623,7 @@ fn create_list_drop_indexes() {
     coll.create_indexes(vec![index1, index2]).unwrap();
     let mut cursor = coll.list_indexes().unwrap();
     let results = cursor.next_n(5).unwrap();
-    
+
     assert_eq!(3, results.len());
 
     // Assert first inserted index
@@ -701,6 +701,6 @@ fn drop_all_indexes() {
     coll.drop_indexes().unwrap();
     let mut cursor = coll.list_indexes().unwrap();
     let results = cursor.next_n(5).unwrap();
-    
+
     assert_eq!(1, results.len());
 }
