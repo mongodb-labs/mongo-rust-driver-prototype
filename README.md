@@ -15,8 +15,8 @@ The API and implementation are currently subject to change at any time. You must
 #### Importing
 The 1.0 driver is currently available as a git dependency. To use the MongoDB driver in your code, add the bson and mongodb packages to your ```Cargo.toml```:
 ```
-[dependencies.bson]
-git = "https://github.com/zonyitoo/bson-rs"
+[dependencies]
+bson = "0.1.3"
 
 [dependencies.mongodb]
 git = "https://github.com/mongodbinc-interns/mongo-rust-driver-prototype"
@@ -36,35 +36,37 @@ Here's a basic example of driver usage:
 
 ```rust
 use bson::Bson;
-use mongodb::Client;
+use mongodb::{Client, ThreadedClient};
+use mongodb::db::ThreadedDatabase;
 
 fn main() {
-   let client = Client::new("localhost", 27017);
-   let db = client.db("test");
-   let coll = db.collection("movies");
+    let client = Client::connect("localhost", 27017)
+        .ok().expect("Failed to initialize standalone client.");
 
-   let doc = doc! { "title" => "Jaws",
-                    "array" => [ 1, 2, 3 ] };
+    let coll = client.db("test").collection("movies");
 
-   // Insert document into 'test.movies' collection
-   coll.insert_one(doc.clone(), None)
-       .ok().expect("Failed to insert document.");
+    let doc = doc! { "title" => "Jaws",
+                      "array" => [ 1, 2, 3 ] };
 
-   // Find the document and receive a cursor
-   let mut cursor = coll.find(doc.clone(), None)
-       .ok().expect("Failed to execute find.");
+    // Insert document into 'test.movies' collection
+    coll.insert_one(doc.clone(), None)
+        .ok().expect("Failed to insert document.");
 
-   let item = cursor.next();
+    // Find the document and receive a cursor
+    let mut cursor = coll.find(Some(doc.clone()), None)
+        .ok().expect("Failed to execute find.");
 
-   // cursor.next() returns an Option<Result<Document>>
-   match item {
-      Some(Ok(doc)) => match doc.get("title") {
-         Some(&Bson::String(title)) => println!("{}", title),
-         _ => panic!("Expected title to be a string!"),
-      },
-      Some(Err(_)) => panic!("Failed to get next from server!"),
-      None => panic!("Server returned no results!"),
-   }
+    let item = cursor.next();
+
+    // cursor.next() returns an Option<Result<Document>>
+    match item {
+        Some(Ok(doc)) => match doc.get("title") {
+            Some(&Bson::String(ref title)) => println!("{}", title),
+            _ => panic!("Expected title to be a string!"),
+        },
+        Some(Err(_)) => panic!("Failed to get next from server!"),
+        None => panic!("Server returned no results!"),
+    }
 }
 ```
 
