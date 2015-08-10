@@ -8,11 +8,17 @@ use pool::{ConnectionPool, PooledStream};
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 use std::thread;
 
 use super::monitor::{IsMasterResult, Monitor};
 use super::TopologyDescription;
+
+/// Server round trip time is calculated as an exponentially-weighted moving
+/// averaging formula with a weighting factor. A factor of 0.2 places approximately
+/// 85% of the RTT weight on the 9 most recent observations. Using a divisor instead
+/// of a floating point provides the closest integer accuracy.
+pub const ROUND_TRIP_DIVISOR: i64 = 5;
 
 /// Describes the server role within a server set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,9 +81,8 @@ pub struct Server {
     pub description: Arc<RwLock<ServerDescription>>,
     /// The connection pool for this server.
     pool: Arc<ConnectionPool>,
-    /// A reference to the associated monitor's running bool.
-    /// When this server is dropped, the monitor will be stopped.
-    monitor_running: Arc<AtomicBool>,
+    /// A reference to the associated server monitor.
+    monitor: Arc<Monitor>,
 }
 
 impl FromStr for ServerType {
@@ -117,7 +122,7 @@ impl ServerDescription {
     }
 
     // Updates the server description using an isMaster server response.
-    pub fn update(&mut self, ismaster: IsMasterResult) {
+    pub fn update(&mut self, ismaster: IsMasterResult, round_trip_time: i64) {
         if !ismaster.ok {
             self.set_err(OperationError("ismaster returned a not-ok response.".to_owned()));
             return;
@@ -133,6 +138,14 @@ impl ServerDescription {
         self.set_name = ismaster.set_name;
         self.election_id = ismaster.election_id;
         self.primary = ismaster.primary;
+        self.round_trip_time = match self.round_trip_time {
+            Some(old_rtt) => {
+                // (rtt / div) + (old_rtt * (div-1)/div)
+                Some(round_trip_time / ROUND_TRIP_DIVISOR +
+                     (old_rtt / (ROUND_TRIP_DIVISOR)) * (ROUND_TRIP_DIVISOR - 1))
+            },
+            None => Some(round_trip_time),
+        };
 
         let set_name_empty = self.set_name.is_empty();
         let msg_empty = ismaster.msg.is_empty();
@@ -159,15 +172,21 @@ impl ServerDescription {
     // Sets an encountered error and reverts the server type to Unknown.
     pub fn set_err(&mut self, err: Error) {
         self.err = Arc::new(Some(err));
+        self.clear();
+    }
+
+    // Reset the server type to unknown.
+    pub fn clear(&mut self) {
+        self.election_id = None;
+        self.round_trip_time = None;
         self.server_type = ServerType::Unknown;
         self.set_name = String::new();
-        self.election_id = None;
     }
 }
 
 impl Drop for Server {
     fn drop(&mut self) {
-        self.monitor_running.store(false, Ordering::SeqCst);
+        self.monitor.running.store(false, Ordering::SeqCst);
     }
 }
 
@@ -185,27 +204,31 @@ impl Server {
         let pool = Arc::new(ConnectionPool::new(host.clone()));
 
         // Fails silently
-        let monitor_running = if run_monitor {
-            let monitor = Monitor::new(client, host_clone, pool.clone(), top_description, desc_clone);
-            let atomic_val = monitor.as_ref().unwrap().running.clone();
+        let monitor = Arc::new(Monitor::new(client, host_clone, pool.clone(),
+                                            top_description, desc_clone));
+
+        if run_monitor {
+            let monitor_clone = monitor.clone();
             thread::spawn(move || {
-                monitor.unwrap().run();
+                monitor_clone.run();
             });
-            atomic_val
-        } else {
-            Arc::new(AtomicBool::new(false))
-        };
+        }
 
         Server {
             host: host,
             pool: pool,
             description: description.clone(),
-            monitor_running: monitor_running,
+            monitor: monitor,
         }
     }
 
     /// Returns a server stream from the connection pool.
     pub fn acquire_stream(&self) -> Result<PooledStream> {
         self.pool.acquire_stream()
+    }
+
+    /// Request an update from the monitor on the server status.
+    pub fn request_update(&self) {
+        self.monitor.request_update();
     }
 }

@@ -36,7 +36,7 @@ use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 
 use apm::Listener;
 use bson::Bson;
-use common::{ReadPreference, WriteConcern};
+use common::{ReadPreference, ReadMode, WriteConcern};
 use connstring::ConnectionString;
 use db::{Database, ThreadedDatabase};
 use error::Error::ResponseError;
@@ -69,7 +69,8 @@ pub trait ThreadedClient: Sync + Sized {
     fn db<'a>(&'a self, db_name: &str) -> Database;
     fn db_with_prefs(&self, db_name: &str, read_preference: Option<ReadPreference>,
                      write_concern: Option<WriteConcern>) -> Database;
-    fn acquire_stream(&self, read_pref: ReadPreference) -> Result<PooledStream>;
+    fn acquire_stream(&self, read_pref: ReadPreference) -> Result<(PooledStream, bool, bool)>;
+    fn acquire_write_stream(&self) -> Result<PooledStream>;
     fn get_req_id(&self) -> i32;
     fn database_names(&self) -> Result<Vec<String>>;
     fn drop_database(&self, db_name: &str) -> Result<()>;
@@ -121,7 +122,7 @@ impl ThreadedClient for Client {
 
         let rp = match read_pref {
             Some(rp) => rp,
-            None => ReadPreference::Primary,
+            None => ReadPreference::new(ReadMode::Primary, None),
         };
 
         let wc = match write_concern {
@@ -172,11 +173,16 @@ impl ThreadedClient for Client {
         Database::open(self.clone(), db_name, read_preference, write_concern)
     }
 
-    /// Acquires a connection stream from the pool.
-    fn acquire_stream(&self, read_preference: ReadPreference) -> Result<PooledStream> {
+    /// Acquires a connection stream from the pool, along with slave_ok and should_send_read_pref.
+    fn acquire_stream(&self, read_preference: ReadPreference) -> Result<(PooledStream, bool, bool)> {
         self.topology.acquire_stream(read_preference)
     }
 
+    /// Acquires a connection stream from the pool for write operations.
+    fn acquire_write_stream(&self) -> Result<PooledStream> {
+        self.topology.acquire_write_stream()
+    }
+    
     /// Returns a unique operational request id.
     fn get_req_id(&self) -> i32 {
         self.req_id.fetch_add(1, Ordering::SeqCst) as i32
@@ -188,7 +194,7 @@ impl ThreadedClient for Client {
         doc.insert("listDatabases".to_owned(), Bson::I32(1));
 
         let db = self.db("admin");
-        let res = try!(db.command(doc, CommandType::ListDatabases));
+        let res = try!(db.command(doc, CommandType::ListDatabases, None));
         if let Some(&Bson::Array(ref batch)) = res.get("databases") {
             // Extract database names
             let map = batch.iter().filter_map(|bdoc| {
@@ -218,7 +224,7 @@ impl ThreadedClient for Client {
         doc.insert("isMaster".to_owned(), Bson::I32(1));
 
         let db = self.db("local");
-        let res = try!(db.command(doc, CommandType::IsMaster));
+        let res = try!(db.command(doc, CommandType::IsMaster, None));
 
         match res.get("ismaster") {
             Some(&Bson::Boolean(is_master)) => Ok(is_master),

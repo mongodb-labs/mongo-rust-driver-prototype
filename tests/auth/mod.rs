@@ -9,7 +9,7 @@ fn invalid_user() {
     let db = client.db("auth");
     let _ = db.drop_all_users(None).unwrap();
     let doc = doc! { "connectionStatus" => 1};
-    let before = db.command(doc.clone(), CommandType::Suppressed).unwrap();
+    let before = db.command(doc.clone(), CommandType::Suppressed, None).unwrap();
 
     let info = match before.get("authInfo") {
         Some(&Bson::Document(ref doc)) => doc.clone(),
@@ -27,7 +27,7 @@ fn invalid_user() {
         _ => panic!("Authentication succeeded despite invalid credentials")
     };
 
-    let after = db.command(doc, CommandType::Suppressed).unwrap();
+    let after = db.command(doc, CommandType::Suppressed, None).unwrap();
 
     let info = match after.get("authInfo") {
         Some(&Bson::Document(ref doc)) => doc.clone(),
@@ -47,7 +47,7 @@ fn invalid_password() {
     let db = client.db("auth");
     let _ = db.drop_all_users(None).unwrap();
     let doc = doc! { "connectionStatus" => 1};
-    let before = db.command(doc.clone(), CommandType::Suppressed).unwrap();
+    let before = db.command(doc.clone(), CommandType::Suppressed, None).unwrap();
 
     let info = match before.get("authInfo") {
         Some(&Bson::Document(ref doc)) => doc.clone(),
@@ -67,7 +67,7 @@ fn invalid_password() {
         _ => panic!("Authentication succeeded despite invalid credentials")
     };
 
-    let after = db.command(doc, CommandType::Suppressed).unwrap();
+    let after = db.command(doc, CommandType::Suppressed, None).unwrap();
 
     let info = match after.get("authInfo") {
         Some(&Bson::Document(ref doc)) => doc.clone(),
@@ -86,7 +86,7 @@ fn successful_login() {
     let db = client.db("auth");
     let _ = db.drop_all_users(None).unwrap();
     let doc = doc! { "connectionStatus" => 1};
-    let before = db.command(doc.clone(), CommandType::Suppressed).unwrap();
+    let before = db.command(doc.clone(), CommandType::Suppressed, None).unwrap();
 
     let info = match before.get("authInfo") {
         Some(&Bson::Document(ref doc)) => doc.clone(),
@@ -101,7 +101,7 @@ fn successful_login() {
     db.create_user("saghm", "such_secure_password", None).unwrap();
     db.auth("saghm", "such_secure_password").unwrap();
 
-    let after = db.command(doc, CommandType::Suppressed).unwrap();
+    let after = db.command(doc, CommandType::Suppressed, None).unwrap();
 
     let info = match after.get("authInfo") {
         Some(&Bson::Document(ref doc)) => doc.clone(),

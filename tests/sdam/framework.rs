@@ -66,7 +66,7 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
                     Ok(ismaster) => {
                         let server = servers.get(&host).expect("Host not found.");
                         let mut server_description = server.description.write().unwrap();
-                        server_description.update(ismaster)
+                        server_description.update(ismaster, 0)
                     },
                     Err(err) => panic!(err),
                 }

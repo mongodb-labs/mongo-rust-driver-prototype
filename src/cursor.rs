@@ -1,7 +1,8 @@
 use {Client, CommandType, Error, ErrorCode, Result, ThreadedClient};
 use apm::{CommandStarted, CommandResult, EventRunner};
+
 use bson::{self, Bson};
-use common::ReadPreference;
+use common::{ReadMode, ReadPreference};
 use pool::PooledStream;
 use time;
 use wire_protocol::flags::OpQueryFlags;
@@ -175,9 +176,42 @@ impl Cursor {
                  return_field_selector: Option<bson::Document>, cmd_type: CommandType,
                  is_cmd_cursor: bool, read_pref: ReadPreference) -> Result<Cursor> {
 
-        let stream = try!(client.acquire_stream(read_pref));
-        Cursor::query_with_stream(stream, client, namespace, batch_size, flags,
-                                  number_to_skip, number_to_return, query,
+        // Select a server stream from the topology.
+        let (stream, slave_ok, send_read_pref) = if cmd_type.is_write_command() {
+            (try!(client.acquire_write_stream()), false, false)
+        } else {
+            try!(client.acquire_stream(read_pref.to_owned()))
+        };
+
+        // Set slave_ok flag based on the result from server selection.
+        let new_flags = if !slave_ok {
+            flags
+        } else {
+            OpQueryFlags { slave_ok: true, .. flags }
+        };
+
+        // Send read_preference to the server based on the result from server selection.
+        let new_query = if !send_read_pref {
+            query
+        } else {
+            match query.get("$query") {
+                Some(_) => {
+                    // Query is already formatted as a $query document; add onto it.
+                    let mut nq = query.clone();
+                    nq.insert("read_preference".to_owned(), Bson::Document(read_pref.to_document()));
+                    nq
+                },
+                None => {
+                    // Convert the query to a $query document.
+                    let mut nq = doc! { "$query" => query };
+                    nq.insert("read_preference".to_owned(), Bson::Document(read_pref.to_document()));
+                    nq
+                }
+            }
+        };
+
+        Cursor::query_with_stream(stream, client, namespace, batch_size, new_flags,
+                                  number_to_skip, number_to_return, new_query,
                                   return_field_selector, cmd_type, is_cmd_cursor, Some(read_pref))
     }
 
@@ -291,7 +325,7 @@ impl Cursor {
             });
         }
 
-        let read_preference = read_pref.unwrap_or(ReadPreference::Primary);
+        let read_preference = read_pref.unwrap_or(ReadPreference::new(ReadMode::Primary, None));
 
         Ok(Cursor { client: client, namespace: namespace,
                     batch_size: batch_size, cursor_id: cursor_id,
@@ -301,13 +335,12 @@ impl Cursor {
     }
 
     fn get_from_stream(&mut self) -> Result<()> {
-        let stream = try!(self.client.acquire_stream(self.read_preference));
+        let (stream, _, _) = try!(self.client.acquire_stream(self.read_preference.to_owned()));
         let mut socket = stream.get_socket();
 
         let req_id = self.client.get_req_id();
         let get_more = Message::new_get_more(req_id, self.namespace.to_owned(), self.batch_size,
                                              self.cursor_id);
-
 
         let index = self.namespace.rfind(".").unwrap_or(self.namespace.len());
         let db_name = self.namespace[..index].to_owned();

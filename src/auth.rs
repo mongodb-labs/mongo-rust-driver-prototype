@@ -68,7 +68,7 @@ impl Authenticator {
             "mechanism" => "SCRAM-SHA-1"
         };
 
-        let doc = try!(self.db.command(start_doc, Suppressed));
+        let doc = try!(self.db.command(start_doc, Suppressed, None));
 
         let data = match doc.get("payload") {
             Some(&Binary(_, ref payload)) => payload.to_owned(),
@@ -172,7 +172,7 @@ impl Authenticator {
             "conversationId" => (initial_data.conversation_id.clone())
         };
 
-        let response = try!(self.db.command(next_doc, Suppressed));
+        let response = try!(self.db.command(next_doc, Suppressed, None));
 
         Ok(AuthData { salted_password: salted_password, message: auth_message,
                       response: response })
@@ -218,7 +218,7 @@ impl Authenticator {
                 }
             }
 
-            doc = try!(self.db.command(final_doc.clone(), Suppressed));
+            doc = try!(self.db.command(final_doc.clone(), Suppressed, None));
 
             if let Some(&Bson::Boolean(true)) = doc.get("done") {
                 return Ok(())

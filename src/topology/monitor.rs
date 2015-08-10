@@ -12,9 +12,10 @@ use pool::ConnectionPool;
 use wire_protocol::flags::OpQueryFlags;
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, RwLock};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
+use std::sync::{Arc, Condvar, Mutex, RwLock};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+use time;
 
 use super::server::{ServerDescription, ServerType};
 use super::{DEFAULT_HEARTBEAT_FREQUENCY_MS, TopologyDescription};
@@ -66,6 +67,13 @@ pub struct Monitor {
     client: Client,
     // Owned, single-threaded pool.
     personal_pool: Arc<ConnectionPool>,
+    // Owned copy of the topology's heartbeat frequency.
+    heartbeat_frequency_ms: AtomicUsize,
+    // Used for condvar functionality.
+    dummy_lock: Mutex<()>,
+    // To allow servers to request an immediate update, this
+    // condvar can be notified to wake up the monitor.
+    condvar: Condvar,
     /// While true, the monitor will check server connection health
     /// at the topology's heartbeat frequency rate.
     pub running: Arc<AtomicBool>,
@@ -195,17 +203,20 @@ impl Monitor {
     /// Returns a new monitor connected to the server.
     pub fn new(client: Client, host: Host, pool: Arc<ConnectionPool>,
                top_description: Arc<RwLock<TopologyDescription>>,
-               server_description: Arc<RwLock<ServerDescription>>) -> Result<Monitor> {
+               server_description: Arc<RwLock<ServerDescription>>) -> Monitor {
 
-        Ok(Monitor {
+        Monitor {
             client: client,
             host: host.clone(),
             server_pool: pool,
             personal_pool: Arc::new(ConnectionPool::with_size(host, 1)),
             top_description: top_description,
             server_description: server_description,
+            heartbeat_frequency_ms: AtomicUsize::new(DEFAULT_HEARTBEAT_FREQUENCY_MS as usize),
+            dummy_lock: Mutex::new(()),
+            condvar: Condvar::new(),
             running: Arc::new(AtomicBool::new(false)),
-        })
+        }
     }
 
     // Set server description error field.
@@ -216,7 +227,7 @@ impl Monitor {
     }
 
     /// Returns an isMaster server response using an owned monitor socket.
-    pub fn is_master(&mut self) -> Result<Cursor> {
+    pub fn is_master(&self) -> Result<(Cursor, i64)> {
         let options = FindOptions::new().with_limit(1);
         let flags = OpQueryFlags::with_find_options(&options);
         let mut filter = bson::Document::new();
@@ -224,18 +235,37 @@ impl Monitor {
 
         let stream = try!(self.personal_pool.acquire_stream());
 
-        Cursor::query_with_stream(
+        let time_start = time::get_time();
+
+        let cursor = try!(Cursor::query_with_stream(
             stream, self.client.clone(), "local.$cmd".to_owned(), 1,
             flags, options.skip as i32, 1, filter.clone(), options.projection.clone(),
-            CommandType::IsMaster, false, None)
+            CommandType::IsMaster, false, None));
+
+        let time_end = time::get_time();
+
+        let sec_start_ms: i64 = time_start.sec * 1000;
+        let start_ms = sec_start_ms + time_start.nsec as i64 / 1000000;
+
+        let sec_end_ms: i64 = time_end.sec * 1000;
+        let end_ms = sec_end_ms + time_end.nsec as i64 / 1000000;
+
+        let round_trip_time = end_ms - start_ms;
+        Ok((cursor, round_trip_time))
+    }
+
+    pub fn request_update(&self) {
+        self.condvar.notify_one();
     }
 
     // Updates the server description associated with this monitor using an isMaster server response.
-    fn update_server_description(&self, doc: bson::Document) -> Result<ServerDescription> {
+    fn update_server_description(&self, doc: bson::Document,
+                                 round_trip_time: i64) -> Result<ServerDescription> {
+
         let ismaster_result = IsMasterResult::new(doc);
         let mut server_description = self.server_description.write().unwrap();
         match ismaster_result {
-            Ok(ismaster) => server_description.update(ismaster),
+            Ok(ismaster) => server_description.update(ismaster, round_trip_time),
             Err(err) => {
                 server_description.set_err(err);
                 return Err(OperationError("Failed to parse ismaster result.".to_owned()))
@@ -253,10 +283,10 @@ impl Monitor {
     }
 
     // Updates server and topology descriptions using a successful isMaster cursor result.
-    fn update_with_is_master_cursor(&self, cursor: &mut Cursor) {
+    fn update_with_is_master_cursor(&self, cursor: &mut Cursor, round_trip_time: i64) {
         match cursor.next() {
             Some(Ok(doc)) => {
-                if let Ok(description) = self.update_server_description(doc) {
+                if let Ok(description) = self.update_server_description(doc, round_trip_time) {
                     self.update_top_description(description);
                 }
             },
@@ -269,44 +299,54 @@ impl Monitor {
         }
     }
 
+    /// Execute isMaster and update the server and topology.
+    fn execute_update(&self) {
+        match self.is_master() {
+            Ok((mut cursor, rtt)) => self.update_with_is_master_cursor(&mut cursor, rtt),
+            Err(err) => {
+                // Refresh all connections
+                self.server_pool.clear();
+                self.personal_pool.clear();
+
+                let stype = self.server_description.read().unwrap().server_type;
+
+                if stype == ServerType::Unknown {
+                    self.set_err(err);
+                } else {
+                    // Retry once
+                    match self.is_master() {
+                        Ok((mut cursor, rtt)) => self.update_with_is_master_cursor(&mut cursor, rtt),
+                        Err(err) => self.set_err(err),
+                    }
+                }
+            }
+        }
+    }
+
     /// Starts server monitoring.
-    pub fn run(&mut self) {
+    pub fn run(&self) {
         if self.running.load(Ordering::SeqCst) {
             return;
         }
 
         self.running.store(true, Ordering::SeqCst);
 
+        let mut guard = self.dummy_lock.lock().unwrap();
+
         loop {
             if !self.running.load(Ordering::SeqCst) {
                 break;
             }
 
-            match self.is_master() {
-                Ok(mut cursor) => self.update_with_is_master_cursor(&mut cursor),
-                Err(err) => {
-                    // Refresh all connections
-                    self.server_pool.clear();
-                    self.personal_pool.clear();
+            self.execute_update();
 
-                    let stype = self.server_description.read().unwrap().server_type;
-
-                    if stype == ServerType::Unknown {
-                        self.set_err(err);
-                    } else {
-                        // Retry once
-                        match self.is_master() {
-                            Ok(mut cursor) => self.update_with_is_master_cursor(&mut cursor),
-                            Err(err) => self.set_err(err),
-                        }
-                    }
-                }
+            if let Ok(description) = self.top_description.read() {
+                self.heartbeat_frequency_ms.store(description.heartbeat_frequency_ms as usize,
+                                                  Ordering::SeqCst);
             }
 
-            match self.top_description.read() {
-                Ok(description) => thread::sleep_ms(description.heartbeat_frequency_ms),
-                Err(_) => thread::sleep_ms(DEFAULT_HEARTBEAT_FREQUENCY_MS),
-            }
+            let frequency = self.heartbeat_frequency_ms.load(Ordering::SeqCst) as u32;
+            guard = self.condvar.wait_timeout_ms(guard, frequency).unwrap().0;
         }
     }
 }
