@@ -15,7 +15,7 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
     let suite = json.get_suite().unwrap();
 
     let dummy_config = ConnectionString::new("i-dont-exist", 27017);
-    let dummy_client = Client::with_config(dummy_config, None, None, None, None).unwrap();
+    let dummy_client = Client::with_config(dummy_config, None, None).unwrap();
     let connection_string = connstring::parse(&suite.uri).unwrap();
 
     // For a standalone topology with multiple startup servers, the user

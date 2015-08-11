@@ -41,7 +41,8 @@ use connstring::ConnectionString;
 use db::{Database, ThreadedDatabase};
 use error::Error::ResponseError;
 use pool::PooledStream;
-use topology::{Topology, TopologyDescription, TopologyType};
+use topology::{Topology, TopologyDescription, TopologyType,
+               DEFAULT_HEARTBEAT_FREQUENCY_MS, DEFAULT_LOCAL_THRESHOLD_MS, DEFAULT_SERVER_SELECTION_TIMEOUT_MS};
 use topology::server::Server;
 
 /// Interfaces with a MongoDB server or replica set.
@@ -54,18 +55,44 @@ pub struct ClientInner {
     log_file: Option<Mutex<File>>,
 }
 
+/// Configuration options for a client.
+pub struct ClientOptions {
+    pub log_file: Option<String>,
+    pub read_preference: Option<ReadPreference>,
+    pub write_concern: Option<WriteConcern>,
+    pub heartbeat_frequency_ms: u32,
+    pub server_selection_timeout_ms: i64,
+    pub local_threshold_ms: i64,
+}
+
+impl ClientOptions {
+    /// Creates a new default options struct.
+    pub fn new() -> ClientOptions {        
+        ClientOptions {
+            log_file: None,
+            read_preference: None,
+            write_concern: None,
+            heartbeat_frequency_ms: DEFAULT_HEARTBEAT_FREQUENCY_MS,
+            server_selection_timeout_ms: DEFAULT_SERVER_SELECTION_TIMEOUT_MS,
+            local_threshold_ms: DEFAULT_LOCAL_THRESHOLD_MS,
+        }
+    }
+
+    /// Creates a new options struct with a specified log file.
+    pub fn with_log_file(file: &str) -> ClientOptions {
+        let mut options = ClientOptions::new();
+        options.log_file = Some(file.to_owned());
+        options
+    }
+}
+
 pub trait ThreadedClient: Sync + Sized {
     fn connect(host: &str, port: u16) -> Result<Self>;
-    fn connect_with_log_file(host: &str, port: u16, log_file: &str) -> Result<Client>;
-    fn with_prefs(host: &str, port: u16, read_pref: Option<ReadPreference>,
-                  write_concern: Option<WriteConcern>,
-                  log_file: Option<&str>) -> Result<Self>;
+    fn connect_with_options(host: &str, port: u16, ClientOptions) -> Result<Self>;
     fn with_uri(uri: &str) -> Result<Self>;
-    fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
-                          write_concern: Option<WriteConcern>,
-                          log_file: Option<&str>) -> Result<Self>;
-    fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>, write_concern: Option<WriteConcern>,
-                   description: Option<TopologyDescription>, log_file: Option<&str>) -> Result<Self>;
+    fn with_uri_and_options(uri: &str, options: ClientOptions) -> Result<Self>;
+    fn with_config(config: ConnectionString, options: Option<ClientOptions>,
+                   description: Option<TopologyDescription>) -> Result<Self>;
     fn db<'a>(&'a self, db_name: &str) -> Database;
     fn db_with_prefs(&self, db_name: &str, read_preference: Option<ReadPreference>,
                      write_concern: Option<WriteConcern>) -> Database;
@@ -84,58 +111,50 @@ pub type Client = Arc<ClientInner>;
 impl ThreadedClient for Client {
     /// Creates a new Client connected to a single MongoDB server.
     fn connect(host: &str, port: u16) -> Result<Client> {
-        Client::with_prefs(host, port, None, None, None)
-    }
-
-    /// Creates a new Client connected to a single MongoDB server that prints logging
-    /// information to a specified file.
-    fn connect_with_log_file(host: &str, port: u16, log_file: &str) -> Result<Client> {
-        Client::with_prefs(host, port, None, None, Some(log_file))
-    }
-
-    /// `new` with custom read and write controls.
-    fn with_prefs(host: &str, port: u16, read_pref: Option<ReadPreference>,
-                  write_concern: Option<WriteConcern>, log_file: Option<&str>) -> Result<Client> {
         let config = ConnectionString::new(host, port);
         let mut description = TopologyDescription::new();
         description.topology_type = TopologyType::Single;
 
-        Client::with_config(config, read_pref, write_concern, Some(description), log_file)
+        Client::with_config(config, None, Some(description))
+    }
+
+    /// Creates a new Client connected to a single MongoDB server with a custom configuration.
+    fn connect_with_options(host: &str, port: u16, options: ClientOptions) -> Result<Client> {
+        let config = ConnectionString::new(host, port);
+        let mut description = TopologyDescription::new();
+        description.topology_type = TopologyType::Single;
+
+        Client::with_config(config, Some(options), Some(description))
     }
 
     /// Creates a new Client connected to a server or replica set using
     /// a MongoDB connection string URI as defined by
     /// [the manual](http://docs.mongodb.org/manual/reference/connection-string/).
     fn with_uri(uri: &str) -> Result<Client> {
-        Client::with_uri_and_prefs(uri, None, None, None)
-    }
-
-    /// `with_uri` with custom read and write controls.
-    fn with_uri_and_prefs(uri: &str, read_pref: Option<ReadPreference>,
-                          write_concern: Option<WriteConcern>, log_file: Option<&str>) -> Result<Client> {
         let config = try!(connstring::parse(uri));
-        Client::with_config(config, read_pref, write_concern, None, log_file)
+        Client::with_config(config, None, None)
     }
 
-    fn with_config(config: ConnectionString, read_pref: Option<ReadPreference>, write_concern: Option<WriteConcern>,
-                   description: Option<TopologyDescription>, log_file: Option<&str>) -> Result<Client> {
+    /// Creates a new Client connected to a server or replica set with a custom configuration.
+    fn with_uri_and_options(uri: &str, options: ClientOptions) -> Result<Client> {
+        let config = try!(connstring::parse(uri));
+        Client::with_config(config, Some(options), None)
+    }
 
-        let rp = match read_pref {
-            Some(rp) => rp,
-            None => ReadPreference::new(ReadMode::Primary, None),
-        };
+    fn with_config(config: ConnectionString, options: Option<ClientOptions>,
+                   description: Option<TopologyDescription>) -> Result<Client> {
 
-        let wc = match write_concern {
-            Some(wc) => wc,
-            None => WriteConcern::new(),
-        };
+        let client_options = options.unwrap_or(ClientOptions::new());
+
+        let rp = client_options.read_preference.unwrap_or(ReadPreference::new(ReadMode::Primary, None));
+        let wc = client_options.write_concern.unwrap_or(WriteConcern::new());
 
         let listener = Listener::new();
-        let file = match log_file {
+        let file = match client_options.log_file {
             Some(string) => {
                 let _ = listener.add_start_hook(log_command_started);
                 let _ = listener.add_completion_hook(log_command_completed);
-                Some(Mutex::new(try!(OpenOptions::new().write(true).append(true).create(true).open(string))))
+                Some(Mutex::new(try!(OpenOptions::new().write(true).append(true).create(true).open(&string))))
             },
             None => None,
         };
@@ -149,10 +168,14 @@ impl ThreadedClient for Client {
             log_file: file,
         });
 
-        // Fill servers array
+        // Fill servers array and set options
         {
             let ref top_description = client.topology.description;
             let mut top = try!(top_description.write());
+            top.heartbeat_frequency_ms = client_options.heartbeat_frequency_ms;
+            top.server_selection_timeout_ms = client_options.server_selection_timeout_ms;
+            top.local_threshold_ms = client_options.local_threshold_ms;
+
             for host in config.hosts.iter() {
                 let server = Server::new(client.clone(), host.clone(), top_description.clone(), true);
                 top.servers.insert(host.clone(), server);
@@ -182,7 +205,7 @@ impl ThreadedClient for Client {
     fn acquire_write_stream(&self) -> Result<PooledStream> {
         self.topology.acquire_write_stream()
     }
-    
+
     /// Returns a unique operational request id.
     fn get_req_id(&self) -> i32 {
         self.req_id.fetch_add(1, Ordering::SeqCst) as i32

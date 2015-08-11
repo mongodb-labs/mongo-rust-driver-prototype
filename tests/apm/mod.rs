@@ -2,7 +2,7 @@ use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 
 use bson::Bson;
-use mongodb::{Client, CommandResult, ThreadedClient};
+use mongodb::{Client, ClientOptions, CommandResult, ThreadedClient};
 use mongodb::db::ThreadedDatabase;
 use rand;
 
@@ -57,7 +57,9 @@ fn logging() {
         }
     }
 
-    let client = Client::connect_with_log_file("localhost", 27017, "test_log.txt").unwrap();
+    let client_options = ClientOptions::with_log_file("test_log.txt");
+    let client = Client::connect_with_options("localhost", 27017, client_options).unwrap();
+
     let db = client.db("test");
     db.create_collection("logging", None).unwrap();
     let coll = db.collection("logging");

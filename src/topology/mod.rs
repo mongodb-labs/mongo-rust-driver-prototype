@@ -21,9 +21,9 @@ use time;
 
 use self::server::{Server, ServerDescription, ServerType};
 
-const DEFAULT_HEARTBEAT_FREQUENCY_MS: u32 = 10000;
-const DEFAULT_LOCAL_THRESHOLD_MS: i64 = 15;
-const DEFAULT_SERVER_SELECTION_TIMEOUT_MS: i64 = 30000;
+pub const DEFAULT_HEARTBEAT_FREQUENCY_MS: u32 = 10000;
+pub const DEFAULT_LOCAL_THRESHOLD_MS: i64 = 15;
+pub const DEFAULT_SERVER_SELECTION_TIMEOUT_MS: i64 = 30000;
 
 /// Describes the type of topology for a server set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -722,7 +722,10 @@ impl Topology {
         loop {
             let description = try!(self.description.read());
             let result = if write {
-                Ok((try!(description.acquire_write_stream()), false, false))
+                match description.acquire_write_stream() {
+                    Ok(stream) => Ok((stream, false, false)),
+                    Err(err) => Err(err),
+                }
             } else {
                 description.acquire_stream(read_preference.as_ref().unwrap())
             };
