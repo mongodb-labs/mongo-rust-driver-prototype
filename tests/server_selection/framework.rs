@@ -13,7 +13,7 @@ pub fn run_suite(file: &str) {
     let suite = json.get_suite().unwrap();
 
     let dummy_config = ConnectionString::new("i-dont-exist", 27017);
-    let dummy_client = Client::with_config(dummy_config, None, None, None, None).unwrap();
+    let dummy_client = Client::with_config(dummy_config, None, None).unwrap();
     let dummy_top_arc = Arc::new(RwLock::new(TopologyDescription::new()));
     
     let mut topology_description = TopologyDescription::new();    
