@@ -1,3 +1,4 @@
+//! Library-wide utilities.
 use Error::{self, ArgumentError};
 use Result;
 
@@ -16,7 +17,7 @@ pub enum ReadMode {
     Nearest,
 }
 
-impl FromStr for ReadMode {   
+impl FromStr for ReadMode {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
         Ok(match s {
@@ -63,10 +64,14 @@ impl ReadPreference {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WriteConcern {
-    pub w: i32,          // Write replication
-    pub w_timeout: i32,  // Used in conjunction with 'w'. Propagation timeout in ms.
-    pub j: bool,         // If true, will block until write operations have been committed to journal.
-    pub fsync: bool,     // If true and server is not journaling, blocks until server has synced all data files to disk.
+    /// Write replication
+    pub w: i32,
+    /// Used in conjunction with 'w'. Propagation timeout in ms.
+    pub w_timeout: i32,
+    /// If true, will block until write operations have been committed to journal.
+    pub j: bool,
+    /// If true and server is not journaling, blocks until server has synced all data files to disk.
+    pub fsync: bool,
 }
 
 impl WriteConcern {

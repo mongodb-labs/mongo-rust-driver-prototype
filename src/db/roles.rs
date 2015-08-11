@@ -1,3 +1,4 @@
+//! Role-based database and command authorization.
 use std::string::ToString;
 
 use bson::Bson;

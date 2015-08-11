@@ -1,3 +1,4 @@
+//! MongoDB server set topology and asynchronous monitoring.
 pub mod server;
 pub mod monitor;
 

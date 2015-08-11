@@ -1,3 +1,4 @@
+//! Interface for collection-level operations.
 mod batch;
 pub mod error;
 pub mod options;
@@ -25,7 +26,9 @@ use std::iter::FromIterator;
 
 /// Interfaces with a MongoDB collection.
 pub struct Collection {
+    /// A reference to the database that spawned this collection.
     pub db: Database,
+    /// The namespace of this collection, formatted as db_name.coll_name.
     pub namespace: String,
     read_preference: ReadPreference,
     write_concern: WriteConcern,

@@ -1,3 +1,27 @@
+//! Specification for storing and retrieving files that exceed 16MB within MongoDB.
+//!
+//! Instead of storing a file in a single document, GridFS divides a file into parts, or chunks,
+//! and stores each of those chunks as a separate document. By default GridFS limits chunk size to 255k.
+//! GridFS uses two collections to store files. One collection stores the file chunks, and the other
+//! stores file metadata.
+
+//! When you query a GridFS store for a file, the driver or client will reassemble the chunks as needed.
+//! You can perform range queries on files stored through GridFS. You also can access information from
+//! arbitrary sections of files, which allows you to “skip” into the middle of a video or audio file.
+
+//! GridFS is useful not only for storing files that exceed 16MB but also for storing any files for which
+//! you want access without having to load the entire file into memory.
+//!
+//! ```no_run
+//! let client = Client::connect("localhost", 27017);
+//! let db = client.db("grid");
+//! let fs = Store::with_db(db.clone());
+//!
+//! try!(fs.put("/path/to/local_file.mp4"));
+//! let file = try!(fs.open("/path/to/local_file.mp4"));
+//! let chunk_bytes = try!(file.find_chunk(file.doc.id.clone(), 5));
+//! try!(file.close());
+//! ```
 pub mod file;
 
 use bson::{self, oid};

@@ -1,3 +1,4 @@
+//! Lower-level file and chunk representations in GridFS.
 use bson::{self, Bson, oid};
 use bson::spec::BinarySubtype;
 
@@ -264,7 +265,7 @@ impl File {
     }
 
     // Retrieves a binary file chunk from GridFS.
-    fn find_chunk(&mut self, id: oid::ObjectId, chunk_num: i32) -> Result<Vec<u8>> {
+    pub fn find_chunk(&mut self, id: oid::ObjectId, chunk_num: i32) -> Result<Vec<u8>> {
         let filter = doc!{"files_id" => id, "n" => chunk_num };
         match try!(self.gfs.chunks.find_one(Some(filter), None)) {
             Some(doc) => match doc.get("data") {

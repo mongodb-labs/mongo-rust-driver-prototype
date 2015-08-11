@@ -1,3 +1,4 @@
+//! Connection string parsing and options.
 use Result;
 use Error::ArgumentError;
 use std::ascii::AsciiExt;
@@ -9,8 +10,11 @@ pub const URI_SCHEME: &'static str = "mongodb://";
 /// Encapsulates the hostname and port of a host.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Host {
+    /// The hostname for this host.
     pub host_name: String,
+    /// The inter-process communication file path, if this is an IPC host.
     pub ipc: String,
+    /// The port to communicate on.
     pub port: u16,
 }
 

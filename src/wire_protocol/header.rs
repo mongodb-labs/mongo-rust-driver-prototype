@@ -1,3 +1,4 @@
+//! Message headers.
 use std::fmt;
 use std::io::{Read, Write};
 
@@ -39,11 +40,6 @@ impl OpCode {
 }
 
 impl fmt::Display for OpCode {
-    /// Gets the string representation of an opcode.
-    ///
-    /// # Return value
-    ///
-    /// Returns the string represetnation of the opcode.
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &OpCode::Reply => write!(fmt, "OP_REPLY"),
@@ -56,117 +52,52 @@ impl fmt::Display for OpCode {
 }
 
 /// Represents a header in the MongoDB Wire Protocol.
-///
-/// # Fields
-///
-/// `message_length` - The length of the entire message in bytes.
-/// `request_id` - Identifies the request being sent. This should be `0` in a
-///                response from the server.
-/// `response_to` - Identifies which response the message is a response to. This
-///                 should be `0` in a request from the client.
-/// `op_code`     - Identifies which type of message is being sent.
-// #[derive(Clone)]
+#[derive(Clone)]
 pub struct Header {
+    /// The length of the entire message, in bytes.
     pub message_length: i32,
+    /// Identifies the request being sent. From a server response, this should be '0'.
     pub request_id: i32,
+    // Identifies which response this message is a response to. From a client request, this should be '0'.
     response_to: i32,
+    /// Identifies which type of message is being sent.
     pub op_code: OpCode,
 }
 
 impl Header {
     /// Constructs a new Header.
-    ///
-    /// # Arguments
-    ///
-    /// `message_length` - The length of the message in bytes.
-    /// `request_id` - Identifier for the request, or `0` if the the message
-    ///                is a response.
-    /// `response_to` - Identifies which request the message is in response to,
-    ///                or `0` if the the message is a request.
-    /// `op_code` - Identifies which type of message is being sent.
-    ///
-    /// # Return value
-    ///
-    /// Returns the newly-created Header.
     pub fn new(message_length: i32, request_id: i32, response_to: i32,
            op_code: OpCode) -> Header {
         Header { message_length: message_length, request_id: request_id,
                  response_to: response_to, op_code: op_code }
     }
 
-    /// Construcs a new Header for a request.
-    ///
-    /// # Arguments
-    ///
-    /// `message_length` - The length of the message in bytes.
-    /// `request_id` - Identifier for the request, or `0` if the the message
-    ///                is a response.
-    /// `op_code` - Identifies which type of message is being sent.
-    ///
-    /// # Return value
-    ///
-    /// Returns a new Header with `response_to` set to 0.
+    /// Constructs a new Header for a request, with `response_to` set to 0.
     fn new_request(message_length: i32, request_id: i32,
                    op_code: OpCode) -> Header {
         Header::new(message_length, request_id, 0, op_code)
     }
 
-    /// Constructs a new Header for an OP_UPDATE.
-    ///
-    /// # Arguments
-    ///
-    /// `message_length` - The length of the message in bytes.
-    /// `request_id` - Identifier for the request, or `0` if the the message
-    ///                is a response.
-    /// # Return value
-    ///
-    /// Returns a new Header with `response_to` set to 0 and `op_code`
-    /// set to `Update`.
+    /// Constructs a new Header for an OP_UPDATE, with `response_to` set to 0 and
+    /// `op_code` set to `Update`.
     pub fn new_update(message_length: i32, request_id: i32) -> Header {
         Header::new_request(message_length, request_id, OpCode::Update)
     }
 
-    /// Constructs a new Header for an OP_INSERT.
-    ///
-    /// # Arguments
-    ///
-    /// `message_length` - The length of the message in bytes.
-    /// `request_id` - Identifier for the request, or `0` if the the message
-    ///                is a response.
-    /// # Return value
-    ///
-    /// Returns a new Header with `response_to` set to 0 and `op_code`
-    /// set to `Insert`.
+    /// Constructs a new Header for an OP_INSERT, with `response_to` set to 0 and
+    /// `op_code` set to `Insert`.
     pub fn new_insert(message_length: i32, request_id: i32) -> Header {
         Header::new_request(message_length, request_id, OpCode::Insert)
     }
 
-    /// Constructs a new Header for an OP_QUERY.
-    ///
-    /// # Arguments
-    ///
-    /// `message_length` - The length of the message in bytes.
-    /// `request_id` - Identifier for the request, or `0` if the the message
-    ///                is a response.
-    /// # Return value
-    ///
-    /// Returns a new Header with `response_to` set to 0 and `op_code`
-    /// set to `Query`.
+    /// Constructs a new Header for an OP_QUERY, with `response_to` set to 0 and
+    /// `op_code` set to `Query`.
     pub fn new_query(message_length: i32, request_id: i32) -> Header {
         Header::new_request(message_length, request_id, OpCode::Query)
     }
 
-    /// Constructs a new Header for an OP_GET_MORE.
-    ///
-    /// # Arguments
-    ///
-    /// `message_length` - The length of the message in bytes.
-    /// `request_id` - Identifier for the request, or `0` if the the message
-    ///                is a response.
-    /// # Return value
-    ///
-    /// Returns a new Header with `response_to` set to 0 and `op_code`
-    /// set to `GetMore`.
+    /// Constructs a new Header for an OP_GET_MORE, with `response_to` set to 0 and
+    /// `op_code` set to `GetMore`.
     pub fn new_get_more(message_length: i32, request_id: i32) -> Header {
         Header::new_request(message_length, request_id, OpCode::GetMore)
     }

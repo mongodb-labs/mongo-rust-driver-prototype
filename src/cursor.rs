@@ -1,3 +1,16 @@
+//! Iterable network cursor for MongoDB queries.
+//!
+//! ```no_run
+//! try!(coll.insert_one(doc!{ "spirit_animal" => "ferret" }, None));
+//!
+//! let mut cursor = coll.find(None, None);
+//! for result in cursor {
+//!     let doc = result.ok().expect("Received network error during cursor operations.");
+//!     if let Some(&Bson::String(ref value)) = doc.get("spirit_animal") {
+//!         println!("My spirit animal is {}", value);
+//!     }
+//! }
+//! ```
 use {Client, CommandType, Error, ErrorCode, Result, ThreadedClient};
 use apm::{CommandStarted, CommandResult, EventRunner};
 

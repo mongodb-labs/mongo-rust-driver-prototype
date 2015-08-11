@@ -1,3 +1,4 @@
+//! Write errors for collection-level operations.
 use bson::{self, Bson};
 use super::options::WriteModel;
 use common::WriteConcern;

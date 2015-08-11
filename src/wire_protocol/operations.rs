@@ -1,3 +1,4 @@
+//! Wire protocol operational client-server communication logic.
 use bson;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use Error::{ArgumentError, ResponseError};
@@ -33,62 +34,81 @@ impl ByteLength for bson::Document {
 /// Represents a message in the MongoDB Wire Protocol.
 pub enum Message {
     OpReply {
+        /// The message header.
         header: Header,
+        /// A Bit vector of reply options.
         flags: OpReplyFlags,
+        /// Uniquely identifies the cursor being returned.
         cursor_id: i64,
+        /// The starting position for the cursor.
         starting_from: i32,
+        /// The total number of documents being returned.
         number_returned: i32,
+        /// The documents being returned.
         documents: Vec<bson::Document>,
     },
     OpUpdate {
+        /// The message header.
         header: Header,
         // The wire protocol specifies that a 32-bit 0 field goes here
+        /// The full qualified name of the collection, beginning with the
+        /// database name and a dot separator.
         namespace: String,
+        /// A bit vector of update options.
         flags: OpUpdateFlags,
+        /// Identifies the document(s) to be updated.
         selector: bson::Document,
+        /// Instruction document for how to update the document(s).
         update: bson::Document,
     },
     OpInsert {
+        /// The message header.
         header: Header,
+        /// A bit vector of insert options.
         flags: OpInsertFlags,
+        /// The full qualified name of the collection, beginning with the
+        /// database name and a dot separator.
         namespace: String,
+        /// The documents to be inserted.
         documents: Vec<bson::Document>,
     },
     OpQuery {
+        /// The message header.
         header: Header,
+        /// A bit vector of query options.
         flags: OpQueryFlags,
+        /// The full qualified name of the collection, beginning with the
+        /// database name and a dot separator.
         namespace: String,
+        /// The number of initial documents to skip over in the query results.
         number_to_skip: i32,
+        /// The total number of documents that should be returned by the query.
         number_to_return: i32,
+        /// Specifies which documents to return.
         query: bson::Document,
+        /// An optional projection of which fields should be present in the
+        /// documents to be returned by the query.
         return_field_selector: Option<bson::Document>,
     },
     OpGetMore {
+        /// The message header.
         header: Header,
         // The wire protocol specifies that a 32-bit 0 field goes here
+        /// The full qualified name of the collection, beginning with the
+        /// database name and a dot separator.
         namespace: String,
+        /// The total number of documents that should be returned by the query.
         number_to_return: i32,
+        /// Uniquely identifies the cursor being returned.
         cursor_id: i64,
     }
 }
 
 impl Message {
     /// Constructs a new message for a reply.
-    ///
-    /// # Arguments
-    ///
-    /// `header` - The message header.
-    /// `flags` - Bit vector of query options.
-    /// `cursor_id` - Uniquely identifies the cursor being returned.
-    /// `number_returned - The total number of documents being returned.
-    /// `documents` - The documents being returned.
-    ///
-    /// # Return value
-    ///
-    /// Returns the newly-created Message.
     fn new_reply(header: Header, flags: i32, cursor_id: i64,
-                  starting_from: i32, number_returned: i32,
-                  documents: Vec<bson::Document>) -> Message {
+                 starting_from: i32, number_returned: i32,
+                 documents: Vec<bson::Document>) -> Message {
         Message::OpReply { header: header,
                            flags: OpReplyFlags::from_i32(flags),
                            cursor_id: cursor_id, starting_from: starting_from,
@@ -97,23 +117,9 @@ impl Message {
     }
 
     /// Constructs a new message for an update.
-    ///
-    /// # Arguments
-    ///
-    /// `request_id` - The request ID to be placed in the message header.
-    /// `namespace` - The full qualified name of the collection, beginning with
-    ///               the database name and a dot.
-    /// `flags` - Bit vector of query options.
-    /// `selector` - Identifies the document(s) to be updated.
-    /// `update` - Instructs how to update the document(s).
-    ///
-    /// # Return value
-    ///
-    /// Returns the newly-created Message, or an Error if it couldn't be
-    /// created.
     pub fn new_update(request_id: i32, namespace: String, flags: OpUpdateFlags,
-                       selector: bson::Document,
-                       update: bson::Document) -> Result<Message> {
+                      selector: bson::Document,
+                      update: bson::Document) -> Result<Message> {
         let header_length = mem::size_of::<Header>() as i32;
 
         // Add an extra byte after the string for null-termination.
@@ -127,7 +133,7 @@ impl Message {
         let update_length = try!(update.byte_length());
 
         let total_length = header_length + string_length + i32_length +
-                           selector_length + update_length;
+            selector_length + update_length;
 
         let header = Header::new_update(total_length, request_id);
 
@@ -137,21 +143,8 @@ impl Message {
     }
 
     /// Constructs a new message request for an insertion.
-    ///
-    /// # Arguments
-    ///
-    /// `request_id` - The request ID to be placed in the message header.
-    /// `flags` - Bit vector of query options.
-    /// `namespace` - The full qualified name of the collection, beginning with
-    ///               the database name and a dot.
-    /// `documents` - The documents to insert.
-    ///
-    /// # Return value
-    ///
-    /// Returns the newly-created Message, or an Error if it couldn't be
-    /// created.
     pub fn new_insert(request_id: i32, flags: OpInsertFlags, namespace: String,
-                       documents: Vec<bson::Document>) -> Result<Message> {
+                      documents: Vec<bson::Document>) -> Result<Message> {
         let header_length = mem::size_of::<Header>() as i32;
         let flags_length = mem::size_of::<i32>() as i32;
 
@@ -171,30 +164,10 @@ impl Message {
     }
 
     /// Constructs a new message request for a query.
-    ///
-    /// # Arguments
-    ///
-    /// `request_id` - The request ID to be placed in the message header.
-    /// `flags` - Bit vector of query options.
-    /// `namespace` - The full qualified name of the collection, beginning with
-    ///               the database name and a dot.
-    /// `number_to_skip` - The number of initial documents to skip over in the
-    ///                    query results.
-    /// `number_to_return - The total number of documents that should be
-    ///                     returned by the query.
-    /// `query` - Specifies which documents to return.
-    /// `return_field_selector - An optional projection of which fields should
-    ///                          be present in the documents to be returned by
-    ///                          the query.
-    ///
-    /// # Return value
-    ///
-    /// Returns the newly-created Message, or an Error if it couldn't be
-    /// created.
     pub fn new_query(request_id: i32, flags: OpQueryFlags, namespace: String,
-                      number_to_skip: i32, number_to_return: i32,
-                      query: bson::Document,
-                      return_field_selector: Option<bson::Document>) -> Result<Message> {
+                     number_to_skip: i32, number_to_return: i32,
+                     query: bson::Document,
+                     return_field_selector: Option<bson::Document>) -> Result<Message> {
 
         let header_length = mem::size_of::<Header>() as i32;
 
@@ -214,7 +187,7 @@ impl Message {
         };
 
         let total_length = header_length + i32_length + string_length +
-                           bson_length + option_length;
+            bson_length + option_length;
 
         let header = Header::new_query(total_length, request_id);
 
@@ -226,22 +199,8 @@ impl Message {
     }
 
     /// Constructs a new "get more" request message.
-    ///
-    /// # Arguments
-    ///
-    /// `request_id` - The request ID to be placed in the message header.
-    /// `namespace` - The full qualified name of the collection, beginning with
-    ///               the database name and a dot.
-    /// `number_to_return - The total number of documents that should be
-    ///                     returned by the query.
-    /// `cursor_id` - Specifies which cursor to get more documents from.
-    ///
-    /// # Return value
-    ///
-    /// Returns the newly-created Message, or an Error if it couldn't be
-    /// created.
     pub fn new_get_more(request_id: i32, namespace: String,
-                         number_to_return: i32, cursor_id: i64) -> Message {
+                        number_to_return: i32, cursor_id: i64) -> Message {
         let header_length = mem::size_of::<Header>() as i32;
 
         // There are two i32 fields because of the reserved "ZERO".
@@ -251,8 +210,7 @@ impl Message {
         let string_length = namespace.len() as i32 + 1;
 
         let i64_length = mem::size_of::<i64>() as i32;
-        let total_length = header_length + i32_length + string_length +
-                           i64_length;
+        let total_length = header_length + i32_length + string_length + i64_length;
 
         let header = Header::new_get_more(total_length, request_id);
 
@@ -533,7 +491,7 @@ impl Message {
             opcode => Err(ResponseError(format!("Expected to read \
                                                  OpCode::Reply but \
                                                  instead found opcode {}",
-                                                 opcode)))
+                                                opcode)))
         }
     }
 }
