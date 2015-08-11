@@ -228,7 +228,7 @@ impl Cursor {
         let mut socket = stream.get_socket();
         let req_id = client.get_req_id();
 
-        let index = namespace.rfind(".").unwrap_or(namespace.len());
+        let index = namespace.find(".").unwrap_or(namespace.len());
         let db_name = namespace[..index].to_owned();
         let coll_name = namespace[index + 1..].to_owned();
         let cmd_name = cmd_type.to_str();
