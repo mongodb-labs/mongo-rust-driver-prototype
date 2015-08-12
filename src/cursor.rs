@@ -1,15 +1,27 @@
 //! Iterable network cursor for MongoDB queries.
 //!
 //! ```no_run
-//! try!(coll.insert_one(doc!{ "spirit_animal" => "ferret" }, None));
+//! # #[macro_use] extern crate bson;
+//! # extern crate mongodb;
 //!
-//! let mut cursor = coll.find(None, None);
+//! # use mongodb::{Client, ThreadedClient};
+//! # use mongodb::db::ThreadedDatabase;
+//! # use bson::Bson;
+//!
+//! # fn main() {
+//! # let client = Client::connect("localhost", 27017).unwrap();
+//! # let coll = client.db("test").collection("info");
+//!
+//! coll.insert_one(doc!{ "spirit_animal" => "ferret" }, None).unwrap();
+//!
+//! let mut cursor = coll.find(None, None).unwrap();
 //! for result in cursor {
 //!     let doc = result.ok().expect("Received network error during cursor operations.");
 //!     if let Some(&Bson::String(ref value)) = doc.get("spirit_animal") {
 //!         println!("My spirit animal is {}", value);
 //!     }
 //! }
+//! # }
 //! ```
 use {Client, CommandType, Error, ErrorCode, Result, ThreadedClient};
 use apm::{CommandStarted, CommandResult, EventRunner};

@@ -13,14 +13,19 @@
 //! you want access without having to load the entire file into memory.
 //!
 //! ```no_run
-//! let client = Client::connect("localhost", 27017);
+//! # use mongodb::{Client, ThreadedClient};
+//! # use mongodb::gridfs::{Store, ThreadedStore};
+//!
+//! let client = Client::connect("localhost", 27017).unwrap();
 //! let db = client.db("grid");
 //! let fs = Store::with_db(db.clone());
 //!
-//! try!(fs.put("/path/to/local_file.mp4"));
-//! let file = try!(fs.open("/path/to/local_file.mp4"));
-//! let chunk_bytes = try!(file.find_chunk(file.doc.id.clone(), 5));
-//! try!(file.close());
+//! fs.put("/path/to/local_file.mp4".to_owned()).unwrap();
+//! let mut file = fs.open("/path/to/local_file.mp4".to_owned()).unwrap();
+//!
+//! let id = file.doc.id.clone();
+//! let chunk_bytes = file.find_chunk(id, 5).unwrap();
+//! file.close().unwrap();
 //! ```
 pub mod file;
 

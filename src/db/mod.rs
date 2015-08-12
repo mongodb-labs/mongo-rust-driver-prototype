@@ -8,20 +8,28 @@
 //! ## Collection Operations
 //!
 //! ```no_run
+//! # use mongodb::{Client, ThreadedClient};
+//! # use mongodb::db::ThreadedDatabase;
+//! # let client = Client::connect("localhost", 27017).unwrap();
+//!
 //! let db = client.db("movies");
-//! try!(db.create_collection("action", None));
-//! let collection_names = try!(db.collection_names());
+//! db.create_collection("action", None).unwrap();
+//! let collection_names = db.collection_names(None).unwrap();
 //! assert!(!collection_names.is_empty());
 //! ```
 //!
 //! ## Authentication
 //!
 //! ```no_run
-//! let db = client.db("redacted");
-//! try!(db.create_user("saghm", "1234", None));
-//! try!(db.auth("saghm", "1234"));
+//! # use mongodb::{Client, ThreadedClient};
+//! # use mongodb::db::ThreadedDatabase;
+//! # let client = Client::connect("localhost", 27017).unwrap();
 //!
-//! let success = try!(db.list_collections(None));
+//! let db = client.db("redacted");
+//! db.create_user("saghm", "1234", None).unwrap();
+//! db.auth("saghm", "1234").unwrap();
+//!
+//! let success = db.list_collections(None).unwrap();
 //! ```
 //!
 //! ## Arbitrary Database Commands
@@ -29,12 +37,22 @@
 //! Any valid MongoDB database command can be sent to the server with the `command` and `command_cursor` functions.
 //!
 //! ```no_run
+//! # #[macro_use] extern crate bson;
+//! # extern crate mongodb;
+//!
+//! # use mongodb::{Client, CommandType, ThreadedClient};
+//! # use mongodb::db::ThreadedDatabase;
+//! # use bson::Bson;
+//! # fn main() {
+//! # let client = Client::connect("localhost", 27017).unwrap();
+//!
 //! let db = client.db("movies");
 //! let cmd = doc! { "connectionStatus" => 1 };
-//! let result = try!(db.command(cmd, CommandType::Suppressed, None));
+//! let result = db.command(cmd, CommandType::Suppressed, None).unwrap();
 //! if let Some(&Bson::Document(ref doc)) = result.get("authInfo") {
 //!     // Read authentication info.
 //! }
+//! # }
 //! ```
 pub mod options;
 pub mod roles;

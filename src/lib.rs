@@ -7,6 +7,9 @@
 //! The Client is an entry-point to interacting with a MongoDB instance.
 //!
 //! ```no_run
+//! # use mongodb::{Client, ClientOptions, ThreadedClient};
+//! # use mongodb::common::{ReadMode, ReadPreference};
+//!
 //! // Direct connection to a server. Will not look for other servers in the topology.
 //! let client = Client::connect("localhost", 27017)
 //!     .ok().expect("Failed to initialize client.");
@@ -26,12 +29,21 @@
 //! ## Interacting with MongoDB Collections
 //!
 //! ```no_run
-//! let coll = client.db("media").coll("movies");
-//! try!(coll.insert_one(doc!{ "title" => "Back to the Future" }, None));
-//! try!(coll.update_one(doc!{}, doc!{ "director" => "Robert Zemeckis" }, None));
-//! try!(coll.delete_many(doc!{}, None));
+//! # #[macro_use] extern crate bson;
+//! # extern crate mongodb;
+//! # use mongodb::{Client, ThreadedClient};
+//! # use mongodb::db::ThreadedDatabase;
+//! # use bson::Bson;
 //!
-//! let mut cursor = try!(coll.find(None, None));
+//! # fn main() {
+//! # let client = Client::connect("localhost", 27017).unwrap();
+//!
+//! let coll = client.db("media").collection("movies");
+//! coll.insert_one(doc!{ "title" => "Back to the Future" }, None).ok().expect("Failed to insert.");
+//! coll.update_one(doc!{}, doc!{ "director" => "Robert Zemeckis" }, None).ok().expect("Failed to update.");
+//! coll.delete_many(doc!{}, None).ok().expect("Failed to delete.");
+//!
+//! let mut cursor = coll.find(None, None).unwrap();
 //! for result in cursor {
 //!     if let Ok(item) = result {
 //!         if let Some(&Bson::String(ref title)) = item.get("title") {
@@ -39,6 +51,7 @@
 //!         }
 //!     }
 //! }
+//! # }
 //! ```
 //!
 //! ## Command Monitoring
@@ -48,16 +61,18 @@
 //! completion hooks, reacting to command results from the server.
 //!
 //! ```no_run
+//! # use mongodb::{Client, CommandResult, ThreadedClient};
 //! fn log_query_duration(client: Client, command_result: &CommandResult) {
 //!     match command_result {
-//!         &CommandResult::Success { ref command_name, duration, .. } => {
-//!             println!("{}: {} nanoseconds." stringify!(command_name), duration);
+//!         &CommandResult::Success { duration, .. } => {
+//!             println!("Command took {} nanoseconds.", duration);
 //!         },
 //!         _ => println!("Failed to execute command."),
 //!     }
 //! }
 //!
-//! try!(client.add_completion_cook(log_query_duration));
+//! let mut client = Client::connect("localhost", 27017).unwrap();
+//! client.add_completion_hook(log_query_duration).unwrap();
 //! ```
 //!
 //! ## Topology Monitoring
