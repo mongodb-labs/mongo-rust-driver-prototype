@@ -15,7 +15,7 @@
 //! ```no_run
 //! # use mongodb::{Client, ThreadedClient};
 //! # use mongodb::gridfs::{Store, ThreadedStore};
-//!
+//! #
 //! let client = Client::connect("localhost", 27017).unwrap();
 //! let db = client.db("grid");
 //! let fs = Store::with_db(db.clone());

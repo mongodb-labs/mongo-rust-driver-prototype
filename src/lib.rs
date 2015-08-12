@@ -9,7 +9,7 @@
 //! ```no_run
 //! # use mongodb::{Client, ClientOptions, ThreadedClient};
 //! # use mongodb::common::{ReadMode, ReadPreference};
-//!
+//! #
 //! // Direct connection to a server. Will not look for other servers in the topology.
 //! let client = Client::connect("localhost", 27017)
 //!     .ok().expect("Failed to initialize client.");
@@ -34,14 +34,14 @@
 //! # use mongodb::{Client, ThreadedClient};
 //! # use mongodb::db::ThreadedDatabase;
 //! # use bson::Bson;
-//!
+//! #
 //! # fn main() {
 //! # let client = Client::connect("localhost", 27017).unwrap();
-//!
+//! #
 //! let coll = client.db("media").collection("movies");
-//! coll.insert_one(doc!{ "title" => "Back to the Future" }, None).ok().expect("Failed to insert.");
-//! coll.update_one(doc!{}, doc!{ "director" => "Robert Zemeckis" }, None).ok().expect("Failed to update.");
-//! coll.delete_many(doc!{}, None).ok().expect("Failed to delete.");
+//! coll.insert_one(doc!{ "title" => "Back to the Future" }, None).unwrap();
+//! coll.update_one(doc!{}, doc!{ "director" => "Robert Zemeckis" }, None).unwrap();
+//! coll.delete_many(doc!{}, None).unwrap();
 //!
 //! let mut cursor = coll.find(None, None).unwrap();
 //! for result in cursor {

@@ -11,7 +11,7 @@
 //! # use mongodb::{Client, ThreadedClient};
 //! # use mongodb::db::ThreadedDatabase;
 //! # let client = Client::connect("localhost", 27017).unwrap();
-//!
+//! #
 //! let db = client.db("movies");
 //! db.create_collection("action", None).unwrap();
 //! let collection_names = db.collection_names(None).unwrap();
@@ -24,7 +24,7 @@
 //! # use mongodb::{Client, ThreadedClient};
 //! # use mongodb::db::ThreadedDatabase;
 //! # let client = Client::connect("localhost", 27017).unwrap();
-//!
+//! #
 //! let db = client.db("redacted");
 //! db.create_user("saghm", "1234", None).unwrap();
 //! db.auth("saghm", "1234").unwrap();
@@ -39,13 +39,13 @@
 //! ```no_run
 //! # #[macro_use] extern crate bson;
 //! # extern crate mongodb;
-//!
+//! #
 //! # use mongodb::{Client, CommandType, ThreadedClient};
 //! # use mongodb::db::ThreadedDatabase;
 //! # use bson::Bson;
 //! # fn main() {
 //! # let client = Client::connect("localhost", 27017).unwrap();
-//!
+//! #
 //! let db = client.db("movies");
 //! let cmd = doc! { "connectionStatus" => 1 };
 //! let result = db.command(cmd, CommandType::Suppressed, None).unwrap();

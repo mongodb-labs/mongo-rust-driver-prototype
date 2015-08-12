@@ -3,15 +3,15 @@
 //! ```no_run
 //! # #[macro_use] extern crate bson;
 //! # extern crate mongodb;
-//!
+//! #
 //! # use mongodb::{Client, ThreadedClient};
 //! # use mongodb::db::ThreadedDatabase;
 //! # use bson::Bson;
-//!
+//! #
 //! # fn main() {
 //! # let client = Client::connect("localhost", 27017).unwrap();
 //! # let coll = client.db("test").collection("info");
-//!
+//! #
 //! coll.insert_one(doc!{ "spirit_animal" => "ferret" }, None).unwrap();
 //!
 //! let mut cursor = coll.find(None, None).unwrap();
