@@ -35,12 +35,17 @@ impl Collection {
     /// Creates a collection representation with optional read and write controls.
     ///
     /// If `create` is specified, the collection will be explicitly created in the database.
-    pub fn new(db: Database, name: &str, _create: bool,
+    pub fn new(db: Database, name: &str, create: bool,
                read_preference: Option<ReadPreference>,
                write_concern: Option<WriteConcern>) -> Collection {
 
         let rp = read_preference.unwrap_or(db.read_preference.to_owned());
         let wc = write_concern.unwrap_or(db.write_concern.to_owned());
+
+        if create {
+            // Attempt to create the collection explicitly, or fail silently.
+            let _ = db.create_collection(name, None);
+        }
 
         Collection {
             db: db.clone(),
