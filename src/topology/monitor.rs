@@ -1,3 +1,4 @@
+//! Asynchronous server and topology discovery and monitoring using isMaster results.
 use {Client, Result};
 use Error::{self, ArgumentError, OperationError};
 

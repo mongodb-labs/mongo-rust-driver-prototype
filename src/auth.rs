@@ -1,3 +1,4 @@
+//! Authentication schemes.
 use bson::Bson::{self, Binary};
 use bson::Document;
 use bson::spec::BinarySubtype::Generic;
@@ -19,6 +20,7 @@ const B64_CONFIG : base64::Config = base64::Config { char_set: base64::Character
                                                      newline: base64::Newline::LF,
                                                      pad: true, line_length: None };
 
+/// Handles SCRAM-SHA-1 authentication logic.
 pub struct Authenticator {
     db: Database,
 }
@@ -37,10 +39,12 @@ struct AuthData {
 }
 
 impl Authenticator {
+    /// Creates a new authenticator.
     pub fn new(db: Database) -> Authenticator {
         Authenticator { db: db }
     }
 
+    /// Authenticates a user-password pair against a database.
     pub fn auth(self, user: &str, password: &str) -> Result<()> {
         let initial_data = try!(self.start(user));
         let conversation_id = initial_data.conversation_id.clone();

@@ -1,3 +1,4 @@
+//! MongoDB server representation.
 use {Client, Result};
 use Error::{self, OperationError};
 

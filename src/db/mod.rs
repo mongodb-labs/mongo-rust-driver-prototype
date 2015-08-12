@@ -1,3 +1,59 @@
+//! Interface for database-level operations.
+//!
+//! # Usage
+//!
+//! The database API provides methods for opening, creating, deleting, and listing collections. It also handles
+//! user-level authentication over SCRAM-SHA-1.
+//!
+//! ## Collection Operations
+//!
+//! ```no_run
+//! # use mongodb::{Client, ThreadedClient};
+//! # use mongodb::db::ThreadedDatabase;
+//! # let client = Client::connect("localhost", 27017).unwrap();
+//! #
+//! let db = client.db("movies");
+//! db.create_collection("action", None).unwrap();
+//! let collection_names = db.collection_names(None).unwrap();
+//! assert!(!collection_names.is_empty());
+//! ```
+//!
+//! ## Authentication
+//!
+//! ```no_run
+//! # use mongodb::{Client, ThreadedClient};
+//! # use mongodb::db::ThreadedDatabase;
+//! # let client = Client::connect("localhost", 27017).unwrap();
+//! #
+//! let db = client.db("redacted");
+//! db.create_user("saghm", "1234", None).unwrap();
+//! db.auth("saghm", "1234").unwrap();
+//!
+//! let success = db.list_collections(None).unwrap();
+//! ```
+//!
+//! ## Arbitrary Database Commands
+//!
+//! Any valid MongoDB database command can be sent to the server with the `command` and `command_cursor` functions.
+//!
+//! ```no_run
+//! # #[macro_use] extern crate bson;
+//! # extern crate mongodb;
+//! #
+//! # use mongodb::{Client, CommandType, ThreadedClient};
+//! # use mongodb::db::ThreadedDatabase;
+//! # use bson::Bson;
+//! # fn main() {
+//! # let client = Client::connect("localhost", 27017).unwrap();
+//! #
+//! let db = client.db("movies");
+//! let cmd = doc! { "connectionStatus" => 1 };
+//! let result = db.command(cmd, CommandType::Suppressed, None).unwrap();
+//! if let Some(&Bson::Document(ref doc)) = result.get("authInfo") {
+//!     // Read authentication info.
+//! }
+//! # }
+//! ```
 pub mod options;
 pub mod roles;
 
@@ -16,9 +72,13 @@ use std::sync::Arc;
 
 /// Interfaces with a MongoDB database.
 pub struct DatabaseInner {
+    /// The database name.
     pub name: String,
+    /// A reference to the client that spawned this database.
     pub client: Client,
+    /// Indicates how a server should be selected for read operations.
     pub read_preference: ReadPreference,
+    /// Describes the guarantees provided by MongoDB when reporting the success of a write operation.
     pub write_concern: WriteConcern,
 }
 
@@ -28,37 +88,57 @@ pub trait ThreadedDatabase {
     /// Creates a database representation with optional read and write controls.
     fn open(client: Client, name: &str, read_preference: Option<ReadPreference>,
             write_concern: Option<WriteConcern>) -> Database;
+    /// Logs in a user using the SCRAM-SHA-1 mechanism.
     fn auth(&self, user: &str, password: &str) -> Result<()>;
+    /// Creates a collection representation with inherited read and write controls.
     fn collection(&self, coll_name: &str) -> Collection;
+    /// Creates a collection representation with custom read and write controls.
     fn collection_with_prefs(&self, coll_name: &str, create: bool,
                              read_preference: Option<ReadPreference>,
                              write_concern: Option<WriteConcern>) -> Collection;
+    /// Return a unique operational request id.
     fn get_req_id(&self) -> i32;
+    /// Generates a cursor for a relevant operational command.
     fn command_cursor(&self, spec: bson::Document, cmd_type: CommandType,
                       read_pref: ReadPreference) -> Result<Cursor>;
+    /// Sends an administrative command over find_one.
     fn command(&self, spec: bson::Document, cmd_type: CommandType,
                read_preference: Option<ReadPreference>) -> Result<bson::Document>;
+    /// Returns a list of collections within the database.
     fn list_collections(&self, filter: Option<bson::Document>) -> Result<Cursor>;
+    /// Returns a list of collections within the database with a custom batch size.
     fn list_collections_with_batch_size(&self, filter: Option<bson::Document>,
                                         batch_size: i32) -> Result<Cursor>;
+    /// Returns a list of collection names within the database.
     fn collection_names(&self, filter: Option<bson::Document>) -> Result<Vec<String>>;
+    /// Creates a new collection.
+    ///
+    /// Note that due to the implicit creation of collections during insertion, this
+    /// method should only be used to instantiate capped collections.
     fn create_collection(&self, name: &str,
                          options: Option<CreateCollectionOptions>) -> Result<()>;
+    /// Creates a new user.
     fn create_user(&self, name: &str, password: &str,
                    options: Option<CreateUserOptions>) -> Result<()>;
+    /// Permanently deletes all users from the database.
     fn drop_all_users(&self, write_concern: Option<WriteConcern>) -> Result<(i32)>;
+    /// Permanently deletes the collection from the database.
     fn drop_collection(&self, name: &str) -> Result<()>;
+    /// Permanently deletes the database from the server.
     fn drop_database(&self) -> Result<()>;
+    /// Permanently deletes the user from the database.
     fn drop_user(&self, name: &str, Option<WriteConcern>) -> Result<()>;
+    /// Retrieves information about all users in the database.
     fn get_all_users(&self, show_credentials: bool) -> Result<Vec<bson::Document>>;
+    /// Retrieves information about a given user from the database.
     fn get_user(&self, user: &str,
                 options: Option<UserInfoOptions>) -> Result<bson::Document>;
+    /// Retrieves information about a given set of users from the database.
     fn get_users(&self, users: Vec<&str>,
                  options: Option<UserInfoOptions>) -> Result<Vec<bson::Document>>;
 }
 
 impl ThreadedDatabase for Database {
-    /// Creates a database representation with optional read and write controls.
     fn open(client: Client, name: &str, read_preference: Option<ReadPreference>,
             write_concern: Option<WriteConcern>) -> Database {
         let rp = read_preference.unwrap_or(client.read_preference.to_owned());
@@ -72,36 +152,30 @@ impl ThreadedDatabase for Database {
         })
     }
 
-    /// Logs in a user using the SCRAM-SHA-1 mechanism
     fn auth(&self, user: &str, password: &str) -> Result<()> {
         let authenticator = Authenticator::new(self.clone());
         authenticator.auth(user, password)
     }
 
-    /// Creates a collection representation with inherited read and write controls.
     fn collection(&self, coll_name: &str) -> Collection {
         Collection::new(self.clone(), coll_name, false, Some(self.read_preference.to_owned()), Some(self.write_concern.to_owned()))
     }
 
-    /// Creates a collection representation with custom read and write controls.
     fn collection_with_prefs(&self, coll_name: &str, create: bool,
                              read_preference: Option<ReadPreference>,
                              write_concern: Option<WriteConcern>) -> Collection {
         Collection::new(self.clone(), coll_name, create, read_preference, write_concern)
     }
 
-    /// Return a unique operational request id.
     fn get_req_id(&self) -> i32 {
         self.client.get_req_id()
     }
 
-    /// Generates a cursor for a relevant operational command.
     fn command_cursor(&self, spec: bson::Document, cmd_type: CommandType,
                       read_pref: ReadPreference) -> Result<Cursor> {
         Cursor::command_cursor(self.client.clone(), &self.name[..], spec, cmd_type, read_pref)
     }
 
-    /// Sends an administrative command over find_one.
     fn command(&self, spec: bson::Document, cmd_type: CommandType,
                read_preference: Option<ReadPreference>) -> Result<bson::Document> {
 
@@ -114,7 +188,6 @@ impl ThreadedDatabase for Database {
         res.ok_or(OperationError(format!("Failed to execute command with spec {:?}.", spec)))
     }
 
-    /// Returns a list of collections within the database.
     fn list_collections(&self, filter: Option<bson::Document>) -> Result<Cursor> {
         self.list_collections_with_batch_size(filter, DEFAULT_BATCH_SIZE)
     }
@@ -135,8 +208,6 @@ impl ThreadedDatabase for Database {
         self.command_cursor(spec, CommandType::ListCollections, self.read_preference.to_owned())
     }
 
-
-    /// Returns a list of collection names within the database.
     fn collection_names(&self, filter: Option<bson::Document>) -> Result<Vec<String>> {
         let mut cursor = try!(self.list_collections(filter));
         let mut results = vec![];
@@ -151,10 +222,6 @@ impl ThreadedDatabase for Database {
         }
     }
 
-    /// Creates a new collection.
-    ///
-    /// Note that due to the implicit creation of collections during insertion, this
-    /// method should only be used to instantiate capped collections.
     fn create_collection(&self, name: &str,
                          options: Option<CreateCollectionOptions>) -> Result<()> {
         let coll_options = options.unwrap_or(CreateCollectionOptions::new());
@@ -180,7 +247,6 @@ impl ThreadedDatabase for Database {
         self.command(doc, CommandType::CreateCollection, None).map(|_| ())
     }
 
-    /// Creates a new user.
     fn create_user(&self, name: &str, password: &str,
                    options: Option<CreateUserOptions>) -> Result<()> {
         let user_options = options.unwrap_or(CreateUserOptions::new());
@@ -202,7 +268,6 @@ impl ThreadedDatabase for Database {
         self.command(doc, CommandType::CreateUser, None).map(|_| ())
     }
 
-    /// Permanently deletes all users from the database.
     fn drop_all_users(&self, write_concern: Option<WriteConcern>) -> Result<(i32)> {
         let mut doc = doc! { "dropAllUsersFromDatabase" => 1 };
 
@@ -219,7 +284,6 @@ impl ThreadedDatabase for Database {
         }
     }
 
-    /// Permanently deletes the collection from the database.
     fn drop_collection(&self, name: &str) -> Result<()> {
         let mut spec = bson::Document::new();
         spec.insert("drop".to_owned(), Bson::String(name.to_owned()));
@@ -227,8 +291,6 @@ impl ThreadedDatabase for Database {
         Ok(())
     }
 
-
-    /// Permanently deletes the database from the server.
     fn drop_database(&self) -> Result<()> {
         let mut spec = bson::Document::new();
         spec.insert("dropDatabase".to_owned(), Bson::I32(1));
@@ -236,7 +298,6 @@ impl ThreadedDatabase for Database {
         Ok(())
     }
 
-    /// Permanently deletes the user from the database.
     fn drop_user(&self, name: &str, write_concern: Option<WriteConcern>) -> Result<()> {
         let mut doc = doc! { "dropUser" => name };
 
@@ -247,7 +308,6 @@ impl ThreadedDatabase for Database {
         self.command(doc, CommandType::DropUser, None).map(|_| ())
     }
 
-    /// Retrieves information about all users in the database.
     fn get_all_users(&self, show_credentials: bool) -> Result<Vec<bson::Document>> {
         let doc = doc! {
             "usersInfo" => 1,
@@ -272,7 +332,6 @@ impl ThreadedDatabase for Database {
         Ok(users)
     }
 
-    /// Retrives information about a given user from the database.
     fn get_user(&self, user: &str,
                 options: Option<UserInfoOptions>) -> Result<bson::Document> {
         let info_options = options.unwrap_or(UserInfoOptions::new());
@@ -299,7 +358,6 @@ impl ThreadedDatabase for Database {
         }
     }
 
-    /// Retrives information about a given set of users from the database.
     fn get_users(&self, users: Vec<&str>,
                  options: Option<UserInfoOptions>) -> Result<Vec<bson::Document>> {
         let info_options = options.unwrap_or(UserInfoOptions::new());

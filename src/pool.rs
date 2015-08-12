@@ -1,3 +1,4 @@
+//! Connection pooling for a single MongoDB server.
 use Error::{ArgumentError, OperationError};
 use Result;
 

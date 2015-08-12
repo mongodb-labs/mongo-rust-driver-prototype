@@ -1,3 +1,4 @@
+//! MongoDB Errors and Error Codes.
 use bson::{self, oid};
 use byteorder;
 use coll::error::{WriteException, BulkWriteException};

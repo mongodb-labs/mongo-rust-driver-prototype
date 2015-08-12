@@ -1,3 +1,4 @@
+//! Models for collection-level batch operations.
 use super::options::WriteModel;
 
 use bson::Document;

@@ -1,3 +1,4 @@
+//! Results for collection-level operations.
 use bson;
 use bson::Bson;
 use std::collections::BTreeMap;

@@ -1,3 +1,4 @@
+//! Options for database-level commands.
 use bson::Document;
 use common::WriteConcern;
 use db::roles::Role;

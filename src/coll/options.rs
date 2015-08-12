@@ -1,3 +1,4 @@
+//! Options for collection-level operations.
 use bson::{self, Bson};
 use cursor;
 use common::{ReadPreference, WriteConcern};
@@ -115,6 +116,7 @@ pub struct FindOneAndUpdateOptions {
 }
 
 /// Options for index operations.
+#[derive(Clone)]
 pub struct IndexOptions {
     pub background: Option<bool>,
     pub expire_after_seconds: Option<i32>,
@@ -139,17 +141,20 @@ pub struct IndexOptions {
 }
 
 /// A single index model.
+#[derive(Clone)]
 pub struct IndexModel {
     pub keys: bson::Document,
     pub options: IndexOptions,
 }
 
+/// Options for insertMany operations.
 #[derive(Clone)]
 pub struct InsertManyOptions {
     pub ordered: bool,
     pub write_concern: Option<WriteConcern>,
 }
 
+/// Options for update operations.
 #[derive(Clone)]
 pub struct UpdateOptions {
     pub upsert: bool,
