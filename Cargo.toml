@@ -10,7 +10,7 @@ repository = "https://github.com/mongodbinc-interns/mongo-rust-driver-prototype"
 documentation = "https://mongodbinc-interns.github.io/mongo-rust-driver-prototype/mongodb"
 readme = "README.md"
 keywords = ["mongo", "mongodb", "database", "bson", "nosql"]
-license = "apache"
+license = "Apache-2.0"
 
 [dependencies]
 bson = "0.1.3"
