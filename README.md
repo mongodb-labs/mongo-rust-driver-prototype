@@ -13,14 +13,11 @@ The API and implementation are currently subject to change at any time. You must
 - [Rust 1.0 with Cargo](http://rust-lang.org)
 
 #### Importing
-The 1.0 driver is currently available as a git dependency. To use the MongoDB driver in your code, add the bson and mongodb packages to your ```Cargo.toml```:
+The 1.0 driver is available on crates.io. To use the MongoDB driver in your code, add the bson and mongodb packages to your ```Cargo.toml```:
 ```
 [dependencies]
 bson = "0.1.3"
-
-[dependencies.mongodb]
-git = "https://github.com/mongodbinc-interns/mongo-rust-driver-prototype"
-branch = "1.0"
+mongodb = "0.1.0"
 ```
 
 Then, import the bson and driver libraries within your code.
