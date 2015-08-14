@@ -51,11 +51,7 @@ fn read_first_non_monitor_line(file: &mut BufReader<&File>, line: &mut String) {
 
 #[test]
 fn logging() {
-    for file in fs::read_dir(".").unwrap() {
-        if file.unwrap().path().file_name().unwrap().eq("test_log.txt") {
-            fs::remove_file("test_log.txt").unwrap();
-        }
-    }
+    let _ = fs::remove_file("test_log.txt");
 
     let client_options = ClientOptions::with_log_file("test_log.txt");
     let client = Client::connect_with_options("localhost", 27017, client_options).unwrap();
@@ -149,4 +145,6 @@ fn logging() {
     assert!(line.ends_with(" ns)\n"));
 
     coll.drop().unwrap();
+
+    let _ = fs::remove_file("test_log.txt").unwrap();
 }
