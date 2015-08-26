@@ -250,6 +250,7 @@ impl Cursor {
                              is_cmd_cursor: bool,
                              read_pref: Option<ReadPreference>) -> Result<Cursor> {
 
+        let mut stream = stream;
         let mut socket = stream.get_socket();
         let req_id = client.get_req_id();
 
@@ -257,7 +258,7 @@ impl Cursor {
         let db_name = namespace[..index].to_owned();
         let coll_name = namespace[index + 1..].to_owned();
         let cmd_name = cmd_type.to_str();
-        let connstring = format!("{}", try!(socket.peer_addr()));
+        let connstring = format!("{}", try!(socket.get_ref().peer_addr()));
 
         let filter : bson::Document = match query.get("$query") {
             Some(&Bson::Document(ref doc)) => doc.clone(),
@@ -310,8 +311,8 @@ impl Cursor {
             }
         }
 
-        try_or_emit!(cmd_type, cmd_name, req_id, connstring, message.write(&mut socket), client);
-        let reply = try_or_emit!(cmd_type, cmd_name, req_id, connstring, Message::read(&mut socket),
+        try_or_emit!(cmd_type, cmd_name, req_id, connstring, message.write(socket), client);
+        let reply = try_or_emit!(cmd_type, cmd_name, req_id, connstring, Message::read(socket),
                                  client);
 
         let fin_time = time::precise_time_ns();
@@ -360,7 +361,7 @@ impl Cursor {
     }
 
     fn get_from_stream(&mut self) -> Result<()> {
-        let (stream, _, _) = try!(self.client.acquire_stream(self.read_preference.to_owned()));
+        let (mut stream, _, _) = try!(self.client.acquire_stream(self.read_preference.to_owned()));
         let mut socket = stream.get_socket();
 
         let req_id = self.client.get_req_id();
@@ -370,7 +371,7 @@ impl Cursor {
         let index = self.namespace.rfind(".").unwrap_or(self.namespace.len());
         let db_name = self.namespace[..index].to_owned();
         let cmd_name = "get_more".to_owned();
-        let connstring = format!("{}", try!(socket.peer_addr()));
+        let connstring = format!("{}", try!(socket.get_ref().peer_addr()));
 
         if self.cmd_type != CommandType::Suppressed {
             let hook_result = self.client.run_start_hooks(&CommandStarted {
@@ -386,8 +387,8 @@ impl Cursor {
             }
         }
 
-        try_or_emit!(self.cmd_type, cmd_name, req_id, connstring, get_more.write(&mut socket), self.client);
-        let reply = try!(Message::read(&mut socket));
+        try_or_emit!(self.cmd_type, cmd_name, req_id, connstring, get_more.write(socket.get_mut()), self.client);
+        let reply = try!(Message::read(socket.get_mut()));
 
         let (_, v, _) = try!(Cursor::get_bson_and_cid_from_message(reply));
         self.buffer.extend(v);
