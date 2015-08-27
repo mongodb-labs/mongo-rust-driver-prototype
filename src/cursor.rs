@@ -223,13 +223,13 @@ impl Cursor {
                 Some(_) => {
                     // Query is already formatted as a $query document; add onto it.
                     let mut nq = query.clone();
-                    nq.insert("read_preference".to_owned(), Bson::Document(read_pref.to_document()));
+                    nq.insert("read_preference", Bson::Document(read_pref.to_document()));
                     nq
                 },
                 None => {
                     // Convert the query to a $query document.
                     let mut nq = doc! { "$query" => query };
-                    nq.insert("read_preference".to_owned(), Bson::Document(read_pref.to_document()));
+                    nq.insert("read_preference", Bson::Document(read_pref.to_document()));
                     nq
                 }
             }

@@ -616,17 +616,17 @@ impl GfsFile {
         };
 
         if self.name.is_some() {
-            doc.insert("filename".to_owned(),
+            doc.insert("filename",
                        Bson::String(self.name.as_ref().unwrap().to_owned()));
         }
 
         if self.content_type.is_some() {
-            doc.insert("contentType".to_owned(),
+            doc.insert("contentType",
                        Bson::String(self.content_type.as_ref().unwrap().to_owned()));
         }
 
         if self.metadata.is_some() {
-            doc.insert("metadata".to_owned(),
+            doc.insert("metadata",
                        Bson::Binary(BinarySubtype::Generic,
                                     self.metadata.as_ref().unwrap().clone()));
         }
