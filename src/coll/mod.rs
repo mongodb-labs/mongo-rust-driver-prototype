@@ -93,12 +93,12 @@ impl Collection {
 
         let mut spec = bson::Document::new();
         let mut cursor = bson::Document::new();
-        cursor.insert("batchSize".to_owned(), Bson::I32(opts.batch_size));
-        spec.insert("aggregate".to_owned(), Bson::String(self.name()));
-        spec.insert("pipeline".to_owned(), Bson::Array(pipeline_map));
-        spec.insert("cursor".to_owned(), Bson::Document(cursor));
+        cursor.insert("batchSize", Bson::I32(opts.batch_size));
+        spec.insert("aggregate", Bson::String(self.name()));
+        spec.insert("pipeline", Bson::Array(pipeline_map));
+        spec.insert("cursor", Bson::Document(cursor));
         if opts.allow_disk_use {
-            spec.insert("allowDiskUse".to_owned(), Bson::Boolean(opts.allow_disk_use));
+            spec.insert("allowDiskUse", Bson::Boolean(opts.allow_disk_use));
         }
 
         let read_pref = opts.read_preference.unwrap_or(self.read_preference.to_owned());
@@ -111,18 +111,18 @@ impl Collection {
         let opts = options.unwrap_or(CountOptions::new());
 
         let mut spec = bson::Document::new();
-        spec.insert("count".to_owned(), Bson::String(self.name()));
-        spec.insert("skip".to_owned(), Bson::I64(opts.skip as i64));
-        spec.insert("limit".to_owned(), Bson::I64(opts.limit));
+        spec.insert("count", Bson::String(self.name()));
+        spec.insert("skip", Bson::I64(opts.skip as i64));
+        spec.insert("limit", Bson::I64(opts.limit));
         if filter.is_some() {
-            spec.insert("query".to_owned(), Bson::Document(filter.unwrap()));
+            spec.insert("query", Bson::Document(filter.unwrap()));
         }
 
         // Favor specified hint document over string
         if opts.hint_doc.is_some() {
-            spec.insert("hint".to_owned(), Bson::Document(opts.hint_doc.unwrap()));
+            spec.insert("hint", Bson::Document(opts.hint_doc.unwrap()));
         } else if opts.hint.is_some() {
-            spec.insert("hint".to_owned(), Bson::String(opts.hint.unwrap()));
+            spec.insert("hint", Bson::String(opts.hint.unwrap()));
         }
 
         let read_pref = opts.read_preference.unwrap_or(self.read_preference.to_owned());
@@ -141,10 +141,10 @@ impl Collection {
         let opts = options.unwrap_or(DistinctOptions::new());
 
         let mut spec = bson::Document::new();
-        spec.insert("distinct".to_owned(), Bson::String(self.name()));
-        spec.insert("key".to_owned(), Bson::String(field_name.to_owned()));
+        spec.insert("distinct", Bson::String(self.name()));
+        spec.insert("key", Bson::String(field_name.to_owned()));
         if filter.is_some() {
-            spec.insert("query".to_owned(), Bson::Document(filter.unwrap()));
+            spec.insert("query", Bson::Document(filter.unwrap()));
         }
 
         let read_pref = opts.read_preference.unwrap_or(self.read_preference.to_owned());
@@ -217,14 +217,14 @@ impl Collection {
         let wc = write_concern.unwrap_or(self.write_concern.clone());
 
         let mut new_cmd = bson::Document::new();
-        new_cmd.insert("findAndModify".to_owned(), Bson::String(self.name()));
-        new_cmd.insert("query".to_owned(), Bson::Document(filter));
-        new_cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
+        new_cmd.insert("findAndModify", Bson::String(self.name()));
+        new_cmd.insert("query", Bson::Document(filter));
+        new_cmd.insert("writeConcern", Bson::Document(wc.to_bson()));
         if sort.is_some() {
-            new_cmd.insert("sort".to_owned(), Bson::Document(sort.unwrap()));
+            new_cmd.insert("sort", Bson::Document(sort.unwrap()));
         }
         if projection.is_some() {
-            new_cmd.insert("fields".to_owned(), Bson::Document(projection.unwrap()));
+            new_cmd.insert("fields", Bson::Document(projection.unwrap()));
         }
 
         for (key, val) in cmd.iter() {
@@ -249,12 +249,12 @@ impl Collection {
                                       Option<WriteConcern>, cmd_type: CommandType) -> Result<Option<bson::Document>> {
 
         let mut cmd = bson::Document::new();
-        cmd.insert("update".to_owned(), Bson::Document(update));
+        cmd.insert("update", Bson::Document(update));
         if after {
-            cmd.insert("new".to_owned(), Bson::Boolean(true));
+            cmd.insert("new", Bson::Boolean(true));
         }
         if upsert {
-            cmd.insert("upsert".to_owned(), Bson::Boolean(true));
+            cmd.insert("upsert", Bson::Boolean(true));
         }
 
         self.find_and_modify(&mut cmd, filter, max_time_ms, projection, sort, write_concern,
@@ -267,7 +267,7 @@ impl Collection {
 
         let opts = options.unwrap_or(FindOneAndDeleteOptions::new());
         let mut cmd = bson::Document::new();
-        cmd.insert("remove".to_owned(), Bson::Boolean(true));
+        cmd.insert("remove", Bson::Boolean(true));
         self.find_and_modify(&mut cmd, filter, opts.max_time_ms,
                              opts.projection, opts.sort, opts.write_concern,
                              CommandType::FindOneAndDelete)
@@ -483,7 +483,7 @@ impl Collection {
                 Some(id) => ids.push(id.clone()),
                 None => {
                     let id = Bson::ObjectId(try!(oid::ObjectId::new()));
-                    cdoc.insert("_id".to_owned(), id.clone());
+                    cdoc.insert("_id", id.clone());
                     ids.push(id);
                 }
             }
@@ -491,10 +491,10 @@ impl Collection {
         }
 
         let mut cmd = bson::Document::new();
-        cmd.insert("insert".to_owned(), Bson::String(self.name()));
-        cmd.insert("documents".to_owned(), Bson::Array(converted_docs));
-        cmd.insert("ordered".to_owned(), Bson::Boolean(ordered));
-        cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
+        cmd.insert("insert", Bson::String(self.name()));
+        cmd.insert("documents", Bson::Array(converted_docs));
+        cmd.insert("ordered", Bson::Boolean(ordered));
+        cmd.insert("writeConcern", Bson::Document(wc.to_bson()));
 
         let result = try!(self.db.command(cmd, cmd_type, None));
 
@@ -568,19 +568,19 @@ impl Collection {
         let mut deletes = Vec::new();
         for model in models {
             let mut delete = bson::Document::new();
-            delete.insert("q".to_owned(), Bson::Document(model.filter));
+            delete.insert("q", Bson::Document(model.filter));
             let limit = if model.multi { 0 } else { 1 };
-            delete.insert("limit".to_owned(), Bson::I64(limit));
+            delete.insert("limit", Bson::I64(limit));
             deletes.push(Bson::Document(delete));
         }
 
         let mut cmd = bson::Document::new();
-        cmd.insert("delete".to_owned(), Bson::String(self.name()));
-        cmd.insert("deletes".to_owned(), Bson::Array(deletes));
+        cmd.insert("delete", Bson::String(self.name()));
+        cmd.insert("deletes", Bson::Array(deletes));
         if !ordered {
-            cmd.insert("ordered".to_owned(), Bson::Boolean(ordered));
+            cmd.insert("ordered", Bson::Boolean(ordered));
         }
-        cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
+        cmd.insert("writeConcern", Bson::Document(wc.to_bson()));
 
         let result = try!(self.db.command(cmd, cmd_type, None));
 
@@ -631,22 +631,22 @@ impl Collection {
         let mut updates = Vec::new();
         for model in models {
             let mut update = bson::Document::new();
-            update.insert("q".to_owned(), Bson::Document(model.filter));
-            update.insert("u".to_owned(), Bson::Document(model.update));
-            update.insert("upsert".to_owned(), Bson::Boolean(model.upsert));
+            update.insert("q", Bson::Document(model.filter));
+            update.insert("u", Bson::Document(model.update));
+            update.insert("upsert", Bson::Boolean(model.upsert));
             if !ordered {
-                update.insert("ordered".to_owned(), Bson::Boolean(ordered));
+                update.insert("ordered", Bson::Boolean(ordered));
             }
             if model.multi {
-                update.insert("multi".to_owned(), Bson::Boolean(model.multi));
+                update.insert("multi", Bson::Boolean(model.multi));
             }
             updates.push(Bson::Document(update));
         }
 
         let mut cmd = bson::Document::new();
-        cmd.insert("update".to_owned(), Bson::String(self.name()));
-        cmd.insert("updates".to_owned(), Bson::Array(updates));
-        cmd.insert("writeConcern".to_owned(), Bson::Document(wc.to_bson()));
+        cmd.insert("update", Bson::String(self.name()));
+        cmd.insert("updates", Bson::Array(updates));
+        cmd.insert("writeConcern", Bson::Document(wc.to_bson()));
 
         let result = try!(self.db.command(cmd, cmd_type, None));
 
@@ -741,8 +741,8 @@ impl Collection {
         }
 
         let mut cmd = bson::Document::new();
-        cmd.insert("createIndexes".to_owned(), Bson::String(self.name()));
-        cmd.insert("indexes".to_owned(), Bson::Array(indexes));
+        cmd.insert("createIndexes", Bson::String(self.name()));
+        cmd.insert("indexes", Bson::Array(indexes));
         let result = try!(self.db.command(cmd, CommandType::CreateIndexes, None));
 
         match result.get("errmsg") {
@@ -769,8 +769,8 @@ impl Collection {
     /// Drop an index by IndexModel.
     pub fn drop_index_model(&self, model: IndexModel) -> Result<()> {
         let mut cmd = bson::Document::new();
-        cmd.insert("dropIndexes".to_owned(), Bson::String(self.name()));
-        cmd.insert("index".to_owned(), Bson::String(try!(model.name())));
+        cmd.insert("dropIndexes", Bson::String(self.name()));
+        cmd.insert("index", Bson::String(try!(model.name())));
 
         let result = try!(self.db.command(cmd, CommandType::DropIndexes, None));
         match result.get("errmsg") {
@@ -791,7 +791,7 @@ impl Collection {
     /// List all indexes in the collection.
     pub fn list_indexes(&self) -> Result<Cursor> {
         let mut cmd = bson::Document::new();
-        cmd.insert("listIndexes".to_owned(), Bson::String(self.name()));
+        cmd.insert("listIndexes", Bson::String(self.name()));
         self.db.command_cursor(cmd, CommandType::ListIndexes, self.read_preference.to_owned())
     }
 }

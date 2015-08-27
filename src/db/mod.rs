@@ -198,11 +198,11 @@ impl ThreadedDatabase for Database {
         let mut spec = bson::Document::new();
         let mut cursor = bson::Document::new();
 
-        cursor.insert("batchSize".to_owned(), Bson::I32(batch_size));
-        spec.insert("listCollections".to_owned(), Bson::I32(1));
-        spec.insert("cursor".to_owned(), Bson::Document(cursor));
+        cursor.insert("batchSize", Bson::I32(batch_size));
+        spec.insert("listCollections", Bson::I32(1));
+        spec.insert("cursor", Bson::Document(cursor));
         if filter.is_some() {
-            spec.insert("filter".to_owned(), Bson::Document(filter.unwrap()));
+            spec.insert("filter", Bson::Document(filter.unwrap()));
         }
 
         self.command_cursor(spec, CommandType::ListCollections, self.read_preference.to_owned())
@@ -232,17 +232,17 @@ impl ThreadedDatabase for Database {
         };
 
         if let Some(i) = coll_options.size {
-            doc.insert("size".to_owned(), Bson::I64(i));
+            doc.insert("size", Bson::I64(i));
         }
 
         if let Some(i) = coll_options.max {
-            doc.insert("max".to_owned(), Bson::I64(i));
+            doc.insert("max", Bson::I64(i));
         }
 
         let flag_one = if coll_options.use_power_of_two_sizes { 1 } else { 0 };
         let flag_two = if coll_options.no_padding { 2 } else { 0 };
 
-        doc.insert("flags".to_owned(), Bson::I32(flag_one + flag_two));
+        doc.insert("flags", Bson::I32(flag_one + flag_two));
 
         self.command(doc, CommandType::CreateCollection, None).map(|_| ())
     }
@@ -256,13 +256,13 @@ impl ThreadedDatabase for Database {
         };
 
         if let Some(data) = user_options.custom_data {
-            doc.insert("customData".to_owned(), Bson::Document(data));
+            doc.insert("customData", Bson::Document(data));
         }
 
-        doc.insert("roles".to_owned(), Role::to_bson_array(user_options.roles));
+        doc.insert("roles", Role::to_bson_array(user_options.roles));
 
         if let Some(concern) = user_options.write_concern {
-            doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
+            doc.insert("writeConcern", Bson::Document(concern.to_bson()));
         }
 
         self.command(doc, CommandType::CreateUser, None).map(|_| ())
@@ -272,7 +272,7 @@ impl ThreadedDatabase for Database {
         let mut doc = doc! { "dropAllUsersFromDatabase" => 1 };
 
         if let Some(concern) = write_concern {
-            doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
+            doc.insert("writeConcern", Bson::Document(concern.to_bson()));
         }
 
         let response = try!(self.command(doc, CommandType::DropAllUsers, None));
@@ -286,14 +286,14 @@ impl ThreadedDatabase for Database {
 
     fn drop_collection(&self, name: &str) -> Result<()> {
         let mut spec = bson::Document::new();
-        spec.insert("drop".to_owned(), Bson::String(name.to_owned()));
+        spec.insert("drop", Bson::String(name.to_owned()));
         try!(self.command(spec, CommandType::DropCollection, None));
         Ok(())
     }
 
     fn drop_database(&self) -> Result<()> {
         let mut spec = bson::Document::new();
-        spec.insert("dropDatabase".to_owned(), Bson::I32(1));
+        spec.insert("dropDatabase", Bson::I32(1));
         try!(self.command(spec, CommandType::DropDatabase, None));
         Ok(())
     }
@@ -302,7 +302,7 @@ impl ThreadedDatabase for Database {
         let mut doc = doc! { "dropUser" => name };
 
         if let Some(concern) = write_concern {
-            doc.insert("writeConcern".to_owned(), Bson::Document(concern.to_bson()));
+            doc.insert("writeConcern", Bson::Document(concern.to_bson()));
         }
 
         self.command(doc, CommandType::DropUser, None).map(|_| ())

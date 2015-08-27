@@ -52,12 +52,12 @@ impl ReadPreference {
         let bson_tag_sets: Vec<_> = self.tag_sets.iter().map(|map| {
             let mut bson_map = bson::Document::new();
             for (key, val) in map.iter() {
-                bson_map.insert(key.to_owned(), Bson::String(val.to_owned()));
+                bson_map.insert(&key[..], Bson::String(val.to_owned()));
             }
             Bson::Document(bson_map)
         }).collect();
 
-        doc.insert("tag_sets".to_owned(), Bson::Array(bson_tag_sets));
+        doc.insert("tag_sets", Bson::Array(bson_tag_sets));
         doc
     }
 }
@@ -86,9 +86,9 @@ impl WriteConcern {
 
     pub fn to_bson(&self) -> bson::Document {
         let mut bson = bson::Document::new();
-        bson.insert("w".to_owned(), Bson::I32(self.w));
-        bson.insert("wtimeout".to_owned(), Bson::I32(self.w_timeout));
-        bson.insert("j".to_owned(), Bson::Boolean(self.j));
+        bson.insert("w", Bson::I32(self.w));
+        bson.insert("wtimeout", Bson::I32(self.w_timeout));
+        bson.insert("j", Bson::Boolean(self.j));
         bson
     }
 }

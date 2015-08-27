@@ -25,7 +25,7 @@
 //! let client = Client::with_uri_and_options("mongodb://localhost:27017/", options)
 //!     .ok().expect("Failed to initialize client.");
 //! ```
-//! 
+//!
 //! ## Interacting with MongoDB Collections
 //!
 //! ```no_run
@@ -169,7 +169,7 @@ pub struct ClientOptions {
 
 impl ClientOptions {
     /// Creates a new default options struct.
-    pub fn new() -> ClientOptions {        
+    pub fn new() -> ClientOptions {
         ClientOptions {
             log_file: None,
             read_preference: None,
@@ -320,7 +320,7 @@ impl ThreadedClient for Client {
 
     fn database_names(&self) -> Result<Vec<String>> {
         let mut doc = bson::Document::new();
-        doc.insert("listDatabases".to_owned(), Bson::I32(1));
+        doc.insert("listDatabases", Bson::I32(1));
 
         let db = self.db("admin");
         let res = try!(db.command(doc, CommandType::ListDatabases, None));
@@ -348,7 +348,7 @@ impl ThreadedClient for Client {
 
     fn is_master(&self) -> Result<bool> {
         let mut doc = bson::Document::new();
-        doc.insert("isMaster".to_owned(), Bson::I32(1));
+        doc.insert("isMaster", Bson::I32(1));
 
         let db = self.db("local");
         let res = try!(db.command(doc, CommandType::IsMaster, None));

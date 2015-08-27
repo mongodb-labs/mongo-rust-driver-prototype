@@ -234,7 +234,7 @@ impl Monitor {
         let options = FindOptions::new().with_limit(1);
         let flags = OpQueryFlags::with_find_options(&options);
         let mut filter = bson::Document::new();
-        filter.insert("isMaster".to_owned(), Bson::I32(1));
+        filter.insert("isMaster", Bson::I32(1));
 
         let stream = try!(self.personal_pool.acquire_stream());
 

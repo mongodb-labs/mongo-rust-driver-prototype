@@ -311,57 +311,57 @@ impl IndexModel {
     /// Converts the model to its BSON document representation.
     pub fn to_bson(&self) -> Result<bson::Document> {
         let mut doc = bson::Document::new();
-        doc.insert("key".to_owned(), Bson::Document(self.keys.clone()));
+        doc.insert("key", Bson::Document(self.keys.clone()));
 
         if let Some(ref val) = self.options.background {
-            doc.insert("background".to_owned(), Bson::Boolean(*val));
+            doc.insert("background", Bson::Boolean(*val));
         }
         if let Some(ref val) = self.options.expire_after_seconds {
-            doc.insert("expireAfterSeconds".to_owned(), Bson::I32(*val));
+            doc.insert("expireAfterSeconds", Bson::I32(*val));
         }
         if let Some(ref val) = self.options.name {
-            doc.insert("name".to_owned(), Bson::String(val.to_owned()));
+            doc.insert("name", Bson::String(val.to_owned()));
         } else {
-            doc.insert("name".to_owned(), Bson::String(try!(self.generate_index_name())));
+            doc.insert("name", Bson::String(try!(self.generate_index_name())));
         }
         if let Some(ref val) = self.options.sparse {
-            doc.insert("sparse".to_owned(), Bson::Boolean(*val));
+            doc.insert("sparse", Bson::Boolean(*val));
         }
         if let Some(ref val) = self.options.storage_engine {
-            doc.insert("storageEngine".to_owned(), Bson::String(val.to_owned()));
+            doc.insert("storageEngine", Bson::String(val.to_owned()));
         }
         if let Some(ref val) = self.options.unique {
-            doc.insert("unique".to_owned(), Bson::Boolean(*val));
+            doc.insert("unique", Bson::Boolean(*val));
         }
         if let Some(ref val) = self.options.version {
-            doc.insert("v".to_owned(), Bson::I32(*val));
+            doc.insert("v", Bson::I32(*val));
         }
         if let Some(ref val) = self.options.default_language {
-            doc.insert("default_language".to_owned(), Bson::String(val.to_owned()));
+            doc.insert("default_language", Bson::String(val.to_owned()));
         }
         if let Some(ref val) = self.options.language_override {
-            doc.insert("language_override".to_owned(), Bson::String(val.to_owned()));
+            doc.insert("language_override", Bson::String(val.to_owned()));
         }
         if let Some(ref val) = self.options.text_version {
-            doc.insert("textIndexVersion".to_owned(), Bson::I32(*val));
+            doc.insert("textIndexVersion", Bson::I32(*val));
         }
         if let Some(ref val) = self.options.weights {
-            doc.insert("weights".to_owned(), Bson::Document(val.clone()));
+            doc.insert("weights", Bson::Document(val.clone()));
         }
         if let Some(ref val) = self.options.sphere_version {
-            doc.insert("2dsphereIndexVersion".to_owned(), Bson::I32(*val));
+            doc.insert("2dsphereIndexVersion", Bson::I32(*val));
         }
         if let Some(ref val) = self.options.bits {
-            doc.insert("bits".to_owned(), Bson::I32(*val));
+            doc.insert("bits", Bson::I32(*val));
         }
         if let Some(ref val) = self.options.max {
-            doc.insert("max".to_owned(), Bson::FloatingPoint(*val));
+            doc.insert("max", Bson::FloatingPoint(*val));
         }
         if let Some(ref val) = self.options.min {
-            doc.insert("min".to_owned(), Bson::FloatingPoint(*val));
+            doc.insert("min", Bson::FloatingPoint(*val));
         }
         if let Some(ref val) = self.options.bucket_size {
-            doc.insert("bucketSize".to_owned(), Bson::I32(*val));
+            doc.insert("bucketSize", Bson::I32(*val));
         }
 
         Ok(doc)
