@@ -101,6 +101,7 @@ extern crate scan_fmt;
 extern crate separator;
 extern crate textnonce;
 extern crate time;
+extern crate bufstream;
 
 pub mod db;
 pub mod coll;

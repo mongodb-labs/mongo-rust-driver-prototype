@@ -229,8 +229,8 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an Error on failure.
-    fn write_bson_document(buffer: &mut Write,
-                           bson: &bson::Document) -> Result<()>{
+    fn write_bson_document<W: Write>(buffer: &mut W,
+                                     bson: &bson::Document) -> Result<()>{
         let mut temp_buffer = vec![];
 
         try!(bson::encode_document(&mut temp_buffer, bson));
@@ -253,9 +253,9 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an Error on failure.
-    pub fn write_update(buffer: &mut Write, header: &Header, namespace: &str,
-                        flags: &OpUpdateFlags, selector: &bson::Document,
-                        update: &bson::Document) -> Result<()> {
+    pub fn write_update<W: Write>(buffer: &mut W, header: &Header, namespace: &str,
+                                  flags: &OpUpdateFlags, selector: &bson::Document,
+                                  update: &bson::Document) -> Result<()> {
 
         try!(header.write(buffer));
 
@@ -292,8 +292,8 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an Error on failure.
-    fn write_insert(buffer: &mut Write, header: &Header, flags: &OpInsertFlags,
-                    namespace: &str, documents: &[bson::Document]) -> Result<()> {
+    fn write_insert<W: Write>(buffer: &mut W, header: &Header, flags: &OpInsertFlags,
+                              namespace: &str, documents: &[bson::Document]) -> Result<()> {
 
         try!(header.write(buffer));
         try!(buffer.write_i32::<LittleEndian>(flags.to_i32()));
@@ -334,11 +334,11 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an Error on failure.
-    fn write_query(buffer: &mut Write, header: &Header,
-                   flags: &OpQueryFlags, namespace: &str,
-                   number_to_skip: i32, number_to_return: i32,
-                   query: &bson::Document,
-                   return_field_selector: &Option<bson::Document>) -> Result<()> {
+    fn write_query<W: Write>(buffer: &mut W, header: &Header,
+                             flags: &OpQueryFlags, namespace: &str,
+                             number_to_skip: i32, number_to_return: i32,
+                             query: &bson::Document,
+                             return_field_selector: &Option<bson::Document>) -> Result<()> {
 
         try!(header.write(buffer));
         try!(buffer.write_i32::<LittleEndian>(flags.to_i32()));
@@ -378,8 +378,8 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an Error on failure.
-    pub fn write_get_more(buffer: &mut Write, header: &Header, namespace: &str,
-                          number_to_return: i32, cursor_id: i64) -> Result<()> {
+    pub fn write_get_more<W: Write>(buffer: &mut W, header: &Header, namespace: &str,
+                                    number_to_return: i32, cursor_id: i64) -> Result<()> {
 
         try!(header.write(buffer));
 
@@ -409,7 +409,7 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an error string on failure.
-    pub fn write(&self, buffer: &mut Write) -> Result<()> {
+    pub fn write<W: Write>(&self, buffer: &mut W) -> Result<()> {
         match self {
             /// Only the server should send replies
             &Message::OpReply {..} =>
@@ -445,7 +445,7 @@ impl Message {
     /// # Return value
     ///
     /// Returns the reply message on success, or an Error on failure.
-    fn read_reply(buffer: &mut Read, header: Header) -> Result<Message> {
+    fn read_reply<R: Read>(buffer: &mut R, header: Header) -> Result<Message> {
         let mut length = header.message_length - mem::size_of::<Header>() as i32;
 
         // Read flags

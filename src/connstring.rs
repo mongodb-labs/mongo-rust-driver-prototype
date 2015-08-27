@@ -105,7 +105,7 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
     // Remove scheme
     let addr = &address[URI_SCHEME.len()..];
 
-    let mut hosts: Vec<Host>;
+    let hosts: Vec<Host>;
     let mut user: Option<String> = None;
     let mut password: Option<String> = None;
     let mut database: Option<String> = Some("test".to_owned());
