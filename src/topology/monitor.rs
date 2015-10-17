@@ -84,9 +84,9 @@ impl IsMasterResult {
     /// Parses an isMaster response document from the server.
     pub fn new(doc: bson::Document) -> Result<IsMasterResult> {
         let ok = match doc.get("ok") {
-            Some(&Bson::I32(v)) => if v == 0 { false } else { true },
-            Some(&Bson::I64(v)) => if v == 0 { false } else { true },
-            Some(&Bson::FloatingPoint(v)) => if v == 0.0 { false } else { true },
+            Some(&Bson::I32(v)) => v != 0,
+            Some(&Bson::I64(v)) => v != 0,
+            Some(&Bson::FloatingPoint(v)) => v != 0.0,
             _ => return Err(ArgumentError("result does not contain `ok`.".to_owned())),
         };
 

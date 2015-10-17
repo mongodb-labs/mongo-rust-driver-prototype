@@ -735,7 +735,7 @@ impl Collection {
         let mut names = Vec::with_capacity(models.len());
         let mut indexes = Vec::with_capacity(models.len());
 
-        for model in models.iter() {
+        for model in models {
             names.push(try!(model.name()));
             indexes.push(Bson::Document(try!(model.to_bson())));
         }
@@ -746,7 +746,7 @@ impl Collection {
         let result = try!(self.db.command(cmd, CommandType::CreateIndexes, None));
 
         match result.get("errmsg") {
-            Some(&Bson::String(ref msg)) => return Err(OperationError(msg.to_owned())),
+            Some(&Bson::String(ref msg)) => Err(OperationError(msg.to_owned())),
             _ => Ok(names),
         }
     }
@@ -774,7 +774,7 @@ impl Collection {
 
         let result = try!(self.db.command(cmd, CommandType::DropIndexes, None));
         match result.get("errmsg") {
-            Some(&Bson::String(ref msg)) => return Err(OperationError(msg.to_owned())),
+            Some(&Bson::String(ref msg)) => Err(OperationError(msg.to_owned())),
             _ => Ok(()),
         }
     }

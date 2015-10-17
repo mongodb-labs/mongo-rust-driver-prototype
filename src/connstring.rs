@@ -37,7 +37,7 @@ impl Host {
     }
 
     pub fn has_ipc(&self) -> bool {
-        self.ipc.len() > 0
+        !self.ipc.is_empty()
     }
 }
 

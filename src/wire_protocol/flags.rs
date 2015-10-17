@@ -134,7 +134,7 @@ impl OpQueryFlags {
     /// # Return value
     ///
     /// Returns the newly created OpQueryFlags struct.
-    pub fn with_find_options<'a>(options: &'a FindOptions) -> OpQueryFlags {
+    pub fn with_find_options(options: &FindOptions) -> OpQueryFlags {
         OpQueryFlags {
             tailable_cursor: options.cursor_type != CursorType::NonTailable,
             slave_ok: false,
