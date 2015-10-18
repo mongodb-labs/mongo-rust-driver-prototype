@@ -376,9 +376,9 @@ impl InsertManyOptions {
 
 impl ReturnDocument {
     pub fn to_bool(&self) -> bool {
-        match self {
-            &ReturnDocument::Before => false,
-            &ReturnDocument::After => true,
+        match *self {
+            ReturnDocument::Before => false,
+            ReturnDocument::After => true,
         }
     }
 }

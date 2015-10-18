@@ -171,7 +171,7 @@ impl TopologyDescription {
 
         // If no servers are available, request an update from all monitors.
         if hosts.is_empty() {
-            for (_, server) in self.servers.iter() {
+            for (_, server) in &self.servers {
                 server.request_update();
             }
         }
@@ -227,7 +227,7 @@ impl TopologyDescription {
 
         // If no servers are available, request an update from all monitors.
         if hosts.is_empty() {
-            for (_, server) in self.servers.iter() {
+            for (_, server) in &self.servers {
                 server.request_update();
             }
         }
@@ -248,7 +248,7 @@ impl TopologyDescription {
         }
 
         // Set the tag_filter to the first tag set that matches at least one server in the set.
-        for tags in read_preference.tag_sets.iter() {
+        for tags in &read_preference.tag_sets {
             for ref host in hosts.iter() {
                 if let Some(server) = self.servers.get(host) {
                     let description = server.description.read().unwrap();
@@ -423,7 +423,7 @@ impl TopologyDescription {
                 let mut secondaries = Vec::new();
 
                 // Collect a list of primaries and secondaries in the set
-                for (host, server) in self.servers.iter() {
+                for (host, server) in &self.servers {
                     let stype = server.description.read().unwrap().server_type;
                     match stype {
                         ServerType::RSPrimary => primaries.push(host.clone()),
@@ -517,7 +517,7 @@ impl TopologyDescription {
 
     // Sets the correct replica set topology type.
     fn check_if_has_primary(&mut self) {
-        for (_, server) in self.servers.iter() {
+        for (_, server) in &self.servers {
             let stype = server.description.read().unwrap().server_type;
             if stype == ServerType::RSPrimary {
                 self.topology_type = TopologyType::ReplicaSetWithPrimary;
@@ -579,7 +579,7 @@ impl TopologyDescription {
         }
 
         // Invalidate any old primaries
-        for (top_host, server) in self.servers.iter() {
+        for (top_host, server) in &self.servers {
             if *top_host != host {
                 let mut server_description = server.description.write().unwrap();
                 if server_description.server_type == ServerType::RSPrimary {
@@ -594,7 +594,7 @@ impl TopologyDescription {
 
         // Remove hosts that are not reported by the primary.
         let mut hosts_to_remove = Vec::new();
-        for (host, _) in self.servers.iter() {
+        for (host, _) in &self.servers {
             if !description.hosts.contains(&host) &&
                 !description.passives.contains(&host) &&
                 !description.arbiters.contains(&host) {
@@ -660,21 +660,21 @@ impl TopologyDescription {
     fn add_missing_hosts(&mut self, description: &ServerDescription, client: Client,
                          top_arc: Arc<RwLock<TopologyDescription>>, run_monitor: bool) {
 
-        for host in description.hosts.iter() {
+        for host in &description.hosts {
             if !self.servers.contains_key(host) {
                 let server = Server::new(client.clone(), host.clone(), top_arc.clone(), run_monitor);
                 self.servers.insert(host.clone(), server);
             }
         }
 
-        for host in description.passives.iter() {
+        for host in &description.passives {
             if !self.servers.contains_key(host) {
                 let server = Server::new(client.clone(), host.clone(), top_arc.clone(), run_monitor);
                 self.servers.insert(host.clone(), server);
             }
         }
 
-        for host in description.arbiters.iter() {
+        for host in &description.arbiters {
             if !self.servers.contains_key(host) {
                 let server = Server::new(client.clone(), host.clone(), top_arc.clone(), run_monitor);
                 self.servers.insert(host.clone(), server);

@@ -70,8 +70,8 @@ impl error::Error for BulkWriteException {
 
 impl fmt::Display for WriteException {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        let ref wc_err = self.write_concern_error;
-        let ref w_err = self.write_error;
+        let wc_err = &self.write_concern_error;
+        let w_err = &self.write_error;
 
         try!(write!(fmt, "WriteException:\n"));
         if wc_err.is_some() {
@@ -286,15 +286,15 @@ impl BulkWriteException {
             }
         };
 
-        for req in exception.processed_requests.iter() {
+        for req in &exception.processed_requests {
             self.processed_requests.push(req.clone());
         }
 
-        for req in exception.unprocessed_requests.iter() {
+        for req in &exception.unprocessed_requests {
             self.unprocessed_requests.push(req.clone());
         }
 
-        for err in exception.write_errors.iter() {
+        for err in &exception.write_errors {
             self.write_errors.push(err.clone());
         }
 

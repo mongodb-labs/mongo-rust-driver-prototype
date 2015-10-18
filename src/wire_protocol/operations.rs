@@ -153,7 +153,7 @@ impl Message {
 
         let mut total_length = header_length + flags_length + string_length;
 
-        for doc in documents.iter() {
+        for doc in &documents {
             total_length += try!(doc.byte_length());
         }
 
@@ -354,9 +354,9 @@ impl Message {
         try!(buffer.write_i32::<LittleEndian>(number_to_return));
         try!(Message::write_bson_document(buffer, query));
 
-        match return_field_selector {
-            &Some(ref doc) => try!(Message::write_bson_document(buffer, doc)),
-            &None => (),
+        match *return_field_selector {
+            Some(ref doc) => try!(Message::write_bson_document(buffer, doc)),
+            None => (),
         };
 
         let _ = buffer.flush();
@@ -410,27 +410,27 @@ impl Message {
     ///
     /// Returns nothing on success, or an error string on failure.
     pub fn write<W: Write>(&self, buffer: &mut W) -> Result<()> {
-        match self {
+        match *self {
             /// Only the server should send replies
-            &Message::OpReply {..} =>
+            Message::OpReply {..} =>
                 Err(ArgumentError("OP_REPLY should not be sent to the client.".to_owned())),
-            &Message::OpUpdate { ref header, ref namespace,
-                                 ref flags, ref selector, ref update } =>
+            Message::OpUpdate { ref header, ref namespace,
+                                ref flags, ref selector, ref update } =>
                 Message::write_update(buffer, &header,&namespace,
                                       &flags, &selector, &update),
-            &Message::OpInsert { ref header, ref flags,
-                                 ref namespace, ref documents } =>
+            Message::OpInsert { ref header, ref flags,
+                                ref namespace, ref documents } =>
                 Message::write_insert(buffer, &header, &flags,
                                       &namespace, &documents),
-            &Message::OpQuery { ref header, ref flags, ref namespace,
-                                number_to_skip, number_to_return, ref query,
-                                ref return_field_selector } =>
+            Message::OpQuery { ref header, ref flags, ref namespace,
+                               number_to_skip, number_to_return, ref query,
+                               ref return_field_selector } =>
                 Message::write_query(buffer, &header, &flags,
                                      &namespace, number_to_skip,
                                      number_to_return, &query,
                                      &return_field_selector),
-            &Message::OpGetMore { ref header, ref namespace,
-                                  number_to_return, cursor_id } =>
+            Message::OpGetMore { ref header, ref namespace,
+                                 number_to_return, cursor_id } =>
                 Message::write_get_more(buffer, &header, &namespace,
                                         number_to_return, cursor_id)
         }

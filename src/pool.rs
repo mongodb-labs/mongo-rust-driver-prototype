@@ -51,7 +51,7 @@ pub struct PooledStream {
 
 impl PooledStream {
     /// Returns a reference to the socket.
-    pub fn get_socket<'a>(&'a mut self) -> &'a mut BufStream<TcpStream> {
+    pub fn get_socket(&mut self) -> &mut BufStream<TcpStream> {
         self.socket.as_mut().unwrap()
     }
 }
@@ -152,7 +152,7 @@ impl ConnectionPool {
 
     // Connects to a MongoDB server as defined by the initial configuration.
     fn connect(&self) -> Result<BufStream<TcpStream>> {
-        let ref host_name = self.host.host_name;
+        let host_name = &self.host.host_name;
         let port = self.host.port;
         let stream = BufStream::new(try!(TcpStream::connect((&host_name[..], port))));
         Ok(stream)

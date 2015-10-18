@@ -148,7 +148,7 @@ impl Cursor {
             return Err(Error::CursorNotFoundError);
         }
 
-        let ref doc = v[0];
+        let doc = &v[0];
 
         // Extract cursor information
         if let Some(&Bson::Document(ref cursor)) = doc.get("cursor") {

@@ -76,10 +76,10 @@ impl From<WriteModel> for Batch {
 
 impl Batch {
     pub fn len(&self) -> i64 {
-        let length = match self {
-            &Batch::Insert(ref v) => v.len(),
-            &Batch::Delete(ref v) => v.len(),
-            &Batch::Update(ref v) => v.len(),
+        let length = match *self {
+            Batch::Insert(ref v) => v.len(),
+            Batch::Delete(ref v) => v.len(),
+            Batch::Update(ref v) => v.len(),
         };
 
         length as i64

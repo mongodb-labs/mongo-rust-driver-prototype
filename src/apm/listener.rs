@@ -6,11 +6,14 @@ use apm::event::{CommandStarted, CommandResult};
 use Client;
 use error::{Error, Result};
 
+pub type StartHook = fn(Client, &CommandStarted);
+pub type CompletionHook = fn(Client, &CommandResult);
+
 pub struct Listener {
     no_start_hooks: AtomicBool,
     no_completion_hooks: AtomicBool,
-    start_hooks: RwLock<Vec<fn(Client, &CommandStarted)>>,
-    completion_hooks: RwLock<Vec<fn(Client, &CommandResult)>>,
+    start_hooks: RwLock<Vec<StartHook>>,
+    completion_hooks: RwLock<Vec<CompletionHook>>,
 }
 
 impl Listener {
@@ -20,7 +23,7 @@ impl Listener {
                    start_hooks: RwLock::new(vec![]), completion_hooks: RwLock::new(vec![]) }
     }
 
-    pub fn add_start_hook(&self, hook: fn(Client, &CommandStarted)) -> Result<()> {
+    pub fn add_start_hook(&self, hook: StartHook) -> Result<()> {
         let mut guard = match self.start_hooks.write() {
             Ok(guard) => guard,
             Err(_) => return Err(Error::PoisonLockError)
@@ -30,7 +33,7 @@ impl Listener {
         Ok(guard.deref_mut().push(hook))
     }
 
-    pub fn add_completion_hook(&self, hook: fn(Client, &CommandResult)) -> Result<()> {
+    pub fn add_completion_hook(&self, hook: CompletionHook) -> Result<()> {
         let mut guard = match self.completion_hooks.write() {
             Ok(guard) => guard,
             Err(_) => return Err(Error::PoisonLockError)

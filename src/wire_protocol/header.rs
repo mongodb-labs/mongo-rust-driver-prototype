@@ -41,12 +41,12 @@ impl OpCode {
 
 impl fmt::Display for OpCode {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &OpCode::Reply => write!(fmt, "OP_REPLY"),
-            &OpCode::Update => write!(fmt, "OP_UPDATE"),
-            &OpCode::Insert => write!(fmt, "OP_INSERT"),
-            &OpCode::Query => write!(fmt, "OP_QUERY"),
-            &OpCode::GetMore => write!(fmt, "OP_GET_MORE"),
+        match *self {
+            OpCode::Reply => write!(fmt, "OP_REPLY"),
+            OpCode::Update => write!(fmt, "OP_UPDATE"),
+            OpCode::Insert => write!(fmt, "OP_INSERT"),
+            OpCode::Query => write!(fmt, "OP_QUERY"),
+            OpCode::GetMore => write!(fmt, "OP_GET_MORE"),
         }
     }
 }

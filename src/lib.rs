@@ -204,7 +204,7 @@ pub trait ThreadedClient: Sync + Sized {
     fn with_config(config: ConnectionString, options: Option<ClientOptions>,
                    description: Option<TopologyDescription>) -> Result<Self>;
     /// Creates a database representation.
-    fn db<'a>(&'a self, db_name: &str) -> Database;
+    fn db(&self, db_name: &str) -> Database;
     /// Creates a database representation with custom read and write controls.
     fn db_with_prefs(&self, db_name: &str, read_preference: Option<ReadPreference>,
                      write_concern: Option<WriteConcern>) -> Database;
@@ -282,13 +282,13 @@ impl ThreadedClient for Client {
 
         // Fill servers array and set options
         {
-            let ref top_description = client.topology.description;
+            let top_description = &client.topology.description;
             let mut top = try!(top_description.write());
             top.heartbeat_frequency_ms = client_options.heartbeat_frequency_ms;
             top.server_selection_timeout_ms = client_options.server_selection_timeout_ms;
             top.local_threshold_ms = client_options.local_threshold_ms;
 
-            for host in config.hosts.iter() {
+            for host in &config.hosts {
                 let server = Server::new(client.clone(), host.clone(), top_description.clone(), true);
                 top.servers.insert(host.clone(), server);
             }

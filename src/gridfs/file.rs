@@ -100,13 +100,13 @@ struct CachedChunk {
 impl Deref for File {
     type Target = GfsFile;
 
-    fn deref<'a>(&'a self) -> &'a Self::Target {
+    fn deref(&self) -> &Self::Target {
         &self.doc
     }
 }
 
 impl DerefMut for File {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut Self::Target {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.doc
     }
 }
@@ -151,13 +151,18 @@ impl File {
         self.len
     }
 
+    /// Returns true if the file contains no bytes.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     /// Retrieves the description of the threaded error, if one occurred.
     pub fn err_description(&self) -> Result<Option<String>> {
         let err = try!(self.err.read());
-        let ref inner = err.deref().inner;
-        let description = match inner {
-            &Some(ref err) => Some(err.description().to_owned()),
-            &None => None
+        let inner = &err.deref().inner;
+        let description = match *inner {
+            Some(ref err) => Some(err.description().to_owned()),
+            None => None
         };
         Ok(description)
     }
@@ -364,7 +369,7 @@ impl io::Write for File {
         }
 
         // Otherwise, form a chunk with the current buffer + data and flush to GridFS.
-        if self.wbuf.len() > 0 {
+        if !self.wbuf.is_empty() {
 
             // Split data
             let missing = cmp::min(chunk_size - self.wbuf.len(), data.len());
@@ -431,7 +436,7 @@ impl io::Write for File {
 
         // Store unfinished chunk to local buffer and return.
         self.wbuf.extend(data.iter().cloned());
-        return Ok(n)
+        Ok(n)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -444,7 +449,7 @@ impl io::Write for File {
         };
 
         // Flush local buffer to GridFS
-        if self.wbuf.len() > 0  && try!(self.err_description()).is_none() {
+        if !self.wbuf.is_empty()  && try!(self.err_description()).is_none() {
             let chunk_num = self.chunk_num;
             self.chunk_num += 1;
             self.wsum.input(&self.wbuf);

@@ -19,18 +19,18 @@ pub enum SingleDatabaseRole {
 
 impl ToString for SingleDatabaseRole {
     fn to_string(&self) -> String {
-        let string = match self {
-            &SingleDatabaseRole::Read => "read",
-            &SingleDatabaseRole::ReadWrite => "readWrite",
-            &SingleDatabaseRole::DbAdmin => "dbAdmin",
-            &SingleDatabaseRole::DbOwner => "dbOwner",
-            &SingleDatabaseRole::UserAdmin => "userAdmin",
-            &SingleDatabaseRole::ClusterAdmin => "clusterAdmin",
-            &SingleDatabaseRole::ClusterManager => "clusterManager",
-            &SingleDatabaseRole::ClusterMonitor => "clusterMonitor",
-            &SingleDatabaseRole::HostManager => "hostManager",
-            &SingleDatabaseRole::Backup => "backup",
-            &SingleDatabaseRole::Restore => "restore",
+        let string = match *self {
+            SingleDatabaseRole::Read => "read",
+            SingleDatabaseRole::ReadWrite => "readWrite",
+            SingleDatabaseRole::DbAdmin => "dbAdmin",
+            SingleDatabaseRole::DbOwner => "dbOwner",
+            SingleDatabaseRole::UserAdmin => "userAdmin",
+            SingleDatabaseRole::ClusterAdmin => "clusterAdmin",
+            SingleDatabaseRole::ClusterManager => "clusterManager",
+            SingleDatabaseRole::ClusterMonitor => "clusterMonitor",
+            SingleDatabaseRole::HostManager => "hostManager",
+            SingleDatabaseRole::Backup => "backup",
+            SingleDatabaseRole::Restore => "restore",
         };
 
         string.to_owned()
@@ -46,11 +46,11 @@ pub enum AllDatabaseRole {
 
 impl ToString for AllDatabaseRole {
     fn to_string(&self) -> String {
-        let string = match self {
-            &AllDatabaseRole::Read => "read",
-            &AllDatabaseRole::ReadWrite => "readWrite",
-            &AllDatabaseRole::UserAdmin => "userAdmin",
-            &AllDatabaseRole::DbAdmin => "dbAdmin",
+        let string = match *self {
+            AllDatabaseRole::Read => "read",
+            AllDatabaseRole::ReadWrite => "readWrite",
+            AllDatabaseRole::UserAdmin => "userAdmin",
+            AllDatabaseRole::DbAdmin => "dbAdmin",
         };
 
         string.to_owned()
@@ -67,9 +67,9 @@ pub enum Role {
 
 impl Role {
     fn to_bson(&self) -> Bson {
-        match self {
-            &Role::All(ref role) => Bson::String(role.to_string()),
-            &Role::Single { ref role, ref db } => Bson::Document(doc! {
+        match *self {
+            Role::All(ref role) => Bson::String(role.to_string()),
+            Role::Single { ref role, ref db } => Bson::Document(doc! {
                 "role" => (Bson::String(role.to_string())),
                 "db" => (Bson::String(db.to_owned()))
             })
