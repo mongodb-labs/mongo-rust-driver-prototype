@@ -1,4 +1,6 @@
-![Travis](https://travis-ci.org/mongodbinc-interns/mongo-rust-driver-prototype.svg)
+[![Travis](https://travis-ci.org/mongodb-labs/mongo-rust-driver-prototype.svg)](https://travis-ci.org/mongodb-labs/mongo-rust-driver-prototype)
+[![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 MongoDB Rust Driver Prototype
 =============================
@@ -68,4 +70,4 @@ fn main() {
 ```
 
 ## Documentation
-Documentation is built using Cargo. Generated documentation using ```cargo doc``` can be found under the _target/doc/_ folder.
+Documentation is built using Cargo. The latest documentation can be found [here](https://mongodb-labs.github.io/mongo-rust-driver-prototype/mongodb). Generated documentation using ```cargo doc``` can be found under the _target/doc/_ folder.
