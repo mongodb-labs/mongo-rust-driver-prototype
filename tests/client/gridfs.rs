@@ -17,8 +17,8 @@ fn init_gridfs(name: &str) -> (Store, Collection, Collection) {
 
     let fsfiles = db.collection("fs.files");
     let fschunks = db.collection("fs.chunks");
-    fsfiles.drop().ok().expect("Failed to drop files collection.");
-    fschunks.drop().ok().expect("Failed to drop chunks collection.");
+    fsfiles.drop().expect("Failed to drop files collection.");
+    fschunks.drop().expect("Failed to drop chunks collection.");
     (fs, fsfiles, fschunks)
 }
 
@@ -56,7 +56,7 @@ fn put_get() {
     // Check chunks
     let mut cursor = fschunks.find(Some(doc!{"files_id" => (id.clone())}), Some(opts)).unwrap();
 
-    let chunks = cursor.next_batch().ok().expect("Failed to get next batch");
+    let chunks = cursor.next_batch().expect("Failed to get next batch");
     assert_eq!(3, chunks.len());
 
     for i in 0..3 {
@@ -82,7 +82,7 @@ fn put_get() {
     let mut cursor = fschunks.list_indexes().unwrap();
     let results = cursor.next_n(10).unwrap();
     assert_eq!(2, results.len());
-    
+
     // Get
     let mut dest = Vec::with_capacity(src_len);
     unsafe { dest.set_len(src_len) };
