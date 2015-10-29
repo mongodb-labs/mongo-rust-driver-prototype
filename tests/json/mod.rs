@@ -12,6 +12,6 @@ pub trait FromJson {
     fn from_json(object: &Object) -> Self;
 }
 
-pub trait FromJsonResult {
+pub trait FromJsonResult: Sized {
     fn from_json(object: &Object) -> Result<Self, String>;
 }

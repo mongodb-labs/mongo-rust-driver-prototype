@@ -51,7 +51,7 @@ fn get_phases(object: &Object) -> Result<Vec<Phase>, String> {
     Ok(phases)
 }
 
-pub trait SuiteContainer {
+pub trait SuiteContainer: Sized {
     fn from_file(path: &str) -> Result<Self, String>;
     fn get_suite(&self) -> Result<Suite, String>;
 }
