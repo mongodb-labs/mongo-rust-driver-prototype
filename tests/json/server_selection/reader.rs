@@ -35,7 +35,7 @@ fn get_server_array(arr: &Vec<Json>) -> Result<Vec<Server>, String> {
     Ok(servers)
 }
 
-pub trait SuiteContainer {
+pub trait SuiteContainer: Sized {
     fn from_file(path: &str) -> Result<Self, String>;
     fn get_suite(&self) -> Result<Suite, String>;
 }

@@ -173,7 +173,7 @@ fn read_pref_tags() {
             let options = connstr.options.unwrap();
             assert_eq!(options.read_pref_tags.len(), prefs.len());
 
-            for i in (0..prefs.len()-1) {
+            for i in 0..prefs.len()-1 {
                 assert_eq!(prefs[i], options.read_pref_tags[i]);
             }
         }
