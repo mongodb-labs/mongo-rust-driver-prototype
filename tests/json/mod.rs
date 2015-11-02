@@ -8,10 +8,10 @@ pub mod server_selection;
 
 use rustc_serialize::json::Object;
 
-pub trait FromJson {
+pub trait FromJson: Sized {
     fn from_json(object: &Object) -> Self;
 }
 
-pub trait FromJsonResult {
+pub trait FromJsonResult: Sized {
     fn from_json(object: &Object) -> Result<Self, String>;
 }
