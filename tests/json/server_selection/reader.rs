@@ -42,8 +42,8 @@ pub trait SuiteContainer: Sized {
 
 impl SuiteContainer for Json {
     fn from_file(path: &str) -> Result<Json, String> {
-        let mut file = File::open(path).ok().expect(&format!("Unable to open file: {}", path));
-        Ok(Json::from_reader(&mut file).ok().expect(&format!("Invalid JSON file: {}", path)))
+        let mut file = File::open(path).expect(&format!("Unable to open file: {}", path));
+        Ok(Json::from_reader(&mut file).expect(&format!("Invalid JSON file: {}", path)))
     }
 
     fn get_suite(&self) -> Result<Suite, String> {

@@ -11,7 +11,7 @@ fn find_sorted() {
     let db = client.db("test");
     let coll = db.collection("find_sorted");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert document
     let doc1 = doc! { "title" => "Jaws" };
@@ -19,14 +19,14 @@ fn find_sorted() {
     let doc3 = doc! { "title" => "Dobby" };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
-        .ok().expect("Failed to insert documents.");
+        .expect("Failed to insert documents.");
 
     // Find document
     let mut opts = FindOptions::new();
     opts.sort = Some(doc! { "title" => 1 });
 
-    let mut cursor = coll.find(None, Some(opts)).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(3).ok().expect("Failed to retrieve documents.");
+    let mut cursor = coll.find(None, Some(opts)).expect("Failed to execute find command.");
+    let results = cursor.next_n(3).expect("Failed to retrieve documents.");
 
     // Assert expected titles of documents
     match results[0].get("title") {
@@ -54,14 +54,14 @@ fn find_and_insert() {
     let db = client.db("test");
     let coll = db.collection("find_and_insert");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert document
     let doc = doc! { "title" => "Jaws" };
-    coll.insert_one(doc, None).ok().expect("Failed to insert document");
+    coll.insert_one(doc, None).expect("Failed to insert document");
 
     // Find document
-    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let mut cursor = coll.find(None, None).expect("Failed to execute find command.");
     let result = match cursor.next() {
         Some(Ok(res)) => res,
         Some(Err(_)) => panic!("Received error from 'cursor.next()'."),
@@ -83,14 +83,14 @@ fn find_and_insert_one() {
     let db = client.db("test");
     let coll = db.collection("find_and_insert");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert document
     let doc = doc! { "title" => "Jaws" };
-    coll.insert_one(doc, None).ok().expect("Failed to insert document");
+    coll.insert_one(doc, None).expect("Failed to insert document");
 
     // Find single document
-    let result = coll.find_one(None, None).ok().expect("Failed to execute find command.");
+    let result = coll.find_one(None, None).expect("Failed to execute find command.");
     assert!(result.is_some());
 
     // Assert expected title of document
@@ -106,18 +106,18 @@ fn find_one_and_delete() {
     let db = client.db("test");
     let coll = db.collection("find_one_and_delete");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
     let doc2 = doc! { "title" => "Back to the Future" };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone()], None)
-        .ok().expect("Failed to insert documents.");
+        .expect("Failed to insert documents.");
 
     // Find and Delete document
     let result = coll.find_one_and_delete(doc2.clone(), None)
-        .ok().expect("Failed to execute find_one_and_delete command.");
+        .expect("Failed to execute find_one_and_delete command.");
 
     match result.unwrap().get("title") {
         Some(&Bson::String(ref title)) => assert_eq!("Back to the Future", title),
@@ -125,7 +125,7 @@ fn find_one_and_delete() {
     }
 
     // Validate state of collection
-    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
+    let mut cursor = coll.find(None, None).expect("Failed to execute find command.");
     let result = match cursor.next() {
         Some(Ok(res)) => res,
         Some(Err(_)) => panic!("Received error from 'cursor.next()'."),
@@ -146,7 +146,7 @@ fn find_one_and_replace() {
     let db = client.db("test");
     let coll = db.collection("find_one_and_replace");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -154,11 +154,11 @@ fn find_one_and_replace() {
     let doc3 = doc! { "title" => "12 Angry Men" };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
-        .ok().expect("Failed to insert documents into collection.");
+        .expect("Failed to insert documents into collection.");
 
     // Replace single document
     let result = coll.find_one_and_replace(doc2.clone(), doc3.clone(), None)
-        .ok().expect("Failed to execute find_one_and_replace command.");
+        .expect("Failed to execute find_one_and_replace command.");
 
     match result.unwrap().get("title") {
         Some(&Bson::String(ref title)) => assert_eq!("Back to the Future", title),
@@ -166,8 +166,8 @@ fn find_one_and_replace() {
     }
 
     // Validate state of collection
-    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
+    let mut cursor = coll.find(None, None).expect("Failed to execute find command.");
+    let results = cursor.next_n(3).expect("Failed to get next 3 from cursor.");
     assert_eq!(3, results.len());
 
     // Assert expected title of documents
@@ -188,7 +188,7 @@ fn find_one_and_replace() {
     let mut opts = FindOneAndUpdateOptions::new();
     opts.return_document = ReturnDocument::After;
     let result = coll.find_one_and_replace(doc3.clone(), doc2.clone(), Some(opts))
-        .ok().expect("Failed to execute find_one_and_replace command.");
+        .expect("Failed to execute find_one_and_replace command.");
 
     match result.unwrap().get("title") {
         Some(&Bson::String(ref title)) => assert_eq!("Back to the Future", title),
@@ -202,7 +202,7 @@ fn find_one_and_update() {
     let db = client.db("test");
     let coll = db.collection("find_one_and_update");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -210,13 +210,13 @@ fn find_one_and_update() {
     let doc3 = doc! { "title" => "12 Angry Men" };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
-        .ok().expect("Failed to insert documents into collection.");
+        .expect("Failed to insert documents into collection.");
 
     // Update single document
     let update = doc! { "$set" => { "director" => "Robert Zemeckis" } };
 
     let result = coll.find_one_and_update(doc2.clone(), update, None)
-        .ok().expect("Failed to execute find_one_and_update command.");
+        .expect("Failed to execute find_one_and_update command.");
 
     match result.unwrap().get("title") {
         Some(&Bson::String(ref title)) => assert_eq!("Back to the Future", title),
@@ -224,8 +224,8 @@ fn find_one_and_update() {
     }
 
     // Validate state of collection
-    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
+    let mut cursor = coll.find(None, None).expect("Failed to execute find command.");
+    let results = cursor.next_n(3).expect("Failed to get next 3 from cursor.");
     assert_eq!(3, results.len());
 
     // Assert director attributes
@@ -243,7 +243,7 @@ fn aggregate() {
     let db = client.db("test");
     let coll = db.collection("aggregate");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "tags" => ["a", "b", "c"] };
@@ -251,7 +251,7 @@ fn aggregate() {
     let doc3 = doc! { "tags" => ["d", "e", "f"] };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
-        .ok().expect("Failed to execute insert_many command.");
+        .expect("Failed to execute insert_many command.");
 
     // Build aggregation pipeline to unwind tag arrays and group distinct tags
     let project = doc! { "$project" => { "tags" => 1 } };
@@ -260,9 +260,9 @@ fn aggregate() {
 
     // Aggregate
     let mut cursor = coll.aggregate(vec![project, unwind, group], None)
-        .ok().expect("Failed to execute aggregate command.");
+        .expect("Failed to execute aggregate command.");
 
-    let results = cursor.next_n(10).ok().expect("Failed to get next 10 from cursor.");
+    let results = cursor.next_n(10).expect("Failed to get next 10 from cursor.");
     assert_eq!(6, results.len());
 
     // Grab ids from aggregated docs
@@ -289,7 +289,7 @@ fn count() {
     let db = client.db("test");
     let coll = db.collection("count");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -300,18 +300,18 @@ fn count() {
         vec.push(doc2.clone());
     }
 
-    coll.insert_many(vec, None).ok().expect("Failed to insert documents.");
-    let count_doc1 = coll.count(Some(doc1), None).ok().expect("Failed to execute count.");
+    coll.insert_many(vec, None).expect("Failed to insert documents.");
+    let count_doc1 = coll.count(Some(doc1), None).expect("Failed to execute count.");
     assert_eq!(1, count_doc1);
 
-    let count_doc2 = coll.count(Some(doc2), None).ok().expect("Failed to execute count.");
+    let count_doc2 = coll.count(Some(doc2), None).expect("Failed to execute count.");
     assert_eq!(10, count_doc2);
 
-    let count_all = coll.count(None, None).ok().expect("Failed to execute count.");
+    let count_all = coll.count(None, None).expect("Failed to execute count.");
     assert_eq!(11, count_all);
 
     let no_doc = doc! { "title" => "Houdini" };
-    let count_none = coll.count(Some(no_doc), None).ok().expect("Failed to execute count.");
+    let count_none = coll.count(Some(no_doc), None).expect("Failed to execute count.");
     assert_eq!(0, count_none);
 }
 
@@ -321,8 +321,8 @@ fn distinct_none() {
     let db = client.db("test");
     let coll = db.collection("distinct_none");
 
-    coll.drop().ok().expect("Failed to drop database");
-    let distinct_titles = coll.distinct("title", None, None).ok().expect("Failed to execute 'distinct'.");
+    coll.drop().expect("Failed to drop database");
+    let distinct_titles = coll.distinct("title", None, None).expect("Failed to execute 'distinct'.");
     assert_eq!(0, distinct_titles.len());
 }
 
@@ -332,11 +332,11 @@ fn distinct_one() {
     let db = client.db("test");
     let coll = db.collection("distinct_none");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
     let doc2 = doc! { "title" => "Back to the Future" };
-    coll.insert_one(doc2, None).ok().expect("Failed to insert document.");
+    coll.insert_one(doc2, None).expect("Failed to insert document.");
 
-    let distinct_titles = coll.distinct("title", None, None).ok().expect("Failed to execute 'distinct'.");
+    let distinct_titles = coll.distinct("title", None, None).expect("Failed to execute 'distinct'.");
     assert_eq!(1, distinct_titles.len());
 }
 
@@ -346,7 +346,7 @@ fn distinct() {
     let db = client.db("test");
     let coll = db.collection("distinct");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws",
@@ -365,10 +365,10 @@ fn distinct() {
         vec.push(doc3.clone());
     }
 
-    coll.insert_many(vec, None).ok().expect("Failed to insert documents.");
+    coll.insert_many(vec, None).expect("Failed to insert documents.");
 
     // Distinct titles over all documents
-    let distinct_titles = coll.distinct("title", None, None).ok().expect("Failed to execute 'distinct'.");
+    let distinct_titles = coll.distinct("title", None, None).expect("Failed to execute 'distinct'.");
     assert_eq!(3, distinct_titles.len());
 
     let titles: Vec<_> = distinct_titles.iter().filter_map(|bson| match bson {
@@ -384,7 +384,7 @@ fn distinct() {
     // Distinct titles over documents with certain director
     let filter = doc! { "director" => "MB" };
     let distinct_titles = coll.distinct("title", Some(filter), None)
-        .ok().expect("Failed to execute 'distinct'.");
+        .expect("Failed to execute 'distinct'.");
 
     assert_eq!(2, distinct_titles.len());
 
@@ -404,17 +404,17 @@ fn insert_many() {
     let db = client.db("test");
     let coll = db.collection("insert_many");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
     let doc2 = doc! { "title" => "Back to the Future" };
 
-    coll.insert_many(vec![doc1, doc2], None).ok().expect("Failed to insert documents.");
+    coll.insert_many(vec![doc1, doc2], None).expect("Failed to insert documents.");
 
     // Find documents
-    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(2).ok().expect("Failed to get next 2 from cursor.");
+    let mut cursor = coll.find(None, None).expect("Failed to execute find command.");
+    let results = cursor.next_n(2).expect("Failed to get next 2 from cursor.");
     assert_eq!(2, results.len());
 
     // Assert expected title of documents
@@ -434,18 +434,18 @@ fn delete_one() {
     let db = client.db("test");
     let coll = db.collection("delete_one");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
     let doc2 = doc! { "title" => "Back to the Future" };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone()], None)
-        .ok().expect("Failed to insert documents.");
+        .expect("Failed to insert documents.");
 
     // Delete document
-    coll.delete_one(doc2.clone(), None).ok().expect("Failed to delete document.");
-    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
+    coll.delete_one(doc2.clone(), None).expect("Failed to delete document.");
+    let mut cursor = coll.find(None, None).expect("Failed to execute find command.");
     let result = match cursor.next() {
         Some(Ok(res)) => res,
         Some(Err(_)) => panic!("Received error from 'cursor.next()'."),
@@ -466,18 +466,18 @@ fn delete_many() {
     let db = client.db("test");
     let coll = db.collection("delete_many");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
     let doc2 = doc! { "title" => "Back to the Future" };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc2.clone()], None)
-        .ok().expect("Failed to insert documents into collection.");
+        .expect("Failed to insert documents into collection.");
 
     // Delete document
-    coll.delete_many(doc2.clone(), None).ok().expect("Failed to delete documents.");
-    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
+    coll.delete_many(doc2.clone(), None).expect("Failed to delete documents.");
+    let mut cursor = coll.find(None, None).expect("Failed to execute find command.");
     let result = match cursor.next() {
         Some(Ok(res)) => res,
         Some(Err(_)) => panic!("Received error from 'cursor.next()'."),
@@ -498,7 +498,7 @@ fn replace_one() {
     let db = client.db("test");
     let coll = db.collection("replace_one");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -506,12 +506,12 @@ fn replace_one() {
     let doc3 = doc! { "title" => "12 Angry Men" };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
-        .ok().expect("Failed to insert documents into collection.");
+        .expect("Failed to insert documents into collection.");
 
     // Replace single document
-    coll.replace_one(doc2.clone(), doc3.clone(), None).ok().expect("Failed to replace document.");
-    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
+    coll.replace_one(doc2.clone(), doc3.clone(), None).expect("Failed to replace document.");
+    let mut cursor = coll.find(None, None).expect("Failed to execute find command.");
+    let results = cursor.next_n(3).expect("Failed to get next 3 from cursor.");
     assert_eq!(3, results.len());
 
     // Assert expected title of documents
@@ -535,7 +535,7 @@ fn update_one() {
     let db = client.db("test");
     let coll = db.collection("update_one");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -543,15 +543,15 @@ fn update_one() {
     let doc3 = doc! { "title" => "12 Angry Men" };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone()], None)
-        .ok().expect("Failed to insert documents into collection.");
+        .expect("Failed to insert documents into collection.");
 
     // Update single document
     let update = doc! { "$set" => { "director" => "Robert Zemeckis" } };
 
-    coll.update_one(doc2.clone(), update, None).ok().expect("Failed to update document.");
+    coll.update_one(doc2.clone(), update, None).expect("Failed to update document.");
 
-    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(3).ok().expect("Failed to get next 3 from cursor.");
+    let mut cursor = coll.find(None, None).expect("Failed to execute find command.");
+    let results = cursor.next_n(3).expect("Failed to get next 3 from cursor.");
     assert_eq!(3, results.len());
 
     // Assert director attributes
@@ -569,7 +569,7 @@ fn update_many() {
     let db = client.db("test");
     let coll = db.collection("update_many");
 
-    coll.drop().ok().expect("Failed to drop database");
+    coll.drop().expect("Failed to drop database");
 
     // Insert documents
     let doc1 = doc! { "title" => "Jaws" };
@@ -577,15 +577,15 @@ fn update_many() {
     let doc3 = doc! { "title" => "12 Angry Men" };
 
     coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone(), doc2.clone()], None)
-        .ok().expect("Failed to insert documents into collection.");
+        .expect("Failed to insert documents into collection.");
 
     // Update single document
     let update = doc! { "$set" => { "director" => "Robert Zemeckis" } };
 
-    coll.update_many(doc2.clone(), update, None).ok().expect("Failed to update documents.");
+    coll.update_many(doc2.clone(), update, None).expect("Failed to update documents.");
 
-    let mut cursor = coll.find(None, None).ok().expect("Failed to execute find command.");
-    let results = cursor.next_n(4).ok().expect("Failed to get next 4 from cursor.");
+    let mut cursor = coll.find(None, None).expect("Failed to execute find command.");
+    let results = cursor.next_n(4).expect("Failed to get next 4 from cursor.");
     assert_eq!(4, results.len());
 
     // Assert director attributes
@@ -609,7 +609,7 @@ fn create_list_drop_indexes() {
     let db = client.db("test");
     let coll = db.collection("create_list_drop_indexes");
 
-    coll.drop().ok().expect("Failed to drop database.");
+    coll.drop().expect("Failed to drop database.");
 
     let mut opts1 = IndexOptions::new();
     opts1.name = Some("nid".to_owned());
@@ -686,7 +686,7 @@ fn drop_all_indexes() {
     let db = client.db("test");
     let coll = db.collection("drop_all_indexes");
 
-    coll.drop().ok().expect("Failed to drop database.");
+    coll.drop().expect("Failed to drop database.");
 
     let mut opts1 = IndexOptions::new();
     opts1.name = Some("nid".to_owned());

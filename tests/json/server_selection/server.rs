@@ -23,7 +23,7 @@ impl Server {
                               Some(&Json::U64(v)) => v as i64,
                               "server must have an average rtt.");
 
-        let mut tags = BTreeMap::new();        
+        let mut tags = BTreeMap::new();
         let json_doc = val_or_err!(object.get("tags"),
                                    Some(&Json::Object(ref obj)) => obj.clone(),
                                    "server must have tags.");
@@ -37,11 +37,11 @@ impl Server {
 
         let stype = val_or_err!(object.get("type"),
                                 Some(&Json::String(ref s)) => ServerType::from_str(s)
-                                .ok().expect("Failed to parse server type"),
+                                .expect("Failed to parse server type"),
                                 "server must have a type.");
 
         Ok(Server {
-            host: connstring::parse_host(&address).ok().expect("Failed to parse host."),
+            host: connstring::parse_host(&address).expect("Failed to parse host."),
             rtt: rtt,
             tags: tags,
             stype: stype,

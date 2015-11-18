@@ -16,7 +16,7 @@
 //!
 //! let mut cursor = coll.find(None, None).unwrap();
 //! for result in cursor {
-//!     let doc = result.ok().expect("Received network error during cursor operations.");
+//!     let doc = result.expect("Received network error during cursor operations.");
 //!     if let Some(&Bson::String(ref value)) = doc.get("spirit_animal") {
 //!         println!("My spirit animal is {}", value);
 //!     }

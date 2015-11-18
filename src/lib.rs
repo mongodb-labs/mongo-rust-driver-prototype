@@ -12,18 +12,18 @@
 //! #
 //! // Direct connection to a server. Will not look for other servers in the topology.
 //! let client = Client::connect("localhost", 27017)
-//!     .ok().expect("Failed to initialize client.");
+//!     .expect("Failed to initialize client.");
 //!
 //! // Connect to a complex server topology, such as a replica set
 //! // or sharded cluster, using a connection string uri.
 //! let client = Client::with_uri("mongodb://localhost:27017,localhost:27018/")
-//!     .ok().expect("Failed to initialize client.");
+//!     .expect("Failed to initialize client.");
 //!
 //! // Specify a read preference, and rely on the driver to find secondaries.
 //! let mut options = ClientOptions::new();
 //! options.read_preference = Some(ReadPreference::new(ReadMode::SecondaryPreferred, None));
 //! let client = Client::with_uri_and_options("mongodb://localhost:27017/", options)
-//!     .ok().expect("Failed to initialize client.");
+//!     .expect("Failed to initialize client.");
 //! ```
 //!
 //! ## Interacting with MongoDB Collections

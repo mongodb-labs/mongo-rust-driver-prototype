@@ -13,7 +13,7 @@ macro_rules! run_aggregate_test {
                 assert!(eq::bson_eq(&bson, b2));
             }
 
-            assert!(!cursor.has_next().ok().expect("Failed to execute 'has_next()' on cursor"));
+            assert!(!cursor.has_next().expect("Failed to execute 'has_next()' on cursor"));
         }
 
         check_coll!($db, $coll, $outcome.collection);
@@ -125,7 +125,7 @@ macro_rules! run_find_test {
             assert!(eq::bson_eq(&bson, &Bson::Document(cursor.next().unwrap().unwrap())));
         }
 
-        assert!(!cursor.has_next().ok().expect("Failed to execute 'has_next()' on cursor"));
+        assert!(!cursor.has_next().expect("Failed to execute 'has_next()' on cursor"));
         check_coll!($db, $coll, $outcome.collection);
     }};
 }
@@ -311,7 +311,7 @@ macro_rules! check_coll {
                                 &Bson::Document(cursor.next().unwrap().unwrap())));
         }
 
-        assert!(!cursor.has_next().ok().expect("Failed to execute 'has_next()' on cursor"));
+        assert!(!cursor.has_next().expect("Failed to execute 'has_next()' on cursor"));
 
         $coll.drop().unwrap();
     }};

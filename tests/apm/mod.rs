@@ -23,7 +23,7 @@ fn timed_query(_client: Client, command_result: &CommandResult) {
 
 #[test]
 fn command_duration() {
-    let mut client = Client::connect("localhost", 27017).ok().expect("damn it!");
+    let mut client = Client::connect("localhost", 27017).expect("damn it!");
     let db = client.db("test");
     let coll = db.collection("event_hooks");
     coll.drop().unwrap();
