@@ -12,7 +12,7 @@ env:
     - RUST_TEST_THREADS=1
 
 script:
-    - mkdir -p ./data/db ./data/test /data/db2 /data/test2
+    - mkdir -p ./data/db ./data/test ./data/db2 ./data/test2
     - 3.0.7/bin/mongod --fork --nopreallocj --dbpath ./data/db --syslog --port 27017
     - 3.0.7/bin/mongod --fork --nopreallocj --dbpath ./data/test --syslog --port 27018
     - cargo build --verbose
