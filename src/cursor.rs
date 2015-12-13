@@ -121,12 +121,12 @@ impl Cursor {
                     if let Some(&Bson::I32(ref code)) = docs[0].get("code") {
                         // If command doesn't exist or namespace not found, return
                         // an empty array instead of throwing an error.
-                        if *code == ErrorCode::CommandNotFound as i32 ||
-                            *code == ErrorCode::NamespaceNotFound as i32 {
-                                return Ok((docs[0].clone(), v, cid));
-                            } else if let Some(&Bson::String(ref msg)) = docs[0].get("errmsg") {
+                        if *code != ErrorCode::CommandNotFound as i32 &&
+                           *code != ErrorCode::NamespaceNotFound as i32 {
+                            if let Some(&Bson::String(ref msg)) = docs[0].get("errmsg") {
                                 return Err(Error::OperationError(msg.to_owned()));
                             }
+                        }
                     }
                 }
 
