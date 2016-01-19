@@ -1,6 +1,6 @@
 [package]
 name = "mongodb"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Valeri Karpov <valkar207@gmail.com>",
            "Saghm Rossi <saghmrossi@gmail.com>",
            "Kevin Yeh <kevinyeah@utexas.edu>"]
