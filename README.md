@@ -3,9 +3,11 @@
 MongoDB Rust Driver Prototype
 =============================
 
-This branch contains active development on a new driver written for Rust 1.x.
+This branch contains active development on a new driver written for Rust 1.x and MongoDB 3.0.x.
 
-The API and implementation are currently subject to change at any time. You must not use this driver in production as it is still under development and is in no way supported by MongoDB Inc. We absolutely encourage you to experiment with it and provide us feedback on the API, design, and implementation. Bug reports and suggestions for improvements are welcomed, as are pull requests.
+The API and implementation are currently subject to change at any time. You should not use this driver in production as it is still under development and is in no way supported by MongoDB Inc. We absolutely encourage you to experiment with it and provide us feedback on the API, design, and implementation. Bug reports and suggestions for improvements are welcomed, as are pull requests.
+
+**Note**: This driver currently only supports MongoDB 3.0.x. This driver is **not** expected to work with MongoDB 2.6 or MongoDB 3.2. Do not use this driver if you need support for other versions of MongoDB.
 
 Installation
 ------------

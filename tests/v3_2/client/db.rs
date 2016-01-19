@@ -20,17 +20,13 @@ fn create_collection() {
 
     let results = cursor.next_n(5).unwrap();
 
-    assert_eq!(3, results.len());
+    assert_eq!(2, results.len());
 
     match results[0].get("name") {
-        Some(&Bson::String(ref name)) => assert_eq!("system.indexes", name),
-        _ => panic!("Expected BSON string!"),
-    }
-    match results[1].get("name") {
         Some(&Bson::String(ref name)) => assert_eq!("test1", name),
         _ => panic!("Expected BSON string!"),
     }
-    match results[2].get("name") {
+    match results[1].get("name") {
         Some(&Bson::String(ref name)) => assert_eq!("test2", name),
         _ => panic!("Expected BSON string!"),
     }
@@ -49,24 +45,20 @@ fn list_collections() {
     db.collection("test2").insert_one(bson::Document::new(), None)
         .expect("Failed to insert placeholder document into collection");
 
+
     // Check for namespaces
     let mut cursor = db.list_collections_with_batch_size(None, 1)
         .expect("Failed to execute list_collections command.");;
 
     let results = cursor.next_n(5).unwrap();
-    assert_eq!(3, results.len());
+    assert_eq!(2, results.len());
 
     match results[0].get("name") {
-        Some(&Bson::String(ref name)) => assert_eq!("system.indexes", name),
-        _ => panic!("Expected BSON string!"),
-    };
-
-    match results[1].get("name") {
         Some(&Bson::String(ref name)) => assert_eq!("test", name),
         _ => panic!("Expected BSON string!"),
     };
 
-    match results[2].get("name") {
+    match results[1].get("name") {
         Some(&Bson::String(ref name)) => assert_eq!("test2", name),
         _ => panic!("Expected BSON string!"),
     }
