@@ -15,6 +15,7 @@ use wire_protocol::flags::OpQueryFlags;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::Duration;
 
 use time;
 
@@ -348,8 +349,8 @@ impl Monitor {
                                                   Ordering::SeqCst);
             }
 
-            let frequency = self.heartbeat_frequency_ms.load(Ordering::SeqCst) as u32;
-            guard = self.condvar.wait_timeout_ms(guard, frequency).unwrap().0;
+            let frequency = self.heartbeat_frequency_ms.load(Ordering::SeqCst) as u64;
+            guard = self.condvar.wait_timeout(guard, Duration::from_millis(frequency)).unwrap().0;
         }
     }
 }
