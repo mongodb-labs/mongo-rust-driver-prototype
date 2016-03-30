@@ -13,17 +13,17 @@ keywords = ["mongo", "mongodb", "database", "bson", "nosql"]
 license = "Apache-2.0"
 
 [dependencies]
-bson = "0.1.4"
-byteorder = "0.3"
+bson = "0.2"
+byteorder = "0.5"
 chrono = "0.2"
 rand = "0.3"
 rust-crypto = "0.2.31"
 rustc-serialize = "0.3"
 scan_fmt = "0.1.0"
-separator = "0.3.0"
-textnonce = "0.1.1"
+separator = "0.3.1"
+textnonce = "0.3"
 time = "0.1"
 bufstream = "0.1.1"
 
 [dev-dependencies]
-nalgebra = "0.2"
+nalgebra = "0.5"

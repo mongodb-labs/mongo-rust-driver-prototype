@@ -27,28 +27,6 @@ impl NumEq for Bson {
 }
 
 pub fn bson_eq(b1: &Bson, b2: &Bson) -> bool {
-    macro_rules! doc_eq {
-        ( $x:expr, $y:expr ) => {
-            {
-                if $x.keys != $y.keys {
-                    return false;
-                }
-
-                for key in $x.keys {
-                    match ($x.get(&key), $y.get(&key)) {
-                        (Some(v1), Some(v2)) => if !bson_eq(v1, v2) {
-                            return false;
-                        },
-                        (None, None) => (),
-                        _ => return false
-                    }
-                }
-
-                true
-            }
-        };
-    }
-
     match b1 {
         &Bson::FloatingPoint(f) => b2.float_eq(f),
         &Bson::I32(i) => b2.int_eq(i as i64),
@@ -66,8 +44,7 @@ pub fn bson_eq(b1: &Bson, b2: &Bson) -> bool {
             true
         }),
         &Bson::Document(ref doc) =>
-            var_match!(b2, &Bson::Document(ref other_doc) =>
-                       doc_eq!(doc.clone(), other_doc.clone())),
+            var_match!(b2, &Bson::Document(ref other_doc) => doc == other_doc),
         &Bson::Boolean(b) => var_match!(b2, &Bson::Boolean(bb) => b == bb),
         &Bson::Null => var_match!(b2, &Bson::Null => true),
         &Bson::RegExp(ref s1, ref s2) =>
@@ -77,7 +54,7 @@ pub fn bson_eq(b1: &Bson, b2: &Bson) -> bool {
             var_match!(b2, &Bson::JavaScriptCode(ref ss) => s == ss),
         &Bson::JavaScriptCodeWithScope(ref s, ref doc) =>
             var_match!(b2, &Bson::JavaScriptCodeWithScope(ref ss, ref other_doc) =>
-                       s == ss && doc_eq!(doc.clone(), other_doc.clone())),
+                       s == ss && doc == other_doc),
         &Bson::TimeStamp(i) => var_match!(b2, &Bson::TimeStamp(ii) => i == ii),
         &Bson::Binary(sub_ty, ref bits) =>
             var_match!(b2, &Bson::Binary(other_sub_ty, ref other_bits) =>

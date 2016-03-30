@@ -1,6 +1,5 @@
 //! MongoDB Errors and Error Codes.
 use bson::{self, oid};
-use byteorder;
 use coll::error::{WriteException, BulkWriteException};
 use rustc_serialize::hex;
 use std::{error, fmt, io, result, sync};
@@ -124,12 +123,6 @@ impl From<hex::FromHexError> for Error {
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
         Error::IoError(err)
-    }
-}
-
-impl From<byteorder::Error> for Error {
-    fn from(err: byteorder::Error) -> Error {
-        Error::IoError(From::from(err))
     }
 }
 
