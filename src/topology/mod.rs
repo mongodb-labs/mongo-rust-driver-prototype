@@ -18,6 +18,7 @@ use std::i64;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::thread;
+use std::time::Duration;
 use time;
 
 use self::server::{Server, ServerDescription, ServerType};
@@ -741,12 +742,12 @@ impl Topology {
                         return Err(err)
                     }
                     // Otherwise, sleep for a little while.
-                    thread::sleep_ms(500);
+                    thread::sleep(Duration::from_millis(500));
                 },
             }
-        }        
+        }
     }
-    
+
     /// Returns a server stream for read operations.
     pub fn acquire_stream(&self, read_preference: ReadPreference) -> Result<(PooledStream, bool, bool)> {
         self.acquire_stream_private(Some(read_preference), false)
