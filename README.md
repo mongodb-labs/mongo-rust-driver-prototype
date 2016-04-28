@@ -1,4 +1,4 @@
-[![Travis](https://travis-ci.org/mongodb-labs/mongo-rust-driver-prototype.svg)](https://travis-ci.org/mongodb-labs/mongo-rust-driver-prototype)[![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb)[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Travis](https://travis-ci.org/mongodb-labs/mongo-rust-driver-prototype.svg)](https://travis-ci.org/mongodb-labs/mongo-rust-driver-prototype) [![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 MongoDB Rust Driver Prototype
 =============================
@@ -14,7 +14,7 @@ Installation
 
 #### Dependencies
 
--	[Rust 1.x with Cargo](http://rust-lang.org)
+-	[Rust 1.7+ with Cargo](http://rust-lang.org)
 
 #### Importing
 
@@ -22,8 +22,8 @@ The 1.0 driver is available on crates.io. To use the MongoDB driver in your code
 
 ```
 [dependencies]
-bson = "0.1.4"
-mongodb = "0.1.0"
+bson = "0.2.0"
+mongodb = "0.1.4"
 ```
 
 Then, import the bson and driver libraries within your code.
