@@ -1,5 +1,7 @@
 language: rust
 
+cache: cargo
+
 before_install:
     - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.0.10.tgz
     - tar xvf mongodb-linux-x86_64-3.0.10.tgz
