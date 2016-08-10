@@ -157,7 +157,7 @@ impl ServerDescription {
             ServerType::Mongos
         } else if ismaster.is_master && !set_name_empty {
             ServerType::RSPrimary
-        } else if ismaster.is_secondary && !set_name_empty {
+        } else if ismaster.is_secondary && !set_name_empty && !ismaster.hidden {
             ServerType::RSSecondary
         } else if ismaster.arbiter_only && !set_name_empty {
             ServerType::RSArbiter
