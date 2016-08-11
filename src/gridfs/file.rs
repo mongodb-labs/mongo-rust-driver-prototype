@@ -325,7 +325,7 @@ impl File {
                 match result {
                     Ok(Some(doc)) => match doc.get("data") {
                         Some(&Bson::Binary(_, ref buf)) => {
-                            cache.data = buf.clone()
+                            cache.data = buf.clone();
                             cache.err = None;
                         },
                         _ => cache.err = Some(OperationError("Chunk contained no data.".to_owned())),
