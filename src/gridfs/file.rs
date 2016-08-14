@@ -649,7 +649,7 @@ impl CachedChunk {
         CachedChunk {
             n: n,
             data: Vec::new(),
-            err: Some(Error::DefaultError(String::from("Chunk has not yet been inititalied"))),
+            err: Some(Error::DefaultError(String::from("Chunk has not yet been initialized"))),
         }
     }
 }
