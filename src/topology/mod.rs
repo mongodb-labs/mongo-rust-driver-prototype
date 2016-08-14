@@ -654,13 +654,13 @@ impl TopologyDescription {
 
         if self.set_name != description.set_name {
             self.servers.remove(&host);
-            return;
         }
 
         if let Some(me) = description.me {
             if host != me {
                 self.servers.remove(&host);
             }
+            return;
         }
 
         self.check_if_has_primary();
