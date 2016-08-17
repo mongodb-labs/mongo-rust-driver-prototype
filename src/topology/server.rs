@@ -71,6 +71,8 @@ pub struct ServerDescription {
     pub election_id: Option<oid::ObjectId>,
     /// The server's opinion of who the primary is.
     pub primary: Option<Host>,
+    /// The current replica set version number.
+    pub set_version: Option<i64>,
 }
 
 /// Holds status and connection information about a single server.
@@ -119,6 +121,7 @@ impl ServerDescription {
             set_name: String::new(),
             election_id: None,
             primary: None,
+            set_version: None,
         }
     }
 
@@ -139,6 +142,7 @@ impl ServerDescription {
         self.set_name = ismaster.set_name;
         self.election_id = ismaster.election_id;
         self.primary = ismaster.primary;
+        self.set_version = ismaster.set_version;
         self.round_trip_time = match self.round_trip_time {
             Some(old_rtt) => {
                 // (rtt / div) + (old_rtt * (div-1)/div)
@@ -157,7 +161,7 @@ impl ServerDescription {
             ServerType::Mongos
         } else if ismaster.is_master && !set_name_empty {
             ServerType::RSPrimary
-        } else if ismaster.is_secondary && !set_name_empty {
+        } else if ismaster.is_secondary && !set_name_empty && !ismaster.hidden {
             ServerType::RSSecondary
         } else if ismaster.arbiter_only && !set_name_empty {
             ServerType::RSArbiter

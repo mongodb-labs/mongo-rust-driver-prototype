@@ -60,6 +60,8 @@ pub struct TopologyDescription {
     // If true, all servers in the topology fall within the compatible
     // mongodb version for this driver.
     compatible: bool,
+    // The largest set version seen from a primary in the topology.
+    max_set_version: Option<i64>,
     compat_error: String,
 }
 
@@ -98,6 +100,7 @@ impl TopologyDescription {
             max_election_id: None,
             compatible: true,
             compat_error: String::new(),
+            max_set_version: None,
         }
     }
 
@@ -560,23 +563,29 @@ impl TopologyDescription {
             return;
         }
 
-        if description.election_id.is_some() {
-            if self.max_election_id.is_some() &&
-                self.max_election_id.as_ref().unwrap() > description.election_id.as_ref().unwrap() {
-                    // Stale primary
-                    if let Some(server) = self.servers.get(&host) {
-                        {
-                            let mut server_description = server.description.write().unwrap();
-                            server_description.server_type = ServerType::Unknown;
-                            server_description.set_name = String::new();
-                            server_description.election_id = None;
+        if description.set_version.is_some() && description.election_id.is_some() {
+            if self.max_set_version.is_some() && self.max_election_id.is_some() &&
+                   (self.max_set_version.unwrap() > description.set_version.unwrap() ||
+                        (self.max_set_version.unwrap() == description.set_version.unwrap() &&
+                        self.max_election_id.as_ref().unwrap() > description.election_id.as_ref().unwrap())) {
+                            // Stale primary
+                            if let Some(server) = self.servers.get(&host) {
+                                {
+                                    let mut server_description = server.description.write().unwrap();
+                                    server_description.server_type = ServerType::Unknown;
+                                    server_description.set_name = String::new();
+                                    server_description.election_id = None;
+                                }
+                            }
+                            self.check_if_has_primary();
+                            return;
+                        } else {
+                            self.max_election_id = description.election_id.clone();
                         }
-                    }
-                    self.check_if_has_primary();
-                    return;
-                } else {
-                    self.max_election_id = description.election_id.clone();
-                }
+        }
+
+        if description.set_version.is_some() && (self.max_set_version.is_none() || description.set_version.unwrap() > self.max_set_version.unwrap()) {
+            self.max_set_version = description.set_version;
         }
 
         // Invalidate any old primaries
@@ -645,13 +654,13 @@ impl TopologyDescription {
 
         if self.set_name != description.set_name {
             self.servers.remove(&host);
-            return;
         }
 
         if let Some(me) = description.me {
             if host != me {
                 self.servers.remove(&host);
             }
+            return;
         }
 
         self.check_if_has_primary();
