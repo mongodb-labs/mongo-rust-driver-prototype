@@ -324,7 +324,10 @@ impl File {
 
                 match result {
                     Ok(Some(doc)) => match doc.get("data") {
-                        Some(&Bson::Binary(_, ref buf)) => cache.data = buf.clone(),
+                        Some(&Bson::Binary(_, ref buf)) => {
+                            cache.data = buf.clone();
+                            cache.err = None;
+                        },
                         _ => cache.err = Some(OperationError("Chunk contained no data.".to_owned())),
                     },
                     Ok(None) => cache.err = Some(OperationError("Chunk not found.".to_owned())),
@@ -646,7 +649,7 @@ impl CachedChunk {
         CachedChunk {
             n: n,
             data: Vec::new(),
-            err: None,
+            err: Some(Error::DefaultError(String::from("Chunk has not yet been initialized"))),
         }
     }
 }
