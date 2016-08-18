@@ -1,10 +1,8 @@
 use bson::{Bson, Document};
 use mongodb::{Client, ThreadedClient};
 use mongodb::db::{ThreadedDatabase};
-use mongodb::wire_protocol::flags::{OpInsertFlags, OpQueryFlags,
-                                            OpUpdateFlags};
+use mongodb::wire_protocol::flags::{OpInsertFlags, OpQueryFlags, OpUpdateFlags};
 use mongodb::wire_protocol::operations::Message;
-use std::io::Write;
 use std::net::TcpStream;
 
 fn drop_db() {

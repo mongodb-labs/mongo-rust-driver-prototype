@@ -34,7 +34,6 @@ use wire_protocol::flags::OpQueryFlags;
 use wire_protocol::operations::Message;
 
 use std::collections::vec_deque::VecDeque;
-use std::io::{Read, Write};
 
 pub const DEFAULT_BATCH_SIZE: i32 = 20;
 

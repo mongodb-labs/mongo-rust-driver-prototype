@@ -14,7 +14,7 @@ use coll::options::IndexOptions;
 
 use std::{cmp, io, thread};
 use std::error::Error as ErrorTrait;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::sync::atomic::{AtomicIsize, ATOMIC_ISIZE_INIT, Ordering};
