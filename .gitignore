@@ -8,3 +8,4 @@ test_log.txt
 bin/
 target/
 test/
+Cargo.lock
