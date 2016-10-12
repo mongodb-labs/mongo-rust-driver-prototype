@@ -22,8 +22,8 @@ The 1.0 driver is available on crates.io. To use the MongoDB driver in your code
 
 ```
 [dependencies]
-bson = "0.2.1"
-mongodb = "0.1.5"
+bson = "0.3.1"
+mongodb = "0.1.7"
 ```
 
 Then, import the bson and driver libraries within your code.
