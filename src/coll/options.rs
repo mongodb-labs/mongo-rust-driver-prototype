@@ -23,15 +23,9 @@ pub enum ReturnDocument {
 /// Marker interface for writes that can be batched together.
 #[derive(Debug, Clone)]
 pub enum WriteModel {
-    InsertOne {
-        document: bson::Document,
-    },
-    DeleteOne {
-        filter: bson::Document,
-    },
-    DeleteMany {
-        filter: bson::Document,
-    },
+    InsertOne { document: bson::Document },
+    DeleteOne { filter: bson::Document },
+    DeleteMany { filter: bson::Document },
     ReplaceOne {
         filter: bson::Document,
         replacement: bson::Document,
@@ -46,7 +40,7 @@ pub enum WriteModel {
         filter: bson::Document,
         update: bson::Document,
         upsert: bool,
-    }
+    },
 }
 
 /// Options for aggregation queries.
@@ -370,7 +364,10 @@ impl IndexModel {
 
 impl InsertManyOptions {
     pub fn new(ordered: bool, write_concern: Option<WriteConcern>) -> InsertManyOptions {
-        InsertManyOptions { ordered: ordered, write_concern: write_concern }
+        InsertManyOptions {
+            ordered: ordered,
+            write_concern: write_concern,
+        }
     }
 }
 
@@ -385,6 +382,9 @@ impl ReturnDocument {
 
 impl UpdateOptions {
     pub fn new(upsert: bool, write_concern: Option<WriteConcern>) -> UpdateOptions {
-        UpdateOptions { upsert: upsert, write_concern: write_concern }
+        UpdateOptions {
+            upsert: upsert,
+            write_concern: write_concern,
+        }
     }
 }

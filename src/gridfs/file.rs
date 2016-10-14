@@ -162,7 +162,7 @@ impl File {
         let inner = &err.deref().inner;
         let description = match *inner {
             Some(ref err) => Some(err.description().to_owned()),
-            None => None
+            None => None,
         };
         Ok(description)
     }
@@ -174,7 +174,7 @@ impl File {
                 Mode::Read => Err(ArgumentError("File is open for reading.".to_owned())),
                 Mode::Write => Err(ArgumentError("File is open for writing.".to_owned())),
                 Mode::Closed => Err(ArgumentError("File is closed.".to_owned())),
-            }
+            };
         }
         Ok(())
     }
@@ -192,7 +192,7 @@ impl File {
         let _ = try!(self.mutex.lock());
 
         // Complete file write
-        if self.mode  == Mode::Write {
+        if self.mode == Mode::Write {
             if try!(self.err_description()).is_none() {
                 if self.doc.upload_date.is_none() {
                     self.doc.upload_date = Some(UTC::now());
@@ -207,7 +207,9 @@ impl File {
                 opts.unique = Some(true);
                 try!(self.gfs.chunks.create_index(doc!{ "files_id" => 1, "n" => 1}, Some(opts)));
             } else {
-                try!(self.gfs.chunks.delete_many(doc!{ "files_id" => (self.doc.id.clone()) }, None));
+                try!(self.gfs
+                    .chunks
+                    .delete_many(doc!{ "files_id" => (self.doc.id.clone()) }, None));
             }
         }
 
@@ -273,10 +275,12 @@ impl File {
     pub fn find_chunk(&mut self, id: oid::ObjectId, chunk_num: i32) -> Result<Vec<u8>> {
         let filter = doc!{"files_id" => id, "n" => chunk_num };
         match try!(self.gfs.chunks.find_one(Some(filter), None)) {
-            Some(doc) => match doc.get("data") {
-                Some(&Bson::Binary(_, ref buf)) => Ok(buf.clone()),
-                _ => Err(OperationError("Chunk contained no data".to_owned())),
-            },
+            Some(doc) => {
+                match doc.get("data") {
+                    Some(&Bson::Binary(_, ref buf)) => Ok(buf.clone()),
+                    _ => Err(OperationError("Chunk contained no data".to_owned())),
+                }
+            }
             None => Err(OperationError("Chunk not found".to_owned())),
         }
     }
@@ -314,22 +318,26 @@ impl File {
                     Ok(cache) => cache,
                     Err(_) => {
                         // Cache lock is poisoned; abandon caching mechanism.
-                        return
+                        return;
                     }
                 };
 
-                let result = arc_gfs.chunks.find_one(
-                    Some(doc!{"files_id" => (id), "n" => (chunk_num)}),
-                    None);
+                let result = arc_gfs.chunks
+                    .find_one(Some(doc!{"files_id" => (id), "n" => (chunk_num)}), None);
 
                 match result {
-                    Ok(Some(doc)) => match doc.get("data") {
-                        Some(&Bson::Binary(_, ref buf)) => {
-                            cache.data = buf.clone();
-                            cache.err = None;
-                        },
-                        _ => cache.err = Some(OperationError("Chunk contained no data.".to_owned())),
-                    },
+                    Ok(Some(doc)) => {
+                        match doc.get("data") {
+                            Some(&Bson::Binary(_, ref buf)) => {
+                                cache.data = buf.clone();
+                                cache.err = None;
+                            }
+                            _ => {
+                                cache.err = Some(OperationError("Chunk contained no data."
+                                    .to_owned()))
+                            }
+                        }
+                    }
                     Ok(None) => cache.err = Some(OperationError("Chunk not found.".to_owned())),
                     Err(err) => cache.err = Some(err),
                 }
@@ -348,15 +356,12 @@ impl io::Write for File {
 
         let mut guard = match self.mutex.lock() {
             Ok(guard) => guard,
-            Err(_) => return Err(io::Error::new(
-                io::ErrorKind::Other, PoisonLockError)),
+            Err(_) => return Err(io::Error::new(io::ErrorKind::Other, PoisonLockError)),
         };
 
         let description = try!(self.err_description());
         if description.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                OperationError(description.unwrap())));
+            return Err(io::Error::new(io::ErrorKind::Other, OperationError(description.unwrap())));
         }
 
         let mut data = buf;
@@ -387,18 +392,17 @@ impl io::Write for File {
             self.wsum.input(buf);
 
             // If over a megabyte is being written at once, wait for the load to reduce.
-            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >= MEGABYTE as i32 {
+            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >=
+                  MEGABYTE as i32 {
                 guard = match self.condvar.wait(guard) {
                     Ok(guard) => guard,
-                    Err(_) => return Err(io::Error::new(
-                        io::ErrorKind::Other, PoisonLockError)),
+                    Err(_) => return Err(io::Error::new(io::ErrorKind::Other, PoisonLockError)),
                 };
 
                 let description = try!(self.err_description());
                 if description.is_some() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        OperationError(description.unwrap())));
+                    return Err(io::Error::new(io::ErrorKind::Other,
+                                              OperationError(description.unwrap())));
                 }
             }
 
@@ -418,18 +422,17 @@ impl io::Write for File {
             self.wsum.input(buf);
 
             // Pending megabyte
-            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >= MEGABYTE as i32 {
+            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >=
+                  MEGABYTE as i32 {
                 guard = match self.condvar.wait(guard) {
                     Ok(guard) => guard,
-                    Err(_) => return Err(io::Error::new(
-                        io::ErrorKind::Other, PoisonLockError))
+                    Err(_) => return Err(io::Error::new(io::ErrorKind::Other, PoisonLockError)),
                 };
 
                 let description = try!(self.err_description());
                 if description.is_some() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        OperationError(description.unwrap())));
+                    return Err(io::Error::new(io::ErrorKind::Other,
+                                              OperationError(description.unwrap())));
                 }
             }
 
@@ -447,22 +450,21 @@ impl io::Write for File {
 
         let mut guard = match self.mutex.lock() {
             Ok(guard) => guard,
-            Err(_) => return Err(io::Error::new(
-                io::ErrorKind::Other, PoisonLockError)),
+            Err(_) => return Err(io::Error::new(io::ErrorKind::Other, PoisonLockError)),
         };
 
         // Flush local buffer to GridFS
-        if !self.wbuf.is_empty()  && try!(self.err_description()).is_none() {
+        if !self.wbuf.is_empty() && try!(self.err_description()).is_none() {
             let chunk_num = self.chunk_num;
             self.chunk_num += 1;
             self.wsum.input(&self.wbuf);
 
             // Pending megabyte
-            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >= MEGABYTE as i32 {
+            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >=
+                  MEGABYTE as i32 {
                 guard = match self.condvar.wait(guard) {
                     Ok(guard) => guard,
-                    Err(_) => return Err(io::Error::new(
-                        io::ErrorKind::Other, PoisonLockError)),
+                    Err(_) => return Err(io::Error::new(io::ErrorKind::Other, PoisonLockError)),
                 }
             }
 
@@ -478,16 +480,13 @@ impl io::Write for File {
         while self.wpending.load(Ordering::SeqCst) > 0 {
             guard = match self.condvar.wait(guard) {
                 Ok(guard) => guard,
-                Err(_) => return Err(io::Error::new(
-                    io::ErrorKind::Other, PoisonLockError)),
+                Err(_) => return Err(io::Error::new(io::ErrorKind::Other, PoisonLockError)),
             }
         }
 
         let description = try!(self.err_description());
         if description.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                OperationError(description.unwrap())));
+            return Err(io::Error::new(io::ErrorKind::Other, OperationError(description.unwrap())));
         }
 
         Ok(())
@@ -500,8 +499,7 @@ impl io::Read for File {
 
         let _ = match self.mutex.lock() {
             Ok(guard) => guard,
-            Err(_) => return Err(io::Error::new(
-                io::ErrorKind::Other, PoisonLockError)),
+            Err(_) => return Err(io::Error::new(io::ErrorKind::Other, PoisonLockError)),
         };
 
         // End of File (EOF)

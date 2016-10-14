@@ -17,7 +17,7 @@ impl FromJsonResult for ReadPreference {
 
         let mut tag_sets_objs = Vec::new();
         let mut tag_sets = Vec::new();
-        
+
         for json in tag_sets_array.into_iter() {
             match json {
                 Json::Object(ref obj) => tag_sets_objs.push(obj.clone()),
@@ -29,7 +29,9 @@ impl FromJsonResult for ReadPreference {
             let mut tags = BTreeMap::new();
             for (ref key, ref json) in obj {
                 match json {
-                    &Json::String(ref s) => { tags.insert(key.to_owned(), s.to_owned()); },
+                    &Json::String(ref s) => {
+                        tags.insert(key.to_owned(), s.to_owned());
+                    }
                     _ => return Err("tags must be string => string maps.".to_owned()),
                 }
             }

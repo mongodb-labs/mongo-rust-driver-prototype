@@ -14,8 +14,14 @@ pub struct CreateCollectionOptions {
 
 impl CreateCollectionOptions {
     pub fn new() -> CreateCollectionOptions {
-        CreateCollectionOptions { capped: false, auto_index_id: true, size: None, max: None,
-                                  use_power_of_two_sizes: true, no_padding: false }
+        CreateCollectionOptions {
+            capped: false,
+            auto_index_id: true,
+            size: None,
+            max: None,
+            use_power_of_two_sizes: true,
+            no_padding: false,
+        }
     }
 }
 
@@ -27,7 +33,11 @@ pub struct CreateUserOptions {
 
 impl CreateUserOptions {
     pub fn new() -> CreateUserOptions {
-        CreateUserOptions { custom_data: None, roles: vec![], write_concern: None }
+        CreateUserOptions {
+            custom_data: None,
+            roles: vec![],
+            write_concern: None,
+        }
     }
 }
 
@@ -38,6 +48,9 @@ pub struct UserInfoOptions {
 
 impl UserInfoOptions {
     pub fn new() -> UserInfoOptions {
-        UserInfoOptions { show_credentials: false, show_privileges: false }
+        UserInfoOptions {
+            show_credentials: false,
+            show_privileges: false,
+        }
     }
 }

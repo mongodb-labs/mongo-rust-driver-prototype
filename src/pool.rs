@@ -71,7 +71,6 @@ impl Drop for PooledStream {
 }
 
 impl ConnectionPool {
-
     /// Returns a connection pool with a default size.
     pub fn new(host: Host) -> ConnectionPool {
         ConnectionPool::with_size(host, DEFAULT_POOL_SIZE)
@@ -110,7 +109,7 @@ impl ConnectionPool {
             locked.len.store(0, Ordering::SeqCst);
         }
     }
-    
+
     /// Attempts to acquire a connected socket. If none are available and
     /// the pool has not reached its maximum size, a new socket will connect.
     /// Otherwise, the function will block until a socket is returned to the pool.
@@ -118,7 +117,8 @@ impl ConnectionPool {
         let mut locked = try!(self.inner.lock());
         if locked.size == 0 {
             return Err(OperationError("The connection pool does not allow connections; \
-                                       increase the size of the pool.".to_owned()));
+                                       increase the size of the pool."
+                .to_owned()));
         }
 
         loop {

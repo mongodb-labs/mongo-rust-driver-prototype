@@ -8,4 +8,3 @@ mod cursor;
 mod error;
 mod gridfs;
 mod wire_protocol;
-

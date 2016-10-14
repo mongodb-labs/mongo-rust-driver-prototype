@@ -69,10 +69,12 @@ impl Role {
     fn to_bson(&self) -> Bson {
         match *self {
             Role::All(ref role) => Bson::String(role.to_string()),
-            Role::Single { ref role, ref db } => Bson::Document(doc! {
+            Role::Single { ref role, ref db } => {
+                Bson::Document(doc! {
                 "role" => (Bson::String(role.to_string())),
                 "db" => (Bson::String(db.to_owned()))
             })
+            }
         }
     }
 

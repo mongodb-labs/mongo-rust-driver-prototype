@@ -173,7 +173,7 @@ fn read_pref_tags() {
             let options = connstr.options.unwrap();
             assert_eq!(options.read_pref_tags.len(), prefs.len());
 
-            for i in 0..prefs.len()-1 {
+            for i in 0..prefs.len() - 1 {
                 assert_eq!(prefs[i], options.read_pref_tags[i]);
             }
         }
@@ -202,7 +202,8 @@ fn unix_domain_socket_auth() {
 
 #[test]
 fn unix_domain_socket_replica_set() {
-    let uri = "mongodb://user:password@/tmp/mongodb-27017.sock,/tmp/mongodb-27018.sock/dbname?safe=false";
+    let uri = "mongodb://user:password@/tmp/mongodb-27017.sock,/tmp/mongodb-27018.\
+               sock/dbname?safe=false";
     let connstr = connstring::parse(uri).unwrap();
     let options = connstr.options.unwrap();
     assert!(connstr.hosts[0].has_ipc());

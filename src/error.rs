@@ -17,9 +17,15 @@ pub enum MaliciousServerErrorType {
 impl fmt::Display for MaliciousServerErrorType {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            MaliciousServerErrorType::InvalidRnonce => fmt.write_str("The server returned an invalid rnonce during authentication"),
-            MaliciousServerErrorType::InvalidServerSignature => fmt.write_str("The server returned an invalid signature during authentication"),
-            MaliciousServerErrorType::NoServerSignature => fmt.write_str("The server did not sign its reponse during authentication"),
+            MaliciousServerErrorType::InvalidRnonce => {
+                fmt.write_str("The server returned an invalid rnonce during authentication")
+            }
+            MaliciousServerErrorType::InvalidServerSignature => {
+                fmt.write_str("The server returned an invalid signature during authentication")
+            }
+            MaliciousServerErrorType::NoServerSignature => {
+                fmt.write_str("The server did not sign its reponse during authentication")
+            }
         }
     }
 }
@@ -146,12 +152,20 @@ impl fmt::Display for Error {
             Error::OperationError(ref inner) => inner.fmt(fmt),
             Error::ResponseError(ref inner) => inner.fmt(fmt),
             Error::CursorNotFoundError => write!(fmt, "No cursor found for cursor operation."),
-            Error::PoisonLockError => write!(fmt, "Socket lock poisoned while attempting to access."),
+            Error::PoisonLockError => {
+                write!(fmt, "Socket lock poisoned while attempting to access.")
+            }
             Error::CodedError(ref err) => write!(fmt, "{}", err),
-            Error::EventListenerError(ref err) => match *err {
-                Some(ref e) => write!(fmt, "Unable to emit failure due to poisoned lock; failure: {}", e),
-                None => write!(fmt, "Unable to emit failure due to poisoned lock")
-            },
+            Error::EventListenerError(ref err) => {
+                match *err {
+                    Some(ref e) => {
+                        write!(fmt,
+                               "Unable to emit failure due to poisoned lock; failure: {}",
+                               e)
+                    }
+                    None => write!(fmt, "Unable to emit failure due to poisoned lock"),
+                }
+            }
             Error::MaliciousServerError(ref err) => write!(fmt, "{}", err),
             Error::DefaultError(ref inner) => inner.fmt(fmt),
         }
@@ -174,15 +188,25 @@ impl error::Error for Error {
             Error::CursorNotFoundError => "No cursor found for cursor operation.",
             Error::PoisonLockError => "Socket lock poisoned while attempting to access.",
             Error::CodedError(ref err) => err.to_str(),
-            Error::EventListenerError(ref err) => match *err {
-                Some(_) => "Due to a poisoned lock on the listeners, unable to emit failure",
-                None => "Due to a poisoned lock on the listeners, unable to emit event"
-            },
-            Error::MaliciousServerError(ref err) => match *err {
-                MaliciousServerErrorType::InvalidRnonce => "The server returned an invalid rnonce during authentication",
-                MaliciousServerErrorType::InvalidServerSignature => "The server returned an invalid signature during authentication",
-                MaliciousServerErrorType::NoServerSignature => "The server did not sign its reponse during authentication",
-            },
+            Error::EventListenerError(ref err) => {
+                match *err {
+                    Some(_) => "Due to a poisoned lock on the listeners, unable to emit failure",
+                    None => "Due to a poisoned lock on the listeners, unable to emit event",
+                }
+            }
+            Error::MaliciousServerError(ref err) => {
+                match *err {
+                    MaliciousServerErrorType::InvalidRnonce => {
+                        "The server returned an invalid rnonce during authentication"
+                    }
+                    MaliciousServerErrorType::InvalidServerSignature => {
+                        "The server returned an invalid signature during authentication"
+                    }
+                    MaliciousServerErrorType::NoServerSignature => {
+                        "The server did not sign its reponse during authentication"
+                    }
+                }
+            }
             Error::DefaultError(ref inner) => &inner,
         }
     }
@@ -365,27 +389,23 @@ pub enum ErrorCode {
     NotMasterOrSecondaryCode = 13436,
     OutOfDiskSpace = 14031,
     KeyTooLong = 17280,
-    MaxError
+    MaxError,
 }
 
 impl ErrorCode {
     pub fn is_network_error(&self) -> bool {
-        *self == ErrorCode::HostUnreachable ||
-        *self == ErrorCode::HostNotFound ||
+        *self == ErrorCode::HostUnreachable || *self == ErrorCode::HostNotFound ||
         *self == ErrorCode::NetworkTimeout
     }
 
     pub fn is_interruption(&self) -> bool {
-        *self == ErrorCode::Interrupted ||
-        *self == ErrorCode::InterruptedAtShutdown ||
+        *self == ErrorCode::Interrupted || *self == ErrorCode::InterruptedAtShutdown ||
         *self == ErrorCode::ExceededTimeLimit
     }
 
     pub fn is_index_creation_error(&self) -> bool {
-        *self == ErrorCode::CannotCreateIndex ||
-        *self == ErrorCode::IndexOptionsConflict ||
-        *self == ErrorCode::IndexKeySpecsConflict ||
-        *self == ErrorCode::IndexAlreadyExists
+        *self == ErrorCode::CannotCreateIndex || *self == ErrorCode::IndexOptionsConflict ||
+        *self == ErrorCode::IndexKeySpecsConflict || *self == ErrorCode::IndexAlreadyExists
     }
 
     fn to_str(&self) -> &str {

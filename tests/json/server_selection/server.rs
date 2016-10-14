@@ -30,7 +30,9 @@ impl Server {
 
         for (key, json) in json_doc.into_iter() {
             match json {
-                Json::String(val) => { tags.insert(key, val); },
+                Json::String(val) => {
+                    tags.insert(key, val);
+                }
                 _ => return Err("server must have tags that are string => string maps.".to_owned()),
             }
         }

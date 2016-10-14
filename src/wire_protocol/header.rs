@@ -34,7 +34,7 @@ impl OpCode {
             2002 => Some(OpCode::Insert),
             2004 => Some(OpCode::Query),
             2005 => Some(OpCode::GetMore),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -58,7 +58,8 @@ pub struct Header {
     pub message_length: i32,
     /// Identifies the request being sent. From a server response, this should be '0'.
     pub request_id: i32,
-    // Identifies which response this message is a response to. From a client request, this should be '0'.
+    // Identifies which response this message is a response to. From a client request, this should
+    // be '0'.
     response_to: i32,
     /// Identifies which type of message is being sent.
     pub op_code: OpCode,
@@ -66,15 +67,17 @@ pub struct Header {
 
 impl Header {
     /// Constructs a new Header.
-    pub fn new(message_length: i32, request_id: i32, response_to: i32,
-           op_code: OpCode) -> Header {
-        Header { message_length: message_length, request_id: request_id,
-                 response_to: response_to, op_code: op_code }
+    pub fn new(message_length: i32, request_id: i32, response_to: i32, op_code: OpCode) -> Header {
+        Header {
+            message_length: message_length,
+            request_id: request_id,
+            response_to: response_to,
+            op_code: op_code,
+        }
     }
 
     /// Constructs a new Header for a request, with `response_to` set to 0.
-    fn new_request(message_length: i32, request_id: i32,
-                   op_code: OpCode) -> Header {
+    fn new_request(message_length: i32, request_id: i32, op_code: OpCode) -> Header {
         Header::new(message_length, request_id, 0, op_code)
     }
 
@@ -138,7 +141,10 @@ impl Header {
         let op_code_i32 = try!(buffer.read_i32::<LittleEndian>());
         let op_code = match OpCode::from_i32(op_code_i32) {
             Some(code) => code,
-            _ => return Err(ResponseError(format!("Invalid header opcode from server: {}.", op_code_i32))),
+            _ => {
+                return Err(ResponseError(format!("Invalid header opcode from server: {}.",
+                                                 op_code_i32)))
+            }
         };
 
         Ok(Header::new(message_length, request_id, response_to, op_code))

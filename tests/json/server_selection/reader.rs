@@ -24,10 +24,12 @@ fn get_server_array(arr: &Vec<Json>) -> Result<Vec<Server>, String> {
 
     for json in arr.iter() {
         match json {
-            &Json::Object(ref obj) => match Server::from_json(obj) {
-                Ok(server) => servers.push(server),
-                Err(err) => return Err(err),
-            },
+            &Json::Object(ref obj) => {
+                match Server::from_json(obj) {
+                    Ok(server) => servers.push(server),
+                    Err(err) => return Err(err),
+                }
+            }
             _ => return Err("Some servers could not be parsed for topology".to_owned()),
         }
     }
@@ -58,15 +60,18 @@ impl SuiteContainer for Json {
         let write = operation == "write";
 
         let read_preference = val_or_err!(object.get("read_preference"),
-                                          Some(&Json::Object(ref object)) => try!(ReadPreference::from_json(object)),
+                                          Some(&Json::Object(ref object)) =>
+                                          try!(ReadPreference::from_json(object)),
                                           "suite requires a read_preference object.");
 
         let in_latency_window = val_or_err!(object.get("in_latency_window"),
-                                           Some(&Json::Array(ref array)) => try!(get_server_array(array)),
+                                           Some(&Json::Array(ref array)) =>
+                                           try!(get_server_array(array)),
                                            "suite requires an in_latency_window array.");
 
         let suitable_servers = val_or_err!(object.get("suitable_servers"),
-                                           Some(&Json::Array(ref array)) => try!(get_server_array(array)),
+                                           Some(&Json::Array(ref array)) =>
+                                           try!(get_server_array(array)),
                                            "suite requires a suitable_servers array.");
 
         let topology_obj = val_or_err!(object.get("topology_description"),
@@ -74,7 +79,8 @@ impl SuiteContainer for Json {
                                        "suite requires a topology_description object.");
 
         let top_servers = val_or_err!(topology_obj.get("servers"),
-                                      Some(&Json::Array(ref array)) => try!(get_server_array(array)),
+                                      Some(&Json::Array(ref array)) =>
+                                      try!(get_server_array(array)),
                                       "topology requires an array of servers.");
 
         let ttype = val_or_err!(topology_obj.get("type"),

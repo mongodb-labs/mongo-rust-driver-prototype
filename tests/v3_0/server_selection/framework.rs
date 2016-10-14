@@ -15,13 +15,15 @@ pub fn run_suite(file: &str) {
     let dummy_config = ConnectionString::new("i-dont-exist", 27017);
     let dummy_client = Client::with_config(dummy_config, None, None).unwrap();
     let dummy_top_arc = Arc::new(RwLock::new(TopologyDescription::new()));
-    
-    let mut topology_description = TopologyDescription::new();    
+
+    let mut topology_description = TopologyDescription::new();
     topology_description.topology_type = suite.topology_description.ttype;
 
     for suite_server in suite.topology_description.servers {
-        let server = Server::new(dummy_client.clone(), suite_server.host.clone(),
-                                 dummy_top_arc.clone(), false);
+        let server = Server::new(dummy_client.clone(),
+                                 suite_server.host.clone(),
+                                 dummy_top_arc.clone(),
+                                 false);
 
         {
             let mut description = server.description.write().unwrap();
@@ -44,17 +46,18 @@ pub fn run_suite(file: &str) {
         topology_description.filter_hosts(&mut suitable_hosts, &suite.read_preference);
     }
 
-    if suitable_hosts.is_empty() && !suite.write && suite.read_preference.mode == ReadMode::SecondaryPreferred {
+    if suitable_hosts.is_empty() && !suite.write &&
+       suite.read_preference.mode == ReadMode::SecondaryPreferred {
         let mut read_pref = suite.read_preference.clone();
         read_pref.mode = ReadMode::PrimaryPreferred;
         let (mut hosts, _) = topology_description.choose_hosts(&read_pref);
         if suite.topology_description.ttype != TopologyType::Sharded &&
-            suite.topology_description.ttype != TopologyType::Single {
-                topology_description.filter_hosts(&mut hosts, &read_pref);
-            }        
+           suite.topology_description.ttype != TopologyType::Single {
+            topology_description.filter_hosts(&mut hosts, &read_pref);
+        }
         suitable_hosts.extend(hosts);
     }
-    
+
     assert_eq!(suite.suitable_servers.len(), suitable_hosts.len());
     for server in suite.suitable_servers.iter() {
         assert!(suitable_hosts.contains(&server.host));

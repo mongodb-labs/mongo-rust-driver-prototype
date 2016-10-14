@@ -20,9 +20,11 @@ fn database_names() {
     // Build dbs
     let db1 = client.db("new_db");
     let db2 = client.db("new_db_2");
-    db1.collection("test1").insert_one(bson::Document::new(), None)
+    db1.collection("test1")
+        .insert_one(bson::Document::new(), None)
         .expect("Failed to insert placeholder document into collection");
-    db2.collection("test2").insert_one(bson::Document::new(), None)
+    db2.collection("test2")
+        .insert_one(bson::Document::new(), None)
         .expect("Failed to insert placeholder document into collection");
 
     // Check new dbs
@@ -60,7 +62,8 @@ fn is_sync() {
 
     let child1 = thread::spawn(move || {
         let db = client1.db("concurrent_db");
-        db.collection("test1").insert_one(bson::Document::new(), None)
+        db.collection("test1")
+            .insert_one(bson::Document::new(), None)
             .expect("Failed to insert placeholder document into collection");
         let results = client1.database_names().expect("Failed to execute database_names.");
         assert!(results.contains(&"concurrent_db".to_owned()));
@@ -68,7 +71,8 @@ fn is_sync() {
 
     let child2 = thread::spawn(move || {
         let db = client2.db("concurrent_db_2");
-        db.collection("test2").insert_one(bson::Document::new(), None)
+        db.collection("test2")
+            .insert_one(bson::Document::new(), None)
             .expect("Failed to insert placeholder document into collection");
         let results = client2.database_names().expect("Failed to execute database_names.");
         assert!(results.contains(&"concurrent_db_2".to_owned()));

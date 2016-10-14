@@ -66,7 +66,7 @@ fn put_get() {
 
         if let Some(&Bson::Binary(_, ref data)) = chunks[i].get("data") {
             for j in 0..data.len() {
-                assert_eq!(src[j + i*DEFAULT_CHUNK_SIZE as usize], data[j]);
+                assert_eq!(src[j + i * DEFAULT_CHUNK_SIZE as usize], data[j]);
             }
         }
     }

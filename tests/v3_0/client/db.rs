@@ -16,7 +16,7 @@ fn create_collection() {
 
     // Check for namespaces
     let mut cursor = db.list_collections_with_batch_size(None, 1)
-        .expect("Failed to execute list_collections command.");;
+        .expect("Failed to execute list_collections command.");
 
     let results = cursor.next_n(5).unwrap();
 
@@ -44,14 +44,16 @@ fn list_collections() {
     db.drop_database().expect("Failed to drop database");
 
     // Build collections
-    db.collection("test").insert_one(bson::Document::new(), None)
+    db.collection("test")
+        .insert_one(bson::Document::new(), None)
         .expect("Failed to insert placeholder document into collection");
-    db.collection("test2").insert_one(bson::Document::new(), None)
+    db.collection("test2")
+        .insert_one(bson::Document::new(), None)
         .expect("Failed to insert placeholder document into collection");
 
     // Check for namespaces
     let mut cursor = db.list_collections_with_batch_size(None, 1)
-        .expect("Failed to execute list_collections command.");;
+        .expect("Failed to execute list_collections command.");
 
     let results = cursor.next_n(5).unwrap();
     assert_eq!(3, results.len());
@@ -81,11 +83,12 @@ fn create_and_get_users() {
 
     let saghm_options = CreateUserOptions {
         custom_data: Some(doc! { "foo" => "bar" }),
-        roles: vec![
-            Role::Single { role: SingleDatabaseRole::DbAdmin, db: "test".to_owned() },
-            Role::All(AllDatabaseRole::ReadWrite)
-        ],
-        write_concern: None
+        roles: vec![Role::Single {
+                        role: SingleDatabaseRole::DbAdmin,
+                        db: "test".to_owned(),
+                    },
+                    Role::All(AllDatabaseRole::ReadWrite)],
+        write_concern: None,
     };
 
     db.create_user("saghm", "ilikepuns!", Some(saghm_options)).unwrap();
@@ -96,25 +99,30 @@ fn create_and_get_users() {
         write_concern: None,
     };
 
-    db.create_user("kevin", "ihavenosenseofhumorandthereforeihatepuns!",
-                   Some(kevin_options)).unwrap();
+    db.create_user("kevin",
+                     "ihavenosenseofhumorandthereforeihatepuns!",
+                     Some(kevin_options))
+        .unwrap();
     db.create_user("val", "ilikeangularjs!", None).unwrap();
 
     let user = db.get_user("saghm", None).unwrap();
 
     match user.get("db") {
         Some(&Bson::String(ref s)) => assert_eq!("create_and_get_users", s),
-        _ => panic!("Invalid `db` specified for user 'saghm': {:?}", user.get("db"))
+        _ => {
+            panic!("Invalid `db` specified for user 'saghm': {:?}",
+                   user.get("db"))
+        }
     };
 
     let data = match user.get("customData") {
         Some(&Bson::Document(ref d)) => d.clone(),
-        _ => panic!("Invalid `customData` specified for user 'saghm'")
+        _ => panic!("Invalid `customData` specified for user 'saghm'"),
     };
 
     match data.get("foo") {
         Some(&Bson::String(ref s)) => assert_eq!("bar", s),
-        _ => panic!("Invalid custom data for user 'saghm': {}", data)
+        _ => panic!("Invalid custom data for user 'saghm': {}", data),
     };
 
     let users = db.get_users(vec!["kevin", "val"], None).unwrap();
@@ -122,12 +130,12 @@ fn create_and_get_users() {
 
     match users[0].get("user") {
         Some(&Bson::String(ref s)) => assert_eq!("kevin", s),
-        _ => panic!("User isn't named 'kevin' but should be")
+        _ => panic!("User isn't named 'kevin' but should be"),
     };
 
     match users[1].get("user") {
         Some(&Bson::String(ref s)) => assert_eq!("val", s),
-        _ => panic!("User isn't named 'val' but should be")
+        _ => panic!("User isn't named 'val' but should be"),
     };
 
     let users = db.get_all_users(false).unwrap();
@@ -136,16 +144,16 @@ fn create_and_get_users() {
 
     match users[0].get("user") {
         Some(&Bson::String(ref s)) => assert_eq!("saghm", s),
-        _ => panic!("User isn't named 'saghm' but should be")
+        _ => panic!("User isn't named 'saghm' but should be"),
     };
 
     match users[1].get("user") {
         Some(&Bson::String(ref s)) => assert_eq!("kevin", s),
-        _ => panic!("User isn't named 'kevin' but should be")
+        _ => panic!("User isn't named 'kevin' but should be"),
     };
 
     match users[2].get("user") {
         Some(&Bson::String(ref s)) => assert_eq!("val", s),
-        _ => panic!("User isn't named 'val' but should be")
+        _ => panic!("User isn't named 'val' but should be"),
     };
 }

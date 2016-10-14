@@ -2,8 +2,8 @@ use bson::Bson;
 
 use mongodb::{Client, ThreadedClient};
 use mongodb::db::ThreadedDatabase;
-use mongodb::coll::options::{FindOptions, FindOneAndUpdateOptions,
-                             IndexModel, IndexOptions, ReturnDocument};
+use mongodb::coll::options::{FindOptions, FindOneAndUpdateOptions, IndexModel, IndexOptions,
+                             ReturnDocument};
 
 #[test]
 fn find_sorted() {
@@ -266,12 +266,14 @@ fn aggregate() {
     assert_eq!(6, results.len());
 
     // Grab ids from aggregated docs
-    let vec: Vec<_> = results.iter().filter_map(|bdoc| {
-        match bdoc.get("_id") {
-            Some(&Bson::String(ref tag)) => Some(tag.to_owned()),
-            _ => None,
-        }
-    }).collect();
+    let vec: Vec<_> = results.iter()
+        .filter_map(|bdoc| {
+            match bdoc.get("_id") {
+                Some(&Bson::String(ref tag)) => Some(tag.to_owned()),
+                _ => None,
+            }
+        })
+        .collect();
 
     // Validate that all distinct tags were received.
     assert_eq!(6, vec.len());
@@ -322,7 +324,8 @@ fn distinct_none() {
     let coll = db.collection("distinct_none");
 
     coll.drop().expect("Failed to drop database");
-    let distinct_titles = coll.distinct("title", None, None).expect("Failed to execute 'distinct'.");
+    let distinct_titles = coll.distinct("title", None, None)
+        .expect("Failed to execute 'distinct'.");
     assert_eq!(0, distinct_titles.len());
 }
 
@@ -336,7 +339,8 @@ fn distinct_one() {
     let doc2 = doc! { "title" => "Back to the Future" };
     coll.insert_one(doc2, None).expect("Failed to insert document.");
 
-    let distinct_titles = coll.distinct("title", None, None).expect("Failed to execute 'distinct'.");
+    let distinct_titles = coll.distinct("title", None, None)
+        .expect("Failed to execute 'distinct'.");
     assert_eq!(1, distinct_titles.len());
 }
 
@@ -368,13 +372,16 @@ fn distinct() {
     coll.insert_many(vec, None).expect("Failed to insert documents.");
 
     // Distinct titles over all documents
-    let distinct_titles = coll.distinct("title", None, None).expect("Failed to execute 'distinct'.");
+    let distinct_titles = coll.distinct("title", None, None)
+        .expect("Failed to execute 'distinct'.");
     assert_eq!(3, distinct_titles.len());
 
-    let titles: Vec<_> = distinct_titles.iter().filter_map(|bson| match bson {
-        &Bson::String(ref title) => Some(title.to_owned()),
-        _ => None,
-    }).collect();
+    let titles: Vec<_> = distinct_titles.iter()
+        .filter_map(|bson| match bson {
+            &Bson::String(ref title) => Some(title.to_owned()),
+            _ => None,
+        })
+        .collect();
 
     assert_eq!(3, titles.len());
     assert!(titles.contains(&"Jaws".to_owned()));
@@ -388,10 +395,12 @@ fn distinct() {
 
     assert_eq!(2, distinct_titles.len());
 
-    let titles: Vec<_> = distinct_titles.iter().filter_map(|bson| match bson {
-        &Bson::String(ref title) => Some(title.to_owned()),
-        _ => None,
-    }).collect();
+    let titles: Vec<_> = distinct_titles.iter()
+        .filter_map(|bson| match bson {
+            &Bson::String(ref title) => Some(title.to_owned()),
+            _ => None,
+        })
+        .collect();
 
     assert_eq!(2, titles.len());
     assert!(titles.contains(&"Jaws".to_owned()));
@@ -576,7 +585,8 @@ fn update_many() {
     let doc2 = doc! { "title" => "Back to the Future" };
     let doc3 = doc! { "title" => "12 Angry Men" };
 
-    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone(), doc2.clone()], None)
+    coll.insert_many(vec![doc1.clone(), doc2.clone(), doc3.clone(), doc2.clone()],
+                     None)
         .expect("Failed to insert documents into collection.");
 
     // Update single document
@@ -637,7 +647,7 @@ fn create_list_drop_indexes() {
                 Some(&Bson::I32(ref i)) => assert_eq!(1, *i),
                 _ => panic!("Expected key 'id => 1'."),
             }
-        },
+        }
         _ => panic!("keys not found for first index."),
     }
 
@@ -657,7 +667,7 @@ fn create_list_drop_indexes() {
                 Some(&Bson::I32(ref i)) => assert_eq!(1, *i),
                 _ => panic!("Expected key 'height => 1'."),
             }
-        },
+        }
         _ => panic!("keys not found for second index."),
     }
 

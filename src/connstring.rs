@@ -50,7 +50,9 @@ pub struct ConnectionOptions {
 
 impl ConnectionOptions {
     /// Creates a new ConnectionOptions struct.
-    pub fn new(options: BTreeMap<String, String>, read_pref_tags: Vec<String>) -> ConnectionOptions {
+    pub fn new(options: BTreeMap<String, String>,
+               read_pref_tags: Vec<String>)
+               -> ConnectionOptions {
         ConnectionOptions {
             options: options,
             read_pref_tags: read_pref_tags,
@@ -99,7 +101,8 @@ impl ConnectionString {
 /// [the manual](http://docs.mongodb.org/manual/reference/connection-string/).
 pub fn parse(address: &str) -> Result<ConnectionString> {
     if !address.starts_with(URI_SCHEME) {
-        return Err(ArgumentError("MongoDB connection string must start with 'mongodb://'.".to_owned()))
+        return Err(ArgumentError("MongoDB connection string must start with 'mongodb://'."
+            .to_owned()));
     }
 
     // Remove scheme
@@ -127,13 +130,14 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
     };
 
     if path_str.is_empty() && host_str.contains("?") {
-        return Err(ArgumentError("A '/' is required between the host list and any options.".to_owned()));
+        return Err(ArgumentError("A '/' is required between the host list and any options."
+            .to_owned()));
     }
 
     // Split on authentication and hosts
     if host_str.contains("@") {
         let (user_info, host_string) = rpartition(host_str, "@");
-        let (u,p) = try!(parse_user_info(user_info));
+        let (u, p) = try!(parse_user_info(user_info));
         user = Some(u.to_owned());
         password = Some(p.to_owned());
         hosts = try!(split_hosts(host_string));
@@ -176,10 +180,12 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
 fn parse_user_info(user_info: &str) -> Result<(&str, &str)> {
     let (user, password) = rpartition(user_info, ":");
     if user_info.contains("@") || user.contains(":") {
-        return Err(ArgumentError("':' or '@' characters in a username or password must be escaped according to RFC 2396.".to_owned()))
+        return Err(ArgumentError("':' or '@' characters in a username or password must be \
+                                  escaped according to RFC 2396."
+            .to_owned()));
     }
     if user.is_empty() {
-        return Err(ArgumentError("The empty string is not a valid username.".to_owned()))
+        return Err(ArgumentError("The empty string is not a valid username.".to_owned()));
     }
     Ok((user, password))
 }
@@ -190,16 +196,20 @@ fn parse_ipv6_literal_host(entity: &str) -> Result<Host> {
         Some(_) => {
             match entity.find("]:") {
                 Some(idx) => {
-                    let port = &entity[idx+2..];
+                    let port = &entity[idx + 2..];
                     match port.parse::<u16>() {
                         Ok(val) => Ok(Host::new(entity[1..idx].to_ascii_lowercase(), val)),
                         Err(_) => Err(ArgumentError("Port must be an integer.".to_owned())),
                     }
-                },
+                }
                 None => Ok(Host::new(entity[1..].to_ascii_lowercase(), DEFAULT_PORT)),
             }
-        },
-        None => Err(ArgumentError("An IPv6 address must be enclosed in '[' and ']' according to RFC 2732.".to_owned())),
+        }
+        None => {
+            Err(ArgumentError("An IPv6 address must be enclosed in '[' and ']' according to RFC \
+                               2732."
+                .to_owned()))
+        }
     }
 }
 
@@ -215,7 +225,8 @@ pub fn parse_host(entity: &str) -> Result<Host> {
         if port.contains(":") {
             return Err(ArgumentError("Reserved characters such as ':' must
                         be escaped according to RFC 2396. An IPv6 address literal
-                        must be enclosed in '[' and according to RFC 2732.".to_owned()));
+                        must be enclosed in '[' and according to RFC 2732."
+                .to_owned()));
         }
         match port.parse::<u16>() {
             Ok(val) => Ok(Host::new(host.to_ascii_lowercase(), val)),
@@ -251,7 +262,7 @@ fn parse_options(opts: &str, delim: Option<&str>) -> ConnectionOptions {
     // Split and collect options into a vec
     let opt_list = match delim {
         Some(delim) => opts.split(delim).collect(),
-        None => vec!(opts)
+        None => vec![opts],
     };
 
     // Build the map and tag vec
@@ -280,7 +291,8 @@ fn split_options(opts: &str) -> Result<ConnectionOptions> {
     } else if semi_idx != None {
         delim = Some(";");
     } else if opts.find("=") == None {
-        return Err(ArgumentError("InvalidURI: MongoDB URI options are key=value pairs.".to_owned()));
+        return Err(ArgumentError("InvalidURI: MongoDB URI options are key=value pairs."
+            .to_owned()));
     }
     let options = parse_options(opts, delim);
     Ok(options)
@@ -289,7 +301,7 @@ fn split_options(opts: &str) -> Result<ConnectionOptions> {
 // Partitions a string around the left-most occurrence of the separator, if it exists.
 fn partition<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
     match string.find(sep) {
-        Some(idx) => (&string[..idx], &string[idx+sep.len()..]),
+        Some(idx) => (&string[..idx], &string[idx + sep.len()..]),
         None => (string, ""),
     }
 }
@@ -297,7 +309,7 @@ fn partition<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
 // Partitions a string around the right-most occurrence of the separator, if it exists.
 fn rpartition<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
     match string.rfind(sep) {
-        Some(idx) => (&string[..idx], &string[idx+sep.len()..]),
+        Some(idx) => (&string[..idx], &string[idx + sep.len()..]),
         None => (string, ""),
     }
 }
@@ -305,7 +317,7 @@ fn rpartition<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
 // Splits a string around the right-most occurrence of the separator, if it exists.
 fn rsplit<'a>(string: &'a str, sep: &str) -> (&'a str, &'a str) {
     match string.rfind(sep) {
-        Some(idx) => (&string[..idx+sep.len()], &string[idx+sep.len()..]),
+        Some(idx) => (&string[..idx + sep.len()], &string[idx + sep.len()..]),
         None => (string, ""),
     }
 }

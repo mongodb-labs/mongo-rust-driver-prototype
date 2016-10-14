@@ -18,15 +18,18 @@ pub struct Listener {
 
 impl Listener {
     pub fn new() -> Listener {
-        Listener { no_start_hooks: AtomicBool::new(true),
-                   no_completion_hooks: AtomicBool::new(true),
-                   start_hooks: RwLock::new(vec![]), completion_hooks: RwLock::new(vec![]) }
+        Listener {
+            no_start_hooks: AtomicBool::new(true),
+            no_completion_hooks: AtomicBool::new(true),
+            start_hooks: RwLock::new(vec![]),
+            completion_hooks: RwLock::new(vec![]),
+        }
     }
 
     pub fn add_start_hook(&self, hook: StartHook) -> Result<()> {
         let mut guard = match self.start_hooks.write() {
             Ok(guard) => guard,
-            Err(_) => return Err(Error::PoisonLockError)
+            Err(_) => return Err(Error::PoisonLockError),
         };
 
         self.no_start_hooks.store(false, Ordering::SeqCst);
@@ -36,7 +39,7 @@ impl Listener {
     pub fn add_completion_hook(&self, hook: CompletionHook) -> Result<()> {
         let mut guard = match self.completion_hooks.write() {
             Ok(guard) => guard,
-            Err(_) => return Err(Error::PoisonLockError)
+            Err(_) => return Err(Error::PoisonLockError),
         };
 
         self.no_completion_hooks.store(false, Ordering::SeqCst);
@@ -50,7 +53,7 @@ impl Listener {
 
         let guard = match self.start_hooks.read() {
             Ok(guard) => guard,
-            Err(_) => return Err(Error::PoisonLockError)
+            Err(_) => return Err(Error::PoisonLockError),
         };
 
         for hook in guard.deref().iter() {
@@ -67,7 +70,7 @@ impl Listener {
 
         let guard = match self.completion_hooks.read() {
             Ok(guard) => guard,
-            Err(_) => return Err(Error::PoisonLockError)
+            Err(_) => return Err(Error::PoisonLockError),
         };
 
         for hook in guard.deref().iter() {

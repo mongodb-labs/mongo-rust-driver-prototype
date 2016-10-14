@@ -16,20 +16,25 @@ impl Responses {
                                           "`responses` must be an array of arrays.");
 
             if inner_array.len() != 2 {
-                return Err("Response item must contain the host string and ismaster object.".to_owned());
+                return Err("Response item must contain the host string and ismaster object."
+                    .to_owned());
             }
 
-            let host = val_or_err!(inner_array[0],
-                                   Json::String(ref s) => s.to_owned(),
-                                   "Response item must contain the host string as the first argument.");
+            let host = val_or_err!(
+                inner_array[0],
+                Json::String(ref s) => s.to_owned(),
+                "Response item must contain the host string as the first argument.");
 
-            let ismaster = val_or_err!(inner_array[1],
-                                       Json::Object(ref obj) => Bson::from_json(&Json::Object(obj.clone())),
-                                       "Response item must contain the ismaster object as \
-                                        the second argument.");
+            let ismaster = val_or_err!(
+                inner_array[1],
+                Json::Object(ref obj) => Bson::from_json(&Json::Object(obj.clone())),
+                "Response item must contain the ismaster object as \
+                the second argument.");
 
             match ismaster {
-                Bson::Document(doc) => { data.push((connstring::parse_host(&host).unwrap(), doc)); },
+                Bson::Document(doc) => {
+                    data.push((connstring::parse_host(&host).unwrap(), doc));
+                }
                 _ => return Err("`ismaster` parse must return a Bson Document".to_owned()),
             }
         }

@@ -11,14 +11,20 @@ fn bulk_ordered_insert_only() {
 
     coll.drop().unwrap();
 
-    let models = (1..5).map(|i| WriteModel::InsertOne { document: doc! {
+    let models = (1..5)
+        .map(|i| {
+            WriteModel::InsertOne {
+                document: doc! {
         "_id" => (i),
         "x" => (i * 11)
-    }}).collect();
+    },
+            }
+        })
+        .collect();
 
     coll.bulk_write(models, true);
 
-    let cursor : Vec<_> = coll.find(None, None).unwrap().collect();
+    let cursor: Vec<_> = coll.find(None, None).unwrap().collect();
 
     assert_eq!(cursor.len(), 4);
 
@@ -28,12 +34,12 @@ fn bulk_ordered_insert_only() {
 
         match doc.get("_id") {
             Some(&Bson::I32(j)) => assert_eq!(expected_id as i32, j),
-            _ => panic!("Invalid id: {:?}", doc)
+            _ => panic!("Invalid id: {:?}", doc),
         }
 
         match doc.get("x") {
             Some(&Bson::I32(j)) => assert_eq!(11 * expected_id as i32, j),
-            _ => panic!("Invalid id: {:?}", doc)
+            _ => panic!("Invalid id: {:?}", doc),
         }
     }
 }
@@ -46,14 +52,20 @@ fn bulk_unordered_insert_only() {
 
     coll.drop().unwrap();
 
-    let models = (1..5).map(|i| WriteModel::InsertOne { document: doc! {
+    let models = (1..5)
+        .map(|i| {
+            WriteModel::InsertOne {
+                document: doc! {
         "_id" => (i),
         "x" => (i * 11)
-    }}).collect();
+    },
+            }
+        })
+        .collect();
 
     coll.bulk_write(models, false);
 
-    let cursor : Vec<_> = coll.find(None, None).unwrap().collect();
+    let cursor: Vec<_> = coll.find(None, None).unwrap().collect();
 
     assert_eq!(cursor.len(), 4);
 
@@ -63,12 +75,12 @@ fn bulk_unordered_insert_only() {
 
         match doc.get("_id") {
             Some(&Bson::I32(j)) => assert_eq!(expected_id as i32, j),
-            _ => panic!("Invalid id: {:?}", doc)
+            _ => panic!("Invalid id: {:?}", doc),
         }
 
         match doc.get("x") {
             Some(&Bson::I32(j)) => assert_eq!(11 * expected_id as i32, j),
-            _ => panic!("Invalid id: {:?}", doc)
+            _ => panic!("Invalid id: {:?}", doc),
         }
     }
 }

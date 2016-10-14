@@ -40,7 +40,10 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
     // Fill servers array
     for host in connection_string.hosts.iter() {
         let mut topology_description = topology.description.write().unwrap();
-        let server = Server::new(dummy_client.clone(), host.clone(), top_description_arc.clone(), false);
+        let server = Server::new(dummy_client.clone(),
+                                 host.clone(),
+                                 top_description_arc.clone(),
+                                 false);
         topology_description.servers.insert(host.clone(), server);
     }
 
@@ -67,7 +70,7 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
                         let server = servers.get(&host).expect("Host not found.");
                         let mut server_description = server.description.write().unwrap();
                         server_description.update(ismaster, 0)
-                    },
+                    }
                     Err(err) => panic!(err),
                 }
             }
@@ -77,8 +80,10 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
                 server.description.read().unwrap().clone()
             };
 
-            topology_description.update_without_monitor(host.clone(), server_description.clone(),
-                                                        dummy_client.clone(), top_description_arc.clone());
+            topology_description.update_without_monitor(host.clone(),
+                                                        server_description.clone(),
+                                                        dummy_client.clone(),
+                                                        top_description_arc.clone());
         }
 
         // Check server and topology descriptions.
@@ -91,7 +96,7 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
                     let top_server_description = top_server.description.read().unwrap();
                     assert_eq!(server.set_name, top_server_description.set_name);
                     assert_eq!(server.stype, top_server_description.server_type);
-                },
+                }
                 None => panic!("Missing host in outcome."),
             }
         }

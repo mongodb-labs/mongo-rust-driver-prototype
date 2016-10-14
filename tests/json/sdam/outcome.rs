@@ -33,10 +33,14 @@ impl Outcome {
                 };
 
                 let server_type = val_or_err!(doc.get("type"),
-                                              Some(&Json::String(ref s)) => ServerType::from_str(s).unwrap(),
+                                              Some(&Json::String(ref s)) =>
+                                              ServerType::from_str(s).unwrap(),
                                               "`type` must be a string.");
 
-                let server_obj = Server { set_name: server_set_name, stype: server_type };
+                let server_obj = Server {
+                    set_name: server_set_name,
+                    stype: server_type,
+                };
                 servers.insert(connstring::parse_host(host).unwrap(), server_obj);
             }
         }
@@ -54,7 +58,7 @@ impl Outcome {
         Ok(Outcome {
             servers: servers,
             set_name: set_name,
-            ttype: ttype
+            ttype: ttype,
         })
     }
 }

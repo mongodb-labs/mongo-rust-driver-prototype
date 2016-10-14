@@ -4,8 +4,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use Error::{ArgumentError, ResponseError};
 use Result;
 use wire_protocol::header::{Header, OpCode};
-use wire_protocol::flags::{OpInsertFlags, OpQueryFlags,
-                           OpReplyFlags, OpUpdateFlags};
+use wire_protocol::flags::{OpInsertFlags, OpQueryFlags, OpReplyFlags, OpUpdateFlags};
 
 use std::io::{Read, Write};
 use std::mem;
@@ -101,25 +100,35 @@ pub enum Message {
         number_to_return: i32,
         /// Uniquely identifies the cursor being returned.
         cursor_id: i64,
-    }
+    },
 }
 
 impl Message {
     /// Constructs a new message for a reply.
-    fn new_reply(header: Header, flags: i32, cursor_id: i64,
-                 starting_from: i32, number_returned: i32,
-                 documents: Vec<bson::Document>) -> Message {
-        Message::OpReply { header: header,
-                           flags: OpReplyFlags::from_i32(flags),
-                           cursor_id: cursor_id, starting_from: starting_from,
-                           number_returned: number_returned,
-                           documents: documents }
+    fn new_reply(header: Header,
+                 flags: i32,
+                 cursor_id: i64,
+                 starting_from: i32,
+                 number_returned: i32,
+                 documents: Vec<bson::Document>)
+                 -> Message {
+        Message::OpReply {
+            header: header,
+            flags: OpReplyFlags::from_i32(flags),
+            cursor_id: cursor_id,
+            starting_from: starting_from,
+            number_returned: number_returned,
+            documents: documents,
+        }
     }
 
     /// Constructs a new message for an update.
-    pub fn new_update(request_id: i32, namespace: String, flags: OpUpdateFlags,
+    pub fn new_update(request_id: i32,
+                      namespace: String,
+                      flags: OpUpdateFlags,
                       selector: bson::Document,
-                      update: bson::Document) -> Result<Message> {
+                      update: bson::Document)
+                      -> Result<Message> {
         let header_length = mem::size_of::<Header>() as i32;
 
         // Add an extra byte after the string for null-termination.
@@ -132,19 +141,26 @@ impl Message {
         let selector_length = try!(selector.byte_length());
         let update_length = try!(update.byte_length());
 
-        let total_length = header_length + string_length + i32_length +
-            selector_length + update_length;
+        let total_length = header_length + string_length + i32_length + selector_length +
+                           update_length;
 
         let header = Header::new_update(total_length, request_id);
 
-        Ok(Message::OpUpdate { header: header, namespace: namespace,
-                               flags: flags, selector: selector,
-                               update: update })
+        Ok(Message::OpUpdate {
+            header: header,
+            namespace: namespace,
+            flags: flags,
+            selector: selector,
+            update: update,
+        })
     }
 
     /// Constructs a new message request for an insertion.
-    pub fn new_insert(request_id: i32, flags: OpInsertFlags, namespace: String,
-                      documents: Vec<bson::Document>) -> Result<Message> {
+    pub fn new_insert(request_id: i32,
+                      flags: OpInsertFlags,
+                      namespace: String,
+                      documents: Vec<bson::Document>)
+                      -> Result<Message> {
         let header_length = mem::size_of::<Header>() as i32;
         let flags_length = mem::size_of::<i32>() as i32;
 
@@ -159,15 +175,23 @@ impl Message {
 
         let header = Header::new_insert(total_length, request_id);
 
-        Ok(Message::OpInsert { header: header, flags: flags,
-                               namespace: namespace, documents: documents })
+        Ok(Message::OpInsert {
+            header: header,
+            flags: flags,
+            namespace: namespace,
+            documents: documents,
+        })
     }
 
     /// Constructs a new message request for a query.
-    pub fn new_query(request_id: i32, flags: OpQueryFlags, namespace: String,
-                     number_to_skip: i32, number_to_return: i32,
+    pub fn new_query(request_id: i32,
+                     flags: OpQueryFlags,
+                     namespace: String,
+                     number_to_skip: i32,
+                     number_to_return: i32,
                      query: bson::Document,
-                     return_field_selector: Option<bson::Document>) -> Result<Message> {
+                     return_field_selector: Option<bson::Document>)
+                     -> Result<Message> {
 
         let header_length = mem::size_of::<Header>() as i32;
 
@@ -186,21 +210,27 @@ impl Message {
             None => 0,
         };
 
-        let total_length = header_length + i32_length + string_length +
-            bson_length + option_length;
+        let total_length = header_length + i32_length + string_length + bson_length + option_length;
 
         let header = Header::new_query(total_length, request_id);
 
-        Ok(Message::OpQuery { header: header, flags: flags,
-                              namespace: namespace,
-                              number_to_skip: number_to_skip,
-                              number_to_return: number_to_return, query: query,
-                              return_field_selector: return_field_selector })
+        Ok(Message::OpQuery {
+            header: header,
+            flags: flags,
+            namespace: namespace,
+            number_to_skip: number_to_skip,
+            number_to_return: number_to_return,
+            query: query,
+            return_field_selector: return_field_selector,
+        })
     }
 
     /// Constructs a new "get more" request message.
-    pub fn new_get_more(request_id: i32, namespace: String,
-                        number_to_return: i32, cursor_id: i64) -> Message {
+    pub fn new_get_more(request_id: i32,
+                        namespace: String,
+                        number_to_return: i32,
+                        cursor_id: i64)
+                        -> Message {
         let header_length = mem::size_of::<Header>() as i32;
 
         // There are two i32 fields because of the reserved "ZERO".
@@ -214,9 +244,12 @@ impl Message {
 
         let header = Header::new_get_more(total_length, request_id);
 
-        Message::OpGetMore { header: header, namespace: namespace,
-                             number_to_return: number_to_return,
-                             cursor_id: cursor_id }
+        Message::OpGetMore {
+            header: header,
+            namespace: namespace,
+            number_to_return: number_to_return,
+            cursor_id: cursor_id,
+        }
     }
 
     /// Writes a serialized BSON document to a given buffer.
@@ -229,8 +262,7 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an Error on failure.
-    fn write_bson_document<W: Write>(buffer: &mut W,
-                                     bson: &bson::Document) -> Result<()>{
+    fn write_bson_document<W: Write>(buffer: &mut W, bson: &bson::Document) -> Result<()> {
         let mut temp_buffer = vec![];
 
         try!(bson::encode_document(&mut temp_buffer, bson));
@@ -253,9 +285,13 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an Error on failure.
-    pub fn write_update<W: Write>(buffer: &mut W, header: &Header, namespace: &str,
-                                  flags: &OpUpdateFlags, selector: &bson::Document,
-                                  update: &bson::Document) -> Result<()> {
+    pub fn write_update<W: Write>(buffer: &mut W,
+                                  header: &Header,
+                                  namespace: &str,
+                                  flags: &OpUpdateFlags,
+                                  selector: &bson::Document,
+                                  update: &bson::Document)
+                                  -> Result<()> {
 
         try!(header.write(buffer));
 
@@ -292,8 +328,12 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an Error on failure.
-    fn write_insert<W: Write>(buffer: &mut W, header: &Header, flags: &OpInsertFlags,
-                              namespace: &str, documents: &[bson::Document]) -> Result<()> {
+    fn write_insert<W: Write>(buffer: &mut W,
+                              header: &Header,
+                              flags: &OpInsertFlags,
+                              namespace: &str,
+                              documents: &[bson::Document])
+                              -> Result<()> {
 
         try!(header.write(buffer));
         try!(buffer.write_i32::<LittleEndian>(flags.to_i32()));
@@ -334,11 +374,15 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an Error on failure.
-    fn write_query<W: Write>(buffer: &mut W, header: &Header,
-                             flags: &OpQueryFlags, namespace: &str,
-                             number_to_skip: i32, number_to_return: i32,
+    fn write_query<W: Write>(buffer: &mut W,
+                             header: &Header,
+                             flags: &OpQueryFlags,
+                             namespace: &str,
+                             number_to_skip: i32,
+                             number_to_return: i32,
                              query: &bson::Document,
-                             return_field_selector: &Option<bson::Document>) -> Result<()> {
+                             return_field_selector: &Option<bson::Document>)
+                             -> Result<()> {
 
         try!(header.write(buffer));
         try!(buffer.write_i32::<LittleEndian>(flags.to_i32()));
@@ -378,8 +422,12 @@ impl Message {
     /// # Return value
     ///
     /// Returns nothing on success, or an Error on failure.
-    pub fn write_get_more<W: Write>(buffer: &mut W, header: &Header, namespace: &str,
-                                    number_to_return: i32, cursor_id: i64) -> Result<()> {
+    pub fn write_get_more<W: Write>(buffer: &mut W,
+                                    header: &Header,
+                                    namespace: &str,
+                                    number_to_return: i32,
+                                    cursor_id: i64)
+                                    -> Result<()> {
 
         try!(header.write(buffer));
 
@@ -412,27 +460,38 @@ impl Message {
     pub fn write<W: Write>(&self, buffer: &mut W) -> Result<()> {
         match *self {
             /// Only the server should send replies
-            Message::OpReply {..} =>
-                Err(ArgumentError("OP_REPLY should not be sent to the client.".to_owned())),
-            Message::OpUpdate { ref header, ref namespace,
-                                ref flags, ref selector, ref update } =>
-                Message::write_update(buffer, &header,&namespace,
-                                      &flags, &selector, &update),
-            Message::OpInsert { ref header, ref flags,
-                                ref namespace, ref documents } =>
-                Message::write_insert(buffer, &header, &flags,
-                                      &namespace, &documents),
-            Message::OpQuery { ref header, ref flags, ref namespace,
-                               number_to_skip, number_to_return, ref query,
-                               ref return_field_selector } =>
-                Message::write_query(buffer, &header, &flags,
-                                     &namespace, number_to_skip,
-                                     number_to_return, &query,
-                                     &return_field_selector),
-            Message::OpGetMore { ref header, ref namespace,
-                                 number_to_return, cursor_id } =>
-                Message::write_get_more(buffer, &header, &namespace,
-                                        number_to_return, cursor_id)
+            Message::OpReply { .. } => {
+                Err(ArgumentError("OP_REPLY should not be sent to the client.".to_owned()))
+            }
+            Message::OpUpdate { ref header,
+                                ref namespace,
+                                ref flags,
+                                ref selector,
+                                ref update } => {
+                Message::write_update(buffer, &header, &namespace, &flags, &selector, &update)
+            }
+            Message::OpInsert { ref header, ref flags, ref namespace, ref documents } => {
+                Message::write_insert(buffer, &header, &flags, &namespace, &documents)
+            }
+            Message::OpQuery { ref header,
+                               ref flags,
+                               ref namespace,
+                               number_to_skip,
+                               number_to_return,
+                               ref query,
+                               ref return_field_selector } => {
+                Message::write_query(buffer,
+                                     &header,
+                                     &flags,
+                                     &namespace,
+                                     number_to_skip,
+                                     number_to_return,
+                                     &query,
+                                     &return_field_selector)
+            }
+            Message::OpGetMore { ref header, ref namespace, number_to_return, cursor_id } => {
+                Message::write_get_more(buffer, &header, &namespace, number_to_return, cursor_id)
+            }
         }
     }
 
@@ -484,14 +543,17 @@ impl Message {
     /// # Return value
     ///
     /// Returns the reply message on success, or an Error on failure.
-    pub fn read<T>(buffer: &mut T) -> Result<Message> where T: Read + Write {
+    pub fn read<T>(buffer: &mut T) -> Result<Message>
+        where T: Read + Write
+    {
         let header = try!(Header::read(buffer));
         match header.op_code {
             OpCode::Reply => Message::read_reply(buffer, header),
-            opcode => Err(ResponseError(format!("Expected to read \
-                                                 OpCode::Reply but \
-                                                 instead found opcode {}",
-                                                opcode)))
+            opcode => {
+                Err(ResponseError(format!("Expected to read OpCode::Reply but instead found \
+                                           opcode {}",
+                                          opcode)))
+            }
         }
     }
 }
