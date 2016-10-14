@@ -119,7 +119,7 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
     let (host_str, path_str) = if addr.contains(".sock") {
         // Partition ipc socket
         let (host_part, path_part) = rsplit(addr, ".sock");
-        if path_part.starts_with("/") {
+        if path_part.starts_with('/') {
             (host_part, &path_part[1..])
         } else {
             (host_part, path_part)
@@ -129,13 +129,13 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
         partition(addr, "/")
     };
 
-    if path_str.is_empty() && host_str.contains("?") {
+    if path_str.is_empty() && host_str.contains('?') {
         return Err(ArgumentError("A '/' is required between the host list and any options."
             .to_owned()));
     }
 
     // Split on authentication and hosts
-    if host_str.contains("@") {
+    if host_str.contains('@') {
         let (user_info, host_string) = rpartition(host_str, "@");
         let (u, p) = try!(parse_user_info(user_info));
         user = Some(u.to_owned());
@@ -148,8 +148,8 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
     let mut opts = "";
 
     // Split on database name, collection, and options
-    if path_str.len() > 0 {
-        if path_str.starts_with("?") {
+    if !path_str.is_empty() {
+        if path_str.starts_with('?') {
             opts = &path_str[1..];
         } else {
             let (dbase, options) = partition(path_str, "?");
@@ -161,7 +161,7 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
     }
 
     // Collect options if any exist
-    if opts.len() > 0 {
+    if !opts.is_empty() {
         options = Some(split_options(opts).unwrap());
     }
 
@@ -179,7 +179,7 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
 // Parse user information of the form user:password
 fn parse_user_info(user_info: &str) -> Result<(&str, &str)> {
     let (user, password) = rpartition(user_info, ":");
-    if user_info.contains("@") || user.contains(":") {
+    if user_info.contains('@') || user.contains(':') {
         return Err(ArgumentError("':' or '@' characters in a username or password must be \
                                   escaped according to RFC 2396."
             .to_owned()));
@@ -192,7 +192,7 @@ fn parse_user_info(user_info: &str) -> Result<(&str, &str)> {
 
 // Parses a literal IPv6 literal host entity of the form [host] or [host]:port
 fn parse_ipv6_literal_host(entity: &str) -> Result<Host> {
-    match entity.find("]") {
+    match entity.find(']') {
         Some(_) => {
             match entity.find("]:") {
                 Some(idx) => {
@@ -216,13 +216,13 @@ fn parse_ipv6_literal_host(entity: &str) -> Result<Host> {
 // Parses a host entity of the form host or host:port, and redirects IPv6 entities.
 // All host names are lowercased.
 pub fn parse_host(entity: &str) -> Result<Host> {
-    if entity.starts_with("[") {
+    if entity.starts_with('[') {
         // IPv6 host
         parse_ipv6_literal_host(entity)
-    } else if entity.contains(":") {
+    } else if entity.contains(':') {
         // Common host:port format
         let (host, port) = partition(entity, ":");
-        if port.contains(":") {
+        if port.contains(':') {
             return Err(ArgumentError("Reserved characters such as ':' must
                         be escaped according to RFC 2396. An IPv6 address literal
                         must be enclosed in '[' and according to RFC 2732."
@@ -244,7 +244,7 @@ pub fn parse_host(entity: &str) -> Result<Host> {
 // Splits and parses comma-separated hosts.
 fn split_hosts(host_str: &str) -> Result<Vec<Host>> {
     let mut hosts: Vec<Host> = Vec::new();
-    for entity in host_str.split(",") {
+    for entity in host_str.split(',') {
         if entity.is_empty() {
             return Err(ArgumentError("Empty host, or extra comma in host list.".to_owned()));
         }
@@ -280,8 +280,8 @@ fn parse_options(opts: &str, delim: Option<&str>) -> ConnectionOptions {
 
 // Determines the option delimiter and offloads parsing to parse_options.
 fn split_options(opts: &str) -> Result<ConnectionOptions> {
-    let and_idx = opts.find("&");
-    let semi_idx = opts.find(";");
+    let and_idx = opts.find('&');
+    let semi_idx = opts.find(';');
     let mut delim = None;
 
     if and_idx != None && semi_idx != None {
@@ -290,7 +290,7 @@ fn split_options(opts: &str) -> Result<ConnectionOptions> {
         delim = Some("&");
     } else if semi_idx != None {
         delim = Some(";");
-    } else if opts.find("=") == None {
+    } else if opts.find('=') == None {
         return Err(ArgumentError("InvalidURI: MongoDB URI options are key=value pairs."
             .to_owned()));
     }

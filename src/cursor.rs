@@ -123,12 +123,7 @@ impl Cursor {
     fn get_bson_and_cid_from_message(message: Message)
                                      -> Result<(bson::Document, VecDeque<bson::Document>, i64)> {
         match message {
-            Message::OpReply { header: _,
-                               flags: _,
-                               cursor_id: cid,
-                               starting_from: _,
-                               number_returned: _,
-                               documents: docs } => {
+            Message::OpReply { cursor_id: cid, documents: docs, .. } => {
                 let mut v = VecDeque::new();
                 let mut out_doc = doc!{};
 
@@ -176,7 +171,7 @@ impl Cursor {
                         // Extract first batch documents
                         let map = batch.iter()
                             .filter_map(|bdoc| {
-                                if let &Bson::Document(ref doc) = bdoc {
+                                if let Bson::Document(ref doc) = *bdoc {
                                     Some(doc.clone())
                                 } else {
                                     None
@@ -294,7 +289,7 @@ impl Cursor {
         let mut socket = stream.get_socket();
         let req_id = client.get_req_id();
 
-        let index = namespace.find(".").unwrap_or(namespace.len());
+        let index = namespace.find('.').unwrap_or(namespace.len());
         let db_name = namespace[..index].to_owned();
         let coll_name = namespace[index + 1..].to_owned();
         let cmd_name = cmd_type.to_str();
@@ -414,7 +409,8 @@ impl Cursor {
             });
         }
 
-        let read_preference = read_pref.unwrap_or(ReadPreference::new(ReadMode::Primary, None));
+        let read_preference =
+            read_pref.unwrap_or_else(|| ReadPreference::new(ReadMode::Primary, None));
 
         Ok(Cursor {
             client: client,
@@ -439,7 +435,7 @@ impl Cursor {
                                              self.batch_size,
                                              self.cursor_id);
 
-        let index = self.namespace.rfind(".").unwrap_or(self.namespace.len());
+        let index = self.namespace.rfind('.').unwrap_or(self.namespace.len());
         let db_name = self.namespace[..index].to_owned();
         let cmd_name = "get_more".to_owned();
         let connstring = format!("{}", try!(socket.get_ref().peer_addr()));

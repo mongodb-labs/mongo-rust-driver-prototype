@@ -25,7 +25,7 @@ impl ByteLength for bson::Document {
     fn byte_length(&self) -> Result<i32> {
         let mut temp_buffer = vec![];
 
-        let _ = try!(bson::encode_document(&mut temp_buffer, self));
+        try!(bson::encode_document(&mut temp_buffer, self));
         Ok(temp_buffer.len() as i32)
     }
 }
@@ -398,10 +398,9 @@ impl Message {
         try!(buffer.write_i32::<LittleEndian>(number_to_return));
         try!(Message::write_bson_document(buffer, query));
 
-        match *return_field_selector {
-            Some(ref doc) => try!(Message::write_bson_document(buffer, doc)),
-            None => (),
-        };
+        if let Some(ref doc) = *return_field_selector {
+            try!(Message::write_bson_document(buffer, doc));
+        }
 
         let _ = buffer.flush();
         Ok(())
@@ -468,10 +467,10 @@ impl Message {
                                 ref flags,
                                 ref selector,
                                 ref update } => {
-                Message::write_update(buffer, &header, &namespace, &flags, &selector, &update)
+                Message::write_update(buffer, header, namespace, flags, selector, update)
             }
             Message::OpInsert { ref header, ref flags, ref namespace, ref documents } => {
-                Message::write_insert(buffer, &header, &flags, &namespace, &documents)
+                Message::write_insert(buffer, header, flags, namespace, documents)
             }
             Message::OpQuery { ref header,
                                ref flags,
@@ -481,16 +480,16 @@ impl Message {
                                ref query,
                                ref return_field_selector } => {
                 Message::write_query(buffer,
-                                     &header,
-                                     &flags,
-                                     &namespace,
+                                     header,
+                                     flags,
+                                     namespace,
                                      number_to_skip,
                                      number_to_return,
-                                     &query,
-                                     &return_field_selector)
+                                     query,
+                                     return_field_selector)
             }
             Message::OpGetMore { ref header, ref namespace, number_to_return, cursor_id } => {
-                Message::write_get_more(buffer, &header, &namespace, number_to_return, cursor_id)
+                Message::write_get_more(buffer, header, namespace, number_to_return, cursor_id)
             }
         }
     }

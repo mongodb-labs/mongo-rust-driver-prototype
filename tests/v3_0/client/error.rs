@@ -43,8 +43,8 @@ fn invalidate_write_result() {
     assert!(result.is_err());
     match result {
         Err(Error::BulkWriteError(err)) => {
-            let ref wc_err = err.write_concern_error;
-            let ref w_errs = err.write_errors;
+            let wc_err = &err.write_concern_error;
+            let w_errs = &err.write_errors;
 
             assert_eq!(2, w_errs.len());
             let w0 = w_errs.get(0).unwrap();

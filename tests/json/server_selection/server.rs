@@ -28,7 +28,7 @@ impl Server {
                                    Some(&Json::Object(ref obj)) => obj.clone(),
                                    "server must have tags.");
 
-        for (key, json) in json_doc.into_iter() {
+        for (key, json) in json_doc {
             match json {
                 Json::String(val) => {
                     tags.insert(key, val);

@@ -146,7 +146,7 @@ impl Authenticator {
 
         // Compute client key
         let mut client_key_hmac = Hmac::new(Sha1::new(), &salted_password[..]);
-        let client_key_bytes = "Client Key".as_bytes();
+        let client_key_bytes = b"Client Key";
         client_key_hmac.input(client_key_bytes);
         let client_key = client_key_hmac.result().code().to_owned();
 
@@ -209,7 +209,7 @@ impl Authenticator {
 
         // Compute server key
         let mut server_key_hmac = Hmac::new(Sha1::new(), &auth_data.salted_password[..]);
-        let server_key_bytes = "Server Key".as_bytes();
+        let server_key_bytes = b"Server Key";
         server_key_hmac.input(server_key_bytes);
         let server_key = server_key_hmac.result().code().to_owned();
 

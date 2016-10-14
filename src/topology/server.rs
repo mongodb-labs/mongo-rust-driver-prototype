@@ -104,6 +104,12 @@ impl FromStr for ServerType {
     }
 }
 
+impl Default for ServerDescription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ServerDescription {
     /// Returns a default, unknown server description.
     pub fn new() -> ServerDescription {

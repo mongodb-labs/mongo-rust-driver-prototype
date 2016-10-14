@@ -54,12 +54,7 @@ fn insert_single_key_doc() {
             };
 
             let docs = match reply {
-                Message::OpReply { header: _,
-                                   flags: _,
-                                   cursor_id: _,
-                                   starting_from: _,
-                                   number_returned: _,
-                                   documents: d } => d,
+                Message::OpReply { documents: d, .. } => d,
                 _ => panic!("Invalid response read from server"),
             };
 
@@ -120,12 +115,7 @@ fn insert_multi_key_doc() {
             };
 
             let docs = match reply {
-                Message::OpReply { header: _,
-                                   flags: _,
-                                   cursor_id: _,
-                                   starting_from: _,
-                                   number_returned: _,
-                                   documents: d } => d,
+                Message::OpReply { documents: d, .. } => d,
                 _ => panic!("Invalid response read from server"),
             };
 
@@ -196,12 +186,7 @@ fn insert_docs() {
             };
 
             let docs = match reply {
-                Message::OpReply { header: _,
-                                   flags: _,
-                                   cursor_id: _,
-                                   starting_from: _,
-                                   number_returned: _,
-                                   documents: d } => d,
+                Message::OpReply { documents: d, .. } => d,
                 _ => panic!("Invalid response read from server"),
             };
 
@@ -288,12 +273,7 @@ fn insert_update_then_query() {
             };
 
             let docs = match reply {
-                Message::OpReply { header: _,
-                                   flags: _,
-                                   cursor_id: _,
-                                   starting_from: _,
-                                   number_returned: _,
-                                   documents: d } => d,
+                Message::OpReply { documents: d, .. } => d,
                 _ => panic!("Invalid response read from server"),
             };
 

@@ -377,8 +377,8 @@ fn distinct() {
     assert_eq!(3, distinct_titles.len());
 
     let titles: Vec<_> = distinct_titles.iter()
-        .filter_map(|bson| match bson {
-            &Bson::String(ref title) => Some(title.to_owned()),
+        .filter_map(|bson| match *bson {
+            Bson::String(ref title) => Some(title.to_owned()),
             _ => None,
         })
         .collect();
@@ -396,8 +396,8 @@ fn distinct() {
     assert_eq!(2, distinct_titles.len());
 
     let titles: Vec<_> = distinct_titles.iter()
-        .filter_map(|bson| match bson {
-            &Bson::String(ref title) => Some(title.to_owned()),
+        .filter_map(|bson| match *bson {
+            Bson::String(ref title) => Some(title.to_owned()),
             _ => None,
         })
         .collect();

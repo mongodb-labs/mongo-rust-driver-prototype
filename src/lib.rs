@@ -80,7 +80,7 @@
 //! Each server within a MongoDB server set is monitored asynchronously for changes in status, and
 //! the driver's view of the current topology is updated in response to this. This allows the
 //! driver to be aware of the status of the server set it is communicating with, and to make server
-//! selections appropriately with regards to the user-specified ReadPreference and WriteConcern.
+//! selections appropriately with regards to the user-specified `ReadPreference` and `WriteConcern`.
 //!
 //! ## Connection Pooling
 //!
@@ -152,6 +152,7 @@ pub struct ClientInner {
 }
 
 /// Configuration options for a client.
+#[derive(Default)]
 pub struct ClientOptions {
     /// File path for command logging.
     pub log_file: Option<String>,
@@ -263,11 +264,11 @@ impl ThreadedClient for Client {
                    description: Option<TopologyDescription>)
                    -> Result<Client> {
 
-        let client_options = options.unwrap_or(ClientOptions::new());
+        let client_options = options.unwrap_or_else(ClientOptions::new);
 
         let rp = client_options.read_preference
-            .unwrap_or(ReadPreference::new(ReadMode::Primary, None));
-        let wc = client_options.write_concern.unwrap_or(WriteConcern::new());
+            .unwrap_or_else(|| ReadPreference::new(ReadMode::Primary, None));
+        let wc = client_options.write_concern.unwrap_or_else(WriteConcern::new);
 
         let listener = Listener::new();
         let file = match client_options.log_file {
@@ -346,7 +347,7 @@ impl ThreadedClient for Client {
             // Extract database names
             let map = batch.iter()
                 .filter_map(|bdoc| {
-                    if let &Bson::Document(ref doc) = bdoc {
+                    if let Bson::Document(ref doc) = *bdoc {
                         if let Some(&Bson::String(ref name)) = doc.get("name") {
                             return Some(name.to_owned());
                         }

@@ -69,34 +69,34 @@ impl CommandType {
 
     pub fn is_write_command(&self) -> bool {
         match *self {
-            CommandType::Aggregate => false,
-            CommandType::Count => false,
-            CommandType::CreateCollection => true,
-            CommandType::CreateIndexes => true,
-            CommandType::CreateUser => true,
-            CommandType::DeleteMany => true,
-            CommandType::DeleteOne => true,
-            CommandType::Distinct => false,
-            CommandType::DropAllUsers => true,
-            CommandType::DropCollection => true,
-            CommandType::DropDatabase => true,
-            CommandType::DropIndexes => true,
-            CommandType::DropUser => true,
-            CommandType::Find => false,
-            CommandType::FindOneAndDelete => true,
-            CommandType::FindOneAndReplace => true,
-            CommandType::FindOneAndUpdate => true,
-            CommandType::GetUser => false,
-            CommandType::GetUsers => false,
-            CommandType::InsertMany => true,
-            CommandType::InsertOne => true,
-            CommandType::IsMaster => false,
-            CommandType::ListCollections => false,
-            CommandType::ListDatabases => false,
-            CommandType::ListIndexes => false,
-            CommandType::Suppressed => false,
-            CommandType::UpdateMany => true,
+            CommandType::CreateCollection |
+            CommandType::CreateIndexes |
+            CommandType::CreateUser |
+            CommandType::DeleteMany |
+            CommandType::DeleteOne |
+            CommandType::DropAllUsers |
+            CommandType::DropCollection |
+            CommandType::DropDatabase |
+            CommandType::DropIndexes |
+            CommandType::DropUser |
+            CommandType::FindOneAndDelete |
+            CommandType::FindOneAndReplace |
+            CommandType::FindOneAndUpdate |
+            CommandType::InsertMany |
+            CommandType::InsertOne |
+            CommandType::UpdateMany |
             CommandType::UpdateOne => true,
+            CommandType::Aggregate |
+            CommandType::Count |
+            CommandType::Distinct |
+            CommandType::Find |
+            CommandType::GetUser |
+            CommandType::GetUsers |
+            CommandType::IsMaster |
+            CommandType::ListCollections |
+            CommandType::ListDatabases |
+            CommandType::ListIndexes |
+            CommandType::Suppressed => false,
         }
     }
 }

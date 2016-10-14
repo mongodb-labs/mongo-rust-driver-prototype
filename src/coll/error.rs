@@ -100,9 +100,8 @@ impl fmt::Display for BulkWriteException {
             try!(write!(fmt, "{:?}\n", v));
         }
 
-        match self.write_concern_error {
-            Some(ref error) => try!(write!(fmt, "{:?}\n", error)),
-            None => (),
+        if let Some(ref error) = self.write_concern_error {
+            try!(write!(fmt, "{:?}\n", error));
         }
 
         for v in &self.write_errors {
@@ -138,9 +137,8 @@ impl WriteException {
             None => "".to_owned(),
         };
 
-        match w_err {
-            Some(ref error) => s.push_str(&format!("{:?}\n", error)[..]),
-            None => (),
+        if let Some(ref error) = w_err {
+            s.push_str(&format!("{:?}\n", error)[..]);
         }
 
         WriteException {
@@ -155,7 +153,7 @@ impl WriteException {
     pub fn with_bulk_exception(bulk_exception: BulkWriteException) -> WriteException {
         let len = bulk_exception.write_errors.len();
         let write_error = match bulk_exception.write_errors.get(len - 1) {
-            Some(ref e) => Some(WriteError::new(e.code, e.message.to_owned())),
+            Some(e) => Some(WriteError::new(e.code, e.message.to_owned())),
             None => None,
         };
 
@@ -341,7 +339,7 @@ impl BulkWriteException {
 
             let mut vec = Vec::new();
             for err in errors {
-                if let &Bson::Document(ref doc) = err {
+                if let Bson::Document(ref doc) = *err {
                     vec.push(try!(BulkWriteError::parse(doc.clone())));
                 } else {
                     return Err(Error::ResponseError("WriteError provided was not a bson \

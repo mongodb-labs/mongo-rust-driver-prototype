@@ -38,7 +38,7 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
     let mut servers = HashMap::new();
 
     // Fill servers array
-    for host in connection_string.hosts.iter() {
+    for host in &connection_string.hosts {
         let mut topology_description = topology.description.write().unwrap();
         let server = Server::new(dummy_client.clone(),
                                  host.clone(),
@@ -53,7 +53,7 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
                 // Save each seen server to replicate monitors for servers
                 // that have been removed from the topology.
                 let topology_description = topology.description.read().unwrap();
-                for (host, server) in topology_description.servers.iter() {
+                for (host, server) in &topology_description.servers {
                     servers.insert(host.clone(), server.clone());
                 }
             }
@@ -90,7 +90,7 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
         let topology_description = topology.description.read().unwrap();
 
         assert_eq!(phase.outcome.servers.len(), topology_description.servers.len());
-        for (host, server) in phase.outcome.servers.iter() {
+        for (host, server) in &phase.outcome.servers {
             match topology_description.servers.get(host) {
                 Some(top_server) => {
                     let top_server_description = top_server.description.read().unwrap();

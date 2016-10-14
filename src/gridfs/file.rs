@@ -407,8 +407,8 @@ impl io::Write for File {
             }
 
             // Flush chunk to GridFS
-            let mut chunk = self.wbuf.clone();
-            try!(self.insert_chunk(chunk_num, &mut chunk));
+            let chunk = self.wbuf.clone();
+            try!(self.insert_chunk(chunk_num, &chunk));
             self.wbuf.clear();
         }
 
@@ -514,14 +514,14 @@ impl io::Read for File {
         }
 
         // Write into buf
-        let i = try!((&mut *buf).write(&mut self.rbuf));
+        let i = try!((&mut *buf).write(&self.rbuf));
         self.offset += i as i64;
 
         // Save unread chunk portion into local read buffer
         let mut new_rbuf = Vec::with_capacity(self.rbuf.len() - i);
         {
             let (_, p2) = self.rbuf.split_at(i);
-            let b: Vec<u8> = p2.iter().map(|&i| i).collect();
+            let b: Vec<u8> = p2.iter().cloned().collect();
             new_rbuf.extend(b);
         }
 

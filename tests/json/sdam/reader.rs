@@ -69,8 +69,8 @@ impl SuiteContainer for Json {
     }
 
     fn get_suite(&self) -> Result<Suite, String> {
-        let object = val_or_err!(self,
-                                 &Json::Object(ref object) => object.clone(),
+        let object = val_or_err!(*self,
+                                 Json::Object(ref object) => object.clone(),
                                  "`get_suite` requires a JSON object");
 
         let uri = val_or_err!(object.get("uri"),

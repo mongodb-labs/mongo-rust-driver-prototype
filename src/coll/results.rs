@@ -6,7 +6,7 @@ use super::error::{BulkWriteException, WriteException};
 use super::options::WriteModel;
 
 /// Results for a bulk write operation.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct BulkWriteResult {
     pub acknowledged: bool,
     pub inserted_count: i32,

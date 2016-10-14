@@ -116,14 +116,14 @@ impl Batch {
     /// Returns `None` on success, or the model that couldn't be merged on
     /// failure.
     pub fn merge_model(&mut self, model: WriteModel) -> Option<WriteModel> {
-        match self {
-            &mut Batch::Insert(ref mut docs) => {
+        match *self {
+            Batch::Insert(ref mut docs) => {
                 match model {
                     WriteModel::InsertOne { document } => docs.push(document),
                     _ => return Some(model),
                 }
             }
-            &mut Batch::Delete(ref mut models) => {
+            Batch::Delete(ref mut models) => {
                 match model {
                     WriteModel::DeleteOne { filter } => {
                         models.push(DeleteModel {
@@ -140,7 +140,7 @@ impl Batch {
                     _ => return Some(model),
                 }
             }
-            &mut Batch::Update(ref mut models) => {
+            Batch::Update(ref mut models) => {
                 match model {
                     WriteModel::ReplaceOne { filter, replacement: update, upsert } => {
                         models.push(UpdateModel {

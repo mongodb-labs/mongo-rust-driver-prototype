@@ -44,7 +44,7 @@ pub enum WriteModel {
 }
 
 /// Options for aggregation queries.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AggregateOptions {
     pub allow_disk_use: bool,
     pub use_cursor: bool,
@@ -54,7 +54,7 @@ pub struct AggregateOptions {
 }
 
 /// Options for count queries.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct CountOptions {
     pub skip: u64,
     pub limit: i64,
@@ -65,7 +65,7 @@ pub struct CountOptions {
 }
 
 /// Options for distinct queries.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct DistinctOptions {
     pub max_time_ms: Option<i64>,
     pub read_preference: Option<ReadPreference>,
@@ -89,8 +89,8 @@ pub struct FindOptions {
     pub read_preference: Option<ReadPreference>,
 }
 
-/// Options for findOneAndDelete operations.
-#[derive(Clone)]
+/// Options for `findOneAndDelete` operations.
+#[derive(Clone, Default)]
 pub struct FindOneAndDeleteOptions {
     pub max_time_ms: Option<i64>,
     pub projection: Option<bson::Document>,
@@ -98,7 +98,7 @@ pub struct FindOneAndDeleteOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
-/// Options for findOneAndUpdate operations.
+/// Options for `findOneAndUpdate` operations.
 #[derive(Clone)]
 pub struct FindOneAndUpdateOptions {
     pub return_document: ReturnDocument,
@@ -110,7 +110,7 @@ pub struct FindOneAndUpdateOptions {
 }
 
 /// Options for index operations.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct IndexOptions {
     pub background: Option<bool>,
     pub expire_after_seconds: Option<i32>,
@@ -142,14 +142,14 @@ pub struct IndexModel {
 }
 
 /// Options for insertMany operations.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct InsertManyOptions {
     pub ordered: bool,
     pub write_concern: Option<WriteConcern>,
 }
 
 /// Options for update operations.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct UpdateOptions {
     pub upsert: bool,
     pub write_concern: Option<WriteConcern>,
@@ -191,6 +191,12 @@ impl DistinctOptions {
     }
 }
 
+impl Default for FindOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FindOptions {
     /// Creates a new FindOptions struct with default parameters.
     pub fn new() -> FindOptions {
@@ -227,6 +233,12 @@ impl FindOneAndDeleteOptions {
             sort: None,
             write_concern: None,
         }
+    }
+}
+
+impl Default for FindOneAndUpdateOptions {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -270,7 +282,7 @@ impl IndexModel {
     pub fn new(keys: bson::Document, options: Option<IndexOptions>) -> IndexModel {
         IndexModel {
             keys: keys,
-            options: options.unwrap_or(IndexOptions::new()),
+            options: options.unwrap_or_else(IndexOptions::new),
         }
     }
 
@@ -292,10 +304,10 @@ impl IndexModel {
                 name.push_str("_");
             }
 
-            name.push_str(&key);
-            name.push_str("_");
-            match bson {
-                &Bson::I32(ref i) => name.push_str(&format!("{}", i)),
+            name.push_str(key);
+            name.push('_');
+            match *bson {
+                Bson::I32(ref i) => name.push_str(&format!("{}", i)),
                 _ => return Err(ArgumentError("Index model keys must map to i32.".to_owned())),
             }
         }

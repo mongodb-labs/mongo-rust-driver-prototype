@@ -46,8 +46,8 @@ fn cursor_features() {
 
     assert_eq!(batch.len(), 3 as usize);
 
-    for i in 0..batch.len() {
-        match batch[i].get("foo") {
+    for (i, item) in batch.iter().enumerate() {
+        match item.get("foo") {
             Some(&Bson::I64(j)) => assert_eq!(i as i64, j),
             _ => panic!("Wrong value returned from Cursor#next_batch"),
         };
@@ -70,8 +70,8 @@ fn cursor_features() {
     assert_eq!(vec.len(), 6 as usize);
     assert!(!cursor.has_next().expect("Failed to execute 'has_next()'."));
 
-    for i in 0..vec.len() {
-        match vec[i].get("foo") {
+    for (i, item) in vec.iter().enumerate() {
+        match item.get("foo") {
             Some(&Bson::I64(j)) => assert_eq!(4 + i as i64 , j),
             _ => panic!("Wrong value returned from Cursor#next_batch"),
         };

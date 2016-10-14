@@ -7,8 +7,8 @@ use mongodb::db::ThreadedDatabase;
 use rand;
 
 fn timed_query(_client: Client, command_result: &CommandResult) {
-    let (command_name, duration) = match command_result {
-        &CommandResult::Success { ref command_name, duration, .. } => {
+    let (command_name, duration) = match *command_result {
+        CommandResult::Success { ref command_name, duration, .. } => {
             (command_name.clone(), duration)
         }
         _ => panic!("Command failed!"),
@@ -163,5 +163,5 @@ fn logging() {
 
     coll.drop().unwrap();
 
-    let _ = fs::remove_file("test_log.txt").unwrap();
+    fs::remove_file("test_log.txt").unwrap();
 }

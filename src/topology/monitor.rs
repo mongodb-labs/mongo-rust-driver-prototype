@@ -121,7 +121,7 @@ impl IsMasterResult {
         }
 
         if let Some(&Bson::UtcDatetime(ref datetime)) = doc.get("localTime") {
-            result.local_time = Some(datetime.clone());
+            result.local_time = Some(*datetime);
         }
 
         if let Some(&Bson::I64(v)) = doc.get("minWireVersion") {
@@ -154,8 +154,8 @@ impl IsMasterResult {
 
         if let Some(&Bson::Array(ref arr)) = doc.get("hosts") {
             result.hosts = arr.iter()
-                .filter_map(|bson| match bson {
-                    &Bson::String(ref s) => connstring::parse_host(s).ok(),
+                .filter_map(|bson| match *bson {
+                    Bson::String(ref s) => connstring::parse_host(s).ok(),
                     _ => None,
                 })
                 .collect();
@@ -163,8 +163,8 @@ impl IsMasterResult {
 
         if let Some(&Bson::Array(ref arr)) = doc.get("passives") {
             result.passives = arr.iter()
-                .filter_map(|bson| match bson {
-                    &Bson::String(ref s) => connstring::parse_host(s).ok(),
+                .filter_map(|bson| match *bson {
+                    Bson::String(ref s) => connstring::parse_host(s).ok(),
                     _ => None,
                 })
                 .collect();
@@ -172,8 +172,8 @@ impl IsMasterResult {
 
         if let Some(&Bson::Array(ref arr)) = doc.get("arbiters") {
             result.arbiters = arr.iter()
-                .filter_map(|bson| match bson {
-                    &Bson::String(ref s) => connstring::parse_host(s).ok(),
+                .filter_map(|bson| match *bson {
+                    Bson::String(ref s) => connstring::parse_host(s).ok(),
                     _ => None,
                 })
                 .collect();
@@ -196,8 +196,8 @@ impl IsMasterResult {
         }
 
         if let Some(&Bson::Document(ref doc)) = doc.get("tags") {
-            for (k, v) in doc.into_iter() {
-                if let &Bson::String(ref tag) = v {
+            for (k, v) in doc {
+                if let Bson::String(ref tag) = *v {
                     result.tags.insert(k.to_owned(), tag.to_owned());
                 }
             }

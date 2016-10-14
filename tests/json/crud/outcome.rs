@@ -14,7 +14,7 @@ pub struct Outcome {
 impl Outcome {
     pub fn from_json(object: &Object) -> Result<Outcome, String> {
         let result = match object.get("result") {
-            Some(ref json) => Bson::from_json(&json),
+            Some(json) => Bson::from_json(json),
             None => Bson::Null,
         };
 
@@ -40,7 +40,7 @@ impl Outcome {
         let mut data = vec![];
 
         for json in array {
-            match Bson::from_json(&json) {
+            match Bson::from_json(json) {
                 Bson::Document(doc) => data.push(doc),
                 _ => return Err("`data` array must contain only objects".to_owned()),
             }

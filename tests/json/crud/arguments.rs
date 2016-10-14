@@ -207,7 +207,7 @@ impl Arguments {
 
         let mut docs = vec![];
 
-        for bson in bsons.into_iter() {
+        for bson in bsons {
             match bson {
                 Bson::Document(doc) => docs.push(doc),
                 _ => return Err("`insert_many` can only insert documents".to_owned()),

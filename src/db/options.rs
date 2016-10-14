@@ -3,6 +3,7 @@ use bson::Document;
 use common::WriteConcern;
 use db::roles::Role;
 
+#[derive(Default)]
 pub struct CreateCollectionOptions {
     pub capped: bool,
     pub auto_index_id: bool,
@@ -25,6 +26,7 @@ impl CreateCollectionOptions {
     }
 }
 
+#[derive(Default)]
 pub struct CreateUserOptions {
     pub custom_data: Option<Document>,
     pub roles: Vec<Role>,
@@ -41,6 +43,7 @@ impl CreateUserOptions {
     }
 }
 
+#[derive(Default)]
 pub struct UserInfoOptions {
     pub show_credentials: bool,
     pub show_privileges: bool,

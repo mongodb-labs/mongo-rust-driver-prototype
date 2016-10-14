@@ -139,7 +139,7 @@ fn overridable_database() {
 
 #[test]
 fn query_separators() {
-    for delim in vec!(";", "&") {
+    for delim in &[";", "&"] {
         let uri = format!("mongodb://rust/?replicaSet=myreplset{}slaveOk=true{}x=1", delim, delim);
         let result = connstring::parse(&uri);
         assert!(result.is_ok());
@@ -162,7 +162,7 @@ fn read_pref_tags() {
         vec!("dc:ny,rack:1", "dc:ny", ""),
         );
 
-    for delim in vec!("&", ";") {
+    for delim in &["&", ";"] {
         for prefs in &pref_set {
             let mut uri = format!("mongodb://localhost/?readPreferenceTags={}", prefs[0]);
             for pref in &prefs[1..] {
@@ -173,8 +173,8 @@ fn read_pref_tags() {
             let options = connstr.options.unwrap();
             assert_eq!(options.read_pref_tags.len(), prefs.len());
 
-            for i in 0..prefs.len() - 1 {
-                assert_eq!(prefs[i], options.read_pref_tags[i]);
+            for (i, pref) in prefs.iter().enumerate().take(prefs.len() - 1) {
+                assert_eq!(pref, &options.read_pref_tags[i]);
             }
         }
     }

@@ -79,11 +79,7 @@ impl OpUpdateFlags {
     ///
     /// Returns the bit vector as an i32.
     pub fn to_i32(&self) -> i32 {
-        let mut i = 0 as i32;
-
-        if self.upsert {
-            i = 1;
-        }
+        let mut i: i32 = if self.upsert { 1 } else { 0 };
 
         if self.multi_update {
             i |= 1 << 1;

@@ -43,7 +43,7 @@ impl ReadPreference {
     pub fn new(mode: ReadMode, tag_sets: Option<Vec<BTreeMap<String, String>>>) -> ReadPreference {
         ReadPreference {
             mode: mode,
-            tag_sets: tag_sets.unwrap_or(Vec::new()),
+            tag_sets: tag_sets.unwrap_or_else(Vec::new),
         }
     }
 
@@ -65,7 +65,7 @@ impl ReadPreference {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct WriteConcern {
     /// Write replication
     pub w: i32,

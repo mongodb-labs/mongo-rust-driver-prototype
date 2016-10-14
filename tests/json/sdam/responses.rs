@@ -7,12 +7,12 @@ pub struct Responses {
 }
 
 impl Responses {
-    pub fn from_json(array: &Vec<Json>) -> Result<Responses, String> {
+    pub fn from_json(array: &[Json]) -> Result<Responses, String> {
         let mut data = Vec::new();
 
         for json in array {
-            let inner_array = val_or_err!(json,
-                                          &Json::Array(ref arr) => arr,
+            let inner_array = val_or_err!(*json,
+                                          Json::Array(ref arr) => arr,
                                           "`responses` must be an array of arrays.");
 
             if inner_array.len() != 2 {

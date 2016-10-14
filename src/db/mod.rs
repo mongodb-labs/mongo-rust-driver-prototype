@@ -231,7 +231,8 @@ impl ThreadedDatabase for Database {
         options.read_preference = read_preference;
         let res = try!(coll.find_one_with_command_type(Some(spec.clone()), Some(options),
                                                        cmd_type));
-        res.ok_or(OperationError(format!("Failed to execute command with spec {:?}.", spec)))
+        res.ok_or_else(|| OperationError(
+                format!("Failed to execute command with spec {:?}.", spec)))
     }
 
     fn list_collections(&self, filter: Option<bson::Document>) -> Result<Cursor> {
@@ -278,7 +279,7 @@ impl ThreadedDatabase for Database {
                          name: &str,
                          options: Option<CreateCollectionOptions>)
                          -> Result<()> {
-        let coll_options = options.unwrap_or(CreateCollectionOptions::new());
+        let coll_options = options.unwrap_or_else(CreateCollectionOptions::new);
         let mut doc = doc! {
             "create" => name,
             "capped" => (coll_options.capped),
@@ -310,7 +311,7 @@ impl ThreadedDatabase for Database {
                    password: &str,
                    options: Option<CreateUserOptions>)
                    -> Result<()> {
-        let user_options = options.unwrap_or(CreateUserOptions::new());
+        let user_options = options.unwrap_or_else(CreateUserOptions::new);
         let mut doc = doc! {
             "createUser" => name,
             "pwd" => password
@@ -394,7 +395,7 @@ impl ThreadedDatabase for Database {
     }
 
     fn get_user(&self, user: &str, options: Option<UserInfoOptions>) -> Result<bson::Document> {
-        let info_options = options.unwrap_or(UserInfoOptions::new());
+        let info_options = options.unwrap_or_else(UserInfoOptions::new);
 
         let doc = doc! {
             "usersInfo" => { "user" => user, "db" => (Bson::String(self.name.to_owned())) },
@@ -422,7 +423,7 @@ impl ThreadedDatabase for Database {
                  users: Vec<&str>,
                  options: Option<UserInfoOptions>)
                  -> Result<Vec<bson::Document>> {
-        let info_options = options.unwrap_or(UserInfoOptions::new());
+        let info_options = options.unwrap_or_else(UserInfoOptions::new);
         let vec = users.into_iter()
             .map(|user| {
                 let doc = doc! { "user" => user, "db" => (Bson::String(self.name.to_owned())) };

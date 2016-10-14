@@ -22,9 +22,9 @@ impl Outcome {
         let mut servers = HashMap::new();
 
         if let Some(&Json::Object(ref obj)) = object.get("servers") {
-            for (host, json) in obj.into_iter() {
-                let doc = val_or_err!(json,
-                                      &Json::Object(ref obj) => obj,
+            for (host, json) in obj {
+                let doc = val_or_err!(*json,
+                                      Json::Object(ref obj) => obj,
                                       "`servers` must be an object map.");
 
                 let server_set_name = match doc.get("setName") {

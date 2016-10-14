@@ -87,6 +87,12 @@ impl FromStr for TopologyType {
     }
 }
 
+impl Default for TopologyDescription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TopologyDescription {
     /// Returns a default, unknown topology description.
     pub fn new() -> TopologyDescription {
@@ -160,7 +166,7 @@ impl TopologyDescription {
     pub fn acquire_stream(&self,
                           read_preference: &ReadPreference)
                           -> Result<(PooledStream, bool, bool)> {
-        let (mut hosts, rand) = self.choose_hosts(&read_preference);
+        let (mut hosts, rand) = self.choose_hosts(read_preference);
 
         // Filter hosts by tagsets
         if self.topology_type != TopologyType::Sharded &&
@@ -178,7 +184,7 @@ impl TopologyDescription {
 
         // If no servers are available, request an update from all monitors.
         if hosts.is_empty() {
-            for (_, server) in &self.servers {
+            for server in self.servers.values() {
                 server.request_update();
             }
         }
@@ -201,11 +207,11 @@ impl TopologyDescription {
                     ServerType::Mongos => {
                         match read_preference.mode {
                             ReadMode::Primary => (false, false),
-                            ReadMode::Secondary => (true, true),
-                            ReadMode::PrimaryPreferred => (true, true),
                             ReadMode::SecondaryPreferred => {
                                 (true, !read_preference.tag_sets.is_empty())
                             }
+                            ReadMode::Secondary |
+                            ReadMode::PrimaryPreferred |
                             ReadMode::Nearest => (true, true),
                         }
                     }
@@ -222,9 +228,9 @@ impl TopologyDescription {
             TopologyType::Sharded => {
                 match read_preference.mode {
                     ReadMode::Primary => (false, false),
-                    ReadMode::Secondary => (true, true),
-                    ReadMode::PrimaryPreferred => (true, true),
                     ReadMode::SecondaryPreferred => (true, !read_preference.tag_sets.is_empty()),
+                    ReadMode::Secondary |
+                    ReadMode::PrimaryPreferred |
                     ReadMode::Nearest => (true, true),
                 }
             }
@@ -239,7 +245,7 @@ impl TopologyDescription {
 
         // If no servers are available, request an update from all monitors.
         if hosts.is_empty() {
-            for (_, server) in &self.servers {
+            for server in self.servers.values() {
                 server.request_update();
             }
         }
@@ -261,16 +267,16 @@ impl TopologyDescription {
 
         // Set the tag_filter to the first tag set that matches at least one server in the set.
         for tags in &read_preference.tag_sets {
-            for ref host in hosts.iter() {
+            for host in hosts.iter() {
                 if let Some(server) = self.servers.get(host) {
                     let description = server.description.read().unwrap();
 
                     // Check whether the read preference tags are contained
                     // within the server description tags.
                     let mut valid = true;
-                    for (key, ref val) in tags.iter() {
+                    for (key, val) in tags.iter() {
                         match description.tags.get(key) {
-                            Some(ref v) => {
+                            Some(v) => {
                                 if val != v {
                                     valid = false;
                                     break;
@@ -325,9 +331,9 @@ impl TopologyDescription {
                         let description = server.description.read().unwrap();
 
                         // Validate tag sets.
-                        for (key, ref val) in tag_filter.iter() {
+                        for (key, val) in tag_filter.iter() {
                             match description.tags.get(key) {
-                                Some(ref v) => {
+                                Some(v) => {
                                     if val != v {
                                         return false;
                                     }
@@ -365,7 +371,7 @@ impl TopologyDescription {
             }
         }, |acc, host| {
             // Compare the previous shortest rtt with the host rtt.
-            if let Some(server) = self.servers.get(&host) {
+            if let Some(server) = self.servers.get(host) {
                 if let Ok(description) = server.description.read() {
                     let item_rtt = description.round_trip_time.unwrap_or(i64::MAX);
                     if acc < item_rtt {
@@ -387,7 +393,7 @@ impl TopologyDescription {
 
         // Filter hosts by the latency window [shortest_rtt, high_rtt].
         hosts.retain(|host| {
-            if let Some(server) = self.servers.get(&host) {
+            if let Some(server) = self.servers.get(host) {
                 if let Ok(description) = server.description.read() {
                     let rtt = description.round_trip_time.unwrap_or(i64::MAX);
                     return shortest_rtt <= rtt && rtt <= high_rtt;
@@ -407,10 +413,8 @@ impl TopologyDescription {
             // No servers are suitable.
             TopologyType::Unknown => (Vec::new(), true),
             // All servers are suitable.
-            TopologyType::Single => (self.servers.keys().map(|host| host.clone()).collect(), true),
-            TopologyType::Sharded => {
-                (self.servers.keys().map(|host| host.clone()).collect(), false)
-            }
+            TopologyType::Single => (self.servers.keys().cloned().collect(), true),
+            TopologyType::Sharded => (self.servers.keys().cloned().collect(), false),
             // Only primary replica set members are suitable.
             _ => {
                 (self.servers
@@ -441,16 +445,14 @@ impl TopologyDescription {
             // No servers are suitable.
             TopologyType::Unknown => (Vec::new(), true),
             // All servers are suitable.
-            TopologyType::Single => (self.servers.keys().map(|host| host.clone()).collect(), true),
-            TopologyType::Sharded => {
-                (self.servers.keys().map(|host| host.clone()).collect(), false)
-            }
+            TopologyType::Single => (self.servers.keys().cloned().collect(), true),
+            TopologyType::Sharded => (self.servers.keys().cloned().collect(), false),
             _ => {
 
                 // Handle replica set server selection
                 // Short circuit if nearest
                 if read_preference.mode == ReadMode::Nearest {
-                    return (self.servers.keys().map(|host| host.clone()).collect(), false);
+                    return (self.servers.keys().cloned().collect(), false);
                 }
 
                 let mut primaries = Vec::new();
@@ -486,9 +488,7 @@ impl TopologyDescription {
                         };
                         (servers, true)
                     }
-                    ReadMode::Nearest => {
-                        (self.servers.keys().map(|host| host.clone()).collect(), false)
-                    }
+                    ReadMode::Nearest => (self.servers.keys().cloned().collect(), false),
                 }
             }
         }
@@ -587,7 +587,7 @@ impl TopologyDescription {
 
     // Sets the correct replica set topology type.
     fn check_if_has_primary(&mut self) {
-        for (_, server) in &self.servers {
+        for server in self.servers.values() {
             let stype = server.description.read().unwrap().server_type;
             if stype == ServerType::RSPrimary {
                 self.topology_type = TopologyType::ReplicaSetWithPrimary;
@@ -677,9 +677,9 @@ impl TopologyDescription {
 
         // Remove hosts that are not reported by the primary.
         let mut hosts_to_remove = Vec::new();
-        for (host, _) in &self.servers {
-            if !description.hosts.contains(&host) && !description.passives.contains(&host) &&
-               !description.arbiters.contains(&host) {
+        for host in self.servers.keys() {
+            if !description.hosts.contains(host) && !description.passives.contains(host) &&
+               !description.arbiters.contains(host) {
                 hosts_to_remove.push(host.clone());
             }
         }
@@ -781,7 +781,7 @@ impl Topology {
                description: Option<TopologyDescription>)
                -> Result<Topology> {
 
-        let mut options = description.unwrap_or(TopologyDescription::new());
+        let mut options = description.unwrap_or_else(TopologyDescription::new);
 
         if config.hosts.len() > 1 && options.topology_type == TopologyType::Single {
             return Err(ArgumentError("TopologyType::Single cannot be used with multiple seeds."

@@ -139,8 +139,8 @@ macro_rules! run_insert_many_test {
             _ => panic!("`insert_many` test result should be a document")
         };
 
-        let ids = match ids_bson {
-            &Bson::Array(ref arr) => arr.into_iter(),
+        let ids = match *ids_bson {
+            Bson::Array(ref arr) => arr.into_iter(),
             _ => panic!("`insertedIds` test result should be an array")
         };
 
@@ -306,7 +306,7 @@ macro_rules! check_coll {
 
         let mut cursor = coll.find(None, None).unwrap();
 
-        for doc in outcome_coll.data.iter() {
+        for doc in &outcome_coll.data {
             assert!(eq::bson_eq(&Bson::Document(doc.clone()),
                                 &Bson::Document(cursor.next().unwrap().unwrap())));
         }

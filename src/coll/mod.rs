@@ -69,7 +69,7 @@ impl Collection {
     /// Extracts the collection name from the namespace.
     /// If the namespace is invalid, this method will panic.
     pub fn name(&self) -> String {
-        match self.namespace.find(".") {
+        match self.namespace.find('.') {
             Some(idx) => {
                 self.namespace[self.namespace
                         .char_indices()
@@ -96,7 +96,7 @@ impl Collection {
                      pipeline: Vec<bson::Document>,
                      options: Option<AggregateOptions>)
                      -> Result<Cursor> {
-        let opts = options.unwrap_or(AggregateOptions::new());
+        let opts = options.unwrap_or_else(AggregateOptions::new);
 
         let pipeline_map = pipeline.iter()
             .map(|bdoc| Bson::Document(bdoc.to_owned()))
@@ -121,7 +121,7 @@ impl Collection {
                  filter: Option<bson::Document>,
                  options: Option<CountOptions>)
                  -> Result<i64> {
-        let opts = options.unwrap_or(CountOptions::new());
+        let opts = options.unwrap_or_else(CountOptions::new);
 
         let mut spec = bson::Document::new();
         spec.insert("count", Bson::String(self.name()));
@@ -154,7 +154,7 @@ impl Collection {
                     options: Option<DistinctOptions>)
                     -> Result<Vec<Bson>> {
 
-        let opts = options.unwrap_or(DistinctOptions::new());
+        let opts = options.unwrap_or_else(DistinctOptions::new);
 
         let mut spec = bson::Document::new();
         spec.insert("distinct", Bson::String(self.name()));
@@ -184,20 +184,20 @@ impl Collection {
                               options: Option<FindOptions>,
                               cmd_type: CommandType)
                               -> Result<Cursor> {
-        let options = options.unwrap_or(FindOptions::new());
+        let options = options.unwrap_or_else(FindOptions::new);
         let flags = OpQueryFlags::with_find_options(&options);
 
         let doc = if options.sort.is_some() {
             let mut doc = bson::Document::new();
             doc.insert("$query".to_owned(),
-                       Bson::Document(filter.unwrap_or(bson::Document::new())));
+                       Bson::Document(filter.unwrap_or_else(bson::Document::new)));
 
             doc.insert("$orderby".to_owned(),
                        Bson::Document(options.sort.as_ref().unwrap().clone()));
 
             doc
         } else {
-            filter.unwrap_or(bson::Document::new())
+            filter.unwrap_or_else(bson::Document::new)
         };
 
         let read_pref = options.read_preference.unwrap_or(self.read_preference.to_owned());
@@ -228,7 +228,7 @@ impl Collection {
                                       options: Option<FindOptions>,
                                       cmd_type: CommandType)
                                       -> Result<Option<bson::Document>> {
-        let options = options.unwrap_or(FindOptions::new());
+        let options = options.unwrap_or_else(FindOptions::new);
         let mut cursor = try!(self.find_with_command_type(filter, Some(options.with_limit(1)),
                                                           cmd_type));
         match cursor.next() {
@@ -313,7 +313,7 @@ impl Collection {
                                options: Option<FindOneAndDeleteOptions>)
                                -> Result<Option<bson::Document>> {
 
-        let opts = options.unwrap_or(FindOneAndDeleteOptions::new());
+        let opts = options.unwrap_or_else(FindOneAndDeleteOptions::new);
         let mut cmd = bson::Document::new();
         cmd.insert("remove", Bson::Boolean(true));
         self.find_and_modify(&mut cmd,
@@ -332,7 +332,7 @@ impl Collection {
                                 replacement: bson::Document,
                                 options: Option<FindOneAndUpdateOptions>)
                                 -> Result<Option<bson::Document>> {
-        let opts = options.unwrap_or(FindOneAndUpdateOptions::new());
+        let opts = options.unwrap_or_else(FindOneAndUpdateOptions::new);
         try!(Collection::validate_replace(&replacement));
         self.find_one_and_replace_or_update(filter,
                                             replacement,
@@ -352,7 +352,7 @@ impl Collection {
                                update: bson::Document,
                                options: Option<FindOneAndUpdateOptions>)
                                -> Result<Option<bson::Document>> {
-        let opts = options.unwrap_or(FindOneAndUpdateOptions::new());
+        let opts = options.unwrap_or_else(FindOneAndUpdateOptions::new);
         try!(Collection::validate_update(&update));
         self.find_one_and_replace_or_update(filter,
                                             update,
@@ -433,9 +433,8 @@ impl Collection {
         for model in requests {
             let last_index = batches.len() - 1;
 
-            match batches[last_index].merge_model(model) {
-                Some(model) => batches.push(Batch::from(model)),
-                None => (),
+            if let Some(model) = batches[last_index].merge_model(model) {
+                batches.push(Batch::from(model));
             }
         }
 
@@ -659,7 +658,7 @@ impl Collection {
                        docs: Vec<bson::Document>,
                        options: Option<InsertManyOptions>)
                        -> Result<InsertManyResult> {
-        let options = options.unwrap_or(InsertManyOptions::new(false, None));
+        let options = options.unwrap_or_else(|| InsertManyOptions::new(false, None));
         let (ids, exception) = try!(self.insert(docs,
                                                 options.ordered,
                                                 options.write_concern,
@@ -826,8 +825,8 @@ impl Collection {
                        replacement: bson::Document,
                        options: Option<ReplaceOptions>)
                        -> Result<UpdateResult> {
-        let options = options.unwrap_or(ReplaceOptions::new(false, None));
-        let _ = try!(Collection::validate_replace(&replacement));
+        let options = options.unwrap_or_else(|| ReplaceOptions::new(false, None));
+        try!(Collection::validate_replace(&replacement));
         self.update(filter,
                     replacement,
                     options.upsert,
@@ -841,8 +840,8 @@ impl Collection {
                       update: bson::Document,
                       options: Option<UpdateOptions>)
                       -> Result<UpdateResult> {
-        let options = options.unwrap_or(UpdateOptions::new(false, None));
-        let _ = try!(Collection::validate_update(&update));
+        let options = options.unwrap_or_else(|| UpdateOptions::new(false, None));
+        try!(Collection::validate_update(&update));
         self.update(filter, update, options.upsert, false, options.write_concern)
     }
 
@@ -852,14 +851,14 @@ impl Collection {
                        update: bson::Document,
                        options: Option<UpdateOptions>)
                        -> Result<UpdateResult> {
-        let options = options.unwrap_or(UpdateOptions::new(false, None));
-        let _ = try!(Collection::validate_update(&update));
+        let options = options.unwrap_or_else(|| UpdateOptions::new(false, None));
+        try!(Collection::validate_update(&update));
         self.update(filter, update, options.upsert, true, options.write_concern)
     }
 
     fn validate_replace(replacement: &bson::Document) -> Result<()> {
         for key in replacement.keys() {
-            if key.starts_with("$") {
+            if key.starts_with('$') {
                 return Err(ArgumentError("Replacement cannot include $ operators.".to_owned()));
             }
         }
@@ -868,7 +867,7 @@ impl Collection {
 
     fn validate_update(update: &bson::Document) -> Result<()> {
         for key in update.keys() {
-            if !key.starts_with("$") {
+            if !key.starts_with('$') {
                 return Err(ArgumentError("Update only works with $ operators.".to_owned()));
             }
         }

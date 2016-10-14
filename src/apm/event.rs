@@ -46,8 +46,8 @@ impl<'a> Display for CommandResult<'a> {
             CommandResult::Success { duration,
                                      ref reply,
                                      ref command_name,
-                                     request_id: _,
-                                     ref connection_string } => {
+                                     ref connection_string,
+                                     .. } => {
                 fmt.write_fmt(format_args!("COMMAND.{} {} COMPLETED: {} ({} ns)",
                                            command_name,
                                            connection_string,
@@ -56,9 +56,9 @@ impl<'a> Display for CommandResult<'a> {
             }
             CommandResult::Failure { duration,
                                      ref command_name,
-                                     ref failure,
-                                     request_id: _,
-                                     ref connection_string } => {
+                                     failure,
+                                     ref connection_string,
+                                     .. } => {
                 fmt.write_fmt(format_args!("COMMAND.{} {} FAILURE: {} ({} ns)",
                                            command_name,
                                            connection_string,
