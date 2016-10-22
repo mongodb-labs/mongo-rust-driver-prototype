@@ -33,7 +33,7 @@ impl Server {
                 Json::String(val) => {
                     tags.insert(key, val);
                 }
-                _ => return Err("server must have tags that are string => string maps.".to_owned()),
+                _ => return Err(String::from("server must have tags that are string => string maps.")),
             }
         }
 

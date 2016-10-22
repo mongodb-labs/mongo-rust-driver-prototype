@@ -161,7 +161,7 @@ impl File {
         let err = try!(self.err.read());
         let inner = &err.deref().inner;
         let description = match *inner {
-            Some(ref err) => Some(err.description().to_owned()),
+            Some(ref err) => Some(String::from(err.description())),
             None => None,
         };
         Ok(description)
@@ -171,9 +171,9 @@ impl File {
     pub fn assert_mode(&self, mode: Mode) -> Result<()> {
         if self.mode != mode {
             return match self.mode {
-                Mode::Read => Err(ArgumentError("File is open for reading.".to_owned())),
-                Mode::Write => Err(ArgumentError("File is open for writing.".to_owned())),
-                Mode::Closed => Err(ArgumentError("File is closed.".to_owned())),
+                Mode::Read => Err(ArgumentError(String::from("File is open for reading."))),
+                Mode::Write => Err(ArgumentError(String::from("File is open for writing."))),
+                Mode::Closed => Err(ArgumentError(String::from("File is closed."))),
             };
         }
         Ok(())
@@ -278,10 +278,10 @@ impl File {
             Some(doc) => {
                 match doc.get("data") {
                     Some(&Bson::Binary(_, ref buf)) => Ok(buf.clone()),
-                    _ => Err(OperationError("Chunk contained no data".to_owned())),
+                    _ => Err(OperationError(String::from("Chunk contained no data"))),
                 }
             }
-            None => Err(OperationError("Chunk not found".to_owned())),
+            None => Err(OperationError(String::from("Chunk not found"))),
         }
     }
 
@@ -333,12 +333,12 @@ impl File {
                                 cache.err = None;
                             }
                             _ => {
-                                cache.err = Some(OperationError("Chunk contained no data."
-                                    .to_owned()))
+                                cache.err = Some(OperationError(String::from("Chunk contained \
+                                                                              no data.")))
                             }
                         }
                     }
-                    Ok(None) => cache.err = Some(OperationError("Chunk not found.".to_owned())),
+                    Ok(None) => cache.err = Some(OperationError(String::from("Chunk not found."))),
                     Err(err) => cache.err = Some(err),
                 }
             });
@@ -589,7 +589,7 @@ impl GfsFile {
         }
 
         if let Some(&Bson::UtcDatetime(ref datetime)) = doc.get("uploadDate") {
-            file.upload_date = Some(datetime.to_owned());
+            file.upload_date = Some(*datetime);
         }
 
         if let Some(&Bson::I64(ref length)) = doc.get("length") {

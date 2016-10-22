@@ -134,7 +134,7 @@ impl WriteException {
     pub fn new(wc_err: Option<WriteConcernError>, w_err: Option<WriteError>) -> WriteException {
         let mut s = match wc_err {
             Some(ref error) => format!("{:?}\n", error),
-            None => "".to_owned(),
+            None => String::from(""),
         };
 
         if let Some(ref error) = w_err {
@@ -144,7 +144,7 @@ impl WriteException {
         WriteException {
             write_concern_error: wc_err,
             write_error: w_err,
-            message: s.to_owned(),
+            message: String::from(s),
         }
     }
 
@@ -257,7 +257,7 @@ impl BulkWriteException {
 
         let mut s = match write_concern_error {
             Some(ref error) => format!("{:?}\n", error),
-            None => "".to_owned(),
+            None => String::from(""),
         };
 
         for v in &write_errors {
@@ -269,7 +269,7 @@ impl BulkWriteException {
             unprocessed_requests: unprocessed,
             write_concern_error: write_concern_error,
             write_errors: write_errors,
-            message: s.to_owned(),
+            message: String::from(s),
         }
     }
 
@@ -332,9 +332,8 @@ impl BulkWriteException {
         // Parse out any write errors.
         let w_errs = if let Some(&Bson::Array(ref errors)) = result.get("writeErrors") {
             if errors.is_empty() {
-                return Err(Error::ResponseError("Server indicates a write error, but none were \
-                                                 found."
-                    .to_owned()));
+                return Err(Error::ResponseError(String::from("Server indicates a write error, \
+                                                              but none were found.")));
             }
 
             let mut vec = Vec::new();
@@ -342,9 +341,8 @@ impl BulkWriteException {
                 if let Bson::Document(ref doc) = *err {
                     vec.push(try!(BulkWriteError::parse(doc.clone())));
                 } else {
-                    return Err(Error::ResponseError("WriteError provided was not a bson \
-                                                     document."
-                        .to_owned()));
+                    return Err(Error::ResponseError(String::from("WriteError provided was not \
+                                                                  a bson document.")));
                 }
             }
             vec

@@ -141,7 +141,7 @@ impl TopologyDescription {
                 }
             }
         }
-        Err(OperationError("No servers available for the provided ReadPreference.".to_owned()))
+        Err(OperationError(String::from("No servers available for the provided ReadPreference.")))
     }
 
     /// Returns a random server stream from the vector.
@@ -159,7 +159,7 @@ impl TopologyDescription {
             }
             servers.remove(index);
         }
-        Err(OperationError("No servers available for the provided ReadPreference.".to_owned()))
+        Err(OperationError(String::from("No servers available for the provided ReadPreference.")))
     }
 
     /// Returns a server stream for read operations.
@@ -784,8 +784,8 @@ impl Topology {
         let mut options = description.unwrap_or_else(TopologyDescription::new);
 
         if config.hosts.len() > 1 && options.topology_type == TopologyType::Single {
-            return Err(ArgumentError("TopologyType::Single cannot be used with multiple seeds."
-                .to_owned()));
+            return Err(ArgumentError(String::from("TopologyType::Single cannot be used with \
+                                                   multiple seeds.")));
         }
 
         if let Some(ref config_opts) = config.options {
@@ -797,9 +797,8 @@ impl Topology {
 
         if !options.set_name.is_empty() &&
            options.topology_type != TopologyType::ReplicaSetNoPrimary {
-            return Err(ArgumentError("TopologyType must be ReplicaSetNoPrimary if set_name is \
-                                      provided."
-                .to_owned()));
+            return Err(ArgumentError(String::from("TopologyType must be ReplicaSetNoPrimary if \
+                                                   set_name is provided.")));
         }
 
         let top_description = Arc::new(RwLock::new(options));

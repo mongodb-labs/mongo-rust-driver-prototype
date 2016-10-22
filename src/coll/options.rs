@@ -308,7 +308,7 @@ impl IndexModel {
             name.push('_');
             match *bson {
                 Bson::I32(ref i) => name.push_str(&format!("{}", i)),
-                _ => return Err(ArgumentError("Index model keys must map to i32.".to_owned())),
+                _ => return Err(ArgumentError(String::from("Index model keys must map to i32."))),
             }
         }
         Ok(name)

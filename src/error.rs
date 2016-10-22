@@ -81,13 +81,13 @@ impl<'a> From<Error> for io::Error {
 
 impl<'a> From<&'a str> for Error {
     fn from(s: &str) -> Error {
-        Error::DefaultError(s.to_owned())
+        Error::DefaultError(String::from(s))
     }
 }
 
 impl From<String> for Error {
     fn from(s: String) -> Error {
-        Error::DefaultError(s.to_owned())
+        Error::DefaultError(String::from(s))
     }
 }
 

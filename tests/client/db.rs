@@ -85,7 +85,7 @@ fn create_and_get_users() {
         custom_data: Some(doc! { "foo" => "bar" }),
         roles: vec![Role::Single {
                         role: SingleDatabaseRole::DbAdmin,
-                        db: "test".to_owned(),
+                        db: String::from("test"),
                     },
                     Role::All(AllDatabaseRole::ReadWrite)],
         write_concern: None,

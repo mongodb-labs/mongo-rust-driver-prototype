@@ -33,7 +33,7 @@ impl ToString for SingleDatabaseRole {
             SingleDatabaseRole::Restore => "restore",
         };
 
-        string.to_owned()
+        String::from(string)
     }
 }
 
@@ -53,7 +53,7 @@ impl ToString for AllDatabaseRole {
             AllDatabaseRole::DbAdmin => "dbAdmin",
         };
 
-        string.to_owned()
+        String::from(string)
     }
 }
 

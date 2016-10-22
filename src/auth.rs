@@ -79,17 +79,17 @@ impl Authenticator {
 
         let data = match doc.get("payload") {
             Some(&Binary(_, ref payload)) => payload.to_owned(),
-            _ => return Err(ResponseError("Invalid payload returned".to_owned())),
+            _ => return Err(ResponseError(String::from("Invalid payload returned"))),
         };
 
         let id = match doc.get("conversationId") {
             Some(bson) => bson.clone(),
-            None => return Err(ResponseError("No conversationId returned".to_owned())),
+            None => return Err(ResponseError(String::from("No conversationId returned"))),
         };
 
         let response = match String::from_utf8(data) {
             Ok(string) => string,
-            Err(_) => return Err(ResponseError("Invalid UTF-8 payload returned".to_owned())),
+            Err(_) => return Err(ResponseError(String::from("Invalid UTF-8 payload returned"))),
         };
 
         Ok(InitialData {
@@ -110,7 +110,7 @@ impl Authenticator {
 
         let rnonce_b64 = match rnonce_opt {
             Some(val) => val,
-            None => return Err(ResponseError("Invalid rnonce returned".to_owned())),
+            None => return Err(ResponseError(String::from("Invalid rnonce returned"))),
         };
 
         // Validate rnonce to make sure server isn't malicious
@@ -120,18 +120,18 @@ impl Authenticator {
 
         let salt_b64 = match salt_opt {
             Some(val) => val,
-            None => return Err(ResponseError("Invalid salt returned".to_owned())),
+            None => return Err(ResponseError(String::from("Invalid salt returned"))),
         };
 
         let salt = match salt_b64.from_base64() {
             Ok(val) => val,
-            Err(_) => return Err(ResponseError("Invalid base64 salt returned".to_owned())),
+            Err(_) => return Err(ResponseError(String::from("Invalid base64 salt returned"))),
         };
 
 
         let i = match i_opt {
             Some(val) => val,
-            None => return Err(ResponseError("Invalid iteration count returned".to_owned())),
+            None => return Err(ResponseError(String::from("Invalid iteration count returned"))),
         };
 
         // Hash password
@@ -170,8 +170,8 @@ impl Authenticator {
 
         // Sanity check
         if client_key.len() != client_signature.len() {
-            return Err(DefaultError("Generated client key and/or client signature is invalid"
-                .to_owned()));
+            return Err(DefaultError(String::from("Generated client key and/or client signature \
+                                                  is invalid")));
         }
 
         // Compute proof by xor'ing key and signature
@@ -226,7 +226,7 @@ impl Authenticator {
                 let payload_str = match String::from_utf8(payload.to_owned()) {
                     Ok(string) => string,
                     Err(_) => {
-                        return Err(ResponseError("Invalid UTF-8 payload returned".to_owned()))
+                        return Err(ResponseError(String::from("Invalid UTF-8 payload returned")))
                     }
                 };
 

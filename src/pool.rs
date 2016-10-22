@@ -93,7 +93,7 @@ impl ConnectionPool {
     /// Sets the maximum number of open connections.
     pub fn set_size(&self, size: usize) -> Result<()> {
         if size < 1 {
-            Err(ArgumentError("The connection pool size must be greater than zero.".to_owned()))
+            Err(ArgumentError(String::from("The connection pool size must be greater than zero.")))
         } else {
             let mut locked = try!(self.inner.lock());
             locked.size = size;
@@ -116,9 +116,8 @@ impl ConnectionPool {
     pub fn acquire_stream(&self) -> Result<PooledStream> {
         let mut locked = try!(self.inner.lock());
         if locked.size == 0 {
-            return Err(OperationError("The connection pool does not allow connections; \
-                                       increase the size of the pool."
-                .to_owned()));
+            return Err(OperationError(String::from("The connection pool does not allow \
+                                                    connections; increase the size of the pool.")));
         }
 
         loop {

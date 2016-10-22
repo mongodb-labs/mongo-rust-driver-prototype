@@ -42,7 +42,7 @@ impl Outcome {
         for json in array {
             match Bson::from_json(json) {
                 Bson::Document(doc) => data.push(doc),
-                _ => return Err("`data` array must contain only objects".to_owned()),
+                _ => return Err(String::from("`data` array must contain only objects")),
             }
         }
 

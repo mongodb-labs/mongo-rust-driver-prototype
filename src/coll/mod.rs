@@ -71,12 +71,12 @@ impl Collection {
     pub fn name(&self) -> String {
         match self.namespace.find('.') {
             Some(idx) => {
-                self.namespace[self.namespace
-                        .char_indices()
-                        .nth(idx + 1)
-                        .unwrap()
-                        .0..]
-                    .to_owned()
+                let string = &self.namespace[self.namespace
+                    .char_indices()
+                    .nth(idx + 1)
+                    .unwrap()
+                    .0..];
+                String::from(string)
             }
             None => {
                 // '.' is inserted in Collection::new, so this should only panic due to user error.
@@ -143,7 +143,7 @@ impl Collection {
         match result.get("n") {
             Some(&Bson::I32(ref n)) => Ok(*n as i64),
             Some(&Bson::I64(ref n)) => Ok(*n),
-            _ => Err(ResponseError("No count received from server.".to_owned())),
+            _ => Err(ResponseError(String::from("No count received from server."))),
         }
     }
 
@@ -158,7 +158,7 @@ impl Collection {
 
         let mut spec = bson::Document::new();
         spec.insert("distinct", Bson::String(self.name()));
-        spec.insert("key", Bson::String(field_name.to_owned()));
+        spec.insert("key", Bson::String(String::from(field_name)));
         if filter.is_some() {
             spec.insert("query", Bson::Document(filter.unwrap()));
         }
@@ -167,7 +167,7 @@ impl Collection {
         let result = try!(self.db.command(spec, CommandType::Distinct, Some(read_pref)));
         match result.get("values") {
             Some(&Bson::Array(ref vals)) => Ok(vals.to_owned()),
-            _ => Err(ResponseError("No values received from server.".to_owned())),
+            _ => Err(ResponseError(String::from("No values received from server."))),
         }
     }
 
@@ -189,10 +189,10 @@ impl Collection {
 
         let doc = if options.sort.is_some() {
             let mut doc = bson::Document::new();
-            doc.insert("$query".to_owned(),
+            doc.insert(String::from("$query"),
                        Bson::Document(filter.unwrap_or_else(bson::Document::new)));
 
-            doc.insert("$orderby".to_owned(),
+            doc.insert(String::from("$orderby"),
                        Bson::Document(options.sort.as_ref().unwrap().clone()));
 
             doc
@@ -630,7 +630,7 @@ impl Collection {
                                                      CommandType::InsertOne));
 
         if ids.is_empty() {
-            return Err(OperationError("No ids returned for insert_one.".to_owned()));
+            return Err(OperationError(String::from("No ids returned for insert_one.")));
         }
 
         // Downgrade bulk exception, if it exists.
@@ -859,7 +859,7 @@ impl Collection {
     fn validate_replace(replacement: &bson::Document) -> Result<()> {
         for key in replacement.keys() {
             if key.starts_with('$') {
-                return Err(ArgumentError("Replacement cannot include $ operators.".to_owned()));
+                return Err(ArgumentError(String::from("Replacement cannot include $ operators.")));
             }
         }
         Ok(())
@@ -868,7 +868,7 @@ impl Collection {
     fn validate_update(update: &bson::Document) -> Result<()> {
         for key in update.keys() {
             if !key.starts_with('$') {
-                return Err(ArgumentError("Update only works with $ operators.".to_owned()));
+                return Err(ArgumentError(String::from("Update only works with $ operators.")));
             }
         }
         Ok(())
@@ -919,7 +919,7 @@ impl Collection {
     /// Drop an index by name.
     pub fn drop_index_string(&self, name: String) -> Result<()> {
         let mut opts = IndexOptions::new();
-        opts.name = Some(name.to_owned());
+        opts.name = Some(String::from(name));
 
         let model = IndexModel::new(bson::Document::new(), Some(opts));
         self.drop_index_model(model)
@@ -941,7 +941,7 @@ impl Collection {
     /// Drop all indexes in the collection.
     pub fn drop_indexes(&self) -> Result<()> {
         let mut opts = IndexOptions::new();
-        opts.name = Some("*".to_owned());
+        opts.name = Some(String::from("*"));
 
         let model = IndexModel::new(bson::Document::new(), Some(opts));
         self.drop_index_model(model)

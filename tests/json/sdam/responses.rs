@@ -16,8 +16,7 @@ impl Responses {
                                           "`responses` must be an array of arrays.");
 
             if inner_array.len() != 2 {
-                return Err("Response item must contain the host string and ismaster object."
-                    .to_owned());
+                return Err(String::from("Response item must contain the host string and ismaster object."));
             }
 
             let host = val_or_err!(
@@ -35,7 +34,7 @@ impl Responses {
                 Bson::Document(doc) => {
                     data.push((connstring::parse_host(&host).unwrap(), doc));
                 }
-                _ => return Err("`ismaster` parse must return a Bson Document".to_owned()),
+                _ => return Err(String::from("`ismaster` parse must return a Bson Document")),
             }
         }
 

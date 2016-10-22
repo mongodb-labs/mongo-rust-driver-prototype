@@ -460,7 +460,7 @@ impl Message {
         match *self {
             /// Only the server should send replies
             Message::OpReply { .. } => {
-                Err(ArgumentError("OP_REPLY should not be sent to the client.".to_owned()))
+                Err(ArgumentError(String::from("OP_REPLY should not be sent to the client.")))
             }
             Message::OpUpdate { ref header,
                                 ref namespace,

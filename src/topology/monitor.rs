@@ -89,7 +89,7 @@ impl IsMasterResult {
             Some(&Bson::I32(v)) => v != 0,
             Some(&Bson::I64(v)) => v != 0,
             Some(&Bson::FloatingPoint(v)) => v != 0.0,
-            _ => return Err(ArgumentError("result does not contain `ok`.".to_owned())),
+            _ => return Err(ArgumentError(String::from("result does not contain `ok`."))),
         };
 
         let mut result = IsMasterResult {
@@ -260,7 +260,7 @@ impl Monitor {
 
         let cursor = try!(Cursor::query_with_stream(stream,
                                                     self.client.clone(),
-                                                    "local.$cmd".to_owned(),
+                                                    String::from("local.$cmd"),
                                                     1,
                                                     flags,
                                                     options.skip as i32,
@@ -300,7 +300,7 @@ impl Monitor {
             Ok(ismaster) => server_description.update(ismaster, round_trip_time),
             Err(err) => {
                 server_description.set_err(err);
-                return Err(OperationError("Failed to parse ismaster result.".to_owned()));
+                return Err(OperationError(String::from("Failed to parse ismaster result.")));
             }
         }
 
@@ -328,7 +328,7 @@ impl Monitor {
                 self.set_err(err);
             }
             None => {
-                self.set_err(OperationError("ismaster returned no response.".to_owned()));
+                self.set_err(OperationError(String::from("ismaster returned no response.")));
             }
         }
     }

@@ -48,7 +48,7 @@ impl Test {
             "replaceOne" => res_or_err!(Arguments::replace_one_from_json(&args_obj)),
             "updateMany" => res_or_err!(Arguments::update_from_json(&args_obj, true)),
             "updateOne" => res_or_err!(Arguments::update_from_json(&args_obj, false)),
-            _ => return Err("Invalid operation name".to_owned()),
+            _ => return Err(String::from("Invalid operation name")),
         };
 
 
@@ -82,7 +82,7 @@ fn get_data(object: &Object) -> Result<Vec<Document>, String> {
     for json in array {
         match Bson::from_json(&json) {
             Bson::Document(doc) => data.push(doc),
-            _ => return Err("`data` array must contain only objects".to_owned()),
+            _ => return Err(String::from("`data` array must contain only objects")),
         }
     }
 

@@ -30,7 +30,7 @@ fn get_server_array(arr: &[Json]) -> Result<Vec<Server>, String> {
                     Err(err) => return Err(err),
                 }
             }
-            _ => return Err("Some servers could not be parsed for topology".to_owned()),
+            _ => return Err(String::from("Some servers could not be parsed for topology")),
         }
     }
 

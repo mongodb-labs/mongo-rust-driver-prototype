@@ -21,7 +21,7 @@ impl FromJsonResult for ReadPreference {
         for json in &tag_sets_array {
             match *json {
                 Json::Object(ref obj) => tag_sets_objs.push(obj.clone()),
-                _ => return Err("tags must be document objects.".to_owned()),
+                _ => return Err(String::from("tags must be document objects.")),
             }
         }
 

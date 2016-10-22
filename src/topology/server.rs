@@ -134,7 +134,7 @@ impl ServerDescription {
     // Updates the server description using an isMaster server response.
     pub fn update(&mut self, ismaster: IsMasterResult, round_trip_time: i64) {
         if !ismaster.ok {
-            self.set_err(OperationError("ismaster returned a not-ok response.".to_owned()));
+            self.set_err(OperationError(String::from("ismaster returned a not-ok response.")));
             return;
         }
 

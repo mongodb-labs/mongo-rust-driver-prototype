@@ -170,7 +170,7 @@ impl ThreadedDatabase for Database {
         let wc = write_concern.unwrap_or(client.write_concern.to_owned());
 
         Arc::new(DatabaseInner {
-            name: name.to_owned(),
+            name: String::from(name),
             client: client,
             read_preference: rp,
             write_concern: wc,
@@ -348,7 +348,7 @@ impl ThreadedDatabase for Database {
 
     fn drop_collection(&self, name: &str) -> Result<()> {
         let mut spec = bson::Document::new();
-        spec.insert("drop", Bson::String(name.to_owned()));
+        spec.insert("drop", Bson::String(String::from(name)));
         try!(self.command(spec, CommandType::DropCollection, None));
         Ok(())
     }

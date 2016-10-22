@@ -184,7 +184,7 @@ impl ClientOptions {
     /// Creates a new options struct with a specified log file.
     pub fn with_log_file(file: &str) -> ClientOptions {
         let mut options = ClientOptions::new();
-        options.log_file = Some(file.to_owned());
+        options.log_file = Some(String::from(file));
         options
     }
 }
@@ -358,7 +358,7 @@ impl ThreadedClient for Client {
             return Ok(map);
         }
 
-        Err(ResponseError("Server reply does not contain 'databases'.".to_owned()))
+        Err(ResponseError(String::from("Server reply does not contain 'databases'.")))
     }
 
     fn drop_database(&self, db_name: &str) -> Result<()> {
@@ -376,7 +376,7 @@ impl ThreadedClient for Client {
 
         match res.get("ismaster") {
             Some(&Bson::Boolean(is_master)) => Ok(is_master),
-            _ => Err(ResponseError("Server reply does not contain 'ismaster'.".to_owned())),
+            _ => Err(ResponseError(String::from("Server reply does not contain 'ismaster'."))),
         }
     }
 

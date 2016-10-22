@@ -71,7 +71,7 @@ impl Arguments {
                     out = out || doc.contains_key("$out");
                     doc
                 }
-                _ => return Err("aggregate pipeline can only contain documents".to_owned()),
+                _ => return Err(String::from("aggregate pipeline can only contain documents")),
             };
 
             docs.push(doc);
@@ -210,7 +210,7 @@ impl Arguments {
         for bson in bsons {
             match bson {
                 Bson::Document(doc) => docs.push(doc),
-                _ => return Err("`insert_many` can only insert documents".to_owned()),
+                _ => return Err(String::from("`insert_many` can only insert documents")),
             };
         }
 

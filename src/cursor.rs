@@ -72,7 +72,7 @@ macro_rules! try_or_emit {
                 if $cmd_type != CommandType::Suppressed {
                     let hook_result = $client.run_completion_hooks(&CommandResult::Failure {
                         duration: 0,
-                        command_name: $cmd_name.to_owned(),
+                        command_name: String::from($cmd_name),
                         failure: &e,
                         request_id: $req_id as i64,
                         connection_string: $connstring,
@@ -290,8 +290,8 @@ impl Cursor {
         let req_id = client.get_req_id();
 
         let index = namespace.find('.').unwrap_or(namespace.len());
-        let db_name = namespace[..index].to_owned();
-        let coll_name = namespace[index + 1..].to_owned();
+        let db_name = String::from(&namespace[..index]);
+        let coll_name = String::from(&namespace[index + 1..]);
         let cmd_name = cmd_type.to_str();
         let connstring = format!("{}", try!(socket.get_ref().peer_addr()));
 
@@ -341,7 +341,7 @@ impl Cursor {
             let hook_result = client.run_start_hooks(&CommandStarted {
                 command: command,
                 database_name: db_name,
-                command_name: cmd_name.to_owned(),
+                command_name: String::from(cmd_name),
                 request_id: req_id as i64,
                 connection_string: connstring.clone(),
             });
@@ -403,7 +403,7 @@ impl Cursor {
             let _hook_result = client.run_completion_hooks(&CommandResult::Success {
                 duration: fin_time - init_time,
                 reply: reply,
-                command_name: cmd_name.to_owned(),
+                command_name: String::from(cmd_name),
                 request_id: req_id as i64,
                 connection_string: connstring,
             });
@@ -436,8 +436,8 @@ impl Cursor {
                                              self.cursor_id);
 
         let index = self.namespace.rfind('.').unwrap_or(self.namespace.len());
-        let db_name = self.namespace[..index].to_owned();
-        let cmd_name = "get_more".to_owned();
+        let db_name = String::from(&self.namespace[..index]);
+        let cmd_name = String::from("get_more");
         let connstring = format!("{}", try!(socket.get_ref().peer_addr()));
 
         if self.cmd_type != CommandType::Suppressed {

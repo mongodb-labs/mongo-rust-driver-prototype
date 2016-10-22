@@ -21,8 +21,8 @@
 //! let db = client.db("grid");
 //! let fs = Store::with_db(db.clone());
 //!
-//! fs.put("/path/to/local_file.mp4".to_owned()).unwrap();
-//! let mut file = fs.open("/path/to/local_file.mp4".to_owned()).unwrap();
+//! fs.put(String::from("/path/to/local_file.mp4")).unwrap();
+//! let mut file = fs.open(String::from("/path/to/local_file.mp4")).unwrap();
 //!
 //! let id = file.doc.id.clone();
 //! let chunk_bytes = file.find_chunk(id, 5).unwrap();
@@ -121,7 +121,7 @@ pub trait ThreadedStore {
 
 impl ThreadedStore for Store {
     fn with_db(db: Database) -> Store {
-        Store::with_prefix(db, "fs".to_owned())
+        Store::with_prefix(db, String::from("fs"))
     }
 
     fn with_prefix(db: Database, prefix: String) -> Store {
@@ -141,14 +141,14 @@ impl ThreadedStore for Store {
 
         match try!(self.files.find_one(Some(doc!{ "filename" => name }), Some(options))) {
             Some(bdoc) => Ok(File::with_doc(self.clone(), bdoc)),
-            None => Err(ArgumentError("File does not exist.".to_owned())),
+            None => Err(ArgumentError(String::from("File does not exist."))),
         }
     }
 
     fn open_id(&self, id: oid::ObjectId) -> Result<File> {
         match try!(self.files.find_one(Some(doc!{ "_id" => id }), None)) {
             Some(bdoc) => Ok(File::with_doc(self.clone(), bdoc)),
-            None => Err(ArgumentError("File does not exist.".to_owned())),
+            None => Err(ArgumentError(String::from("File does not exist."))),
         }
     }
 
@@ -182,16 +182,16 @@ impl ThreadedStore for Store {
     }
 
     fn put(&self, name: String) -> Result<()> {
-        let mut file = try!(self.create(name.to_owned()));
-        let mut f = try!(fs::File::open(name.to_owned()));
+        let mut file = try!(self.create(name.clone()));
+        let mut f = try!(fs::File::open(name));
         try!(io::copy(&mut f, &mut file));
         try!(file.close());
         Ok(())
     }
 
     fn get(&self, name: String) -> Result<()> {
-        let mut f = try!(fs::File::create(name.to_owned()));
-        let mut file = try!(self.open(name.to_owned()));
+        let mut f = try!(fs::File::create(name.clone()));
+        let mut file = try!(self.open(name));
         try!(io::copy(&mut file, &mut f));
         try!(file.close());
         Ok(())
