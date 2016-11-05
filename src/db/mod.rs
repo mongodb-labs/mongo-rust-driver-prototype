@@ -62,13 +62,15 @@ use auth::Authenticator;
 use bson;
 use bson::Bson;
 use {Client, CommandType, ThreadedClient, Result};
-use Error::{CursorNotFoundError, OperationError};
+use Error::{CursorNotFoundError, OperationError, ResponseError};
 use coll::Collection;
 use coll::options::FindOptions;
 use common::{ReadPreference, WriteConcern};
 use cursor::{Cursor, DEFAULT_BATCH_SIZE};
 use self::options::{CreateCollectionOptions, CreateUserOptions, UserInfoOptions};
 use self::roles::Role;
+use semver::Version;
+use std::error::Error;
 use std::sync::Arc;
 
 /// Interfaces with a MongoDB database.
@@ -93,6 +95,8 @@ pub trait ThreadedDatabase {
             read_preference: Option<ReadPreference>,
             write_concern: Option<WriteConcern>)
             -> Database;
+    // Returns the version of the MongoDB instance.
+    fn version(&self) -> Result<Version>;
     /// Logs in a user using the SCRAM-SHA-1 mechanism.
     fn auth(&self, user: &str, password: &str) -> Result<()>;
     /// Creates a collection representation with inherited read and write controls.
@@ -272,6 +276,21 @@ impl ThreadedDatabase for Database {
                 Some(Err(err)) => return Err(err),
                 None => return Ok(results),
             }
+        }
+    }
+
+    fn version(&self) -> Result<Version> {
+        let doc = doc! { "buildinfo" => 1 };
+        let out = try!(self.command(doc,
+                                    CommandType::BuildInfo,
+                                    None));
+
+        match out.get("version") {
+            Some(&Bson::String(ref s)) => match Version::parse(s) {
+                Ok(v) => Ok(v),
+                Err(e) => Err(ResponseError(String::from(e.description()))),
+            },
+            _ => Err(ResponseError(String::from("No version received from server"))),
         }
     }
 

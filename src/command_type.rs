@@ -4,6 +4,7 @@
 #[derive(PartialEq, Eq, Clone)]
 pub enum CommandType {
     Aggregate,
+    BuildInfo,
     Count,
     CreateCollection,
     CreateIndexes,
@@ -37,6 +38,7 @@ impl CommandType {
     pub fn to_str(&self) -> &str {
         match *self {
             CommandType::Aggregate => "aggregate",
+            CommandType::BuildInfo => "buildinfo",
             CommandType::Count => "count",
             CommandType::CreateCollection => "create_collection",
             CommandType::CreateIndexes => "create_indexes",
@@ -87,6 +89,7 @@ impl CommandType {
             CommandType::UpdateMany |
             CommandType::UpdateOne => true,
             CommandType::Aggregate |
+            CommandType::BuildInfo |
             CommandType::Count |
             CommandType::Distinct |
             CommandType::Find |

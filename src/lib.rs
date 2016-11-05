@@ -97,6 +97,7 @@ extern crate rand;
 extern crate rustc_serialize;
 #[macro_use]
 extern crate scan_fmt;
+extern crate semver;
 extern crate separator;
 extern crate textnonce;
 extern crate time;
