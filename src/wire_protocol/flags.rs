@@ -5,10 +5,10 @@ use coll::options::{CursorType, FindOptions};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpReplyFlags {
     pub cursor_not_found: bool, // Bit 0
-    pub query_failure: bool,    // Bit 1
-    pub await_capable: bool,    // Bit 3
-
-    // All bits remaining must be 0
+    pub query_failure: bool, // Bit 1
+    pub await_capable: bool, /* Bit 3
+                              *
+                              * All bits remaining must be 0 */
 }
 
 impl OpReplyFlags {
@@ -22,40 +22,42 @@ impl OpReplyFlags {
         let query_failure = (i & (1 << 1)) != 0;
         let await_capable = (i & (1 << 3)) != 0;
 
-        OpReplyFlags { cursor_not_found: cursor_not_found,
-                       query_failure: query_failure,
-                       await_capable: await_capable }
+        OpReplyFlags {
+            cursor_not_found: cursor_not_found,
+            query_failure: query_failure,
+            await_capable: await_capable,
+        }
     }
 }
 
 /// Represents the bit vector of options for an OP_UPDATE message.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpUpdateFlags {
-    pub upsert: bool,        // Bit 0
-    pub multi_update: bool,  // Bit 1
-
-    // All bits remaining must be 0
+    pub upsert: bool, // Bit 0
+    pub multi_update: bool, /* Bit 1
+                             *
+                             * All bits remaining must be 0 */
 }
 
 /// Represents the bit vector of flags for an OP_INSERT message.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpInsertFlags {
-    pub continue_on_error: bool,  // Bit 0
-
-    // All bits remaining must be 0
+    pub continue_on_error: bool, /* Bit 0
+                                  *
+                                  * All bits remaining must be 0 */
 }
 
 /// Represents the bit vector of flags for an OP_QUERY message.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpQueryFlags {
-    pub tailable_cursor: bool,    // Bit 1
-    pub slave_ok: bool,           // Bit 2
-    pub oplog_relay: bool,        // Bit 3
-    pub no_cursor_timeout: bool,  // Bit 4
-    pub await_data: bool,         // Bit 5
-    pub exhaust: bool,            // Bit 6
-    pub partial: bool,            // Bit 7
-    // All bits remaining must be 0
+    pub tailable_cursor: bool, // Bit 1
+    pub slave_ok: bool, // Bit 2
+    pub oplog_relay: bool, // Bit 3
+    pub no_cursor_timeout: bool, // Bit 4
+    pub await_data: bool, // Bit 5
+    pub exhaust: bool, // Bit 6
+    pub partial: bool, /* Bit 7
+                        * All bits remaining must be 0 */
 }
 
 impl OpUpdateFlags {
@@ -65,7 +67,10 @@ impl OpUpdateFlags {
     ///
     /// Returns the newly-created struct.
     pub fn no_flags() -> OpUpdateFlags {
-        OpUpdateFlags { upsert: false, multi_update: false }
+        OpUpdateFlags {
+            upsert: false,
+            multi_update: false,
+        }
     }
 
     /// Gets the actual bit vector that the struct represents.
@@ -74,11 +79,7 @@ impl OpUpdateFlags {
     ///
     /// Returns the bit vector as an i32.
     pub fn to_i32(&self) -> i32 {
-        let mut i = 0 as i32;
-
-        if self.upsert {
-            i = 1;
-        }
+        let mut i: i32 = if self.upsert { 1 } else { 0 };
 
         if self.multi_update {
             i |= 1 << 1;
@@ -104,11 +105,7 @@ impl OpInsertFlags {
     ///
     /// Returns the bit vector as an i32.
     pub fn to_i32(&self) -> i32 {
-        if self.continue_on_error {
-            1
-        } else {
-            0
-        }
+        if self.continue_on_error { 1 } else { 0 }
     }
 }
 
@@ -119,9 +116,15 @@ impl OpQueryFlags {
     ///
     /// Returns the newly-created struct.
     pub fn no_flags() -> OpQueryFlags {
-        OpQueryFlags { tailable_cursor: false, slave_ok: false,
-                       oplog_relay: false, no_cursor_timeout: false,
-                       await_data: false, exhaust: false, partial: false }
+        OpQueryFlags {
+            tailable_cursor: false,
+            slave_ok: false,
+            oplog_relay: false,
+            no_cursor_timeout: false,
+            await_data: false,
+            exhaust: false,
+            partial: false,
+        }
     }
 
     /// Constructs a new struct with flags based on a FindOptions struct.

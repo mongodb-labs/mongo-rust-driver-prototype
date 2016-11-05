@@ -7,16 +7,19 @@ use mongodb::db::ThreadedDatabase;
 use rand;
 
 fn timed_query(_client: Client, command_result: &CommandResult) {
-    let (command_name, duration) = match command_result {
-        &CommandResult::Success { ref command_name, duration, .. } => (command_name.clone(), duration),
-        _ => panic!("Command failed!")
+    let (command_name, duration) = match *command_result {
+        CommandResult::Success { ref command_name, duration, .. } => {
+            (command_name.clone(), duration)
+        }
+        _ => panic!("Command failed!"),
     };
 
     if command_name.eq("find") {
         // Sanity check
         assert!(duration >= 1500000000);
 
-        // Technically not guaranteed, but since the query is running locally, it shouldn't even be close
+        // Technically not guaranteed, but since the query is running locally, it shouldn't even be
+        // close
         assert!(duration < 2000000000);
     }
 }
@@ -81,7 +84,9 @@ fn logging() {
 
     // Create collection started
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.create_collection 127.0.0.1:27017 STARTED: { create: \"logging\", capped: false, auto_index_id: true, flags: 1 }\n", &line);
+    assert_eq!("COMMAND.create_collection 127.0.0.1:27017 STARTED: { create: \"logging\", \
+                capped: false, auto_index_id: true, flags: 1 }\n",
+               &line);
 
     // Create Collection completed
     line.clear();
@@ -92,18 +97,22 @@ fn logging() {
     // Drop collection started
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.drop_collection 127.0.0.1:27017 STARTED: { drop: \"logging\" }\n", &line);
+    assert_eq!("COMMAND.drop_collection 127.0.0.1:27017 STARTED: { drop: \"logging\" }\n",
+               &line);
 
     // Drop collection completed
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert!(line.starts_with("COMMAND.drop_collection 127.0.0.1:27017 COMPLETED: { ns: \"test.logging\", nIndexesWas: 1, ok: 1 } ("));
+    assert!(line.starts_with("COMMAND.drop_collection 127.0.0.1:27017 COMPLETED: { ns: \
+                              \"test.logging\", nIndexesWas: 1, ok: 1 } ("));
     assert!(line.ends_with(" ns)\n"));
 
     // First insert started
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ _id: 1 }], ordered: true, writeConcern: { w: 1, wtimeout: 0, j: false } }\n", &line);
+    assert_eq!("COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ \
+                _id: 1 }], ordered: true, writeConcern: { w: 1, wtimeout: 0, j: false } }\n",
+               &line);
 
     // First insert completed
     line.clear();
@@ -114,7 +123,9 @@ fn logging() {
     // Second insert started
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ _id: 2 }], ordered: true, writeConcern: { w: 1, wtimeout: 0, j: false } }\n", &line);
+    assert_eq!("COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ \
+                _id: 2 }], ordered: true, writeConcern: { w: 1, wtimeout: 0, j: false } }\n",
+               &line);
 
     // Second insert completed
     line.clear();
@@ -125,7 +136,9 @@ fn logging() {
     // Third insert started
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ _id: 3 }], ordered: true, writeConcern: { w: 1, wtimeout: 0, j: false } }\n", &line);
+    assert_eq!("COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ \
+                _id: 3 }], ordered: true, writeConcern: { w: 1, wtimeout: 0, j: false } }\n",
+               &line);
 
     // Third insert completed
     line.clear();
@@ -136,15 +149,19 @@ fn logging() {
     // Find command started
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.find 127.0.0.1:27017 STARTED: { find: \"logging\", filter: {  }, projection: {  }, skip: 0, limit: 0, batchSize: 20, sort: {  } }\n", &line);
+    assert_eq!("COMMAND.find 127.0.0.1:27017 STARTED: { find: \"logging\", filter: {  }, \
+                projection: {  }, skip: 0, limit: 0, batchSize: 20, sort: {  } }\n",
+               &line);
 
     // Find command completed
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert!(line.starts_with("COMMAND.find 127.0.0.1:27017 COMPLETED: { cursor: { id: 0, ns: \"test.logging\", firstBatch: [{ _id: 2 }, { _id: 3 }] }, ok: 1 } ("));
+    assert!(line.starts_with("COMMAND.find 127.0.0.1:27017 COMPLETED: { cursor: { id: 0, ns: \
+                              \"test.logging\", firstBatch: [{ _id: 2 }, { _id: 3 }] }, ok: 1 } \
+                              ("));
     assert!(line.ends_with(" ns)\n"));
 
     coll.drop().unwrap();
 
-    let _ = fs::remove_file("test_log.txt").unwrap();
+    fs::remove_file("test_log.txt").unwrap();
 }

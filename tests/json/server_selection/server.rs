@@ -28,10 +28,12 @@ impl Server {
                                    Some(&Json::Object(ref obj)) => obj.clone(),
                                    "server must have tags.");
 
-        for (key, json) in json_doc.into_iter() {
+        for (key, json) in json_doc {
             match json {
-                Json::String(val) => { tags.insert(key, val); },
-                _ => return Err("server must have tags that are string => string maps.".to_owned()),
+                Json::String(val) => {
+                    tags.insert(key, val);
+                }
+                _ => return Err(String::from("server must have tags that are string => string maps.")),
             }
         }
 

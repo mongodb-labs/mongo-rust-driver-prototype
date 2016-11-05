@@ -35,12 +35,12 @@ fn put_get() {
 
     let name = "grid_put_file";
     let src_len = (DEFAULT_CHUNK_SIZE as f32 * 2.5) as usize;
-    let mut src = gen_rand_file(src_len);
+    let src = gen_rand_file(src_len);
 
     let mut grid_file = fs.create(name.to_owned()).unwrap();
     let id = grid_file.id.clone();
-    let _ = grid_file.write(&mut src).unwrap();
-    let _ = grid_file.close().unwrap();
+    grid_file.write(&src).unwrap();
+    grid_file.close().unwrap();
 
     // Check file
     let mut cursor = fs.find(Some(doc!{"filename" => name}), None).unwrap();
@@ -59,14 +59,14 @@ fn put_get() {
     let chunks = cursor.next_batch().expect("Failed to get next batch");
     assert_eq!(3, chunks.len());
 
-    for i in 0..3 {
-        if let Some(&Bson::I32(ref n)) = chunks[i].get("n") {
+    for (i, chunk) in chunks.iter().enumerate().take(3) {
+        if let Some(&Bson::I32(ref n)) = chunk.get("n") {
             assert_eq!(i as i32, *n);
         }
 
-        if let Some(&Bson::Binary(_, ref data)) = chunks[i].get("data") {
-            for j in 0..data.len() {
-                assert_eq!(src[j + i*DEFAULT_CHUNK_SIZE as usize], data[j]);
+        if let Some(&Bson::Binary(_, ref data)) = chunk.get("data") {
+            for (j, item) in data.iter().enumerate() {
+                assert_eq!(src[j + i * DEFAULT_CHUNK_SIZE as usize], *item);
             }
         }
     }
@@ -91,7 +91,7 @@ fn put_get() {
     let n = read_file.read(&mut dest).unwrap();
     assert_eq!(src_len, n);
 
-    let _ = read_file.close().unwrap();
+    read_file.close().unwrap();
 
     for i in 0..src_len {
         assert_eq!(src[i], dest[i]);
@@ -104,12 +104,12 @@ fn remove() {
 
     let name = "grid_remove_file";
     let src_len = (DEFAULT_CHUNK_SIZE as f32 * 1.5) as usize;
-    let mut src = gen_rand_file(src_len);
+    let src = gen_rand_file(src_len);
 
     let mut grid_file = fs.create(name.to_owned()).unwrap();
     let id = grid_file.id.clone();
-    let _ = grid_file.write(&mut src).unwrap();
-    let _ = grid_file.close().unwrap();
+    grid_file.write(&src).unwrap();
+    grid_file.close().unwrap();
 
     assert!(fsfiles.find_one(Some(doc!{"_id" => (id.clone())}), None).unwrap().is_some());
 
@@ -131,12 +131,12 @@ fn remove_id() {
 
     let name = "grid_remove_id_file";
     let src_len = (DEFAULT_CHUNK_SIZE as f32 * 1.5) as usize;
-    let mut src = gen_rand_file(src_len);
+    let src = gen_rand_file(src_len);
 
     let mut grid_file = fs.create(name.to_owned()).unwrap();
     let id = grid_file.id.clone();
-    let _ = grid_file.write(&mut src).unwrap();
-    let _ = grid_file.close().unwrap();
+    grid_file.write(&src).unwrap();
+    grid_file.close().unwrap();
 
     assert!(fsfiles.find_one(Some(doc!{"_id" => (id.clone())}), None).unwrap().is_some());
 
@@ -158,17 +158,17 @@ fn find() {
     let name2 = "grid_find_file_2";
 
     let src_len = (DEFAULT_CHUNK_SIZE as f32 * 1.5) as usize;
-    let mut src = gen_rand_file(src_len);
+    let src = gen_rand_file(src_len);
 
     let mut grid_file = fs.create(name.to_owned()).unwrap();
     let id = grid_file.id.clone();
-    let _ = grid_file.write(&mut src).unwrap();
-    let _ = grid_file.close().unwrap();
+    grid_file.write(&src).unwrap();
+    grid_file.close().unwrap();
 
     let mut grid_file2 = fs.create(name2.to_owned()).unwrap();
     let id2 = grid_file2.id.clone();
-    let _ = grid_file2.write(&mut src).unwrap();
-    let _ = grid_file2.close().unwrap();
+    grid_file2.write(&src).unwrap();
+    grid_file2.close().unwrap();
 
     let mut cursor = fs.find(None, None).unwrap();
     let results = cursor.next_batch().unwrap();

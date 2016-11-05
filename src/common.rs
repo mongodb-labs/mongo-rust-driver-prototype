@@ -43,26 +43,29 @@ impl ReadPreference {
     pub fn new(mode: ReadMode, tag_sets: Option<Vec<BTreeMap<String, String>>>) -> ReadPreference {
         ReadPreference {
             mode: mode,
-            tag_sets: tag_sets.unwrap_or(Vec::new()),
+            tag_sets: tag_sets.unwrap_or_else(Vec::new),
         }
     }
 
     pub fn to_document(&self) -> bson::Document {
         let mut doc = doc! { "mode" => (stringify!(self.mode).to_ascii_lowercase()) };
-        let bson_tag_sets: Vec<_> = self.tag_sets.iter().map(|map| {
-            let mut bson_map = bson::Document::new();
-            for (key, val) in map.iter() {
-                bson_map.insert(&key[..], Bson::String(val.to_owned()));
-            }
-            Bson::Document(bson_map)
-        }).collect();
+        let bson_tag_sets: Vec<_> = self.tag_sets
+            .iter()
+            .map(|map| {
+                let mut bson_map = bson::Document::new();
+                for (key, val) in map.iter() {
+                    bson_map.insert(&key[..], Bson::String(val.to_owned()));
+                }
+                Bson::Document(bson_map)
+            })
+            .collect();
 
         doc.insert("tag_sets", Bson::Array(bson_tag_sets));
         doc
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct WriteConcern {
     /// Write replication
     pub w: i32,

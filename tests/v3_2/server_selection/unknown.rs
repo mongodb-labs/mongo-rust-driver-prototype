@@ -5,7 +5,8 @@ use std::path::Path;
 
 #[test]
 fn server_selection_unknown_read() {
-    let paths = fs::read_dir(&Path::new("tests/json/data/specs/source/server-selection/tests/server_selection/Unknown/read")).unwrap();
+    let dir = "tests/json/data/specs/source/server-selection/tests/server_selection/Unknown/read";
+    let paths = fs::read_dir(&Path::new(dir)).unwrap();
 
     for path in paths {
         let path2 = path.unwrap().path();
@@ -19,7 +20,8 @@ fn server_selection_unknown_read() {
 
 #[test]
 fn server_selection_unknown_write() {
-    let paths = fs::read_dir(&Path::new("tests/json/data/specs/source/server-selection/tests/server_selection/Unknown/write")).unwrap();
+    let dir = "tests/json/data/specs/source/server-selection/tests/server_selection/Unknown/write";
+    let paths = fs::read_dir(&Path::new(dir)).unwrap();
 
     for path in paths {
         let path2 = path.unwrap().path();

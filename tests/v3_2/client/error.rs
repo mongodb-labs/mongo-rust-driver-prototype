@@ -43,8 +43,8 @@ fn invalidate_write_result() {
     assert!(result.is_err());
     match result {
         Err(Error::BulkWriteError(err)) => {
-            let ref wc_err = err.write_concern_error;
-            let ref w_errs = err.write_errors;
+            let wc_err = &err.write_concern_error;
+            let w_errs = &err.write_errors;
 
             assert_eq!(2, w_errs.len());
             let w0 = w_errs.get(0).unwrap();
@@ -61,7 +61,7 @@ fn invalidate_write_result() {
             assert_eq!(1124, wc.code);
             assert_eq!("Real error message.".to_owned(), wc.message);
             assert_eq!(WriteConcern::new(), wc.details);
-        },
+        }
         Err(_) => panic!("Expected BulkWriteError, received alternative error!"),
         Ok(()) => panic!("Expected BulkWriteError, received an Ok(())!"),
     }
@@ -80,7 +80,7 @@ fn parse_write_concern_error() {
             assert_eq!(1124, err.code);
             assert_eq!("Real error message.".to_owned(), err.message);
             assert_eq!(WriteConcern::new(), err.details);
-        },
+        }
         Err(_) => panic!("Failed to parse valid Write Concern Error from document."),
     }
 }
@@ -108,7 +108,7 @@ fn parse_write_error() {
         Ok(err) => {
             assert_eq!(1054, err.code);
             assert_eq!("Unreal error message.".to_owned(), err.message);
-        },
+        }
         Err(_) => panic!("Failed to parse valid Write Error from document."),
     }
 }

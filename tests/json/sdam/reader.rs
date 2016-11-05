@@ -12,14 +12,19 @@ pub struct Phase {
 impl Phase {
     fn from_json(object: &Object) -> Result<Phase, String> {
         let operation = val_or_err!(object.get("responses"),
-                                    Some(&Json::Array(ref array)) => try!(Responses::from_json(array)),
+                                    Some(&Json::Array(ref array)) =>
+                                    try!(Responses::from_json(array)),
                                     "No `responses` array found.");
 
         let outcome = val_or_err!(object.get("outcome"),
-                                  Some(&Json::Object(ref obj)) => try!(Outcome::from_json(obj)),
+                                  Some(&Json::Object(ref obj)) =>
+                                  try!(Outcome::from_json(obj)),
                                   "No `outcome` object found.");
 
-        Ok(Phase{ operation: operation, outcome: outcome })
+        Ok(Phase {
+            operation: operation,
+            outcome: outcome,
+        })
     }
 }
 
@@ -42,7 +47,7 @@ fn get_phases(object: &Object) -> Result<Vec<Phase>, String> {
 
         let phase = match Phase::from_json(&obj) {
             Ok(phase) => phase,
-            Err(s) => return Err(s)
+            Err(s) => return Err(s),
         };
 
         phases.push(phase);
@@ -64,8 +69,8 @@ impl SuiteContainer for Json {
     }
 
     fn get_suite(&self) -> Result<Suite, String> {
-        let object = val_or_err!(self,
-                                 &Json::Object(ref object) => object.clone(),
+        let object = val_or_err!(*self,
+                                 Json::Object(ref object) => object.clone(),
                                  "`get_suite` requires a JSON object");
 
         let uri = val_or_err!(object.get("uri"),
@@ -74,6 +79,9 @@ impl SuiteContainer for Json {
 
 
         let phases = try!(get_phases(&object));
-        Ok(Suite { uri: uri, phases: phases })
+        Ok(Suite {
+            uri: uri,
+            phases: phases,
+        })
     }
 }

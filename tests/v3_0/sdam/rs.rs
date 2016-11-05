@@ -5,7 +5,8 @@ use std::path::Path;
 
 #[test]
 fn sdam_rs() {
-    let paths = fs::read_dir(&Path::new("tests/json/data/specs/source/server-discovery-and-monitoring/tests/rs/")).unwrap();
+    let dir = "tests/json/data/specs/source/server-discovery-and-monitoring/tests/rs/";
+    let paths = fs::read_dir(&Path::new(dir)).unwrap();
 
     for path in paths {
         let path2 = path.unwrap().path();

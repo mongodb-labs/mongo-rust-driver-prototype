@@ -7,7 +7,8 @@ use super::framework::run_suite;
 
 #[test]
 fn sdam_single() {
-    let paths = fs::read_dir(&Path::new("tests/json/data/specs/source/server-discovery-and-monitoring/tests/single/")).unwrap();
+    let dir = "tests/json/data/specs/source/server-discovery-and-monitoring/tests/single/";
+    let paths = fs::read_dir(&Path::new(dir)).unwrap();
 
     for path in paths {
         let path2 = path.unwrap().path();

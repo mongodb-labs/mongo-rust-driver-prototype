@@ -14,18 +14,23 @@ pub struct Outcome {
 impl Outcome {
     pub fn from_json(object: &Object) -> Result<Outcome, String> {
         let result = match object.get("result") {
-            Some(ref json) => Bson::from_json(&json),
-            None => Bson::Null
+            Some(json) => Bson::from_json(json),
+            None => Bson::Null,
         };
 
         let coll_obj = match object.get("collection") {
             Some(&Json::Object(ref obj)) => obj.clone(),
-            _ => return Ok(Outcome { result: result, collection: None })
+            _ => {
+                return Ok(Outcome {
+                    result: result,
+                    collection: None,
+                })
+            }
         };
 
         let name = match coll_obj.get("name") {
             Some(&Json::String(ref s)) => Some(s.clone()),
-            _ => None
+            _ => None,
         };
 
         let array = val_or_err!(coll_obj.get("data"),
@@ -35,14 +40,20 @@ impl Outcome {
         let mut data = vec![];
 
         for json in array {
-            match Bson::from_json(&json) {
+            match Bson::from_json(json) {
                 Bson::Document(doc) => data.push(doc),
-                _ => return Err("`data` array must contain only objects".to_owned())
+                _ => return Err(String::from("`data` array must contain only objects")),
             }
         }
 
-        let collection = Collection { name: name, data: data };
+        let collection = Collection {
+            name: name,
+            data: data,
+        };
 
-        Ok(Outcome { result: result, collection: Some(collection) })
+        Ok(Outcome {
+            result: result,
+            collection: Some(collection),
+        })
     }
 }

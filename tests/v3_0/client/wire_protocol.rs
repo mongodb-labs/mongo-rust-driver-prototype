@@ -1,6 +1,6 @@
 use bson::{Bson, Document};
 use mongodb::{Client, ThreadedClient};
-use mongodb::db::{ThreadedDatabase};
+use mongodb::db::ThreadedDatabase;
 use mongodb::wire_protocol::flags::{OpInsertFlags, OpQueryFlags, OpUpdateFlags};
 use mongodb::wire_protocol::operations::Message;
 use std::net::TcpStream;
@@ -25,12 +25,12 @@ fn insert_single_key_doc() {
 
             let cm = match res {
                 Ok(message) => message,
-                Err(_) => panic!("Could not create message!")
+                Err(_) => panic!("Could not create message!"),
             };
 
             match cm.write(&mut stream) {
                 Ok(_) => (),
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             let doc = Document::new();
@@ -40,36 +40,32 @@ fn insert_single_key_doc() {
 
             let cm = match res {
                 Ok(message) => message,
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             match cm.write(&mut stream) {
                 Ok(_) => (),
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             let reply = match Message::read(&mut stream) {
                 Ok(m) => m,
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             let docs = match reply {
-                Message::OpReply { header: _, flags: _, cursor_id:_,
-                                   starting_from: _, number_returned: _,
-                                   documents: d } => d,
-                _ => panic!("Invalid response read from server")
+                Message::OpReply { documents: d, .. } => d,
+                _ => panic!("Invalid response read from server"),
             };
 
             assert_eq!(docs.len() as i32, 1);
 
             match docs[0].get("foo") {
                 Some(&Bson::FloatingPoint(42.0)) => (),
-                _ => panic!("Wrong value returned!")
+                _ => panic!("Wrong value returned!"),
             };
-        },
-        Err(_) => {
-            panic!("Could not connect to server")
         }
+        Err(_) => panic!("Could not connect to server"),
     }
 }
 
@@ -90,12 +86,12 @@ fn insert_multi_key_doc() {
 
             let cm = match res {
                 Ok(message) => message,
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             match cm.write(&mut stream) {
                 Ok(_) => (),
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             let doc = Document::new();
@@ -105,41 +101,37 @@ fn insert_multi_key_doc() {
 
             let cm = match res {
                 Ok(message) => message,
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             match cm.write(&mut stream) {
                 Ok(_) => (),
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             let reply = match Message::read(&mut stream) {
                 Ok(m) => m,
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             let docs = match reply {
-                Message::OpReply { header: _, flags: _, cursor_id:_,
-                                   starting_from: _, number_returned: _,
-                                   documents: d } => d,
-                _ => panic!("Invalid response read from server")
+                Message::OpReply { documents: d, .. } => d,
+                _ => panic!("Invalid response read from server"),
             };
 
             assert_eq!(docs.len() as i32, 1);
 
             match docs[0].get("foo") {
                 Some(&Bson::FloatingPoint(42.0)) => (),
-                _ => panic!("Wrong value returned!")
+                _ => panic!("Wrong value returned!"),
             };
 
             match docs[0].get("bar") {
                 Some(&Bson::String(ref s)) => assert_eq!(s, "__z&"),
-                _ => panic!("Wrong value returned!")
+                _ => panic!("Wrong value returned!"),
             };
-        },
-        Err(_) => {
-            panic!("Could not connect to server")
         }
+        Err(_) => panic!("Could not connect to server"),
     }
 }
 
@@ -164,12 +156,12 @@ fn insert_docs() {
 
             let cm = match res {
                 Ok(message) => message,
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             match cm.write(&mut stream) {
                 Ok(_) => (),
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             let doc = Document::new();
@@ -179,47 +171,43 @@ fn insert_docs() {
 
             let cm = match res {
                 Ok(message) => message,
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             match cm.write(&mut stream) {
                 Ok(_) => (),
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
 
             let reply = match Message::read(&mut stream) {
                 Ok(m) => m,
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             let docs = match reply {
-                Message::OpReply { header: _, flags: _, cursor_id:_,
-                                   starting_from: _, number_returned: _,
-                                   documents: d } => d,
-                _ => panic!("Invalid response read from server")
+                Message::OpReply { documents: d, .. } => d,
+                _ => panic!("Invalid response read from server"),
             };
 
             assert_eq!(docs.len() as i32, 2);
 
             match docs[0].get("foo") {
                 Some(&Bson::FloatingPoint(42.0)) => (),
-                _ => panic!("Wrong value returned!")
+                _ => panic!("Wrong value returned!"),
             };
 
             match docs[0].get("bar") {
                 Some(&Bson::String(ref s)) => assert_eq!(s, "__z&"),
-                _ => panic!("Wrong value returned!")
+                _ => panic!("Wrong value returned!"),
             };
 
             match docs[1].get("booyah") {
                 Some(&Bson::I32(23)) => (),
-                _ => panic!("Wrong value returned!")
+                _ => panic!("Wrong value returned!"),
             };
-        },
-        Err(_) => {
-            panic!("Could not connect to server")
         }
+        Err(_) => panic!("Could not connect to server"),
     }
 }
 
@@ -238,12 +226,12 @@ fn insert_update_then_query() {
 
             let cm = match res {
                 Ok(message) => message,
-                Err(_) => panic!("Could not create insert message!")
+                Err(_) => panic!("Could not create insert message!"),
             };
 
             match cm.write(&mut stream) {
                 Ok(_) => (),
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             let selector = Document::new();
@@ -256,12 +244,12 @@ fn insert_update_then_query() {
 
             let cm = match res {
                 Ok(message) => message,
-                Err(_) => panic!("Could not create update message!")
+                Err(_) => panic!("Could not create update message!"),
             };
 
             match cm.write(&mut stream) {
                 Ok(_) => (),
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             let doc = Document::new();
@@ -271,35 +259,31 @@ fn insert_update_then_query() {
 
             let cm = match res {
                 Ok(message) => message,
-                Err(_) => panic!("Could not create query message!")
+                Err(_) => panic!("Could not create query message!"),
             };
 
             match cm.write(&mut stream) {
                 Ok(_) => (),
-                Err(s) => panic!("{}", s)
+                Err(s) => panic!("{}", s),
             };
 
             let reply = match Message::read(&mut stream) {
                 Ok(m) => m,
-                Err(s) => panic!("Could not read response: {}", s)
+                Err(s) => panic!("Could not read response: {}", s),
             };
 
             let docs = match reply {
-                Message::OpReply { header: _, flags: _, cursor_id:_,
-                                   starting_from: _, number_returned: _,
-                                   documents: d } => d,
-                _ => panic!("Invalid response read from server")
+                Message::OpReply { documents: d, .. } => d,
+                _ => panic!("Invalid response read from server"),
             };
 
             assert_eq!(docs.len() as i32, 1);
 
             match docs[0].get("foo") {
                 Some(&Bson::String(ref s)) => assert_eq!(s, "bar"),
-                _ => panic!("Wrong value returned!")
+                _ => panic!("Wrong value returned!"),
             };
-        },
-        Err(_) => {
-            panic!("Could not connect to server")
         }
+        Err(_) => panic!("Could not connect to server"),
     }
 }

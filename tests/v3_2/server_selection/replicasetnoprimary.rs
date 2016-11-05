@@ -5,7 +5,9 @@ use std::path::Path;
 
 #[test]
 fn server_selection_replica_set_no_primary_read() {
-    let paths = fs::read_dir(&Path::new("tests/json/data/specs/source/server-selection/tests/server_selection/ReplicaSetNoPrimary/read")).unwrap();
+    let dir = "tests/json/data/specs/source/server-selection/tests/server_selection/\
+               ReplicaSetNoPrimary/read";
+    let paths = fs::read_dir(&Path::new(dir)).unwrap();
 
     for path in paths {
         let path2 = path.unwrap().path();
@@ -19,7 +21,9 @@ fn server_selection_replica_set_no_primary_read() {
 
 #[test]
 fn server_selection_replica_set_no_primary_write() {
-    let paths = fs::read_dir(&Path::new("tests/json/data/specs/source/server-selection/tests/server_selection/ReplicaSetNoPrimary/write")).unwrap();
+    let dir = "tests/json/data/specs/source/server-selection/tests/server_selection/\
+               ReplicaSetNoPrimary/write";
+    let paths = fs::read_dir(&Path::new(dir)).unwrap();
 
     for path in paths {
         let path2 = path.unwrap().path();

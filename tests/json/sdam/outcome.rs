@@ -22,9 +22,9 @@ impl Outcome {
         let mut servers = HashMap::new();
 
         if let Some(&Json::Object(ref obj)) = object.get("servers") {
-            for (host, json) in obj.into_iter() {
-                let doc = val_or_err!(json,
-                                      &Json::Object(ref obj) => obj,
+            for (host, json) in obj {
+                let doc = val_or_err!(*json,
+                                      Json::Object(ref obj) => obj,
                                       "`servers` must be an object map.");
 
                 let server_set_name = match doc.get("setName") {
@@ -33,10 +33,14 @@ impl Outcome {
                 };
 
                 let server_type = val_or_err!(doc.get("type"),
-                                              Some(&Json::String(ref s)) => ServerType::from_str(s).unwrap(),
+                                              Some(&Json::String(ref s)) =>
+                                              ServerType::from_str(s).unwrap(),
                                               "`type` must be a string.");
 
-                let server_obj = Server { set_name: server_set_name, stype: server_type };
+                let server_obj = Server {
+                    set_name: server_set_name,
+                    stype: server_type,
+                };
                 servers.insert(connstring::parse_host(host).unwrap(), server_obj);
             }
         }
@@ -54,7 +58,7 @@ impl Outcome {
         Ok(Outcome {
             servers: servers,
             set_name: set_name,
-            ttype: ttype
+            ttype: ttype,
         })
     }
 }

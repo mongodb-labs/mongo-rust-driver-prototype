@@ -89,7 +89,7 @@ impl IsMasterResult {
             Some(&Bson::I32(v)) => v != 0,
             Some(&Bson::I64(v)) => v != 0,
             Some(&Bson::FloatingPoint(v)) => v != 0.0,
-            _ => return Err(ArgumentError("result does not contain `ok`.".to_owned())),
+            _ => return Err(ArgumentError(String::from("result does not contain `ok`."))),
         };
 
         let mut result = IsMasterResult {
@@ -121,7 +121,7 @@ impl IsMasterResult {
         }
 
         if let Some(&Bson::UtcDatetime(ref datetime)) = doc.get("localTime") {
-            result.local_time = Some(datetime.clone());
+            result.local_time = Some(*datetime);
         }
 
         if let Some(&Bson::I64(v)) = doc.get("minWireVersion") {
@@ -153,24 +153,30 @@ impl IsMasterResult {
         }
 
         if let Some(&Bson::Array(ref arr)) = doc.get("hosts") {
-            result.hosts = arr.iter().filter_map(|bson| match bson {
-                &Bson::String(ref s) => connstring::parse_host(s).ok(),
-                _ => None,
-            }).collect();
+            result.hosts = arr.iter()
+                .filter_map(|bson| match *bson {
+                    Bson::String(ref s) => connstring::parse_host(s).ok(),
+                    _ => None,
+                })
+                .collect();
         }
 
         if let Some(&Bson::Array(ref arr)) = doc.get("passives") {
-            result.passives = arr.iter().filter_map(|bson| match bson {
-                &Bson::String(ref s) => connstring::parse_host(s).ok(),
-                _ => None,
-            }).collect();
+            result.passives = arr.iter()
+                .filter_map(|bson| match *bson {
+                    Bson::String(ref s) => connstring::parse_host(s).ok(),
+                    _ => None,
+                })
+                .collect();
         }
 
         if let Some(&Bson::Array(ref arr)) = doc.get("arbiters") {
-            result.arbiters = arr.iter().filter_map(|bson| match bson {
-                &Bson::String(ref s) => connstring::parse_host(s).ok(),
-                _ => None,
-            }).collect();
+            result.arbiters = arr.iter()
+                .filter_map(|bson| match *bson {
+                    Bson::String(ref s) => connstring::parse_host(s).ok(),
+                    _ => None,
+                })
+                .collect();
         }
 
         if let Some(&Bson::String(ref s)) = doc.get("primary") {
@@ -190,8 +196,8 @@ impl IsMasterResult {
         }
 
         if let Some(&Bson::Document(ref doc)) = doc.get("tags") {
-            for (k, v) in doc.into_iter() {
-                if let &Bson::String(ref tag) = v {
+            for (k, v) in doc {
+                if let Bson::String(ref tag) = *v {
                     result.tags.insert(k.to_owned(), tag.to_owned());
                 }
             }
@@ -199,9 +205,11 @@ impl IsMasterResult {
 
         match doc.get("electionId") {
             Some(&Bson::ObjectId(ref id)) => result.election_id = Some(id.clone()),
-            Some(&Bson::Document(ref doc)) => if let Some(&Bson::String(ref s)) = doc.get("$oid") {
-                result.election_id = Some(try!(oid::ObjectId::with_string(s)));
-            },
+            Some(&Bson::Document(ref doc)) => {
+                if let Some(&Bson::String(ref s)) = doc.get("$oid") {
+                    result.election_id = Some(try!(oid::ObjectId::with_string(s)));
+                }
+            }
             _ => (),
         }
 
@@ -211,9 +219,12 @@ impl IsMasterResult {
 
 impl Monitor {
     /// Returns a new monitor connected to the server.
-    pub fn new(client: Client, host: Host, pool: Arc<ConnectionPool>,
+    pub fn new(client: Client,
+               host: Host,
+               pool: Arc<ConnectionPool>,
                top_description: Arc<RwLock<TopologyDescription>>,
-               server_description: Arc<RwLock<ServerDescription>>) -> Monitor {
+               server_description: Arc<RwLock<ServerDescription>>)
+               -> Monitor {
 
         Monitor {
             client: client,
@@ -247,10 +258,18 @@ impl Monitor {
 
         let time_start = time::get_time();
 
-        let cursor = try!(Cursor::query_with_stream(
-            stream, self.client.clone(), "local.$cmd".to_owned(), 1,
-            flags, options.skip as i32, 1, filter.clone(), options.projection.clone(),
-            CommandType::IsMaster, false, None));
+        let cursor = try!(Cursor::query_with_stream(stream,
+                                                    self.client.clone(),
+                                                    String::from("local.$cmd"),
+                                                    1,
+                                                    flags,
+                                                    options.skip as i32,
+                                                    1,
+                                                    filter.clone(),
+                                                    options.projection.clone(),
+                                                    CommandType::IsMaster,
+                                                    false,
+                                                    None));
 
         let time_end = time::get_time();
 
@@ -268,9 +287,12 @@ impl Monitor {
         self.condvar.notify_one();
     }
 
-    // Updates the server description associated with this monitor using an isMaster server response.
-    fn update_server_description(&self, doc: bson::Document,
-                                 round_trip_time: i64) -> Result<ServerDescription> {
+    // Updates the server description associated with this monitor using an isMaster server
+    // response.
+    fn update_server_description(&self,
+                                 doc: bson::Document,
+                                 round_trip_time: i64)
+                                 -> Result<ServerDescription> {
 
         let ismaster_result = IsMasterResult::new(doc);
         let mut server_description = self.server_description.write().unwrap();
@@ -278,8 +300,8 @@ impl Monitor {
             Ok(ismaster) => server_description.update(ismaster, round_trip_time),
             Err(err) => {
                 server_description.set_err(err);
-                return Err(OperationError("Failed to parse ismaster result.".to_owned()))
-            },
+                return Err(OperationError(String::from("Failed to parse ismaster result.")));
+            }
         }
 
         Ok(server_description.clone())
@@ -288,7 +310,9 @@ impl Monitor {
     // Updates the topology description associated with this monitor using a new server description.
     fn update_top_description(&self, description: ServerDescription) {
         let mut top_description = self.top_description.write().unwrap();
-        top_description.update(self.host.clone(), description, self.client.clone(),
+        top_description.update(self.host.clone(),
+                               description,
+                               self.client.clone(),
                                self.top_description.clone());
     }
 
@@ -299,12 +323,12 @@ impl Monitor {
                 if let Ok(description) = self.update_server_description(doc, round_trip_time) {
                     self.update_top_description(description);
                 }
-            },
+            }
             Some(Err(err)) => {
                 self.set_err(err);
-            },
+            }
             None => {
-                self.set_err(OperationError("ismaster returned no response.".to_owned()));
+                self.set_err(OperationError(String::from("ismaster returned no response.")));
             }
         }
     }
@@ -325,7 +349,9 @@ impl Monitor {
                 } else {
                     // Retry once
                     match self.is_master() {
-                        Ok((mut cursor, rtt)) => self.update_with_is_master_cursor(&mut cursor, rtt),
+                        Ok((mut cursor, rtt)) => {
+                            self.update_with_is_master_cursor(&mut cursor, rtt)
+                        }
                         Err(err) => self.set_err(err),
                     }
                 }

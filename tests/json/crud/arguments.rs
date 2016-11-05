@@ -1,7 +1,7 @@
 use bson::{Bson, Document};
 use json::FromJson;
-use mongodb::coll::options::{AggregateOptions, CountOptions,
-    FindOneAndDeleteOptions, FindOneAndUpdateOptions, FindOptions};
+use mongodb::coll::options::{AggregateOptions, CountOptions, FindOneAndDeleteOptions,
+                             FindOneAndUpdateOptions, FindOptions};
 use rustc_serialize::json::Object;
 
 pub enum Arguments {
@@ -14,10 +14,7 @@ pub enum Arguments {
         filter: Option<Document>,
         options: CountOptions,
     },
-    Delete {
-        filter: Document,
-        many: bool,
-    },
+    Delete { filter: Document, many: bool },
     Distinct {
         field_name: String,
         filter: Option<Document>,
@@ -40,12 +37,8 @@ pub enum Arguments {
         update: Document,
         options: FindOneAndUpdateOptions,
     },
-    InsertOne {
-        document: Document,
-    },
-    InsertMany {
-        documents: Vec<Document>,
-    },
+    InsertOne { document: Document },
+    InsertMany { documents: Vec<Document> },
     ReplaceOne {
         filter: Document,
         replacement: Document,
@@ -56,7 +49,7 @@ pub enum Arguments {
         update: Document,
         upsert: bool,
         many: bool,
-    }
+    },
 }
 
 impl Arguments {
@@ -77,14 +70,18 @@ impl Arguments {
                 Bson::Document(doc) => {
                     out = out || doc.contains_key("$out");
                     doc
-                },
-                _ => return Err("aggregate pipeline can only contain documents".to_owned())
+                }
+                _ => return Err(String::from("aggregate pipeline can only contain documents")),
             };
 
             docs.push(doc);
         }
 
-        Ok(Arguments::Aggregate { pipeline: docs, options: options, out: out })
+        Ok(Arguments::Aggregate {
+            pipeline: docs,
+            options: options,
+            out: out,
+        })
     }
 
     pub fn count_from_json(object: &Object) -> Arguments {
@@ -93,20 +90,25 @@ impl Arguments {
         let f = |x| Some(Bson::from_json(x));
         let filter = match object.get("filter").and_then(f) {
             Some(Bson::Document(doc)) => Some(doc),
-            _ => None
+            _ => None,
         };
 
-        Arguments::Count { filter: filter, options: options }
+        Arguments::Count {
+            filter: filter,
+            options: options,
+        }
     }
 
-    pub fn delete_from_json(object: &Object,
-                            many: bool) -> Result<Arguments, String> {
+    pub fn delete_from_json(object: &Object, many: bool) -> Result<Arguments, String> {
         let f = |x| Some(Bson::from_json(x));
         let document = val_or_err!(object.get("filter").and_then(f),
                                    Some(Bson::Document(doc)) => doc,
                                    "`delete` requires document");
 
-        Ok(Arguments::Delete { filter: document, many: many })
+        Ok(Arguments::Delete {
+            filter: document,
+            many: many,
+        })
     }
 
     pub fn distinct_from_json(object: &Object) -> Result<Arguments, String> {
@@ -118,10 +120,13 @@ impl Arguments {
         let f = |x| Some(Bson::from_json(x));
         let filter = match object.get("filter").and_then(f) {
             Some(Bson::Document(doc)) => Some(doc),
-            _ => None
+            _ => None,
         };
 
-        Ok(Arguments::Distinct { field_name: field_name, filter: filter })
+        Ok(Arguments::Distinct {
+            field_name: field_name,
+            filter: filter,
+        })
     }
 
     pub fn find_from_json(object: &Object) -> Arguments {
@@ -130,10 +135,13 @@ impl Arguments {
         let f = |x| Some(Bson::from_json(x));
         let filter = match object.get("filter").and_then(f) {
             Some(Bson::Document(doc)) => Some(doc),
-            _ => None
+            _ => None,
         };
 
-        Arguments::Find { filter: filter, options: options }
+        Arguments::Find {
+            filter: filter,
+            options: options,
+        }
     }
 
     pub fn find_one_and_delete_from_json(object: &Object) -> Result<Arguments, String> {
@@ -144,7 +152,10 @@ impl Arguments {
                                  Some(Bson::Document(doc)) => doc,
                                  "`find_one_and_delete` requires filter document");
 
-        Ok(Arguments::FindOneAndDelete { filter: filter, options: options })
+        Ok(Arguments::FindOneAndDelete {
+            filter: filter,
+            options: options,
+        })
     }
 
     pub fn find_one_and_replace_from_json(object: &Object) -> Result<Arguments, String> {
@@ -160,9 +171,11 @@ impl Arguments {
                                  Some(Bson::Document(doc)) => doc,
                                  "`find_one_and_replace` requires replacement document");
 
-        Ok(Arguments::FindOneAndReplace { filter: filter,
-                                          replacement: replacement,
-                                          options: options })
+        Ok(Arguments::FindOneAndReplace {
+            filter: filter,
+            replacement: replacement,
+            options: options,
+        })
     }
 
     pub fn find_one_and_update_from_json(object: &Object) -> Result<Arguments, String> {
@@ -178,8 +191,11 @@ impl Arguments {
                                  Some(Bson::Document(doc)) => doc,
                                  "`find_one_and_update` requires update document");
 
-        Ok(Arguments::FindOneAndUpdate { filter: filter, update: update,
-                                         options: options })
+        Ok(Arguments::FindOneAndUpdate {
+            filter: filter,
+            update: update,
+            options: options,
+        })
     }
 
     pub fn insert_many_from_json(object: &Object) -> Result<Arguments, String> {
@@ -191,10 +207,10 @@ impl Arguments {
 
         let mut docs = vec![];
 
-        for bson in bsons.into_iter() {
+        for bson in bsons {
             match bson {
                 Bson::Document(doc) => docs.push(doc),
-                _ => return Err("`insert_many` can only insert documents".to_owned())
+                _ => return Err(String::from("`insert_many` can only insert documents")),
             };
         }
 
@@ -225,8 +241,11 @@ impl Arguments {
         let upsert = var_match!(object.get("upsert").and_then(f),
                                 Some(Bson::Boolean(b)) => b);
 
-        Ok(Arguments::ReplaceOne { filter: filter, replacement: replacement,
-                                upsert: upsert })
+        Ok(Arguments::ReplaceOne {
+            filter: filter,
+            replacement: replacement,
+            upsert: upsert,
+        })
     }
 
     pub fn update_from_json(object: &Object, many: bool) -> Result<Arguments, String> {
@@ -244,7 +263,11 @@ impl Arguments {
         let upsert = var_match!(object.get("upsert").and_then(f),
                                 Some(Bson::Boolean(b)) => b);
 
-        Ok(Arguments::Update { filter: filter, update: update, upsert: upsert,
-                               many: many })
+        Ok(Arguments::Update {
+            filter: filter,
+            update: update,
+            upsert: upsert,
+            many: many,
+        })
     }
 }

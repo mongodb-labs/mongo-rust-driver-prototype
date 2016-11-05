@@ -104,6 +104,12 @@ impl FromStr for ServerType {
     }
 }
 
+impl Default for ServerDescription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ServerDescription {
     /// Returns a default, unknown server description.
     pub fn new() -> ServerDescription {
@@ -128,7 +134,7 @@ impl ServerDescription {
     // Updates the server description using an isMaster server response.
     pub fn update(&mut self, ismaster: IsMasterResult, round_trip_time: i64) {
         if !ismaster.ok {
-            self.set_err(OperationError("ismaster returned a not-ok response.".to_owned()));
+            self.set_err(OperationError(String::from("ismaster returned a not-ok response.")));
             return;
         }
 
@@ -148,7 +154,7 @@ impl ServerDescription {
                 // (rtt / div) + (old_rtt * (div-1)/div)
                 Some(round_trip_time / ROUND_TRIP_DIVISOR +
                      (old_rtt / (ROUND_TRIP_DIVISOR)) * (ROUND_TRIP_DIVISOR - 1))
-            },
+            }
             None => Some(round_trip_time),
         };
 
@@ -197,8 +203,11 @@ impl Drop for Server {
 
 impl Server {
     /// Returns a new server with the given host, initializing a new connection pool and monitor.
-    pub fn new(client: Client, host: Host,
-               top_description: Arc<RwLock<TopologyDescription>>, run_monitor: bool) -> Server {
+    pub fn new(client: Client,
+               host: Host,
+               top_description: Arc<RwLock<TopologyDescription>>,
+               run_monitor: bool)
+               -> Server {
 
         let description = Arc::new(RwLock::new(ServerDescription::new()));
 
@@ -209,8 +218,11 @@ impl Server {
         let pool = Arc::new(ConnectionPool::new(host.clone()));
 
         // Fails silently
-        let monitor = Arc::new(Monitor::new(client, host_clone, pool.clone(),
-                                            top_description, desc_clone));
+        let monitor = Arc::new(Monitor::new(client,
+                                            host_clone,
+                                            pool.clone(),
+                                            top_description,
+                                            desc_clone));
 
         if run_monitor {
             let monitor_clone = monitor.clone();
