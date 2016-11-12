@@ -171,6 +171,6 @@ fn create_and_get_users() {
 #[test]
 fn get_version() {
     let client = Client::connect("localhost", 27017).unwrap();
-    let db = client.db("create_and_get_users");
+    let db = client.db("get_version");
     let version = db.version().unwrap();
 }
