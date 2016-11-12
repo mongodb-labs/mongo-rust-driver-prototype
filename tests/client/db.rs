@@ -167,3 +167,10 @@ fn create_and_get_users() {
         _ => panic!("User isn't named 'val' but should be"),
     };
 }
+
+#[test]
+fn get_version() {
+    let client = Client::connect("localhost", 27017).unwrap();
+    let db = client.db("create_and_get_users");
+    let version = db.version().unwrap();
+}
