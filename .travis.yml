@@ -3,18 +3,18 @@ language: rust
 cache: cargo
 
 before_install:
-    - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.0.12.tgz
-    - tar xvf mongodb-linux-x86_64-3.0.12.tgz
-    - mv mongodb-linux-x86_64-3.0.12 3.0.12
-    - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.2.10.tgz
-    - tar xvf mongodb-linux-x86_64-3.2.10.tgz
-    - mv mongodb-linux-x86_64-3.2.10 3.2.10
+    - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.0.14.tgz
+    - tar xvf mongodb-linux-x86_64-3.0.14.tgz
+    - mv mongodb-linux-x86_64-3.0.14 3.0.14
+    - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.2.11.tgz
+    - tar xvf mongodb-linux-x86_64-3.2.11.tgz
+    - mv mongodb-linux-x86_64-3.2.11 3.2.11
 
 script:
     - mkdir -p ./data/db ./data/db2
-    - 3.0.12/bin/mongod --fork --nopreallocj --dbpath ./data/db --syslog --port 27017
+    - 3.0.14/bin/mongod --fork --nopreallocj --dbpath ./data/db --syslog --port 27017
     - cargo build --verbose
     - cargo test --verbose
     - killall mongod
-    - 3.2.10/bin/mongod --fork --nopreallocj --dbpath ./data/db2 --syslog --port 27017
+    - 3.2.11/bin/mongod --fork --nopreallocj --dbpath ./data/db2 --syslog --port 27017
     - cargo test --verbose
