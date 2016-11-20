@@ -7,7 +7,7 @@ use mongodb::db::roles::{AllDatabaseRole, SingleDatabaseRole, Role};
 #[test]
 fn create_collection() {
     let client = Client::connect("localhost", 27017).unwrap();
-    let db = client.db("create_collection");
+    let db = client.db("test-client-db-create_collection");
     db.drop_database().unwrap();
 
     // Build collections
@@ -33,12 +33,15 @@ fn create_collection() {
         }
     }
 
+    let db1 = if v3_1 { "test1" } else { "test2" };
+    let db2 = if v3_1 { "test2" } else { "test1" };
+    
     match results[result_size - 2].get("name") {
-        Some(&Bson::String(ref name)) => assert_eq!("test1", name),
+        Some(&Bson::String(ref name)) => assert_eq!(db1, name),
         _ => panic!("Expected BSON string!"),
     }
     match results[result_size - 1].get("name") {
-        Some(&Bson::String(ref name)) => assert_eq!("test2", name),
+        Some(&Bson::String(ref name)) => assert_eq!(db2, name),
         _ => panic!("Expected BSON string!"),
     }
 }
@@ -46,7 +49,7 @@ fn create_collection() {
 #[test]
 fn list_collections() {
     let client = Client::connect("localhost", 27017).unwrap();
-    let db = client.db("list_collections");
+    let db = client.db("test-client-db-list_collections");
 
     db.drop_database().expect("Failed to drop database");
 
@@ -77,13 +80,16 @@ fn list_collections() {
         };
     }
 
+    let db1 = if v3_1 { "test" } else { "test2" };
+    let db2 = if v3_1 { "test2" } else { "test" };
+    
     match results[result_size - 2].get("name") {
-        Some(&Bson::String(ref name)) => assert_eq!("test", name),
+        Some(&Bson::String(ref name)) => assert_eq!(db1, name),
         _ => panic!("Expected BSON string!"),
     };
 
     match results[result_size - 1].get("name") {
-        Some(&Bson::String(ref name)) => assert_eq!("test2", name),
+        Some(&Bson::String(ref name)) => assert_eq!(db2, name),
         _ => panic!("Expected BSON string!"),
     }
 }
@@ -91,7 +97,7 @@ fn list_collections() {
 #[test]
 fn create_and_get_users() {
     let client = Client::connect("localhost", 27017).unwrap();
-    let db = client.db("create_and_get_users");
+    let db = client.db("test-client-db-create_and_get_users");
     db.drop_database().unwrap();
     db.drop_all_users(None).unwrap();
 
@@ -122,7 +128,7 @@ fn create_and_get_users() {
     let user = db.get_user("saghm", None).unwrap();
 
     match user.get("db") {
-        Some(&Bson::String(ref s)) => assert_eq!("create_and_get_users", s),
+        Some(&Bson::String(ref s)) => assert_eq!("test-client-db-create_and_get_users", s),
         _ => {
             panic!("Invalid `db` specified for user 'saghm': {:?}",
                    user.get("db"))
@@ -175,6 +181,6 @@ fn create_and_get_users() {
 #[test]
 fn get_version() {
     let client = Client::connect("localhost", 27017).unwrap();
-    let db = client.db("get_version");
+    let db = client.db("test-client-db-get_version");
     let _ = db.version().unwrap();
 }

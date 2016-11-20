@@ -9,10 +9,10 @@ use mongodb::wire_protocol::flags::OpQueryFlags;
 #[test]
 fn cursor_features() {
     let client = Client::connect("localhost", 27017).unwrap();
-    let db = client.db("test");
+    let db = client.db("test-client-cursor");
     let coll = db.collection("cursor_test");
 
-    coll.drop().expect("Failed to drop database.");
+    coll.drop().expect("Failed to drop collection.");
 
     let docs = (0..10)
         .map(|i| {
@@ -26,7 +26,7 @@ fn cursor_features() {
     let flags = OpQueryFlags::no_flags();
 
     let result = Cursor::query(client.clone(),
-                               "test.cursor_test".to_owned(),
+                               "test-client-cursor.cursor_test".to_owned(),
                                3,
                                flags,
                                0,
