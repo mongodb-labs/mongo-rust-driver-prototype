@@ -78,4 +78,4 @@ fn main() {
 Documentation
 -------------
 
-Documentation is built using Cargo. The latest documentation can be found [here](https://mongodb-labs.github.io/mongo-rust-driver-prototype/mongodb). Generated documentation using `cargo doc` can be found under the *target/doc/* folder.
+Documentation is built using Cargo. The latest documentation can be found [here](https://docs.rs/mongodb). Generated documentation using `cargo doc` can be found under the *target/doc/* folder.
