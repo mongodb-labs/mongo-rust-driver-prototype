@@ -87,7 +87,7 @@
 //! Each server within a MongoDB server set is maintained by the driver with a separate connection
 //! pool. By default, each pool has a maximum of 5 concurrent open connections.
 
-#[doc(html_root_url = "https://mongodbinc-interns.github.io/mongo-rust-driver-prototype")]
+#[doc(html_root_url = "https://docs.rs/mongodb")]
 #[macro_use(bson, doc)]
 extern crate bson;
 extern crate byteorder;
