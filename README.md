@@ -31,7 +31,7 @@ Alternately, you can use the MongoDB driver with SSL support. To do this, you mu
 ```
 [dependencies]
 ...
-mongodb = { version = "0.1.8", features = ["ssl"] }
+mongodb = { version = "0.2.0", features = ["ssl"] }
 ```
 
 Then, import the bson and driver libraries within your code.
