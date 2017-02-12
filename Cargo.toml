@@ -1,9 +1,9 @@
 [package]
 name = "mongodb"
-version = "0.2.0"
-authors = ["Valeri Karpov <valkar207@gmail.com>",
+version = "0.2.1"
+authors = ["Kevin Yeh <kevinyeah@utexas.edu>",
            "Saghm Rossi <saghmrossi@gmail.com>",
-           "Kevin Yeh <kevinyeah@utexas.edu>"]
+           "Valeri Karpov <valkar207@gmail.com>"]
 
 description = "A native MongoDB driver developed under MongoDB labs."
 repository = "https://github.com/mongodb-labs/mongo-rust-driver-prototype"
