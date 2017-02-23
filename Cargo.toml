@@ -18,7 +18,7 @@ ssl = ["openssl"]
 
 [dependencies]
 bitflags = "0.7.0"
-bson = "0.3.2"
+bson = "0.4.1"
 bufstream = "0.1.1"
 byteorder = "0.5.3"
 chrono = "0.2.25"
