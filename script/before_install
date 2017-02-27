@@ -1,0 +1,9 @@
+#!/bin/bash
+
+mkdir -p $RELEASE_CACHE
+if [ ! -d "$RELEASE_CACHE/$MONGODB_RELEASE" ]; then
+    wget "http://fastdl.mongodb.org/linux/$MONGODB_RELEASE.tgz"
+    tar xvf "$MONGODB_RELEASE.tgz"
+    mv $MONGODB_RELEASE $RELEASE_CACHE
+    rm "$MONGODB_RELEASE.tgz"
+fi

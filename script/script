@@ -1,0 +1,10 @@
+#!/bin/bash
+
+data="data/$MONGODB_RELEASE"
+data_ssl="$data-ssl"
+mkdir -p $data $data_ssl
+
+$RELEASE_CACHE/$MONGODB_RELEASE/bin/mongod --fork --dbpath $data --syslog --port 27017
+$RELEASE_CACHE/$MONGODB_RELEASE/bin/mongod --fork --dbpath $data_ssl --syslog --port 27018 --sslMode requireSSL --sslPEMKeyFile tests/ssl/server.pem --sslCAFile tests/ssl/ca.pem
+
+cargo test --features ssl --verbose
