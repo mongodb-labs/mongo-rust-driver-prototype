@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use rustc_serialize::json::{Json, Object};
+use serde_json::{Map, Value};
 
 pub struct Collection {
     pub name: Option<String>,
@@ -12,14 +12,14 @@ pub struct Outcome {
 }
 
 impl Outcome {
-    pub fn from_json(object: &Object) -> Result<Outcome, String> {
+    pub fn from_json(object: &Map<String, Value>) -> Result<Outcome, String> {
         let result = match object.get("result") {
             Some(json) => Bson::from_json(json),
             None => Bson::Null,
         };
 
         let coll_obj = match object.get("collection") {
-            Some(&Json::Object(ref obj)) => obj.clone(),
+            Some(&Value::Object(ref obj)) => obj.clone(),
             _ => {
                 return Ok(Outcome {
                     result: result,
@@ -29,12 +29,12 @@ impl Outcome {
         };
 
         let name = match coll_obj.get("name") {
-            Some(&Json::String(ref s)) => Some(s.clone()),
+            Some(&Value::String(ref s)) => Some(s.clone()),
             _ => None,
         };
 
         let array = val_or_err!(coll_obj.get("data"),
-                               Some(&Json::Array(ref arr)) => arr,
+                               Some(&Value::Array(ref arr)) => arr,
                               "`result` must be an array");
 
         let mut data = vec![];

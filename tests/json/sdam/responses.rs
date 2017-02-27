@@ -1,18 +1,18 @@
 use bson::{Bson, Document};
 use mongodb::connstring::{self, Host};
-use rustc_serialize::json::Json;
+use serde_json::Value;
 
 pub struct Responses {
     pub data: Vec<(Host, Document)>,
 }
 
 impl Responses {
-    pub fn from_json(array: &[Json]) -> Result<Responses, String> {
+    pub fn from_json(array: &[Value]) -> Result<Responses, String> {
         let mut data = Vec::new();
 
         for json in array {
             let inner_array = val_or_err!(*json,
-                                          Json::Array(ref arr) => arr,
+                                          Value::Array(ref arr) => arr,
                                           "`responses` must be an array of arrays.");
 
             if inner_array.len() != 2 {
@@ -21,12 +21,12 @@ impl Responses {
 
             let host = val_or_err!(
                 inner_array[0],
-                Json::String(ref s) => s.to_owned(),
+                Value::String(ref s) => s.to_owned(),
                 "Response item must contain the host string as the first argument.");
 
             let ismaster = val_or_err!(
                 inner_array[1],
-                Json::Object(ref obj) => Bson::from_json(&Json::Object(obj.clone())),
+                Value::Object(ref obj) => Bson::from_json(&Value::Object(obj.clone())),
                 "Response item must contain the ismaster object as \
                 the second argument.");
 

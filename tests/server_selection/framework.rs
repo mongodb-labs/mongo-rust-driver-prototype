@@ -6,11 +6,11 @@ use mongodb::topology::{TopologyDescription, TopologyType};
 use mongodb::topology::server::Server;
 
 use json::server_selection::reader::SuiteContainer;
-use rustc_serialize::json::Json;
+use serde_json::Value;
 use std::sync::{Arc, RwLock};
 
 pub fn run_suite(file: &str) {
-    let json = Json::from_file(file).unwrap();
+    let json = Value::from_file(file).unwrap();
     let suite = json.get_suite().unwrap();
 
     let dummy_config = ConnectionString::new("i-dont-exist", 27017);

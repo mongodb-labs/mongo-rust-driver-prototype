@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use rustc_serialize::json::{Json, Object};
+use serde_json::{self, Map, Value};
 use std::fs::File;
 
 use super::arguments::Arguments;
@@ -11,7 +11,7 @@ pub struct Test {
 }
 
 impl Test {
-    fn from_json(object: &Object) -> Result<Test, String> {
+    fn from_json(object: &Map<String, Value>) -> Result<Test, String> {
         macro_rules! res_or_err {
             ($exp:expr) => { match $exp {
                 Ok(a) => a,
@@ -20,15 +20,15 @@ impl Test {
         }
 
         let op = val_or_err!(object.get("operation"),
-                             Some(&Json::Object(ref obj)) => obj.clone(),
+                             Some(&Value::Object(ref obj)) => obj.clone(),
                              "`operation` must be an object");
 
         let args_obj = val_or_err!(op.get("arguments"),
-                                   Some(&Json::Object(ref obj)) => obj.clone(),
+                                   Some(&Value::Object(ref obj)) => obj.clone(),
                                    "`arguments` must be an object");
 
         let name = val_or_err!(op.get("name"),
-                               Some(&Json::String(ref s)) => s,
+                               Some(&Value::String(ref s)) => s,
                                "`name` must be a string");
 
         let args = match name.as_ref() {
@@ -53,7 +53,7 @@ impl Test {
 
 
         let outcome_obj = val_or_err!(object.get("outcome"),
-                                      Some(&Json::Object(ref obj)) => obj.clone(),
+                                      Some(&Value::Object(ref obj)) => obj.clone(),
                                       "`outcome` must be an object");
 
         let outcome = match Outcome::from_json(&outcome_obj) {
@@ -73,9 +73,9 @@ pub struct Suite {
     pub tests: Vec<Test>,
 }
 
-fn get_data(object: &Object) -> Result<Vec<Document>, String> {
+fn get_data(object: &Map<String, Value>) -> Result<Vec<Document>, String> {
     let array = val_or_err!(object.get("data"),
-                            Some(&Json::Array(ref arr)) => arr.clone(),
+                            Some(&Value::Array(ref arr)) => arr.clone(),
                             "No `data` array found");
     let mut data = vec![];
 
@@ -89,16 +89,16 @@ fn get_data(object: &Object) -> Result<Vec<Document>, String> {
     Ok(data)
 }
 
-fn get_tests(object: &Object) -> Result<Vec<Test>, String> {
+fn get_tests(object: &Map<String, Value>) -> Result<Vec<Test>, String> {
     let array = val_or_err!(object.get("tests"),
-                            Some(&Json::Array(ref array)) => array.clone(),
+                            Some(&Value::Array(ref array)) => array.clone(),
                             "No `tests` array found");
 
     let mut tests = vec![];
 
     for json in array {
         let obj = val_or_err!(json,
-                              Json::Object(ref obj) => obj.clone(),
+                              Value::Object(ref obj) => obj.clone(),
                               "`tests` array must only contain objects");
 
         let test = match Test::from_json(&obj) {
@@ -117,16 +117,15 @@ pub trait SuiteContainer: Sized {
     fn get_suite(&self) -> Result<Suite, String>;
 }
 
-impl SuiteContainer for Json {
-    fn from_file(path: &str) -> Result<Json, String> {
+impl SuiteContainer for Value {
+    fn from_file(path: &str) -> Result<Value, String> {
         let mut file = File::open(path).expect(&format!("Unable to open file: {}", path));
-
-        Ok(Json::from_reader(&mut file).expect(&format!("Invalid JSON file: {}", path)))
+        Ok(serde_json::from_reader(&mut file).expect(&format!("Invalid JSON file: {}", path)))
     }
 
     fn get_suite(&self) -> Result<Suite, String> {
         let object = val_or_err!(*self,
-                                 Json::Object(ref object) => object.clone(),
+                                 Value::Object(ref object) => object.clone(),
                                  "`get_suite` requires a JSON object");
 
         let data = try!(get_data(&object));
