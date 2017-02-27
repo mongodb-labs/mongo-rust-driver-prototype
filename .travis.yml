@@ -12,7 +12,7 @@ env:
     - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1204-3.4.2
 
 before_install:
-    - ./script/install_mongo_release $TRAVIS_OS_NAME $MONGODB_RELEASE
+    - ./script/start_mongo_release $TRAVIS_OS_NAME $MONGODB_RELEASE
 
 script:
-    - ./script/test $MONGODB_RELEASE
+    - cargo test --features ssl --verbose
