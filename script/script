@@ -1,6 +1,6 @@
 #!/bin/bash
 
-data="data/$MONGODB_RELEASE"
+data="$RELEASE_CACHE/data/$MONGODB_RELEASE"
 data_ssl="$data-ssl"
 mkdir -p $data $data_ssl
 
