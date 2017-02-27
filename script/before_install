@@ -1,6 +1,0 @@
-#!/bin/bash
-
-mkdir -p $RELEASE_CACHE
-if [ ! -d "$RELEASE_CACHE/$MONGODB_RELEASE" ]; then
-    curl "http://fastdl.mongodb.org/linux/$MONGODB_RELEASE.tgz" | tar x -C $RELEASE_CACHE
-fi
