@@ -2,13 +2,13 @@
 
 if [ $# -lt 1 ]; then
     echo "Usage: test <mongo_release> [data_dir]"
-    echo "e.g. test mongodb-linux-x86_64-ubuntu1204-3.4.2 travis/mongodb/data"
+    echo "e.g. test mongodb-linux-x86_64-ubuntu1204-3.4.2 travis/mongodb"
 fi
 
 release=$1
-data_dir=${2:-travis/mongodb/data}
+install_dir=${2:-travis/mongodb}
 
-data="$data_dir/$release"
+data="$install_dir/data/$release"
 data_ssl="$data-ssl"
 mkdir -p $data $data_ssl
 
