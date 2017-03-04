@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e
+
+if [ $# -lt 1 ]; then
+    echo "Usage: test <mongo_release> [data_dir]"
+    echo "e.g. test mongodb-linux-x86_64-ubuntu1204-3.4.2 travis/mongodb"
+fi
+
+release=$1
+install_dir=${2:-travis/mongodb}
+
+data="$install_dir/data/$release"
+data_ssl="$data-ssl"
+mkdir -p $data $data_ssl
+
+# use mongo orchestration here to make it easier to start and stop these processes, yo
+$install_dir/$release/bin/mongod --fork --dbpath $data --syslog --port 27017
+$install_dir/$release/bin/mongod --fork --dbpath $data_ssl --syslog --port 27018 --sslMode requireSSL --sslPEMKeyFile tests/ssl/serer.pem --sslCAFile tests/ssl/ca.pem
+
+cargo test --verbose
+cargo test --features ssl --verbose
+# kill mongod here

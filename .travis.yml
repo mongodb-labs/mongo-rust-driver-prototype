@@ -1,18 +1,12 @@
 language: rust
 
-cache: cargo
-
-env:
-  global:
-    # Use a global cache to re-use dependencies across release builds; downloading a mongodb release is quick.
-    - CACHE_NAME=global_cache
-  matrix:
-    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1204-3.0.14
-    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1204-3.2.12
-    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1204-3.4.2
+cache:
+  - cargo: true
+  - directories:
+      - ./travis/mongodb/
 
 before_install:
-    - ./script/start_mongo_release $TRAVIS_OS_NAME $MONGODB_RELEASE
+    - ./script/install_mongo_release $TRAVIS_OS_NAME $MONGODB_RELEASE
 
 script:
     - cargo test --features ssl --verbose

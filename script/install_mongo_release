@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ $# -lt 2 ]; then
+    echo "Usage: install_mongo_release <operating system> <mongo_release> [install_dir]"
+    echo "e.g. install_mongo_release linux mongodb-linux-x86_64-ubuntu1204-3.4.2 travis/mongodb"
+fi
+
+# Install release
+os=$1
+release=$2
+install_dir=${3:-travis/mongodb}
+
+mkdir -p $install_dir
+if [ ! -d "$install_dir/$release" ]; then
+    curl "http://fastdl.mongodb.org/$os/$release.tgz" | tar xz -C $install_dir
+fi
