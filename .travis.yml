@@ -6,6 +6,7 @@ cache:
       - ./travis/mongodb/
 
 before_install:
+  - sudo apt-get install parallel
   - ./script/install_mongo_releases linux x86_64-ubuntu1204
 
 script:
