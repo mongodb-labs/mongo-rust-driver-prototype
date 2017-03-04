@@ -6,7 +6,7 @@ cache:
       - ./travis/mongodb/
 
 before_install:
-    - ./script/install_mongo_release $TRAVIS_OS_NAME $MONGODB_RELEASE
+  - ./script/install_mongo_releases linux x86_64-ubuntu1204
 
 script:
-    - cargo test --features ssl --verbose
+  - ./script/test_mongo_releases linux x86_64-ubuntu1204

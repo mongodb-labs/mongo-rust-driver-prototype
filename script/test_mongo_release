@@ -1,0 +1,20 @@
+#!/bin/bash
+set -e
+
+if [ $# -lt 1 ]; then
+    echo "Usage: test_mongo_release <mongo_release_dir> <data_dir>"
+    echo "e.g. test_mongo_release travis/mongodb/mongodb-linux-x86_64-ubuntu1204-3.4.2 travis/mongodb/data/mongodb-linux-x86_64-ubuntu1204-3.4.2"
+fi
+
+release_dir=$1
+data_dir=$2
+data_ssl="$data-ssl"
+mkdir -p $data $data_ssl
+
+# use mongo orchestration here to make it easier to start and stop these processes, yo
+$release_dir/bin/mongod --fork --dbpath $data --syslog --port 27017
+$release_dir/bin/mongod --fork --dbpath $data_ssl --syslog --port 27018 --sslMode requireSSL --sslPEMKeyFile tests/ssl/server.pem --sslCAFile tests/ssl/ca.pem
+
+cargo test --verbose
+cargo test --features ssl --verbose
+killall mongod
