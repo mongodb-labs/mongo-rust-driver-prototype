@@ -6,11 +6,11 @@ if [ $# -lt 2 ]; then
 fi
 
 os=$1
-base=$2
+arch=$2
 install_dir=${3:-travis/mongodb}
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-releases=("3.0.14", "3.2.12", "3.4.2")
+releases=("3.0.14" "3.2.12" "3.4.2")
 
 for release in $releases; do
     $script_dir/install_mongo_release $os "mongodb-$os-$arch-$release"

@@ -10,8 +10,11 @@ arch=$2
 install_dir=${3:-travis/mongodb}
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-releases=("3.0.14", "3.2.12", "3.4.2")
+releases=("3.0.14" "3.2.12" "3.4.2")
 
+parallel_command=""
 for release in $releases; do
-    $script_dir/test_mongo_release "$install_dir/mongodb-$os-$arch-$release $install_dir/data/mongodb-$os-$arch-$release"
+    parallel_command="$parallel_command $script_dir/test_mongo_release $install_dir/mongodb-$os-$arch-$release $install_dir/data/mongodb-$os-$arch-$release;"
 done
+
+parallel /bin/bash -c $parallel_command
