@@ -2,38 +2,18 @@ language: rust
 
 cache: cargo
 
+env:
+  global:
+    # Use a global cache to re-use dependencies across release builds; downloading a mongodb release is quick.
+    - CACHE_NAME=global_cache
+  matrix:
+    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1204-3.0.14
+    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1204-3.2.12
+    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1204-3.4.2
+
 before_install:
-    - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1204-3.0.14.tgz
-    - tar xvf mongodb-linux-x86_64-ubuntu1204-3.0.14.tgz
-    - mv mongodb-linux-x86_64-ubuntu1204-3.0.14 3.0.14
-    - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1204-3.2.12.tgz
-    - tar xvf mongodb-linux-x86_64-ubuntu1204-3.2.12.tgz
-    - mv mongodb-linux-x86_64-ubuntu1204-3.2.12 3.2.12
-    - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1204-3.4.2.tgz
-    - tar xvf mongodb-linux-x86_64-ubuntu1204-3.4.2.tgz
-    - mv mongodb-linux-x86_64-ubuntu1204-3.4.2 3.4.2
+    - ./script/start_mongo_release $TRAVIS_OS_NAME $MONGODB_RELEASE
 
 script:
-    - mkdir -p ./data/db30 ./data/db30-ssl ./data/db32 ./data/db32-ssl ./data/db34 ./data/db34-ssl
-    - 3.0.14/bin/mongod --fork --dbpath ./data/db30 --syslog --port 27017
-    - cargo build --verbose
     - cargo test --verbose
-    - killall mongod
-    - 3.2.12/bin/mongod --fork --dbpath ./data/db32 --syslog --port 27017
-    - cargo test --verbose
-    - killall mongod
-    - 3.4.2/bin/mongod --fork --dbpath ./data/db34 --syslog --port 27017
-    - cargo test --verbose
-    - killall mongod
-    - 3.0.14/bin/mongod --fork --dbpath ./data/db30 --syslog --port 27017
-    - 3.0.14/bin/mongod --fork --dbpath ./data/db30-ssl --syslog --port 27018 --sslMode requireSSL --sslPEMKeyFile tests/ssl/server.pem --sslCAFile tests/ssl/ca.pem
-    - cargo build --features ssl --verbose
-    - cargo test --features ssl --verbose
-    - killall mongod
-    - 3.2.12/bin/mongod --fork --dbpath ./data/db32 --syslog --port 27017
-    - 3.2.12/bin/mongod --fork --dbpath ./data/db32-ssl --syslog --port 27018 --sslMode requireSSL --sslPEMKeyFile tests/ssl/server.pem --sslCAFile tests/ssl/ca.pem
-    - cargo test --features ssl --verbose
-    - killall mongod
-    - 3.4.2/bin/mongod --fork --dbpath ./data/db34 --syslog --port 27017
-    - 3.4.2/bin/mongod --fork --dbpath ./data/db34-ssl --syslog --port 27018 --sslMode requireSSL --sslPEMKeyFile tests/ssl/server.pem --sslCAFile tests/ssl/ca.pem
     - cargo test --features ssl --verbose

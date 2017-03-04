@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ $# -lt 2 ]; then
+    echo "Usage: start_mongo_release <operating system> <mongo_release> [install_dir]"
+    echo "e.g. start_mongo_release linux mongodb-linux-x86_64-ubuntu1204-3.4.2 travis/mongodb"
+fi
+
+# Install release
+os=$1
+release=$2
+install_dir=${3:-travis/mongodb}
+
+mkdir -p $install_dir
+if [ ! -d "$install_dir/$release" ]; then
+    curl "http://fastdl.mongodb.org/$os/$release.tgz" | tar xz -C $install_dir
+fi
+
+# Start mongod processes
+data="$install_dir/data/$release"
+data_ssl="$data-ssl"
+
+mkdir -p $data $data_ssl
+$install_dir/$release/bin/mongod --fork --dbpath $data --syslog --port 27017
+$install_dir/$release/bin/mongod --fork --dbpath $data_ssl --syslog --port 27018 --sslMode requireSSL --sslPEMKeyFile tests/ssl/server.pem --sslCAFile tests/ssl/ca.pem

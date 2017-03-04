@@ -8,4 +8,5 @@ test_log.txt
 bin/
 target/
 test/
+travis/
 Cargo.lock
