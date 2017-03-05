@@ -3,6 +3,7 @@
 if [ $# -lt 2 ]; then
     echo "Usage: install_mongo_release <operating system> <mongo_release> [install_dir]"
     echo "e.g. install_mongo_release linux mongodb-linux-x86_64-ubuntu1204-3.4.2 travis/mongodb"
+    exit
 fi
 
 # Install release

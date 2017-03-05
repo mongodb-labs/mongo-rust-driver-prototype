@@ -3,6 +3,7 @@
 if [ $# -lt 2 ]; then
     echo "Usage: test_mongo_releases <os> <arch> [<install_dir>]"
     echo "e.g. test_mongo_releases linux x86_64-ubuntu1204 travis/mongodb"
+    exit
 fi
 
 os=$1
@@ -17,4 +18,5 @@ for release in $releases; do
     full_names="$full_names mongodb-$os-$arch-$release"
 done
 
+echo $script_dir
 parallel $script_dir/test_mongo_release $install_dir/{1} $install_dir/data/{1} ::: $full_names

@@ -4,11 +4,13 @@ set -e
 if [ $# -lt 1 ]; then
     echo "Usage: test_mongo_release <mongo_release_dir> <data_dir>"
     echo "e.g. test_mongo_release travis/mongodb/mongodb-linux-x86_64-ubuntu1204-3.4.2 travis/mongodb/data/mongodb-linux-x86_64-ubuntu1204-3.4.2"
+    exit
 fi
 
 release_dir=$1
-data_dir=$2
+data=$2
 data_ssl="$data-ssl"
+
 mkdir -p $data $data_ssl
 
 # use mongo orchestration here to make it easier to start and stop these processes, yo
