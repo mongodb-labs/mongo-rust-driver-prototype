@@ -14,5 +14,6 @@ install_dir=${3:-travis/mongodb}
 mkdir -p $install_dir
 if [ ! -d "$install_dir/$release" ]; then
     echo "installing from http://fastdl.mongodb.org/$os/$release.tgz"
+    # TODO: parallelize
     curl "http://fastdl.mongodb.org/$os/$release.tgz" | tar xz -C $install_dir
 fi

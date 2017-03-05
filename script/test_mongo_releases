@@ -1,14 +1,15 @@
 #!/bin/bash
 
 if [ $# -lt 2 ]; then
-    echo "Usage: test_mongo_releases <os> <arch> [<install_dir>]"
-    echo "e.g. test_mongo_releases linux x86_64-ubuntu1204 travis/mongodb"
+    echo "Usage: test_mongo_releases <os> <arch> [<install_dir>] [<data_dir]"
+    echo "e.g. test_mongo_releases linux x86_64-ubuntu1204 travis/mongodb travis/data"
     exit
 fi
 
 os=$1
 arch=$2
 install_dir=${3:-travis/mongodb}
+data_dir=${4:-travis/data}
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 releases=("3.0.14" "3.2.12" "3.4.2")
@@ -19,5 +20,5 @@ for release in ${releases[*]}; do
     full_names="$full_names mongodb-$os-$arch-$release"
 done
 
-echo "parallel $script_dir/test_mongo_release $install_dir/{1} $install_dir/data/{1} ::: $full_names"
-parallel $script_dir/test_mongo_release $install_dir/{1} $install_dir/data/{1} ::: $full_names
+echo "parallel $script_dir/test_mongo_release ::: $full_names ::: $install_dir ::: $data_dir"
+parallel $script_dir/test_mongo_release ::: $full_names ::: $install_dir ::: $data_dir

@@ -2,21 +2,39 @@
 set -e
 
 if [ $# -lt 1 ]; then
-    echo "Usage: test_mongo_release <mongo_release_dir> <data_dir>"
-    echo "e.g. test_mongo_release travis/mongodb/mongodb-linux-x86_64-ubuntu1204-3.4.2 travis/mongodb/data/mongodb-linux-x86_64-ubuntu1204-3.4.2"
+    echo "Usage: test_mongo_release <release> [<install_dir>] [<data_dir>]"
+    echo "e.g. test_mongo_release mongodb-linux-x86_64-ubuntu1204-3.4.2 travis/mongodb travis/data"
     exit
 fi
 
-release_dir=$1
-data=$2
+release=$1
+install_dir=$2
+data_dir=$3
+
+data="data_dir/$release/data"
 data_ssl="$data-ssl"
 
 mkdir -p $data $data_ssl
 
 # use mongo orchestration here to make it easier to start and stop these processes, yo
-$release_dir/bin/mongod --fork --dbpath $data --syslog --port 27017
-$release_dir/bin/mongod --fork --dbpath $data_ssl --syslog --port 27018 --sslMode requireSSL --sslPEMKeyFile tests/ssl/server.pem --sslCAFile tests/ssl/ca.pem
+function get_unused_port() {
+    for port in $(seq 4444 65000);
+    do
+        echo -ne "\035" | telnet 127.0.0.1 $port > /dev/null 2>&1;
+        [ $? -eq 1 ] && echo "$port" && break;
+    done
+}
 
-cargo test --verbose
-cargo test --features ssl --verbose
-killall mongod
+# TODO: how to ensure this during parallel
+port="$(get_unused_port)"
+echo "Opening mongod on port $port"
+$install_dir/$release/bin/mongod --fork --dbpath $data --syslog --port $port
+
+ssl_port="$(get_unused_port)"
+echo "Opening mongod with ssl on port $ssl_port"
+$install_dir/$release/bin/mongod --fork --dbpath $data_ssl --syslog --port $ssl_port --sslMode requireSSL --sslPEMKeyFile tests/ssl/server.pem --sslCAFile tests/ssl/ca.pem
+
+# TODO: add method to read env or have default for tests
+MONGODB_RUST_DRIVER_TEST_PORT="mongodb://localhost:$port" cargo test --verbose
+MONGODB_RUST_DRIVER_TEST_PORT="mongodb://localhost:$port" MONGODB_RUST_DRIVER_TEST_SSL_PORT="mongodb://localhost:$ssl_port" cargo test --features ssl --verbose
+
