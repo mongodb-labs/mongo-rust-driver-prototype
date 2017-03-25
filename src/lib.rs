@@ -87,6 +87,42 @@
 //! Each server within a MongoDB server set is maintained by the driver with a separate connection
 //! pool. By default, each pool has a maximum of 5 concurrent open connections.
 
+// Clippy lints
+#![cfg_attr(feature = "clippy", feature(plugin))]
+#![cfg_attr(feature = "clippy", plugin(clippy))]
+#![cfg_attr(feature = "clippy", allow(
+    doc_markdown,
+    // allow double_parens for bson/doc macro.
+    double_parens,
+    // more explicit than catch-alls.
+    match_wild_err_arm,
+    too_many_arguments,
+))]
+#![cfg_attr(feature = "clippy", warn(
+    cast_precision_loss,
+    enum_glob_use,
+    filter_map,
+    if_not_else,
+    invalid_upcast_comparisons,
+    items_after_statements,
+    mem_forget,
+    mut_mut,
+    mutex_integer,
+    non_ascii_literal,
+    nonminimal_bool,
+    option_map_unwrap_or,
+    option_map_unwrap_or_else,
+    print_stdout,
+    shadow_reuse,
+    shadow_same,
+    shadow_unrelated,
+    similar_names,
+    unicode_not_nfc,
+    unseparated_literal_suffix,
+    used_underscore_binding,
+    wrong_pub_self_convention,
+))]
+
 #[doc(html_root_url = "https://docs.rs/mongodb")]
 #[macro_use(bitflags)]
 extern crate bitflags;
