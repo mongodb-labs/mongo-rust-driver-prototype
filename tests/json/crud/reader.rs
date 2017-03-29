@@ -80,7 +80,7 @@ fn get_data(object: &Map<String, Value>) -> Result<Vec<Document>, String> {
     let mut data = vec![];
 
     for json in array {
-        match Bson::from_json(&json) {
+        match Bson::from(json) {
             Bson::Document(doc) => data.push(doc),
             _ => return Err(String::from("`data` array must contain only objects")),
         }
