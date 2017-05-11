@@ -40,25 +40,20 @@ pub const DEFAULT_BATCH_SIZE: i32 = 20;
 
 /// Maintains a connection to the server and lazily returns documents from a
 /// query.
-///
-/// # Fields
-///
-/// `client` - The client to read from.
-/// `namespace` - The namespace to read and write from.
-/// `batch_size` - How many documents to fetch at a given time from the server.
-/// `cursor_id` - Uniquely identifies the cursor being returned by the reply.
-/// `limit` - An upper bound on the total number of documents this cursor
-///           should return.
-/// `count` - How many documents have been returned so far.
-/// `buffer` - A cache for documents received from the query that have not
-///            yet been returned.
 pub struct Cursor {
+    // The client to read from.
     client: Client,
+    // The namespace to read and write from.
     namespace: String,
+    // How many documents to fetch at a given time from the server.
     batch_size: i32,
+    // Uniquely identifies the cursor being returned by the reply.
     cursor_id: i64,
+    // An upper bound on the total number of documents this cursor should return.
     limit: i32,
+    // How many documents have been returned so far.
     count: i32,
+    // A cache for documents received from the query that have not yet been returned.
     buffer: VecDeque<bson::Document>,
     read_preference: ReadPreference,
     cmd_type: CommandType,
@@ -98,6 +93,8 @@ impl Cursor {
     /// `client` - Client making the request.
     /// `db` - Which database the command is being sent to.
     /// `doc` - Specifies the command that is being run.
+    /// `cmd_type` - The type of command, which will be used for monitoring events.
+    /// `read_pref` - The read preference for the query.
     ///
     /// # Return value
     ///
@@ -194,17 +191,13 @@ impl Cursor {
     ///
     /// `client` - The client to read from.
     /// `namespace` - The namespace to read and write from.
-    /// `batch_size` - How many documents the cursor should return at a time.
     /// `flags` - Bit vector of query options.
-    /// `number_to_skip` - The number of initial documents to skip over in the
-    ///                    query results.
-    /// `number_to_return - The total number of documents that should be
-    ///                     returned by the query.
-    /// `return_field_selector - An optional projection of which fields should
-    ///                          be present in the documents to be returned by
-    ///                          the query.
+    /// `query` - Document describing the query to make.
+    /// `options` - Options for the query.
+    /// `cmd_type` - The type of command, which will be used for monitoring events.
     /// `is_cmd_cursor` - Whether or not the Cursor is for a database command.
-    /// `monitor_host` - The host being monitored, if this is a query from a server monitor.
+    /// `read_pref` - The read preference for the query.
+    ///
     /// # Return value
     ///
     /// Returns the cursor for the query results on success, or an Error on
