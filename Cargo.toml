@@ -11,10 +11,10 @@ version = "0.2.8"
 
 [dependencies]
 bitflags = "0.7.0"
-bson = "0.7.0"
+bson = "0.7.1"
 bufstream = "0.1.1"
 byteorder = "0.5.3"
-chrono = "0.2.25"
+chrono = "0.3.1"
 data-encoding = "1.2.0"
 rand = "0.3.14"
 rust-crypto = "0.2.31"
