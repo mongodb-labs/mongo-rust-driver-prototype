@@ -244,9 +244,12 @@ impl Monitor {
 
     // Set server description error field.
     fn set_err(&self, err: Error) {
-        let mut server_description = self.server_description.write().unwrap();
-        server_description.set_err(err);
-        self.update_top_description(server_description.clone());
+        {
+            let mut server_description = self.server_description.write().unwrap();
+            server_description.set_err(err);
+        }
+
+        self.update_top_description(self.server_description.clone());
     }
 
     /// Returns an isMaster server response using an owned monitor socket.
@@ -298,25 +301,27 @@ impl Monitor {
         &self,
         doc: bson::Document,
         round_trip_time: i64,
-    ) -> Result<ServerDescription> {
+    ) -> Result<Arc<RwLock<ServerDescription>>> {
 
         let ismaster_result = IsMasterResult::new(doc);
-        let mut server_description = self.server_description.write().unwrap();
-        match ismaster_result {
-            Ok(ismaster) => server_description.update(ismaster, round_trip_time),
-            Err(err) => {
-                server_description.set_err(err);
-                return Err(OperationError(
-                    String::from("Failed to parse ismaster result."),
-                ));
+        {
+            let mut server_description = self.server_description.write().unwrap();
+            match ismaster_result {
+                Ok(ismaster) => server_description.update(ismaster, round_trip_time),
+                Err(err) => {
+                    server_description.set_err(err);
+                    return Err(OperationError(
+                        String::from("Failed to parse ismaster result."),
+                    ));
+                }
             }
         }
 
-        Ok(server_description.clone())
+        Ok(self.server_description.clone())
     }
 
     // Updates the topology description associated with this monitor using a new server description.
-    fn update_top_description(&self, description: ServerDescription) {
+    fn update_top_description(&self, description: Arc<RwLock<ServerDescription>>) {
         let mut top_description = self.top_description.write().unwrap();
         top_description.update(
             self.host.clone(),
@@ -354,18 +359,15 @@ impl Monitor {
                 self.server_pool.clear();
                 self.personal_pool.clear();
 
-                let stype = self.server_description.read().unwrap().server_type;
-
-                if stype == ServerType::Unknown {
+                if self.server_description.read().unwrap().server_type == ServerType::Unknown {
                     self.set_err(err);
-                } else {
-                    // Retry once
-                    match self.is_master() {
-                        Ok((mut cursor, rtt)) => {
-                            self.update_with_is_master_cursor(&mut cursor, rtt)
-                        }
-                        Err(err) => self.set_err(err),
-                    }
+                    return;
+                }
+
+                // Retry once
+                match self.is_master() {
+                    Ok((mut cursor, rtt)) => self.update_with_is_master_cursor(&mut cursor, rtt),
+                    Err(err) => self.set_err(err),
                 }
             }
         }

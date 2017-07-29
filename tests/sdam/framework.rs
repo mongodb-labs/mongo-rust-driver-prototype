@@ -80,13 +80,10 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
                 }
             }
 
-            let server_description = {
-                let server = servers.get(&host).expect("Host not found.");
-                server.description.read().unwrap().clone()
-            };
+            let server = servers.get(&host).expect("Host not found.");
 
             topology_description.update_without_monitor(host.clone(),
-                                                        server_description.clone(),
+                                                        server.description.clone(),
                                                         dummy_client.clone(),
                                                         top_description_arc.clone());
         }

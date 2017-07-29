@@ -92,9 +92,9 @@
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 #![cfg_attr(feature = "clippy", allow(
     doc_markdown,
-    // allow double_parens for bson/doc macro.
+// allow double_parens for bson/doc macro.
     double_parens,
-    // more explicit than catch-alls.
+// more explicit than catch-alls.
     match_wild_err_arm,
     too_many_arguments,
 ))]
@@ -178,7 +178,7 @@ use error::Error::ResponseError;
 use pool::PooledStream;
 use stream::StreamConnector;
 use topology::{Topology, TopologyDescription, TopologyType, DEFAULT_HEARTBEAT_FREQUENCY_MS,
-DEFAULT_LOCAL_THRESHOLD_MS, DEFAULT_SERVER_SELECTION_TIMEOUT_MS};
+               DEFAULT_LOCAL_THRESHOLD_MS, DEFAULT_SERVER_SELECTION_TIMEOUT_MS};
 use topology::server::Server;
 
 /// Interfaces with a MongoDB server or replica set.
@@ -236,16 +236,17 @@ impl ClientOptions {
 
     #[cfg(feature = "ssl")]
     /// Creates a new options struct with a specified SSL certificate and key files.
-    pub fn with_ssl(ca_file: &str,
-                    certificate_file: &str,
-                    key_file: &str,
-                    verify_peer: bool)
-        -> ClientOptions {
-            let mut options = ClientOptions::new();
-            options.stream_connector = StreamConnector::with_ssl(ca_file, certificate_file,
-                                                                 key_file, verify_peer);
-            options
-        }
+    pub fn with_ssl(
+        ca_file: &str,
+        certificate_file: &str,
+        key_file: &str,
+        verify_peer: bool,
+    ) -> ClientOptions {
+        let mut options = ClientOptions::new();
+        options.stream_connector =
+            StreamConnector::with_ssl(ca_file, certificate_file, key_file, verify_peer);
+        options
+    }
 }
 
 pub trait ThreadedClient: Sync + Sized {
@@ -261,18 +262,20 @@ pub trait ThreadedClient: Sync + Sized {
     fn with_uri_and_options(uri: &str, options: ClientOptions) -> Result<Self>;
     /// Create a new Client with manual connection configurations.
     /// `connect` and `with_uri` should generally be used as higher-level constructors.
-    fn with_config(config: ConnectionString,
-                   options: Option<ClientOptions>,
-                   description: Option<TopologyDescription>)
-        -> Result<Self>;
+    fn with_config(
+        config: ConnectionString,
+        options: Option<ClientOptions>,
+        description: Option<TopologyDescription>,
+    ) -> Result<Self>;
     /// Creates a database representation.
     fn db(&self, db_name: &str) -> Database;
     /// Creates a database representation with custom read and write controls.
-    fn db_with_prefs(&self,
-                     db_name: &str,
-                     read_preference: Option<ReadPreference>,
-                     write_concern: Option<WriteConcern>)
-        -> Database;
+    fn db_with_prefs(
+        &self,
+        db_name: &str,
+        read_preference: Option<ReadPreference>,
+        write_concern: Option<WriteConcern>,
+    ) -> Database;
     /// Acquires a connection stream from the pool, along with slave_ok and should_send_read_pref.
     fn acquire_stream(&self, read_pref: ReadPreference) -> Result<(PooledStream, bool, bool)>;
     /// Acquires a connection stream from the pool for write operations.
@@ -319,75 +322,93 @@ impl ThreadedClient for Client {
         Client::with_config(config, Some(options), None)
     }
 
-    fn with_config(config: ConnectionString,
-                   options: Option<ClientOptions>,
-                   description: Option<TopologyDescription>)
-        -> Result<Client> {
+    fn with_config(
+        config: ConnectionString,
+        options: Option<ClientOptions>,
+        description: Option<TopologyDescription>,
+    ) -> Result<Client> {
 
-            let client_options = options.unwrap_or_else(ClientOptions::new);
+        let client_options = options.unwrap_or_else(ClientOptions::new);
 
-            let rp = client_options.read_preference
-                .unwrap_or_else(|| ReadPreference::new(ReadMode::Primary, None));
-            let wc = client_options.write_concern.unwrap_or_else(WriteConcern::new);
+        let rp = client_options.read_preference.unwrap_or_else(|| {
+            ReadPreference::new(ReadMode::Primary, None)
+        });
+        let wc = client_options.write_concern.unwrap_or_else(
+            WriteConcern::new,
+        );
 
-            let listener = Listener::new();
-            let file = match client_options.log_file {
-                Some(string) => {
-                    let _ = listener.add_start_hook(log_command_started);
-                    let _ = listener.add_completion_hook(log_command_completed);
-                    Some(Mutex::new(try!(OpenOptions::new()
-                                         .write(true)
-                                         .append(true)
-                                         .create(true)
-                                         .open(&string))))
-                }
-                None => None,
-            };
-
-            let client = Arc::new(ClientInner {
-                req_id: Arc::new(ATOMIC_ISIZE_INIT),
-                topology: try!(Topology::new(config.clone(), description, client_options.stream_connector.clone())),
-                listener: listener,
-                read_preference: rp,
-                write_concern: wc,
-                log_file: file,
-            });
-
-            // Fill servers array and set options
-            {
-                let top_description = &client.topology.description;
-                let mut top = try!(top_description.write());
-                top.heartbeat_frequency_ms = client_options.heartbeat_frequency_ms;
-                top.server_selection_timeout_ms = client_options.server_selection_timeout_ms;
-                top.local_threshold_ms = client_options.local_threshold_ms;
-
-                for host in &config.hosts {
-                    let server = Server::new(client.clone(), host.clone(), top_description.clone(), true, client_options.stream_connector.clone());
-
-                    top.servers.insert(host.clone(), server);
-                }
+        let listener = Listener::new();
+        let file = match client_options.log_file {
+            Some(string) => {
+                let _ = listener.add_start_hook(log_command_started);
+                let _ = listener.add_completion_hook(log_command_completed);
+                Some(Mutex::new(try!(
+                    OpenOptions::new()
+                        .write(true)
+                        .append(true)
+                        .create(true)
+                        .open(&string)
+                )))
             }
+            None => None,
+        };
 
-            Ok(client)
+        let client = Arc::new(ClientInner {
+            req_id: Arc::new(ATOMIC_ISIZE_INIT),
+            topology: try!(Topology::new(
+                config.clone(),
+                description,
+                client_options.stream_connector.clone(),
+            )),
+            listener: listener,
+            read_preference: rp,
+            write_concern: wc,
+            log_file: file,
+        });
+
+        // Fill servers array and set options
+        {
+            let top_description = &client.topology.description;
+            let mut top = try!(top_description.write());
+            top.heartbeat_frequency_ms = client_options.heartbeat_frequency_ms;
+            top.server_selection_timeout_ms = client_options.server_selection_timeout_ms;
+            top.local_threshold_ms = client_options.local_threshold_ms;
+
+            for host in &config.hosts {
+                let server = Server::new(
+                    client.clone(),
+                    host.clone(),
+                    top_description.clone(),
+                    true,
+                    client_options.stream_connector.clone(),
+                );
+
+                top.servers.insert(host.clone(), server);
+            }
         }
+
+        Ok(client)
+    }
 
     fn db(&self, db_name: &str) -> Database {
         Database::open(self.clone(), db_name, None, None)
     }
 
-    fn db_with_prefs(&self,
-                     db_name: &str,
-                     read_preference: Option<ReadPreference>,
-                     write_concern: Option<WriteConcern>)
-        -> Database {
-            Database::open(self.clone(), db_name, read_preference, write_concern)
-        }
+    fn db_with_prefs(
+        &self,
+        db_name: &str,
+        read_preference: Option<ReadPreference>,
+        write_concern: Option<WriteConcern>,
+    ) -> Database {
+        Database::open(self.clone(), db_name, read_preference, write_concern)
+    }
 
-    fn acquire_stream(&self,
-                      read_preference: ReadPreference)
-        -> Result<(PooledStream, bool, bool)> {
-            self.topology.acquire_stream(read_preference)
-        }
+    fn acquire_stream(
+        &self,
+        read_preference: ReadPreference,
+    ) -> Result<(PooledStream, bool, bool)> {
+        self.topology.acquire_stream(read_preference)
+    }
 
     fn acquire_write_stream(&self) -> Result<PooledStream> {
         self.topology.acquire_write_stream()
@@ -405,7 +426,8 @@ impl ThreadedClient for Client {
         let res = try!(db.command(doc, CommandType::ListDatabases, None));
         if let Some(&Bson::Array(ref batch)) = res.get("databases") {
             // Extract database names
-            let map = batch.iter()
+            let map = batch
+                .iter()
                 .filter_map(|bdoc| {
                     if let Bson::Document(ref doc) = *bdoc {
                         if let Some(&Bson::String(ref name)) = doc.get("name") {
@@ -414,11 +436,13 @@ impl ThreadedClient for Client {
                     }
                     None
                 })
-            .collect();
+                .collect();
             return Ok(map);
         }
 
-        Err(ResponseError(String::from("Server reply does not contain 'databases'.")))
+        Err(ResponseError(
+            String::from("Server reply does not contain 'databases'."),
+        ))
     }
 
     fn drop_database(&self, db_name: &str) -> Result<()> {
@@ -436,7 +460,9 @@ impl ThreadedClient for Client {
 
         match res.get("ismaster") {
             Some(&Bson::Boolean(is_master)) => Ok(is_master),
-            _ => Err(ResponseError(String::from("Server reply does not contain 'ismaster'."))),
+            _ => Err(ResponseError(
+                String::from("Server reply does not contain 'ismaster'."),
+            )),
         }
     }
 
