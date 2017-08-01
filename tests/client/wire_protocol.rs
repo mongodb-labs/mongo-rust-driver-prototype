@@ -58,7 +58,7 @@ fn insert_single_key_doc() {
             assert_eq!(docs.len() as i32, 1);
 
             match docs[0].get("foo") {
-                Some(&Bson::FloatingPoint(42.0)) => (),
+                Some(&Bson::FloatingPoint(f)) if f == 42.0 => (),
                 _ => panic!("Wrong value returned!"),
             };
         }
@@ -122,7 +122,7 @@ fn insert_multi_key_doc() {
             assert_eq!(docs.len() as i32, 1);
 
             match docs[0].get("foo") {
-                Some(&Bson::FloatingPoint(42.0)) => (),
+                Some(&Bson::FloatingPoint(f)) if f == 42.0 => (),
                 _ => panic!("Wrong value returned!"),
             };
 
@@ -196,7 +196,7 @@ fn insert_docs() {
             assert_eq!(docs.len() as i32, 2);
 
             match docs[0].get("foo") {
-                Some(&Bson::FloatingPoint(42.0)) => (),
+                Some(&Bson::FloatingPoint(f)) if f == 42.0 => (),
                 _ => panic!("Wrong value returned!"),
             };
 
