@@ -31,7 +31,7 @@ use common::{merge_options, ReadMode, ReadPreference};
 use coll::options::FindOptions;
 use pool::PooledStream;
 use time;
-use wire_protocol::flags::{self, OpQueryFlags};
+use wire_protocol::flags::OpQueryFlags;
 use wire_protocol::operations::Message;
 
 use std::collections::vec_deque::VecDeque;
@@ -100,29 +100,37 @@ impl Cursor {
     /// # Return value
     ///
     /// Returns the newly created Cursor on success, or an Error on failure.
-    pub fn command_cursor(client: Client,
-                          db: &str,
-                          doc: bson::Document,
-                          cmd_type: CommandType,
-                          read_pref: ReadPreference)
-                          -> Result<Cursor> {
+    pub fn command_cursor(
+        client: Client,
+        db: &str,
+        doc: bson::Document,
+        cmd_type: CommandType,
+        read_pref: ReadPreference,
+    ) -> Result<Cursor> {
         let mut options = FindOptions::new();
         options.batch_size = Some(1);
 
-        Cursor::query(client.clone(),
-                      format!("{}.$cmd", db),
-                      OpQueryFlags::empty(),
-                      doc,
-                      options,
-                      cmd_type,
-                      true,
-                      read_pref)
+        Cursor::query(
+            client.clone(),
+            format!("{}.$cmd", db),
+            OpQueryFlags::empty(),
+            doc,
+            options,
+            cmd_type,
+            true,
+            read_pref,
+        )
     }
 
-    fn get_bson_and_cid_from_message(message: Message)
-                                     -> Result<(bson::Document, VecDeque<bson::Document>, i64)> {
+    fn get_bson_and_cid_from_message(
+        message: Message,
+    ) -> Result<(bson::Document, VecDeque<bson::Document>, i64)> {
         match message {
-            Message::OpReply { cursor_id: cid, documents: docs, .. } => {
+            Message::OpReply {
+                cursor_id: cid,
+                documents: docs,
+                ..
+            } => {
                 let mut v = VecDeque::new();
                 let mut out_doc = doc!{};
 
@@ -132,7 +140,8 @@ impl Cursor {
                         // If command doesn't exist or namespace not found, return
                         // an empty array instead of throwing an error.
                         if *code != ErrorCode::CommandNotFound as i32 &&
-                           *code != ErrorCode::NamespaceNotFound as i32 {
+                            *code != ErrorCode::NamespaceNotFound as i32
+                        {
                             if let Some(&Bson::String(ref msg)) = docs[0].get("errmsg") {
                                 return Err(Error::OperationError(msg.to_owned()));
                             }
@@ -150,9 +159,9 @@ impl Cursor {
         }
     }
 
-    fn get_bson_and_cursor_info_from_command_message
-        (message: Message)
-         -> Result<(bson::Document, VecDeque<bson::Document>, i64, String)> {
+    fn get_bson_and_cursor_info_from_command_message(
+        message: Message,
+    ) -> Result<(bson::Document, VecDeque<bson::Document>, i64, String)> {
 
         let (first, v, _) = try!(Cursor::get_bson_and_cid_from_message(message));
         if v.len() != 1 {
@@ -168,7 +177,8 @@ impl Cursor {
                     if let Some(&Bson::Array(ref batch)) = cursor.get("firstBatch") {
 
                         // Extract first batch documents
-                        let map = batch.iter()
+                        let map = batch
+                            .iter()
                             .filter_map(|bdoc| if let Bson::Document(ref doc) = *bdoc {
                                 Some(doc.clone())
                             } else {
@@ -203,15 +213,16 @@ impl Cursor {
     ///
     /// Returns the cursor for the query results on success, or an Error on
     /// failure.
-    pub fn query(client: Client,
-                 namespace: String,
-                 flags: OpQueryFlags,
-                 query: bson::Document,
-                 options: FindOptions,
-                 cmd_type: CommandType,
-                 is_cmd_cursor: bool,
-                 read_pref: ReadPreference)
-                 -> Result<Cursor> {
+    pub fn query(
+        client: Client,
+        namespace: String,
+        flags: OpQueryFlags,
+        query: bson::Document,
+        options: FindOptions,
+        cmd_type: CommandType,
+        is_cmd_cursor: bool,
+        read_pref: ReadPreference,
+    ) -> Result<Cursor> {
 
         // Select a server stream from the topology.
         let (stream, slave_ok, send_read_pref) = if cmd_type.is_write_command() {
@@ -222,7 +233,7 @@ impl Cursor {
 
         // Set slave_ok flag based on the result from server selection.
         let new_flags = if slave_ok {
-            flags | flags::SLAVE_OK
+            flags | OpQueryFlags::SLAVE_OK
         } else {
             flags
         };
@@ -242,27 +253,30 @@ impl Cursor {
             nq
         };
 
-        Cursor::query_with_stream(stream,
-                                  client,
-                                  namespace,
-                                  new_flags,
-                                  new_query,
-                                  options,
-                                  cmd_type,
-                                  is_cmd_cursor,
-                                  Some(read_pref))
+        Cursor::query_with_stream(
+            stream,
+            client,
+            namespace,
+            new_flags,
+            new_query,
+            options,
+            cmd_type,
+            is_cmd_cursor,
+            Some(read_pref),
+        )
     }
 
-    pub fn query_with_stream(stream: PooledStream,
-                             client: Client,
-                             namespace: String,
-                             flags: OpQueryFlags,
-                             query: bson::Document,
-                             options: FindOptions,
-                             cmd_type: CommandType,
-                             is_cmd_cursor: bool,
-                             read_pref: Option<ReadPreference>)
-                             -> Result<Cursor> {
+    pub fn query_with_stream(
+        stream: PooledStream,
+        client: Client,
+        namespace: String,
+        flags: OpQueryFlags,
+        query: bson::Document,
+        options: FindOptions,
+        cmd_type: CommandType,
+        is_cmd_cursor: bool,
+        read_pref: Option<ReadPreference>,
+    ) -> Result<Cursor> {
 
         let mut stream = stream;
         let mut socket = stream.get_socket();
@@ -282,7 +296,8 @@ impl Cursor {
 
         let command = match cmd_type {
             CommandType::Find => {
-                let document = doc! { 
+                let document =
+                    doc! { 
                     "find" => coll_name,
                     "filter" => filter
                 };
@@ -293,13 +308,15 @@ impl Cursor {
         };
 
         let init_time = time::precise_time_ns();
-        let result = Message::new_query(req_id,
-                                        flags,
-                                        namespace.clone(),
-                                        options.skip.unwrap_or(0) as i32,
-                                        options.batch_size.unwrap_or(DEFAULT_BATCH_SIZE),
-                                        query,
-                                        options.projection);
+        let result = Message::new_query(
+            req_id,
+            flags,
+            namespace.clone(),
+            options.skip.unwrap_or(0) as i32,
+            options.batch_size.unwrap_or(DEFAULT_BATCH_SIZE),
+            query,
+            options.projection,
+        );
 
         let message = try!(result);
 
@@ -317,35 +334,43 @@ impl Cursor {
             }
         }
 
-        try_or_emit!(cmd_type,
-                     cmd_name,
-                     req_id,
-                     connstring,
-                     message.write(socket),
-                     client);
-        let reply = try_or_emit!(cmd_type,
-                                 cmd_name,
-                                 req_id,
-                                 connstring,
-                                 Message::read(socket),
-                                 client);
+        try_or_emit!(
+            cmd_type,
+            cmd_name,
+            req_id,
+            connstring,
+            message.write(socket),
+            client
+        );
+        let reply = try_or_emit!(
+            cmd_type,
+            cmd_name,
+            req_id,
+            connstring,
+            Message::read(socket),
+            client
+        );
 
         let fin_time = time::precise_time_ns();
 
         let (doc, buf, cursor_id, namespace) = if is_cmd_cursor {
-            try_or_emit!(cmd_type,
-                         cmd_name,
-                         req_id,
-                         connstring,
-                         Cursor::get_bson_and_cursor_info_from_command_message(reply),
-                         client)
+            try_or_emit!(
+                cmd_type,
+                cmd_name,
+                req_id,
+                connstring,
+                Cursor::get_bson_and_cursor_info_from_command_message(reply),
+                client
+            )
         } else {
-            let (doc, buf, id) = try_or_emit!(cmd_type,
-                                              cmd_name,
-                                              req_id,
-                                              connstring,
-                                              Cursor::get_bson_and_cid_from_message(reply),
-                                              client);
+            let (doc, buf, id) = try_or_emit!(
+                cmd_type,
+                cmd_name,
+                req_id,
+                connstring,
+                Cursor::get_bson_and_cid_from_message(reply),
+                client
+            );
             (doc, buf, id, namespace)
         };
 
@@ -396,12 +421,16 @@ impl Cursor {
         let mut socket = stream.get_socket();
 
         let req_id = self.client.get_req_id();
-        let get_more = Message::new_get_more(req_id,
-                                             self.namespace.to_owned(),
-                                             self.batch_size,
-                                             self.cursor_id);
+        let get_more = Message::new_get_more(
+            req_id,
+            self.namespace.to_owned(),
+            self.batch_size,
+            self.cursor_id,
+        );
 
-        let index = self.namespace.rfind('.').unwrap_or_else(|| self.namespace.len());
+        let index = self.namespace.rfind('.').unwrap_or_else(
+            || self.namespace.len(),
+        );
         let db_name = String::from(&self.namespace[..index]);
         let cmd_name = String::from("get_more");
         let connstring = format!("{}", try!(socket.get_ref().peer_addr()));
@@ -420,12 +449,14 @@ impl Cursor {
             }
         }
 
-        try_or_emit!(self.cmd_type,
-                     cmd_name,
-                     req_id,
-                     connstring,
-                     get_more.write(socket.get_mut()),
-                     self.client);
+        try_or_emit!(
+            self.cmd_type,
+            cmd_name,
+            req_id,
+            connstring,
+            get_more.write(socket.get_mut()),
+            self.client
+        );
         let reply = try!(Message::read(socket.get_mut()));
 
         let (_, v, _) = try!(Cursor::get_bson_and_cid_from_message(reply));
@@ -461,7 +492,8 @@ impl Cursor {
     /// # Return value
     ///
     /// Returns a vector containing the BSON documents that were read.
-    #[deprecated(since="0.2.8", note="this method uses 20 as the default batch size instead of letting the server decide; using `drain_current_batch` is recommended instead")]
+    #[deprecated(since = "0.2.8",
+                 note = "this method uses 20 as the default batch size instead of letting the server decide; using `drain_current_batch` is recommended instead")]
     pub fn next_batch(&mut self) -> Result<Vec<bson::Document>> {
         let batch_size = if self.batch_size == 0 {
             20

@@ -3,9 +3,9 @@
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 #![cfg_attr(feature = "clippy", allow(
     doc_markdown,
-    // allow double_parens for bson/doc macro.
+// allow double_parens for bson/doc macro.
     double_parens,
-    // more explicit than catch-alls.
+// more explicit than catch-alls.
     match_wild_err_arm,
     too_many_arguments,
 ))]

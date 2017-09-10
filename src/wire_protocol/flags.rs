@@ -52,23 +52,23 @@ impl OpQueryFlags {
     pub fn with_find_options(options: &FindOptions) -> OpQueryFlags {
         let mut flags = OpQueryFlags::empty();
         if options.cursor_type != CursorType::NonTailable {
-            flags.insert(TAILABLE_CURSOR);
+            flags.insert(Self::TAILABLE_CURSOR);
         }
 
         if options.oplog_replay {
-            flags.insert(OPLOG_RELAY);
+            flags.insert(Self::OPLOG_RELAY);
         }
 
         if options.no_cursor_timeout {
-            flags.insert(NO_CURSOR_TIMEOUT);
+            flags.insert(Self::NO_CURSOR_TIMEOUT);
         }
 
         if options.cursor_type == CursorType::TailableAwait {
-            flags.insert(AWAIT_DATA);
+            flags.insert(Self::AWAIT_DATA);
         }
 
         if options.allow_partial_results {
-            flags.insert(PARTIAL);
+            flags.insert(Self::PARTIAL);
         }
 
         flags
