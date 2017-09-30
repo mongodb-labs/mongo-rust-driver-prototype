@@ -63,7 +63,9 @@ impl FromValue for FindOneAndDeleteOptions {
     fn from_json(object: &Map<String, Value>) -> FindOneAndDeleteOptions {
         let mut options = FindOneAndDeleteOptions::new();
 
-        if let Some(Bson::Document(projection)) = object.get("projection").map(Value::clone).map(Into::into) {
+        if let Some(Bson::Document(projection)) =
+            object.get("projection").map(Value::clone).map(Into::into)
+        {
             options.projection = Some(projection);
         }
 
@@ -79,11 +81,17 @@ impl FromValue for FindOneAndUpdateOptions {
     fn from_json(object: &Map<String, Value>) -> FindOneAndUpdateOptions {
         let mut options = FindOneAndUpdateOptions::new();
 
-        if let Some(Bson::Document(projection)) = object.get("projection").map(Value::clone).map(Into::into) {
+        if let Some(Bson::Document(projection)) =
+            object.get("projection").map(Value::clone).map(Into::into)
+        {
             options.projection = Some(projection);
         }
 
-        if let Some(Bson::String(s)) = object.get("returnDocument").map(Value::clone).map(Into::into) {
+        if let Some(Bson::String(s)) =
+            object.get("returnDocument").map(Value::clone).map(
+                Into::into,
+            )
+        {
             match s.as_ref() {
                 "After" => options.return_document = Some(ReturnDocument::After),
                 "Before" => options.return_document = Some(ReturnDocument::Before),
@@ -96,7 +104,9 @@ impl FromValue for FindOneAndUpdateOptions {
             options.sort = Some(sort);
         }
 
-        if let Some(Bson::Boolean(upsert)) = object.get("upsert").map(Value::clone).map(Into::into) {
+        if let Some(Bson::Boolean(upsert)) =
+            object.get("upsert").map(Value::clone).map(Into::into)
+        {
             options.upsert = Some(upsert);
         }
 

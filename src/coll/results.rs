@@ -88,11 +88,12 @@ impl BulkWriteResult {
     }
 
     /// Adds the data in a BulkDeleteResult to this result.
-    pub fn process_bulk_delete_result(&mut self,
-                                      result: BulkDeleteResult,
-                                      models: Vec<WriteModel>,
-                                      exception: &mut BulkWriteException)
-                                      -> bool {
+    pub fn process_bulk_delete_result(
+        &mut self,
+        result: BulkDeleteResult,
+        models: Vec<WriteModel>,
+        exception: &mut BulkWriteException,
+    ) -> bool {
         let ok = exception.add_bulk_write_exception(result.write_exception, models);
         self.deleted_count += result.deleted_count;
 
@@ -100,12 +101,13 @@ impl BulkWriteResult {
     }
 
     /// Adds the data in an InsertManyResult to this result.
-    pub fn process_insert_many_result(&mut self,
-                                      result: InsertManyResult,
-                                      models: Vec<WriteModel>,
-                                      start_index: i64,
-                                      exception: &mut BulkWriteException)
-                                      -> bool {
+    pub fn process_insert_many_result(
+        &mut self,
+        result: InsertManyResult,
+        models: Vec<WriteModel>,
+        start_index: i64,
+        exception: &mut BulkWriteException,
+    ) -> bool {
         let ok = exception.add_bulk_write_exception(result.bulk_write_exception, models);
 
         if let Some(ids) = result.inserted_ids {
@@ -120,10 +122,11 @@ impl BulkWriteResult {
 
     // Parses an index and id from a single BSON document and adds it to
     // the tree of upserted ids.
-    fn parse_upserted_id(mut document: bson::Document,
-                         start_index: i64,
-                         upserted_ids: &mut BTreeMap<i64, Bson>)
-                         -> i32 {
+    fn parse_upserted_id(
+        mut document: bson::Document,
+        start_index: i64,
+        upserted_ids: &mut BTreeMap<i64, Bson>,
+    ) -> i32 {
         let (index, id) = (document.remove("index"), document.remove("_id"));
 
         match (index, id) {
@@ -141,10 +144,11 @@ impl BulkWriteResult {
 
     // Parses multiple indexes and ids from a single BSON document and adds
     // them to the tree of upserted ids.
-    fn parse_upserted_ids(bson: Bson,
-                          start_index: i64,
-                          upserted_ids: &mut BTreeMap<i64, Bson>)
-                          -> i32 {
+    fn parse_upserted_ids(
+        bson: Bson,
+        start_index: i64,
+        upserted_ids: &mut BTreeMap<i64, Bson>,
+    ) -> i32 {
         match bson {
             Bson::Document(doc) => {
                 BulkWriteResult::parse_upserted_id(doc, start_index, upserted_ids)
@@ -165,21 +169,24 @@ impl BulkWriteResult {
     }
 
     /// Adds the data in a BulkUpdateResult to this result.
-    pub fn process_bulk_update_result(&mut self,
-                                      result: BulkUpdateResult,
-                                      models: Vec<WriteModel>,
-                                      start_index: i64,
-                                      exception: &mut BulkWriteException)
-                                      -> bool {
+    pub fn process_bulk_update_result(
+        &mut self,
+        result: BulkUpdateResult,
+        models: Vec<WriteModel>,
+        start_index: i64,
+        exception: &mut BulkWriteException,
+    ) -> bool {
         let ok = exception.add_bulk_write_exception(result.write_exception, models);
 
         self.matched_count += result.matched_count;
         self.modified_count += result.modified_count;
 
         if let Some(upserted_ids) = result.upserted_ids {
-            self.upserted_count += BulkWriteResult::parse_upserted_ids(upserted_ids,
-                                                                       start_index,
-                                                                       &mut self.upserted_ids);
+            self.upserted_count += BulkWriteResult::parse_upserted_ids(
+                upserted_ids,
+                start_index,
+                &mut self.upserted_ids,
+            );
         }
 
         ok
@@ -245,9 +252,10 @@ impl InsertOneResult {
 
 impl InsertManyResult {
     /// Extracts server reply information into a result.
-    pub fn new(inserted_ids: Option<BTreeMap<i64, Bson>>,
-               exception: Option<BulkWriteException>)
-               -> InsertManyResult {
+    pub fn new(
+        inserted_ids: Option<BTreeMap<i64, Bson>>,
+        exception: Option<BulkWriteException>,
+    ) -> InsertManyResult {
         InsertManyResult {
             acknowledged: true,
             inserted_ids: inserted_ids,

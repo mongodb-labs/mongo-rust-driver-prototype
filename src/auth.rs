@@ -61,7 +61,8 @@ impl Authenticator {
         let bytes = format!("n,,{}", message).into_bytes();
         let binary = Binary(Generic, bytes);
 
-        let start_doc = doc! {
+        let start_doc =
+            doc! {
             "saslStart" => 1,
             "autoAuthorize" => 1,
             "payload" => binary,
@@ -82,7 +83,11 @@ impl Authenticator {
 
         let response = match String::from_utf8(data) {
             Ok(string) => string,
-            Err(_) => return Err(ResponseError(String::from("Invalid UTF-8 payload returned"))),
+            Err(_) => {
+                return Err(ResponseError(
+                    String::from("Invalid UTF-8 payload returned"),
+                ))
+            }
         };
 
         Ok(InitialData {
@@ -95,28 +100,38 @@ impl Authenticator {
 
     fn next(&self, password: String, initial_data: InitialData) -> Result<AuthData> {
         // Parse out rnonce, salt, and iteration count
-        let (rnonce_opt, salt_opt, i_opt) = scan_fmt!(&initial_data.response[..],
-                                                      "r={},s={},i={}",
-                                                      String,
-                                                      String,
-                                                      u32);
+        let (rnonce_opt, salt_opt, i_opt) = scan_fmt!(
+            &initial_data.response[..],
+            "r={},s={},i={}",
+            String,
+            String,
+            u32
+        );
 
-        let rnonce_b64 = rnonce_opt
-            .ok_or_else(|| ResponseError(String::from("Invalid rnonce returned")))?;
+        let rnonce_b64 = rnonce_opt.ok_or_else(|| {
+            ResponseError(String::from("Invalid rnonce returned"))
+        })?;
 
         // Validate rnonce to make sure server isn't malicious
         if !rnonce_b64.starts_with(&initial_data.nonce[..]) {
-            return Err(MaliciousServerError(MaliciousServerErrorType::InvalidRnonce));
+            return Err(MaliciousServerError(
+                MaliciousServerErrorType::InvalidRnonce,
+            ));
         }
 
-        let salt_b64 = salt_opt
-            .ok_or_else(|| ResponseError(String::from("Invalid salt returned")))?;
+        let salt_b64 = salt_opt.ok_or_else(|| {
+            ResponseError(String::from("Invalid salt returned"))
+        })?;
 
-        let salt = base64::decode(salt_b64.as_bytes())
-            .or_else(|e| Err(ResponseError(format!("Invalid base64 salt returned: {}", e))))?;
+        let salt = base64::decode(salt_b64.as_bytes()).or_else(|e| {
+            Err(ResponseError(
+                format!("Invalid base64 salt returned: {}", e),
+            ))
+        })?;
 
-        let i = i_opt
-            .ok_or_else(|| ResponseError(String::from("Invalid iteration count returned")))?;
+        let i = i_opt.ok_or_else(|| {
+            ResponseError(String::from("Invalid iteration count returned"))
+        })?;
 
         // Hash password
         let mut md5 = Md5::new();
@@ -142,10 +157,12 @@ impl Authenticator {
 
         // Create auth message
         let without_proof = format!("c=biws,r={}", rnonce_b64);
-        let auth_message = format!("{},{},{}",
-                                   initial_data.message,
-                                   initial_data.response,
-                                   without_proof);
+        let auth_message = format!(
+            "{},{},{}",
+            initial_data.message,
+            initial_data.response,
+            without_proof
+        );
 
         // Compute client signature
         let mut client_signature_hmac = Hmac::new(Sha1::new(), &stored_key[..]);
@@ -154,8 +171,9 @@ impl Authenticator {
 
         // Sanity check
         if client_key.len() != client_signature.len() {
-            return Err(DefaultError(String::from("Generated client key and/or client signature \
-                                                  is invalid")));
+            return Err(DefaultError(String::from(
+                "Generated client key and/or client signature is invalid",
+            )));
         }
 
         // Compute proof by xor'ing key and signature
@@ -169,11 +187,12 @@ impl Authenticator {
         let final_message = format!("{},p={}", without_proof, b64_proof);
         let binary = Binary(Generic, final_message.into_bytes());
 
-        let next_doc = doc! {
-            "saslContinue" => 1,
-            "payload" => binary,
-            "conversationId" => (initial_data.conversation_id.clone())
-        };
+        let next_doc =
+            doc! {
+                "saslContinue" => 1,
+                "payload" => binary,
+                "conversationId" => (initial_data.conversation_id.clone())
+            };
 
         let response = try!(self.db.command(next_doc, Suppressed, None));
 
@@ -185,11 +204,12 @@ impl Authenticator {
     }
 
     fn finish(&self, conversation_id: Bson, auth_data: AuthData) -> Result<()> {
-        let final_doc = doc! {
-            "saslContinue" => 1,
-            "payload" => (Binary(Generic, vec![])),
-            "conversationId" => conversation_id
-        };
+        let final_doc =
+            doc! {
+                "saslContinue" => 1,
+                "payload" => (Binary(Generic, vec![])),
+                "conversationId" => conversation_id
+            };
 
         // Compute server key
         let mut server_key_hmac = Hmac::new(Sha1::new(), &auth_data.salted_password[..]);
@@ -210,21 +230,27 @@ impl Authenticator {
                 let payload_str = match String::from_utf8(payload.to_owned()) {
                     Ok(string) => string,
                     Err(_) => {
-                        return Err(ResponseError(String::from("Invalid UTF-8 payload returned")))
+                        return Err(ResponseError(
+                            String::from("Invalid UTF-8 payload returned"),
+                        ))
                     }
                 };
 
                 // Check that the signature exists
                 let verifier = match scan_fmt!(&payload_str[..], "v={}", String) {
                     Some(string) => string,
-                    None => return Err(
-                        MaliciousServerError(MaliciousServerErrorType::NoServerSignature)),
+                    None => {
+                        return Err(MaliciousServerError(
+                            MaliciousServerErrorType::NoServerSignature,
+                        ))
+                    }
                 };
 
                 // Check that the signature is valid
                 if verifier.ne(&base64::encode(&server_signature)[..]) {
-                    return Err(
-                        MaliciousServerError(MaliciousServerErrorType::InvalidServerSignature));
+                    return Err(MaliciousServerError(
+                        MaliciousServerErrorType::InvalidServerSignature,
+                    ));
                 }
             }
 

@@ -15,10 +15,12 @@ pub struct CommandStarted {
 
 impl Display for CommandStarted {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
-        fmt.write_fmt(format_args!("COMMAND.{} {} STARTED: {}",
-                                   self.command_name,
-                                   self.connection_string,
-                                   self.command))
+        fmt.write_fmt(format_args!(
+            "COMMAND.{} {} STARTED: {}",
+            self.command_name,
+            self.connection_string,
+            self.command
+        ))
     }
 }
 
@@ -43,27 +45,35 @@ pub enum CommandResult<'a> {
 impl<'a> Display for CommandResult<'a> {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         match *self {
-            CommandResult::Success { duration,
-                                     ref reply,
-                                     ref command_name,
-                                     ref connection_string,
-                                     .. } => {
-                fmt.write_fmt(format_args!("COMMAND.{} {} COMPLETED: {} ({} ns)",
-                                           command_name,
-                                           connection_string,
-                                           reply,
-                                           duration.separated_string()))
+            CommandResult::Success {
+                duration,
+                ref reply,
+                ref command_name,
+                ref connection_string,
+                ..
+            } => {
+                fmt.write_fmt(format_args!(
+                    "COMMAND.{} {} COMPLETED: {} ({} ns)",
+                    command_name,
+                    connection_string,
+                    reply,
+                    duration.separated_string()
+                ))
             }
-            CommandResult::Failure { duration,
-                                     ref command_name,
-                                     failure,
-                                     ref connection_string,
-                                     .. } => {
-                fmt.write_fmt(format_args!("COMMAND.{} {} FAILURE: {} ({} ns)",
-                                           command_name,
-                                           connection_string,
-                                           failure,
-                                           duration.separated_string()))
+            CommandResult::Failure {
+                duration,
+                ref command_name,
+                failure,
+                ref connection_string,
+                ..
+            } => {
+                fmt.write_fmt(format_args!(
+                    "COMMAND.{} {} FAILURE: {} ({} ns)",
+                    command_name,
+                    connection_string,
+                    failure,
+                    duration.separated_string()
+                ))
             }
         }
     }

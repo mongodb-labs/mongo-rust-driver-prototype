@@ -50,9 +50,10 @@ pub struct ConnectionOptions {
 
 impl ConnectionOptions {
     /// Creates a new ConnectionOptions struct.
-    pub fn new(options: BTreeMap<String, String>,
-               read_pref_tags: Vec<String>)
-               -> ConnectionOptions {
+    pub fn new(
+        options: BTreeMap<String, String>,
+        read_pref_tags: Vec<String>,
+    ) -> ConnectionOptions {
         ConnectionOptions {
             options: options,
             read_pref_tags: read_pref_tags,
@@ -101,8 +102,9 @@ impl ConnectionString {
 /// [the manual](http://docs.mongodb.org/manual/reference/connection-string/).
 pub fn parse(address: &str) -> Result<ConnectionString> {
     if !address.starts_with(URI_SCHEME) {
-        return Err(ArgumentError(String::from("MongoDB connection string must start with \
-                                               'mongodb://'.")));
+        return Err(ArgumentError(String::from(
+            "MongoDB connection string must start with 'mongodb://'.",
+        )));
     }
 
     // Remove scheme
@@ -130,8 +132,9 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
     };
 
     if path_str.is_empty() && host_str.contains('?') {
-        return Err(ArgumentError(String::from("A '/' is required between the host list and any \
-                                               options.")));
+        return Err(ArgumentError(String::from(
+            "A '/' is required between the host list and any options.",
+        )));
     }
 
     // Split on authentication and hosts
@@ -180,11 +183,14 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
 fn parse_user_info(user_info: &str) -> Result<(&str, &str)> {
     let (user, password) = rpartition(user_info, ":");
     if user_info.contains('@') || user.contains(':') {
-        return Err(ArgumentError(String::from("':' or '@' characters in a username or password \
-                                               must be escaped according to RFC 2396.")));
+        return Err(ArgumentError(String::from(
+            "':' or '@' characters in a username or password must be escaped according to RFC 2396.",
+        )));
     }
     if user.is_empty() {
-        return Err(ArgumentError(String::from("The empty string is not a valid username.")));
+        return Err(ArgumentError(
+            String::from("The empty string is not a valid username."),
+        ));
     }
     Ok((user, password))
 }
@@ -205,8 +211,9 @@ fn parse_ipv6_literal_host(entity: &str) -> Result<Host> {
             }
         }
         None => {
-            Err(ArgumentError(String::from("An IPv6 address must be enclosed in '[' and ']' \
-                                            according to RFC 2732.")))
+            Err(ArgumentError(String::from(
+                "An IPv6 address must be enclosed in '[' and ']' according to RFC 2732.",
+            )))
         }
     }
 }
@@ -221,13 +228,17 @@ pub fn parse_host(entity: &str) -> Result<Host> {
         // Common host:port format
         let (host, port) = partition(entity, ":");
         if port.contains(':') {
-            return Err(ArgumentError(String::from("Reserved characters such as ':' must
+            return Err(ArgumentError(String::from(
+                "Reserved characters such as ':' must
                         be escaped according to RFC 2396. An IPv6 address literal
-                        must be enclosed in '[' and according to RFC 2732.")));
+                        must be enclosed in '[' and according to RFC 2732.",
+            )));
         }
         match port.parse::<u16>() {
             Ok(val) => Ok(Host::new(host.to_ascii_lowercase(), val)),
-            Err(_) => Err(ArgumentError(String::from("Port must be an unsigned integer."))),
+            Err(_) => Err(ArgumentError(
+                String::from("Port must be an unsigned integer."),
+            )),
         }
     } else if entity.contains(".sock") {
         // IPC socket
@@ -243,7 +254,9 @@ fn split_hosts(host_str: &str) -> Result<Vec<Host>> {
     let mut hosts: Vec<Host> = Vec::new();
     for entity in host_str.split(',') {
         if entity.is_empty() {
-            return Err(ArgumentError(String::from("Empty host, or extra comma in host list.")));
+            return Err(ArgumentError(
+                String::from("Empty host, or extra comma in host list."),
+            ));
         }
         let host = try!(parse_host(entity));
         hosts.push(host);
@@ -282,14 +295,17 @@ fn split_options(opts: &str) -> Result<ConnectionOptions> {
     let mut delim = None;
 
     if and_idx != None && semi_idx != None {
-        return Err(ArgumentError(String::from("Cannot mix '&' and ';' for option separators.")));
+        return Err(ArgumentError(String::from(
+            "Cannot mix '&' and ';' for option separators.",
+        )));
     } else if and_idx != None {
         delim = Some("&");
     } else if semi_idx != None {
         delim = Some(";");
     } else if opts.find('=') == None {
-        return Err(ArgumentError(String::from("InvalidURI: MongoDB URI options are key=value \
-                                               pairs.")));
+        return Err(ArgumentError(String::from(
+            "InvalidURI: MongoDB URI options are key=value pairs.",
+        )));
     }
     let options = parse_options(opts, delim);
     Ok(options)

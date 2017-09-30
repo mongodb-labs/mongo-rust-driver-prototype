@@ -10,7 +10,7 @@ fn insert_single_key_doc() {
     let client = Client::connect("localhost", 27017).unwrap();
     let db = client.db("test-client-wire_protocol-insert_single_key_doc");
     db.drop_database().unwrap();
-    
+
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
             let doc = doc! { "foo" => 42.0 };
@@ -74,7 +74,8 @@ fn insert_multi_key_doc() {
 
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
-            let doc = doc! {
+            let doc =
+                doc! {
                 "foo" => 42.0,
                 "bar" => "__z&"
             };
@@ -143,12 +144,14 @@ fn insert_docs() {
 
     match TcpStream::connect("localhost:27017") {
         Ok(mut stream) => {
-            let doc1 = doc! {
+            let doc1 =
+                doc! {
                 "foo" => 42.0,
                 "bar" => "__z&"
             };
 
-            let doc2 = doc! {
+            let doc2 =
+                doc! {
                 "booyah" => 23
             };
 

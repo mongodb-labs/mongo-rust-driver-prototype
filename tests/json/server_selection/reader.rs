@@ -30,7 +30,11 @@ fn get_server_array(vals: &[Value]) -> Result<Vec<Server>, String> {
                     Err(err) => return Err(err),
                 }
             }
-            _ => return Err(String::from("Some servers could not be parsed for topology")),
+            _ => {
+                return Err(String::from(
+                    "Some servers could not be parsed for topology",
+                ))
+            }
         }
     }
 
@@ -45,7 +49,10 @@ pub trait SuiteContainer: Sized {
 impl SuiteContainer for Value {
     fn from_file(path: &str) -> Result<Value, String> {
         let mut file = File::open(path).expect(&format!("Unable to open file: {}", path));
-        Ok(serde_json::from_reader(&mut file).expect(&format!("Invalid JSON file: {}", path)))
+        Ok(serde_json::from_reader(&mut file).expect(&format!(
+            "Invalid JSON file: {}",
+            path
+        )))
     }
 
     fn get_suite(&self) -> Result<Suite, String> {

@@ -87,22 +87,30 @@ fn bulk_unordered_insert_only() {
 #[test]
 fn bulk_ordered_mix() {
     let models = vec![
-        WriteModel::InsertOne { document: doc! {
+        WriteModel::InsertOne {
+            document: doc! {
             "_id" => (1),
             "x" => (11)
-        }},
-        WriteModel::InsertOne { document: doc! {
+        },
+        },
+        WriteModel::InsertOne {
+            document: doc! {
             "_id" => (2),
             "x" => (22)
-        }},
-        WriteModel::InsertOne { document: doc! {
+        },
+        },
+        WriteModel::InsertOne {
+            document: doc! {
             "_id" => (3),
             "x" => (33)
-        }},
-        WriteModel::InsertOne { document: doc! {
+        },
+        },
+        WriteModel::InsertOne {
+            document: doc! {
             "_id" => (4),
             "x" => (44)
-        }},
+        },
+        },
         WriteModel::ReplaceOne {
             filter: doc! { "_id" => (3) },
             replacement: doc! { "x" => (37) },
@@ -113,37 +121,51 @@ fn bulk_ordered_mix() {
             update: doc! { "$inc" => { "x" => (1) } },
             upsert: Some(false),
         },
-        WriteModel::DeleteOne { filter: doc! {
+        WriteModel::DeleteOne {
+            filter: doc! {
             "_id" => (4)
-        }},
-        WriteModel::InsertOne { document: doc! {
+        },
+        },
+        WriteModel::InsertOne {
+            document: doc! {
             "_id" => (5),
             "x" => (55)
-        }},
+        },
+        },
         WriteModel::UpdateOne {
             filter: doc! { "_id" => (6) },
             update: doc! { "$set" =>  { "x" => (62) } },
-            upsert: Some(true)
+            upsert: Some(true),
         },
-        WriteModel::InsertOne { document: doc! {
+        WriteModel::InsertOne {
+            document: doc! {
             "_id" => (101),
             "x" => ("dalmations")
-        }},
-        WriteModel::InsertOne { document: doc! {
+        },
+        },
+        WriteModel::InsertOne {
+            document: doc! {
             "_id" => (102),
             "x" => ("strawberries")
-        }},
-        WriteModel::InsertOne { document: doc! {
+        },
+        },
+        WriteModel::InsertOne {
+            document: doc! {
             "_id" => (103),
             "x" => ("blueberries")
-        }},
-        WriteModel::InsertOne { document: doc! {
+        },
+        },
+        WriteModel::InsertOne {
+            document: doc! {
             "_id" => (104),
             "x" => ("bananas")
-        }},
-        WriteModel::DeleteMany { filter: doc! {
+        },
+        },
+        WriteModel::DeleteMany {
+            filter: doc! {
             "_id" => { "$gte" => (103) }
-        }},
+        },
+        },
     ];
 
     let client = Client::connect("localhost", 27017).unwrap();

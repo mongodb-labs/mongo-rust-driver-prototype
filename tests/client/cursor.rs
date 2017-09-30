@@ -29,21 +29,25 @@ fn cursor_features() {
     let mut options = FindOptions::new();
     options.batch_size = Some(3);
 
-    let result = Cursor::query(client.clone(),
-                               "test-client-cursor.cursor_test".to_owned(),
-                               flags,
-                               doc,
-                               options,
-                               CommandType::Find,
-                               false,
-                               ReadPreference::new(ReadMode::Primary, None));
+    let result = Cursor::query(
+        client.clone(),
+        "test-client-cursor.cursor_test".to_owned(),
+        flags,
+        doc,
+        options,
+        CommandType::Find,
+        false,
+        ReadPreference::new(ReadMode::Primary, None),
+    );
 
     let mut cursor = match result {
         Ok(c) => c,
         Err(s) => panic!("{}", s),
     };
 
-    let batch = cursor.drain_current_batch().expect("Failed to get current batch from cursor.");
+    let batch = cursor.drain_current_batch().expect(
+        "Failed to get current batch from cursor.",
+    );
 
     assert_eq!(batch.len(), 3 as usize);
 

@@ -89,11 +89,12 @@ pub type Database = Arc<DatabaseInner>;
 
 pub trait ThreadedDatabase {
     /// Creates a database representation with optional read and write controls.
-    fn open(client: Client,
-            name: &str,
-            read_preference: Option<ReadPreference>,
-            write_concern: Option<WriteConcern>)
-            -> Database;
+    fn open(
+        client: Client,
+        name: &str,
+        read_preference: Option<ReadPreference>,
+        write_concern: Option<WriteConcern>,
+    ) -> Database;
     // Returns the version of the MongoDB instance.
     fn version(&self) -> Result<Version>;
     /// Logs in a user using the SCRAM-SHA-1 mechanism.
@@ -101,49 +102,52 @@ pub trait ThreadedDatabase {
     /// Creates a collection representation with inherited read and write controls.
     fn collection(&self, coll_name: &str) -> Collection;
     /// Creates a collection representation with custom read and write controls.
-    fn collection_with_prefs(&self,
-                             coll_name: &str,
-                             create: bool,
-                             read_preference: Option<ReadPreference>,
-                             write_concern: Option<WriteConcern>)
-                             -> Collection;
+    fn collection_with_prefs(
+        &self,
+        coll_name: &str,
+        create: bool,
+        read_preference: Option<ReadPreference>,
+        write_concern: Option<WriteConcern>,
+    ) -> Collection;
     /// Return a unique operational request id.
     fn get_req_id(&self) -> i32;
     /// Generates a cursor for a relevant operational command.
-    fn command_cursor(&self,
-                      spec: bson::Document,
-                      cmd_type: CommandType,
-                      read_pref: ReadPreference)
-                      -> Result<Cursor>;
+    fn command_cursor(
+        &self,
+        spec: bson::Document,
+        cmd_type: CommandType,
+        read_pref: ReadPreference,
+    ) -> Result<Cursor>;
     /// Sends an administrative command over find_one.
-    fn command(&self,
-               spec: bson::Document,
-               cmd_type: CommandType,
-               read_preference: Option<ReadPreference>)
-               -> Result<bson::Document>;
+    fn command(
+        &self,
+        spec: bson::Document,
+        cmd_type: CommandType,
+        read_preference: Option<ReadPreference>,
+    ) -> Result<bson::Document>;
     /// Returns a list of collections within the database.
     fn list_collections(&self, filter: Option<bson::Document>) -> Result<Cursor>;
     /// Returns a list of collections within the database with a custom batch size.
-    fn list_collections_with_batch_size(&self,
-                                        filter: Option<bson::Document>,
-                                        batch_size: i32)
-                                        -> Result<Cursor>;
+    fn list_collections_with_batch_size(
+        &self,
+        filter: Option<bson::Document>,
+        batch_size: i32,
+    ) -> Result<Cursor>;
     /// Returns a list of collection names within the database.
     fn collection_names(&self, filter: Option<bson::Document>) -> Result<Vec<String>>;
     /// Creates a new collection.
     ///
     /// Note that due to the implicit creation of collections during insertion, this
     /// method should only be used to instantiate capped collections.
-    fn create_collection(&self,
-                         name: &str,
-                         options: Option<CreateCollectionOptions>)
-                         -> Result<()>;
+    fn create_collection(&self, name: &str, options: Option<CreateCollectionOptions>)
+        -> Result<()>;
     /// Creates a new user.
-    fn create_user(&self,
-                   name: &str,
-                   password: &str,
-                   options: Option<CreateUserOptions>)
-                   -> Result<()>;
+    fn create_user(
+        &self,
+        name: &str,
+        password: &str,
+        options: Option<CreateUserOptions>,
+    ) -> Result<()>;
     /// Permanently deletes all users from the database.
     fn drop_all_users(&self, write_concern: Option<WriteConcern>) -> Result<(i32)>;
     /// Permanently deletes the collection from the database.
@@ -157,18 +161,20 @@ pub trait ThreadedDatabase {
     /// Retrieves information about a given user from the database.
     fn get_user(&self, user: &str, options: Option<UserInfoOptions>) -> Result<bson::Document>;
     /// Retrieves information about a given set of users from the database.
-    fn get_users(&self,
-                 users: Vec<&str>,
-                 options: Option<UserInfoOptions>)
-                 -> Result<Vec<bson::Document>>;
+    fn get_users(
+        &self,
+        users: Vec<&str>,
+        options: Option<UserInfoOptions>,
+    ) -> Result<Vec<bson::Document>>;
 }
 
 impl ThreadedDatabase for Database {
-    fn open(client: Client,
-            name: &str,
-            read_preference: Option<ReadPreference>,
-            write_concern: Option<WriteConcern>)
-            -> Database {
+    fn open(
+        client: Client,
+        name: &str,
+        read_preference: Option<ReadPreference>,
+        write_concern: Option<WriteConcern>,
+    ) -> Database {
         let rp = read_preference.unwrap_or_else(|| client.read_preference.to_owned());
         let wc = write_concern.unwrap_or_else(|| client.write_concern.to_owned());
 
@@ -186,54 +192,66 @@ impl ThreadedDatabase for Database {
     }
 
     fn collection(&self, coll_name: &str) -> Collection {
-        Collection::new(self.clone(),
-                        coll_name,
-                        false,
-                        Some(self.read_preference.to_owned()),
-                        Some(self.write_concern.to_owned()))
+        Collection::new(
+            self.clone(),
+            coll_name,
+            false,
+            Some(self.read_preference.to_owned()),
+            Some(self.write_concern.to_owned()),
+        )
     }
 
-    fn collection_with_prefs(&self,
-                             coll_name: &str,
-                             create: bool,
-                             read_preference: Option<ReadPreference>,
-                             write_concern: Option<WriteConcern>)
-                             -> Collection {
-        Collection::new(self.clone(),
-                        coll_name,
-                        create,
-                        read_preference,
-                        write_concern)
+    fn collection_with_prefs(
+        &self,
+        coll_name: &str,
+        create: bool,
+        read_preference: Option<ReadPreference>,
+        write_concern: Option<WriteConcern>,
+    ) -> Collection {
+        Collection::new(
+            self.clone(),
+            coll_name,
+            create,
+            read_preference,
+            write_concern,
+        )
     }
 
     fn get_req_id(&self) -> i32 {
         self.client.get_req_id()
     }
 
-    fn command_cursor(&self,
-                      spec: bson::Document,
-                      cmd_type: CommandType,
-                      read_pref: ReadPreference)
-                      -> Result<Cursor> {
-        Cursor::command_cursor(self.client.clone(),
-                               &self.name[..],
-                               spec,
-                               cmd_type,
-                               read_pref)
+    fn command_cursor(
+        &self,
+        spec: bson::Document,
+        cmd_type: CommandType,
+        read_pref: ReadPreference,
+    ) -> Result<Cursor> {
+        Cursor::command_cursor(
+            self.client.clone(),
+            &self.name[..],
+            spec,
+            cmd_type,
+            read_pref,
+        )
     }
 
-    fn command(&self,
-               spec: bson::Document,
-               cmd_type: CommandType,
-               read_preference: Option<ReadPreference>)
-               -> Result<bson::Document> {
+    fn command(
+        &self,
+        spec: bson::Document,
+        cmd_type: CommandType,
+        read_preference: Option<ReadPreference>,
+    ) -> Result<bson::Document> {
 
         let coll = self.collection("$cmd");
         let mut options = FindOptions::new();
         options.batch_size = Some(1);
         options.read_preference = read_preference;
-        let res = try!(coll.find_one_with_command_type(Some(spec.clone()), Some(options),
-                                                       cmd_type));
+        let res = try!(coll.find_one_with_command_type(
+            Some(spec.clone()),
+            Some(options),
+            cmd_type,
+        ));
         res.ok_or_else(|| {
             OperationError(format!("Failed to execute command with spec {:?}.", spec))
         })
@@ -243,10 +261,11 @@ impl ThreadedDatabase for Database {
         self.list_collections_with_batch_size(filter, DEFAULT_BATCH_SIZE)
     }
 
-    fn list_collections_with_batch_size(&self,
-                                        filter: Option<bson::Document>,
-                                        batch_size: i32)
-                                        -> Result<Cursor> {
+    fn list_collections_with_batch_size(
+        &self,
+        filter: Option<bson::Document>,
+        batch_size: i32,
+    ) -> Result<Cursor> {
 
         let mut spec = bson::Document::new();
         let mut cursor = bson::Document::new();
@@ -258,9 +277,11 @@ impl ThreadedDatabase for Database {
             spec.insert("filter", Bson::Document(filter.unwrap()));
         }
 
-        self.command_cursor(spec,
-                            CommandType::ListCollections,
-                            self.read_preference.to_owned())
+        self.command_cursor(
+            spec,
+            CommandType::ListCollections,
+            self.read_preference.to_owned(),
+        )
     }
 
     fn collection_names(&self, filter: Option<bson::Document>) -> Result<Vec<String>> {
@@ -290,29 +311,36 @@ impl ThreadedDatabase for Database {
                     Err(e) => Err(ResponseError(String::from(e.description()))),
                 }
             }
-            _ => Err(ResponseError(String::from("No version received from server"))),
+            _ => Err(ResponseError(
+                String::from("No version received from server"),
+            )),
         }
     }
 
-    fn create_collection(&self,
-                         name: &str,
-                         options: Option<CreateCollectionOptions>)
-                         -> Result<()> {
+    fn create_collection(
+        &self,
+        name: &str,
+        options: Option<CreateCollectionOptions>,
+    ) -> Result<()> {
         let mut doc = doc! { "create" => name };
 
         if let Some(create_collection_options) = options {
             doc = merge_options(doc, create_collection_options);
         }
 
-        self.command(doc, CommandType::CreateCollection, None).map(|_| ())
+        self.command(doc, CommandType::CreateCollection, None).map(
+            |_| (),
+        )
     }
 
-    fn create_user(&self,
-                   name: &str,
-                   password: &str,
-                   options: Option<CreateUserOptions>)
-                   -> Result<()> {
-        let mut doc = doc! {
+    fn create_user(
+        &self,
+        name: &str,
+        password: &str,
+        options: Option<CreateUserOptions>,
+    ) -> Result<()> {
+        let mut doc =
+            doc! {
             "createUser" => name,
             "pwd" => password
         };
@@ -370,7 +398,8 @@ impl ThreadedDatabase for Database {
     }
 
     fn get_all_users(&self, show_credentials: bool) -> Result<Vec<bson::Document>> {
-        let doc = doc! {
+        let doc =
+            doc! {
             "usersInfo" => 1,
             "showCredentials" => show_credentials
         };
@@ -394,7 +423,8 @@ impl ThreadedDatabase for Database {
     }
 
     fn get_user(&self, user: &str, options: Option<UserInfoOptions>) -> Result<bson::Document> {
-        let mut doc = doc! {
+        let mut doc =
+            doc! {
             "usersInfo" => { "user" => user, "db" => (self.name.to_owned()) }
         };
 
@@ -418,11 +448,13 @@ impl ThreadedDatabase for Database {
         }
     }
 
-    fn get_users(&self,
-                 users: Vec<&str>,
-                 options: Option<UserInfoOptions>)
-                 -> Result<Vec<bson::Document>> {
-        let vec: Vec<_> = users.into_iter()
+    fn get_users(
+        &self,
+        users: Vec<&str>,
+        options: Option<UserInfoOptions>,
+    ) -> Result<Vec<bson::Document>> {
+        let vec: Vec<_> = users
+            .into_iter()
             .map(|user| {
                 let doc = doc! { "user" => user, "db" => (self.name.to_owned()) };
                 Bson::Document(doc)

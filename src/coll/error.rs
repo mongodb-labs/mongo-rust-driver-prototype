@@ -114,15 +114,22 @@ impl fmt::Display for BulkWriteException {
 
 impl fmt::Display for BulkWriteError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(fmt,
-                    "BulkWriteError at index {} (code {}): {}\n",
-                    self.index,
-                    self.code,
-                    self.message));
+        try!(write!(
+            fmt,
+            "BulkWriteError at index {} (code {}): {}\n",
+            self.index,
+            self.code,
+            self.message
+        ));
 
         match self.request {
             Some(ref request) => try!(write!(fmt, "Failed to execute request {:?}\n.", request)),
-            None => try!(write!(fmt, "No additional error information was received.\n")),
+            None => {
+                try!(write!(
+                    fmt,
+                    "No additional error information was received.\n"
+                ))
+            }
         }
 
         Ok(())
@@ -161,16 +168,19 @@ impl WriteException {
     }
 
     /// Validates a single-write result.
-    pub fn validate_write_result(result: bson::Document,
-                                 write_concern: WriteConcern)
-                                 -> Result<()> {
+    pub fn validate_write_result(
+        result: bson::Document,
+        write_concern: WriteConcern,
+    ) -> Result<()> {
         let bulk_err_result = BulkWriteException::validate_bulk_write_result(result, write_concern);
 
         // Convert a bulk-write error into a write error, if it exists,
         // or propagate any other results.
         match bulk_err_result {
             Err(Error::BulkWriteError(bulk_exception)) => {
-                Err(Error::WriteError(WriteException::with_bulk_exception(bulk_exception)))
+                Err(Error::WriteError(
+                    WriteException::with_bulk_exception(bulk_exception),
+                ))
             }
             Err(err) => Err(err),
             Ok(()) => Ok(()),
@@ -195,7 +205,10 @@ impl WriteConcernError {
                 return Ok(WriteConcernError::new(*code, write_concern, message));
             }
         }
-        Err(Error::ResponseError(format!("WriteConcernError document is invalid: {:?}", error)))
+        Err(Error::ResponseError(format!(
+            "WriteConcernError document is invalid: {:?}",
+            error
+        )))
     }
 }
 
@@ -215,17 +228,20 @@ impl WriteError {
                 return Ok(WriteError::new(*code, message));
             }
         }
-        Err(Error::ResponseError(format!("WriteError document is invalid: {:?}", error)))
+        Err(Error::ResponseError(
+            format!("WriteError document is invalid: {:?}", error),
+        ))
     }
 }
 
 impl BulkWriteError {
     /// Returns a new BulkWriteError containing the provided error information.
-    pub fn new<T: ToString>(index: i32,
-                            code: i32,
-                            message: T,
-                            request: Option<WriteModel>)
-                            -> BulkWriteError {
+    pub fn new<T: ToString>(
+        index: i32,
+        code: i32,
+        message: T,
+        request: Option<WriteModel>,
+    ) -> BulkWriteError {
         BulkWriteError {
             index: index,
             code: code,
@@ -243,17 +259,20 @@ impl BulkWriteError {
                 }
             }
         }
-        Err(Error::ResponseError(format!("WriteError document is invalid: {:?}", error)))
+        Err(Error::ResponseError(
+            format!("WriteError document is invalid: {:?}", error),
+        ))
     }
 }
 
 impl BulkWriteException {
     /// Returns a new BulkWriteException containing the provided error information.
-    pub fn new(processed: Vec<WriteModel>,
-               unprocessed: Vec<WriteModel>,
-               write_errors: Vec<BulkWriteError>,
-               write_concern_error: Option<WriteConcernError>)
-               -> BulkWriteException {
+    pub fn new(
+        processed: Vec<WriteModel>,
+        unprocessed: Vec<WriteModel>,
+        write_errors: Vec<BulkWriteError>,
+        write_concern_error: Option<WriteConcernError>,
+    ) -> BulkWriteException {
 
         let mut s = match write_concern_error {
             Some(ref error) => format!("{:?}\n", error),
@@ -284,10 +303,11 @@ impl BulkWriteException {
     }
 
     /// Adds the data contined by another BulkWriteException to this one.
-    pub fn add_bulk_write_exception(&mut self,
-                                    exception_opt: Option<BulkWriteException>,
-                                    models: Vec<WriteModel>)
-                                    -> bool {
+    pub fn add_bulk_write_exception(
+        &mut self,
+        exception_opt: Option<BulkWriteException>,
+        models: Vec<WriteModel>,
+    ) -> bool {
         let exception = match exception_opt {
             Some(exception) => exception,
             None => {
@@ -318,9 +338,10 @@ impl BulkWriteException {
     }
 
     /// Validates a bulk write result.
-    pub fn validate_bulk_write_result(result: bson::Document,
-                                      write_concern: WriteConcern)
-                                      -> Result<()> {
+    pub fn validate_bulk_write_result(
+        result: bson::Document,
+        write_concern: WriteConcern,
+    ) -> Result<()> {
 
         // Parse out any write concern errors.
         let wc_err = if let Some(&Bson::Document(ref error)) = result.get("writeConcernError") {
@@ -332,8 +353,9 @@ impl BulkWriteException {
         // Parse out any write errors.
         let w_errs = if let Some(&Bson::Array(ref errors)) = result.get("writeErrors") {
             if errors.is_empty() {
-                return Err(Error::ResponseError(String::from("Server indicates a write error, \
-                                                              but none were found.")));
+                return Err(Error::ResponseError(String::from(
+                    "Server indicates a write error, but none were found.",
+                )));
             }
 
             let mut vec = Vec::new();
@@ -341,8 +363,9 @@ impl BulkWriteException {
                 if let Bson::Document(ref doc) = *err {
                     vec.push(try!(BulkWriteError::parse(doc.clone())));
                 } else {
-                    return Err(Error::ResponseError(String::from("WriteError provided was not \
-                                                                  a bson document.")));
+                    return Err(Error::ResponseError(
+                        String::from("WriteError provided was not a bson document."),
+                    ));
                 }
             }
             vec
@@ -354,10 +377,12 @@ impl BulkWriteException {
         if wc_err.is_none() && w_errs.is_empty() {
             Ok(())
         } else {
-            Err(Error::BulkWriteError(BulkWriteException::new(Vec::new(),
-                                                              Vec::new(),
-                                                              w_errs,
-                                                              wc_err)))
+            Err(Error::BulkWriteError(BulkWriteException::new(
+                Vec::new(),
+                Vec::new(),
+                w_errs,
+                wc_err,
+            )))
         }
     }
 }

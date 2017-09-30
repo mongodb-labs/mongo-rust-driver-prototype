@@ -2,7 +2,7 @@ use mongodb::connstring;
 
 #[test]
 fn valid_uri() {
-    let valid_uris = vec!(
+    let valid_uris = vec![
         "mongodb://localhost",
         "mongodb://localhost/",
         "mongodb://localhost/?",
@@ -15,7 +15,7 @@ fn valid_uri() {
         "mongodb://127.0.0.1:27017",
         "mongodb://127.0.0.1:27017/",
         "mongodb://127.0.0.1:27017/?",
-    );
+    ];
 
     for uri in valid_uris {
         assert!(connstring::parse(uri).is_ok());
@@ -24,13 +24,13 @@ fn valid_uri() {
 
 #[test]
 fn invalid_prefix() {
-    let invalid_uris = vec!(
+    let invalid_uris = vec![
         "mongodb:/localhost",
         "mngodb://localhost",
         "mongodb//localhost",
         "://localhost",
         "localhost:27017",
-    );
+    ];
 
     for uri in invalid_uris {
         assert!(connstring::parse(uri).is_err());
@@ -69,12 +69,12 @@ fn hash_in_password() {
 
 #[test]
 fn required_host() {
-    let missing_hosts = vec!(
+    let missing_hosts = vec![
         "mongodb://",
         "mongodb:///fake",
         "mongodb://?opt",
         "mongodb:///?opt",
-        );
+    ];
 
     for uri in missing_hosts {
         assert!(connstring::parse(uri).is_err());
@@ -140,7 +140,11 @@ fn overridable_database() {
 #[test]
 fn query_separators() {
     for delim in &[";", "&"] {
-        let uri = format!("mongodb://rust/?replicaSet=myreplset{}slaveOk=true{}x=1", delim, delim);
+        let uri = format!(
+            "mongodb://rust/?replicaSet=myreplset{}slaveOk=true{}x=1",
+            delim,
+            delim
+        );
         let result = connstring::parse(&uri);
         assert!(result.is_ok());
 
@@ -154,13 +158,13 @@ fn query_separators() {
 
 #[test]
 fn read_pref_tags() {
-    let pref_set = vec!(
-        vec!("dc:ny"),
-        vec!("dc:ny,rack:1"),
-        vec!("dc:ny,rack:1", "dc:sf,rack:2"),
-        vec!("dc:ny,rack:1", "dc:sf,rack:2", ""),
-        vec!("dc:ny,rack:1", "dc:ny", ""),
-        );
+    let pref_set = vec![
+        vec!["dc:ny"],
+        vec!["dc:ny,rack:1"],
+        vec!["dc:ny,rack:1", "dc:sf,rack:2"],
+        vec!["dc:ny,rack:1", "dc:sf,rack:2", ""],
+        vec!["dc:ny,rack:1", "dc:ny", ""],
+    ];
 
     for delim in &["&", ";"] {
         for prefs in &pref_set {
@@ -228,7 +232,10 @@ fn ipv6() {
 #[test]
 fn full() {
     let opts = "?replicaSet=myreplset&journal=true&w=2&wtimeoutMS=50";
-    let uri = format!("mongodb://u#ser:pas#s@local,remote:27018,japan:27019/rocksdb{}", opts);
+    let uri = format!(
+        "mongodb://u#ser:pas#s@local,remote:27018,japan:27019/rocksdb{}",
+        opts
+    );
     let connstr = connstring::parse(&uri).unwrap();
     assert_eq!("u#ser", connstr.user.unwrap());
     assert_eq!("pas#s", connstr.password.unwrap());

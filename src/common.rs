@@ -26,7 +26,11 @@ impl FromStr for ReadMode {
             "Secondary" => ReadMode::Secondary,
             "SecondaryPreferred" => ReadMode::SecondaryPreferred,
             "Nearest" => ReadMode::Nearest,
-            _ => return Err(ArgumentError(format!("Could not convert '{}' to ReadMode.", s))),
+            _ => {
+                return Err(ArgumentError(
+                    format!("Could not convert '{}' to ReadMode.", s),
+                ))
+            }
         })
     }
 }
@@ -96,7 +100,13 @@ impl WriteConcern {
     }
 }
 
-pub fn merge_options<T: Into<bson::Document>>(document: bson::Document, options: T) -> bson::Document {
+pub fn merge_options<T: Into<bson::Document>>(
+    document: bson::Document,
+    options: T,
+) -> bson::Document {
     let options_doc: bson::Document = options.into();
-    document.into_iter().chain(options_doc.into_iter()).collect()
+    document
+        .into_iter()
+        .chain(options_doc.into_iter())
+        .collect()
 }

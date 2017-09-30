@@ -31,10 +31,11 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
     let topology = if should_ignore_description {
         Topology::new(connection_string.clone(), None, StreamConnector::default()).unwrap()
     } else {
-        Topology::new(connection_string.clone(),
-                      description,
-                      StreamConnector::default())
-            .unwrap()
+        Topology::new(
+            connection_string.clone(),
+            description,
+            StreamConnector::default(),
+        ).unwrap()
     };
 
     let top_description_arc = topology.description.clone();
@@ -44,11 +45,13 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
     // Fill servers array
     for host in &connection_string.hosts {
         let mut topology_description = topology.description.write().unwrap();
-        let server = Server::new(dummy_client.clone(),
-                                 host.clone(),
-                                 top_description_arc.clone(),
-                                 false,
-                                 StreamConnector::default());
+        let server = Server::new(
+            dummy_client.clone(),
+            host.clone(),
+            top_description_arc.clone(),
+            false,
+            StreamConnector::default(),
+        );
         topology_description.servers.insert(host.clone(), server);
     }
 
@@ -82,17 +85,21 @@ pub fn run_suite(file: &str, description: Option<TopologyDescription>) {
 
             let server = servers.get(&host).expect("Host not found.");
 
-            topology_description.update_without_monitor(host.clone(),
-                                                        server.description.clone(),
-                                                        dummy_client.clone(),
-                                                        top_description_arc.clone());
+            topology_description.update_without_monitor(
+                host.clone(),
+                server.description.clone(),
+                dummy_client.clone(),
+                top_description_arc.clone(),
+            );
         }
 
         // Check server and topology descriptions.
         let topology_description = topology.description.read().unwrap();
 
-        assert_eq!(phase.outcome.servers.len(),
-                   topology_description.servers.len());
+        assert_eq!(
+            phase.outcome.servers.len(),
+            topology_description.servers.len()
+        );
         for (host, server) in &phase.outcome.servers {
             match topology_description.servers.get(host) {
                 Some(top_server) => {

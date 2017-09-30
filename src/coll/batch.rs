@@ -28,11 +28,12 @@ pub struct UpdateModel {
 }
 
 impl UpdateModel {
-    pub fn new(filter: Document,
-               update: Document,
-               upsert: Option<bool>,
-               multi: bool)
-               -> UpdateModel {
+    pub fn new(
+        filter: Document,
+        update: Document,
+        upsert: Option<bool>,
+        multi: bool,
+    ) -> UpdateModel {
         UpdateModel {
             filter: filter,
             update: update,
@@ -44,10 +45,11 @@ impl UpdateModel {
 
 impl From<UpdateModel> for Document {
     fn from(model: UpdateModel) -> Self {
-        let mut document = doc! {
-            "q" => (model.filter),
-            "u" => (model.update)
-        };
+        let mut document =
+            doc! {
+                "q" => (model.filter),
+                "u" => (model.update)
+            };
 
         if let Some(upsert) = model.upsert {
             document.insert("upsert", Bson::Boolean(upsert));
@@ -73,33 +75,53 @@ impl From<WriteModel> for Batch {
         match model {
             WriteModel::InsertOne { document } => Batch::Insert(vec![document]),
             WriteModel::DeleteOne { filter } => {
-                Batch::Delete(vec![DeleteModel {
-                                       filter: filter,
-                                       multi: false,
-                                   }])
+                Batch::Delete(vec![
+                    DeleteModel {
+                        filter: filter,
+                        multi: false,
+                    },
+                ])
             }
             WriteModel::DeleteMany { filter } => {
-                Batch::Delete(vec![DeleteModel {
-                                       filter: filter,
-                                       multi: true,
-                                   }])
+                Batch::Delete(vec![
+                    DeleteModel {
+                        filter: filter,
+                        multi: true,
+                    },
+                ])
             }
-            WriteModel::ReplaceOne { filter, replacement: update, upsert } |
-            WriteModel::UpdateOne { filter, update, upsert } => {
-                Batch::Update(vec![UpdateModel {
-                                       filter: filter,
-                                       update: update,
-                                       upsert: upsert,
-                                       multi: false,
-                                   }])
+            WriteModel::ReplaceOne {
+                filter,
+                replacement: update,
+                upsert,
+            } |
+            WriteModel::UpdateOne {
+                filter,
+                update,
+                upsert,
+            } => {
+                Batch::Update(vec![
+                    UpdateModel {
+                        filter: filter,
+                        update: update,
+                        upsert: upsert,
+                        multi: false,
+                    },
+                ])
             }
-            WriteModel::UpdateMany { filter, update, upsert } => {
-                Batch::Update(vec![UpdateModel {
-                                       filter: filter,
-                                       update: update,
-                                       upsert: upsert,
-                                       multi: true,
-                                   }])
+            WriteModel::UpdateMany {
+                filter,
+                update,
+                upsert,
+            } => {
+                Batch::Update(vec![
+                    UpdateModel {
+                        filter: filter,
+                        update: update,
+                        upsert: upsert,
+                        multi: true,
+                    },
+                ])
             }
         }
     }
@@ -153,8 +175,16 @@ impl Batch {
             }
             Batch::Update(ref mut models) => {
                 match model {
-                    WriteModel::ReplaceOne { filter, replacement: update, upsert } |
-                    WriteModel::UpdateOne { filter, update, upsert } => {
+                    WriteModel::ReplaceOne {
+                        filter,
+                        replacement: update,
+                        upsert,
+                    } |
+                    WriteModel::UpdateOne {
+                        filter,
+                        update,
+                        upsert,
+                    } => {
                         models.push(UpdateModel {
                             filter: filter,
                             update: update,
@@ -162,7 +192,11 @@ impl Batch {
                             multi: false,
                         })
                     }
-                    WriteModel::UpdateMany { filter, update, upsert } => {
+                    WriteModel::UpdateMany {
+                        filter,
+                        update,
+                        upsert,
+                    } => {
                         models.push(UpdateModel {
                             filter: filter,
                             update: update,

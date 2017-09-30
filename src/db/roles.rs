@@ -73,7 +73,7 @@ impl From<Role> for Bson {
         match role {
             Role::All(role) => Bson::String(role.to_string()),
             Role::Single { role, db } => {
-              Bson::Document(doc! {
+                Bson::Document(doc! {
                   "role" => (Bson::String(role.to_string())),
                   "db" => (Bson::String(db))
               })
@@ -87,7 +87,7 @@ impl Role {
         self.clone().into()
     }
 
-    #[deprecated(since="0.2.4", note="this method will be removed in the next major release")]
+    #[deprecated(since = "0.2.4", note = "this method will be removed in the next major release")]
     pub fn to_bson_array(vec: Vec<Role>) -> Bson {
         Bson::Array(vec.into_iter().map(|r| r.to_bson()).collect())
     }

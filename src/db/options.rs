@@ -78,9 +78,7 @@ impl From<CreateUserOptions> for Document {
             document.insert("customData", Bson::Document(custom_data));
         }
 
-        let roles_barr = options.roles.into_iter()
-            .map(|r| r.to_bson())
-            .collect();
+        let roles_barr = options.roles.into_iter().map(|r| r.to_bson()).collect();
 
         document.insert("roles", Bson::Array(roles_barr));
 

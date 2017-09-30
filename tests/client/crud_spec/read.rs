@@ -9,24 +9,32 @@ use serde_json::Value;
 
 #[test]
 fn aggregate() {
-    run_suite!("tests/json/data/specs/source/crud/tests/read/aggregate.json",
-               "aggregate");
+    run_suite!(
+        "tests/json/data/specs/source/crud/tests/read/aggregate.json",
+        "aggregate"
+    );
 }
 
 #[test]
 fn count() {
-    run_suite!("tests/json/data/specs/source/crud/tests/read/count.json",
-               "count");
+    run_suite!(
+        "tests/json/data/specs/source/crud/tests/read/count.json",
+        "count"
+    );
 }
 
 #[test]
 fn distinct() {
-    run_suite!("tests/json/data/specs/source/crud/tests/read/distinct.json",
-               "distinct");
+    run_suite!(
+        "tests/json/data/specs/source/crud/tests/read/distinct.json",
+        "distinct"
+    );
 }
 
 #[test]
 fn find() {
-    run_suite!("tests/json/data/specs/source/crud/tests/read/find.json",
-               "find");
+    run_suite!(
+        "tests/json/data/specs/source/crud/tests/read/find.json",
+        "find"
+    );
 }

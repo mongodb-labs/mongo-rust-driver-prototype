@@ -135,7 +135,9 @@ impl ServerDescription {
     // Updates the server description using an isMaster server response.
     pub fn update(&mut self, ismaster: IsMasterResult, round_trip_time: i64) {
         if !ismaster.ok {
-            self.set_err(OperationError(String::from("ismaster returned a not-ok response.")));
+            self.set_err(OperationError(
+                String::from("ismaster returned a not-ok response."),
+            ));
             return;
         }
 
@@ -153,8 +155,10 @@ impl ServerDescription {
         self.round_trip_time = match self.round_trip_time {
             Some(old_rtt) => {
                 // (rtt / div) + (old_rtt * (div-1)/div)
-                Some(round_trip_time / ROUND_TRIP_DIVISOR +
-                     (old_rtt / (ROUND_TRIP_DIVISOR)) * (ROUND_TRIP_DIVISOR - 1))
+                Some(
+                    round_trip_time / ROUND_TRIP_DIVISOR +
+                        (old_rtt / (ROUND_TRIP_DIVISOR)) * (ROUND_TRIP_DIVISOR - 1),
+                )
             }
             None => Some(round_trip_time),
         };
@@ -204,12 +208,13 @@ impl Drop for Server {
 
 impl Server {
     /// Returns a new server with the given host, initializing a new connection pool and monitor.
-    pub fn new(client: Client,
-               host: Host,
-               top_description: Arc<RwLock<TopologyDescription>>,
-               run_monitor: bool,
-               connector: StreamConnector)
-               -> Server {
+    pub fn new(
+        client: Client,
+        host: Host,
+        top_description: Arc<RwLock<TopologyDescription>>,
+        run_monitor: bool,
+        connector: StreamConnector,
+    ) -> Server {
         let description = Arc::new(RwLock::new(ServerDescription::new()));
 
         // Create new monitor thread
@@ -219,12 +224,14 @@ impl Server {
         let pool = Arc::new(ConnectionPool::new(host.clone(), connector.clone()));
 
         // Fails silently
-        let monitor = Arc::new(Monitor::new(client,
-                                            host_clone,
-                                            pool.clone(),
-                                            top_description,
-                                            desc_clone,
-                                            connector));
+        let monitor = Arc::new(Monitor::new(
+            client,
+            host_clone,
+            pool.clone(),
+            top_description,
+            desc_clone,
+            connector,
+        ));
 
         if run_monitor {
             let monitor_clone = monitor.clone();

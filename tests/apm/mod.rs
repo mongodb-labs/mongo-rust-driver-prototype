@@ -8,9 +8,11 @@ use rand;
 
 fn timed_query(_client: Client, command_result: &CommandResult) {
     let (command_name, duration) = match *command_result {
-        CommandResult::Success { ref command_name, duration, .. } => {
-            (command_name.clone(), duration)
-        }
+        CommandResult::Success {
+            ref command_name,
+            duration,
+            ..
+        } => (command_name.clone(), duration),
         _ => panic!("Command failed!"),
     };
 
@@ -31,11 +33,16 @@ fn command_duration() {
     let coll = db.collection("command_duration");
     coll.drop().unwrap();
 
-    let docs = (1..4).map(|i| doc! { "_id" => i, "x" => (rand::random::<u8>() as u32) }).collect();
+    let docs = (1..4)
+        .map(|i| {
+            doc! { "_id" => i, "x" => (rand::random::<u8>() as u32) }
+        })
+        .collect();
     coll.insert_many(docs, None).unwrap();
     client.add_completion_hook(timed_query).unwrap();
 
-    let doc = doc! {
+    let doc =
+        doc! {
         "$where" => (Bson::JavaScriptCode("function() { sleep(500); }".to_owned()))
     };
 
@@ -57,8 +64,8 @@ fn logging() {
     let _ = fs::remove_file("test_log.txt");
 
     // Reset State
-    let reset_client = Client::connect("localhost", 27017)
-        .expect("Failed to connect to localhost:27017");
+    let reset_client =
+        Client::connect("localhost", 27017).expect("Failed to connect to localhost:27017");
     let reset_db = reset_client.db("test-apm-mod");
     let reset_coll = reset_db.collection("logging");
     reset_coll.drop().unwrap();
@@ -83,7 +90,8 @@ fn logging() {
     coll.insert_one(doc2, None).unwrap();
     coll.insert_one(doc3, None).unwrap();
 
-    let filter = doc! {
+    let filter =
+        doc! {
         "_id" => { "$gt" => 1 }
     };
 
@@ -95,34 +103,42 @@ fn logging() {
 
     // Create collection started
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.create_collection 127.0.0.1:27017 STARTED: { create: \"logging\" }\n",
-               &line);
+    assert_eq!(
+        "COMMAND.create_collection 127.0.0.1:27017 STARTED: { create: \"logging\" }\n",
+        &line
+    );
 
     // Create collection completed
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert!(line.starts_with("COMMAND.create_collection 127.0.0.1:27017 COMPLETED: { ok: 1 } ("));
+    assert!(line.starts_with(
+        "COMMAND.create_collection 127.0.0.1:27017 COMPLETED: { ok: 1 } (",
+    ));
     assert!(line.ends_with(" ns)\n"));
 
     // Drop collection started
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.drop_collection 127.0.0.1:27017 STARTED: { drop: \"logging\" }\n",
-               &line);
+    assert_eq!(
+        "COMMAND.drop_collection 127.0.0.1:27017 STARTED: { drop: \"logging\" }\n",
+        &line
+    );
 
     // Drop collection completed
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert!(line.starts_with("COMMAND.drop_collection 127.0.0.1:27017 COMPLETED: { ns: \
-                              \"test-apm-mod.logging\", nIndexesWas: 1, ok: 1 } ("));
+    assert!(line.starts_with(
+        "COMMAND.drop_collection 127.0.0.1:27017 COMPLETED: { ns: \"test-apm-mod.logging\", nIndexesWas: 1, ok: 1 } (",
+    ));
     assert!(line.ends_with(" ns)\n"));
 
     // First insert started
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ \
-                _id: 1 }] }\n",
-               &line);
+    assert_eq!(
+        "COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ _id: 1 }] }\n",
+        &line
+    );
 
 
     let insert_one_line_start = if v3_3 {
@@ -140,9 +156,10 @@ fn logging() {
     // Second insert started
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ \
-                _id: 2 }] }\n",
-               &line);
+    assert_eq!(
+        "COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ _id: 2 }] }\n",
+        &line
+    );
 
     // Second insert completed
     line.clear();
@@ -153,9 +170,10 @@ fn logging() {
     // Third insert started
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ \
-                _id: 3 }] }\n",
-               &line);
+    assert_eq!(
+        "COMMAND.insert_one 127.0.0.1:27017 STARTED: { insert: \"logging\", documents: [{ _id: 3 }] }\n",
+        &line
+    );
 
     // Third insert completed
     line.clear();
@@ -166,16 +184,18 @@ fn logging() {
     // Find command started
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert_eq!("COMMAND.find 127.0.0.1:27017 STARTED: { find: \"logging\", filter: { _id: { \
-                $gt: 1 } } }\n",
-               &line);
+    assert_eq!(
+        "COMMAND.find 127.0.0.1:27017 STARTED: { find: \"logging\", filter: { _id: { $gt: 1 } } }\n",
+        &line
+    );
 
     // Find command completed
     line.clear();
     read_first_non_monitor_line(&mut file, &mut line);
-    assert!(line.starts_with("COMMAND.find 127.0.0.1:27017 COMPLETED: { cursor: { id: 0, ns: \
-                              \"test-apm-mod.logging\", firstBatch: [{ _id: 2 }, { _id: 3 }] }, \
-                              ok: 1 } ("));
+    assert!(line.starts_with(
+        "COMMAND.find 127.0.0.1:27017 COMPLETED: { cursor: { id: 0, ns: \
+            \"test-apm-mod.logging\", firstBatch: [{ _id: 2 }, { _id: 3 }] }, ok: 1 } (",
+    ));
     assert!(line.ends_with(" ns)\n"));
 
     coll.drop().unwrap();

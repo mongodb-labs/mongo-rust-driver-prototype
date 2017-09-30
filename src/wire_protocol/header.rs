@@ -118,7 +118,9 @@ impl Header {
         try!(buffer.write_i32::<LittleEndian>(self.message_length));
         try!(buffer.write_i32::<LittleEndian>(self.request_id));
         try!(buffer.write_i32::<LittleEndian>(self.response_to));
-        try!(buffer.write_i32::<LittleEndian>(self.op_code.clone() as i32));
+        try!(buffer.write_i32::<LittleEndian>(
+            self.op_code.clone() as i32,
+        ));
         let _ = buffer.flush();
 
         Ok(())
@@ -142,11 +144,18 @@ impl Header {
         let op_code = match OpCode::from_i32(op_code_i32) {
             Some(code) => code,
             _ => {
-                return Err(ResponseError(format!("Invalid header opcode from server: {}.",
-                                                 op_code_i32)))
+                return Err(ResponseError(format!(
+                    "Invalid header opcode from server: {}.",
+                    op_code_i32
+                )))
             }
         };
 
-        Ok(Header::new(message_length, request_id, response_to, op_code))
+        Ok(Header::new(
+            message_length,
+            request_id,
+            response_to,
+            op_code,
+        ))
     }
 }

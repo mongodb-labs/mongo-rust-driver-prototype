@@ -11,24 +11,30 @@ impl Responses {
         let mut data = Vec::new();
 
         for json in array {
-            let inner_array = val_or_err!(*json,
-                                          Value::Array(ref arr) => arr,
-                                          "`responses` must be an array of arrays.");
+            let inner_array = val_or_err!(
+                *json,
+                Value::Array(ref arr) => arr,
+                "`responses` must be an array of arrays."
+            );
 
             if inner_array.len() != 2 {
-                return Err(String::from("Response item must contain the host string and ismaster object."));
+                return Err(String::from(
+                    "Response item must contain the host string and ismaster object.",
+                ));
             }
 
             let host = val_or_err!(
                 inner_array[0],
                 Value::String(ref s) => s.to_owned(),
-                "Response item must contain the host string as the first argument.");
+                "Response item must contain the host string as the first argument."
+            );
 
             let ismaster = val_or_err!(
                 inner_array[1],
                 Value::Object(ref obj) => Bson::from(Value::Object(obj.clone())),
                 "Response item must contain the ismaster object as \
-                the second argument.");
+                the second argument."
+            );
 
             match ismaster {
                 Bson::Document(doc) => {

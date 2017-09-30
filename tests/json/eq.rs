@@ -74,4 +74,3 @@ pub fn bson_eq(b1: &Bson, b2: &Bson) -> bool {
         Bson::Symbol(ref s1) => var_match!(*b2, Bson::Symbol(ref s2) => s1 == s2),
     }
 }
-

@@ -95,7 +95,9 @@ impl ConnectionPool {
     /// Sets the maximum number of open connections.
     pub fn set_size(&self, size: usize) -> Result<()> {
         if size < 1 {
-            Err(ArgumentError(String::from("The connection pool size must be greater than zero.")))
+            Err(ArgumentError(String::from(
+                "The connection pool size must be greater than zero.",
+            )))
         } else {
             let mut locked = try!(self.inner.lock());
             locked.size = size;
@@ -118,8 +120,9 @@ impl ConnectionPool {
     pub fn acquire_stream(&self) -> Result<PooledStream> {
         let mut locked = try!(self.inner.lock());
         if locked.size == 0 {
-            return Err(OperationError(String::from("The connection pool does not allow \
-                                                    connections; increase the size of the pool.")));
+            return Err(OperationError(String::from(
+                "The connection pool does not allow connections; increase the size of the pool.",
+            )));
         }
 
         loop {
@@ -154,7 +157,10 @@ impl ConnectionPool {
 
     // Connects to a MongoDB server as defined by the initial configuration.
     fn connect(&self) -> Result<BufStream<Stream>> {
-        match self.stream_connector.connect(&self.host.host_name[..], self.host.port) {
+        match self.stream_connector.connect(
+            &self.host.host_name[..],
+            self.host.port,
+        ) {
             Ok(s) => Ok(BufStream::new(s)),
             Err(e) => Err(Error::from(e)),
         }

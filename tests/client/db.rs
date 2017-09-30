@@ -15,8 +15,9 @@ fn create_collection() {
     db.create_collection("test2", None).unwrap();
 
     // Check for namespaces
-    let mut cursor = db.list_collections_with_batch_size(None, 1)
-        .expect("Failed to execute list_collections command.");
+    let mut cursor = db.list_collections_with_batch_size(None, 1).expect(
+        "Failed to execute list_collections command.",
+    );
 
     let results = cursor.next_n(5).unwrap();
 
@@ -62,8 +63,9 @@ fn list_collections() {
         .expect("Failed to insert placeholder document into collection");
 
     // Check for namespaces
-    let mut cursor = db.list_collections_with_batch_size(None, 1)
-        .expect("Failed to execute list_collections command.");
+    let mut cursor = db.list_collections_with_batch_size(None, 1).expect(
+        "Failed to execute list_collections command.",
+    );
 
     let results = cursor.next_n(5).unwrap();
 
@@ -107,22 +109,26 @@ fn create_and_get_users() {
         write_concern: None,
     };
 
-    db.create_user("kevin",
-                     "ihavenosenseofhumorandthereforeihatepuns!",
-                     Some(kevin_options))
-        .unwrap();
+    db.create_user(
+        "kevin",
+        "ihavenosenseofhumorandthereforeihatepuns!",
+        Some(kevin_options),
+    ).unwrap();
 
     let saghm_options = CreateUserOptions {
         custom_data: Some(doc! { "foo" => "bar" }),
-        roles: vec![Role::Single {
-                        role: SingleDatabaseRole::DbAdmin,
-                        db: String::from("test"),
-                    },
-                    Role::All(AllDatabaseRole::ReadWrite)],
+        roles: vec![
+            Role::Single {
+                role: SingleDatabaseRole::DbAdmin,
+                db: String::from("test"),
+            },
+            Role::All(AllDatabaseRole::ReadWrite),
+        ],
         write_concern: None,
     };
 
-    db.create_user("saghm", "ilikepuns!", Some(saghm_options)).unwrap();
+    db.create_user("saghm", "ilikepuns!", Some(saghm_options))
+        .unwrap();
 
     db.create_user("val", "ilikeangularjs!", None).unwrap();
 
@@ -131,8 +137,10 @@ fn create_and_get_users() {
     match user.get("db") {
         Some(&Bson::String(ref s)) => assert_eq!("test-client-db-create_and_get_users", s),
         _ => {
-            panic!("Invalid `db` specified for user 'saghm': {:?}",
-                   user.get("db"))
+            panic!(
+                "Invalid `db` specified for user 'saghm': {:?}",
+                user.get("db")
+            )
         }
     };
 

@@ -19,10 +19,14 @@ impl fmt::Display for MaliciousServerErrorType {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             MaliciousServerErrorType::InvalidRnonce => {
-                fmt.write_str("The server returned an invalid rnonce during authentication")
+                fmt.write_str(
+                    "The server returned an invalid rnonce during authentication",
+                )
             }
             MaliciousServerErrorType::InvalidServerSignature => {
-                fmt.write_str("The server returned an invalid signature during authentication")
+                fmt.write_str(
+                    "The server returned an invalid signature during authentication",
+                )
             }
             MaliciousServerErrorType::NoServerSignature => {
                 fmt.write_str("The server did not sign its reponse during authentication")
@@ -160,9 +164,11 @@ impl fmt::Display for Error {
             Error::EventListenerError(ref err) => {
                 match *err {
                     Some(ref e) => {
-                        write!(fmt,
-                               "Unable to emit failure due to poisoned lock; failure: {}",
-                               e)
+                        write!(
+                            fmt,
+                            "Unable to emit failure due to poisoned lock; failure: {}",
+                            e
+                        )
                     }
                     None => write!(fmt, "Unable to emit failure due to poisoned lock"),
                 }
@@ -396,17 +402,18 @@ pub enum ErrorCode {
 impl ErrorCode {
     pub fn is_network_error(&self) -> bool {
         *self == ErrorCode::HostUnreachable || *self == ErrorCode::HostNotFound ||
-        *self == ErrorCode::NetworkTimeout
+            *self == ErrorCode::NetworkTimeout
     }
 
     pub fn is_interruption(&self) -> bool {
         *self == ErrorCode::Interrupted || *self == ErrorCode::InterruptedAtShutdown ||
-        *self == ErrorCode::ExceededTimeLimit
+            *self == ErrorCode::ExceededTimeLimit
     }
 
     pub fn is_index_creation_error(&self) -> bool {
         *self == ErrorCode::CannotCreateIndex || *self == ErrorCode::IndexOptionsConflict ||
-        *self == ErrorCode::IndexKeySpecsConflict || *self == ErrorCode::IndexAlreadyExists
+            *self == ErrorCode::IndexKeySpecsConflict ||
+            *self == ErrorCode::IndexAlreadyExists
     }
 
     fn to_str(&self) -> &str {
@@ -513,7 +520,9 @@ impl ErrorCode {
             ErrorCode::CannotSatisfyWriteConcern => "CannotSatisfyWriteConcern",
             ErrorCode::OutdatedClient => "OutdatedClient",
             ErrorCode::IncompatibleAuditMetadata => "IncompatibleAuditMetadata",
-            ErrorCode::NewReplicaSetConfigurationIncompatible => "NewReplicaSetConfigurationIncompatible",
+            ErrorCode::NewReplicaSetConfigurationIncompatible => {
+                "NewReplicaSetConfigurationIncompatible"
+            }
             ErrorCode::NodeNotElectable => "NodeNotElectable",
             ErrorCode::IncompatibleShardingMetadata => "IncompatibleShardingMetadata",
             ErrorCode::DistributedClockSkewed => "DistributedClockSkewed",
@@ -544,7 +553,9 @@ impl ErrorCode {
             ErrorCode::RLPInitializationFailed => "RLPInitializationFailed",
             ErrorCode::ConfigServersInconsistent => "ConfigServersInconsistent",
             ErrorCode::FailedToSatisfyReadPreference => "FailedToSatisfyReadPreference",
-            ErrorCode::XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable => "XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable",
+            ErrorCode::XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable => {
+                "XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable"
+            }
             ErrorCode::StaleTerm => "StaleTerm",
             ErrorCode::CappedPositionLost => "CappedPositionLost",
             ErrorCode::IncompatibleShardingConfigVersion => "IncompatibleShardingConfigVersion",
@@ -554,8 +565,12 @@ impl ErrorCode {
             ErrorCode::DuplicateKey => "DuplicateKey",
             ErrorCode::InterruptedAtShutdown => "InterruptedAtShutdown",
             ErrorCode::Interrupted => "Interrupted",
-            ErrorCode::BackgroundOperationInProgressForDatabase => "BackgroundOperationInProgressForDatabase",
-            ErrorCode::BackgroundOperationInProgressForNamespace => "BackgroundOperationInProgressForNamespace",
+            ErrorCode::BackgroundOperationInProgressForDatabase => {
+                "BackgroundOperationInProgressForDatabase"
+            }
+            ErrorCode::BackgroundOperationInProgressForNamespace => {
+                "BackgroundOperationInProgressForNamespace"
+            }
             ErrorCode::PrepareConfigsFailedCode => "PrepareConfigsFailedCode",
             ErrorCode::DatabaseDifferCase => "DatabaseDifferCase",
             ErrorCode::ShardKeyTooBig => "ShardKeyTooBig",

@@ -35,7 +35,7 @@ impl Default for StreamConnector {
 impl StreamConnector {
     #[cfg(feature = "ssl")]
     /// Creates a StreamConnector that will connect with SSL encryption.
-    /// 
+    ///
     /// The SSL connection will use the cipher with the longest key length available to both the
     /// server and client, with the following caveats:
     ///   * SSLv2 and SSlv3 are disabled
@@ -52,11 +52,12 @@ impl StreamConnector {
     /// `certificate_file` - Path to the file containing the client certificate.
     /// `key_file` - Path to the file containing the client private key.
     /// `verify_peer` - Whether or not to verify that the server's certificate is trusted.
-    pub fn with_ssl(ca_file: &str,
-                    certificate_file: &str,
-                    key_file: &str,
-                    verify_peer: bool)
-                    -> Self {
+    pub fn with_ssl(
+        ca_file: &str,
+        certificate_file: &str,
+        key_file: &str,
+        verify_peer: bool,
+    ) -> Self {
         StreamConnector::Ssl {
             ca_file: String::from(ca_file),
             certificate_file: Some(String::from(certificate_file)),
@@ -82,9 +83,7 @@ impl StreamConnector {
     ///
     /// `ca_file` - Path to the file containing trusted CA certificates.
     /// `verify_peer` - Whether or not to verify that the server's certificate is trusted.
-    pub fn with_unauthenticated_ssl(ca_file: &str,
-                    verify_peer: bool)
-                    -> Self {
+    pub fn with_unauthenticated_ssl(ca_file: &str, verify_peer: bool) -> Self {
         StreamConnector::Ssl {
             ca_file: String::from(ca_file),
             certificate_file: None,
@@ -97,18 +96,23 @@ impl StreamConnector {
         match *self {
             StreamConnector::Tcp => TcpStream::connect((hostname, port)).map(Stream::Tcp),
             #[cfg(feature = "ssl")]
-            StreamConnector::Ssl { ref ca_file,
-                                   ref certificate_file,
-                                   ref key_file,
-                                   verify_peer } => {
+            StreamConnector::Ssl {
+                ref ca_file,
+                ref certificate_file,
+                ref key_file,
+                verify_peer,
+            } => {
                 let inner_stream = TcpStream::connect((hostname, port))?;
 
                 let mut ssl_context = SslContext::builder(SslMethod::tls())?;
-                ssl_context.set_cipher_list("ALL:!EXPORT:!eNULL:!aNULL:HIGH:@STRENGTH")?;
+                ssl_context.set_cipher_list(
+                    "ALL:!EXPORT:!eNULL:!aNULL:HIGH:@STRENGTH",
+                )?;
                 ssl_context.set_options(SSL_OP_NO_SSLV2);
                 ssl_context.set_options(SSL_OP_NO_SSLV3);
                 ssl_context.set_options(SSL_OP_NO_COMPRESSION);
                 ssl_context.set_ca_file(ca_file)?;
+
                 if let &Some(ref file) = certificate_file {
                     ssl_context.set_certificate_file(file, X509_FILETYPE_PEM)?;
                 }

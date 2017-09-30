@@ -70,17 +70,21 @@ impl FileCursor {
     /// Returns the next n files.
     pub fn next_n(&mut self, n: i32) -> Result<Vec<File>> {
         let docs = try!(self.cursor.next_n(n));
-        Ok(docs.into_iter()
-            .map(|doc| File::with_doc(self.store.clone(), doc.clone()))
-            .collect())
+        Ok(
+            docs.into_iter()
+                .map(|doc| File::with_doc(self.store.clone(), doc.clone()))
+                .collect(),
+        )
     }
 
     /// Returns the next batch of files.
     pub fn drain_current_batch(&mut self) -> Result<Vec<File>> {
         let docs = try!(self.cursor.drain_current_batch());
-        Ok(docs.into_iter()
-            .map(|doc| File::with_doc(self.store.clone(), doc))
-            .collect())
+        Ok(
+            docs.into_iter()
+                .map(|doc| File::with_doc(self.store.clone(), doc))
+                .collect(),
+        )
     }
 }
 
@@ -105,10 +109,11 @@ pub trait ThreadedStore {
     /// Opens a file by object ID.
     fn open_id(&self, id: oid::ObjectId) -> Result<File>;
     /// Returns a cursor to all file documents matching the provided filter.
-    fn find(&self,
-            filter: Option<bson::Document>,
-            options: Option<FindOptions>)
-            -> Result<FileCursor>;
+    fn find(
+        &self,
+        filter: Option<bson::Document>,
+        options: Option<FindOptions>,
+    ) -> Result<FileCursor>;
     /// Removes a file from GridFS by filename.
     fn remove(&self, name: String) -> Result<()>;
     /// Removes a file from GridFS by object ID.
@@ -132,14 +137,22 @@ impl ThreadedStore for Store {
     }
 
     fn create(&self, name: String) -> Result<File> {
-        Ok(File::with_name(self.clone(), name, try!(oid::ObjectId::new()), Mode::Write))
+        Ok(File::with_name(
+            self.clone(),
+            name,
+            try!(oid::ObjectId::new()),
+            Mode::Write,
+        ))
     }
 
     fn open(&self, name: String) -> Result<File> {
         let mut options = FindOptions::new();
         options.sort = Some(doc!{ "uploadDate" => 1 });
 
-        match try!(self.files.find_one(Some(doc!{ "filename" => name }), Some(options))) {
+        match try!(self.files.find_one(
+            Some(doc!{ "filename" => name }),
+            Some(options),
+        )) {
             Some(bdoc) => Ok(File::with_doc(self.clone(), bdoc)),
             None => Err(ArgumentError(String::from("File does not exist."))),
         }
@@ -152,10 +165,11 @@ impl ThreadedStore for Store {
         }
     }
 
-    fn find(&self,
-            filter: Option<bson::Document>,
-            options: Option<FindOptions>)
-            -> Result<FileCursor> {
+    fn find(
+        &self,
+        filter: Option<bson::Document>,
+        options: Option<FindOptions>,
+    ) -> Result<FileCursor> {
         Ok(FileCursor {
             store: self.clone(),
             cursor: try!(self.files.find(filter, options)),
@@ -177,7 +191,10 @@ impl ThreadedStore for Store {
 
     fn remove_id(&self, id: oid::ObjectId) -> Result<()> {
         try!(self.files.delete_many(doc!{ "_id" => (id.clone()) }, None));
-        try!(self.chunks.delete_many(doc!{ "files_id" => (id.clone()) }, None));
+        try!(self.chunks.delete_many(
+            doc!{ "files_id" => (id.clone()) },
+            None,
+        ));
         Ok(())
     }
 
