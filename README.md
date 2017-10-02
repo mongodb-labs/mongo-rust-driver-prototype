@@ -58,8 +58,10 @@ fn main() {
 
     let coll = client.db("test").collection("movies");
 
-    let doc = doc! { "title" => "Jaws",
-                      "array" => [ 1, 2, 3 ] };
+    let doc = doc! { 
+        "title": "Jaws",
+        "array": [ 1, 2, 3 ],
+    };
 
     // Insert document into 'test.movies' collection
     coll.insert_one(doc.clone(), None)
