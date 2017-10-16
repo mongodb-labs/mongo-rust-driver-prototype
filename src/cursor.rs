@@ -12,7 +12,7 @@
 //! # let client = Client::connect("localhost", 27017).unwrap();
 //! # let coll = client.db("test").collection("info");
 //! #
-//! coll.insert_one(doc!{ "spirit_animal" => "ferret" }, None).unwrap();
+//! coll.insert_one(doc!{ "spirit_animal": "ferret" }, None).unwrap();
 //!
 //! let mut cursor = coll.find(None, None).unwrap();
 //! for result in cursor {
@@ -248,7 +248,7 @@ impl Cursor {
             nq
         } else {
             // Convert the query to a $query document.
-            let mut nq = doc! { "$query" => query };
+            let mut nq = doc! { "$query": query };
             nq.insert("read_preference", Bson::Document(read_pref.to_document()));
             nq
         };
@@ -279,7 +279,7 @@ impl Cursor {
     ) -> Result<Cursor> {
 
         let mut stream = stream;
-        let mut socket = stream.get_socket();
+        let socket = stream.get_socket();
         let req_id = client.get_req_id();
 
         let index = namespace.find('.').unwrap_or_else(|| namespace.len());
@@ -298,8 +298,8 @@ impl Cursor {
             CommandType::Find => {
                 let document =
                     doc! { 
-                    "find" => coll_name,
-                    "filter" => filter
+                    "find": coll_name,
+                    "filter": filter
                 };
 
                 merge_options(document, options.clone())
@@ -379,12 +379,12 @@ impl Cursor {
         let reply = match cmd_type {
             CommandType::Find => {
                 doc! {
-                "cursor" => {
-                    "id" => cursor_id,
-                    "ns" => (&namespace[..]),
-                    "firstBatch" => (Bson::Array(vec))
+                "cursor": {
+                    "id": cursor_id,
+                    "ns": &namespace[..],
+                    "firstBatch": Bson::Array(vec)
                 },
-                "ok" => 1
+                "ok": 1
             }
             }
             _ => doc,
@@ -418,7 +418,7 @@ impl Cursor {
 
     fn get_from_stream(&mut self) -> Result<()> {
         let (mut stream, _, _) = try!(self.client.acquire_stream(self.read_preference.to_owned()));
-        let mut socket = stream.get_socket();
+        let socket = stream.get_socket();
 
         let req_id = self.client.get_req_id();
         let get_more = Message::new_get_more(
@@ -437,7 +437,7 @@ impl Cursor {
 
         if self.cmd_type != CommandType::Suppressed {
             let hook_result = self.client.run_start_hooks(&CommandStarted {
-                command: doc! { "cursor_id" => (self.cursor_id) },
+                command: doc! { "cursor_id": self.cursor_id },
                 database_name: db_name,
                 command_name: cmd_name.clone(),
                 request_id: req_id as i64,

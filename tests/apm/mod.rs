@@ -35,15 +35,19 @@ fn command_duration() {
 
     let docs = (1..4)
         .map(|i| {
-            doc! { "_id" => i, "x" => (rand::random::<u8>() as u32) }
+            doc! {
+                "_id": i,
+                "x": rand::random::<u8>() as u32,
+            }
         })
         .collect();
     coll.insert_many(docs, None).unwrap();
     client.add_completion_hook(timed_query).unwrap();
 
-    let doc =
-        doc! {
-        "$where" => (Bson::JavaScriptCode("function() { sleep(500); }".to_owned()))
+    let doc = doc! {
+        "$where": Bson::JavaScriptCode(
+            "function() { sleep(500); }".to_owned()
+        )
     };
 
     coll.find(Some(doc), None).unwrap();
@@ -82,9 +86,9 @@ fn logging() {
     db.create_collection("logging", None).unwrap();
     coll.drop().unwrap();
 
-    let doc1 = doc! { "_id" => 1 };
-    let doc2 = doc! { "_id" => 2 };
-    let doc3 = doc! { "_id" => 3 };
+    let doc1 = doc! { "_id": 1 };
+    let doc2 = doc! { "_id": 2 };
+    let doc3 = doc! { "_id": 3 };
 
     coll.insert_one(doc1, None).unwrap();
     coll.insert_one(doc2, None).unwrap();
@@ -92,7 +96,7 @@ fn logging() {
 
     let filter =
         doc! {
-        "_id" => { "$gt" => 1 }
+        "_id": { "$gt": 1 }
     };
 
     coll.find(Some(filter), None).unwrap();
