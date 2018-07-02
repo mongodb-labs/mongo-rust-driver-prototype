@@ -7,9 +7,11 @@ env:
     # Use a global cache to re-use dependencies across release builds; downloading a mongodb release is quick.
     - CACHE_NAME=global_cache
   matrix:
-    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1204-3.0.14
-    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1204-3.2.12
-    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1204-3.4.2
+    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1404-3.0.15
+    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1404-3.2.20
+    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1404-3.4.15
+    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1404-3.6.5
+    - MONGODB_RELEASE=mongodb-linux-x86_64-ubuntu1404-4.0.0
 
 before_install:
     - ./script/start_mongo_release $TRAVIS_OS_NAME $MONGODB_RELEASE
