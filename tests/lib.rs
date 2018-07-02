@@ -44,7 +44,23 @@ extern crate approx;
 extern crate bson;
 extern crate mongodb;
 extern crate rand;
+extern crate semver;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
 extern crate serde_json;
+
+#[macro_export]
+macro_rules! skip_if_db_version_below {
+    ($db:expr, $major:expr, $minor:expr) => {{
+        use mongodb::db::ThreadedDatabase;
+        use semver::Version;
+
+        if $db.version().unwrap() < Version::from(($major, $minor, 0)) {
+            return;
+        }
+    }};
+}
 
 mod apm;
 mod auth;

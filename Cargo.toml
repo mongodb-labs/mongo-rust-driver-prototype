@@ -37,6 +37,8 @@ version = "0.6.3"
 
 [dev-dependencies]
 approx = "0.1.1"
+serde = "1.0.69"
+serde_derive = "1.0.69"
 
 [dev-dependencies.serde_json]
 features = ["preserve_order"]

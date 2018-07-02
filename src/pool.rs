@@ -2,8 +2,13 @@
 use error::Error::{self, ArgumentError, OperationError};
 use error::Result;
 
+use Client;
+use coll::options::FindOptions;
+use command_type::CommandType;
 use connstring::Host;
+use cursor::Cursor;
 use stream::{Stream, StreamConnector};
+use wire_protocol::flags::OpQueryFlags;
 
 use bufstream::BufStream;
 use std::sync::{Arc, Condvar, Mutex};
@@ -48,6 +53,8 @@ pub struct PooledStream {
     wait_lock: Arc<Condvar>,
     // The pool iteration at the moment of extraction.
     iteration: usize,
+    // Whether the handshake occurred successfully.
+    successful_handshake: bool,
 }
 
 impl PooledStream {
@@ -59,6 +66,11 @@ impl PooledStream {
 
 impl Drop for PooledStream {
     fn drop(&mut self) {
+        // Don't add streams that couldn't successfully handshake to the pool.
+        if !self.successful_handshake {
+            return;
+        }
+
         // Attempt to lock and return the socket to the pool,
         // or give up if the pool lock has been poisoned.
         if let Ok(mut locked) = self.pool.lock() {
@@ -117,7 +129,7 @@ impl ConnectionPool {
     /// Attempts to acquire a connected socket. If none are available and
     /// the pool has not reached its maximum size, a new socket will connect.
     /// Otherwise, the function will block until a socket is returned to the pool.
-    pub fn acquire_stream(&self) -> Result<PooledStream> {
+    pub fn acquire_stream(&self, client: Client) -> Result<PooledStream> {
         let mut locked = try!(self.inner.lock());
         if locked.size == 0 {
             return Err(OperationError(String::from(
@@ -133,6 +145,7 @@ impl ConnectionPool {
                     pool: self.inner.clone(),
                     wait_lock: self.wait_lock.clone(),
                     iteration: locked.iteration,
+                    successful_handshake: true,
                 });
             }
 
@@ -140,20 +153,23 @@ impl ConnectionPool {
             let len = locked.len.load(Ordering::SeqCst);
             if len < locked.size {
                 let socket = try!(self.connect());
-                let _ = locked.len.fetch_add(1, Ordering::SeqCst);
-                return Ok(PooledStream {
+                let mut stream = PooledStream {
                     socket: Some(socket),
                     pool: self.inner.clone(),
                     wait_lock: self.wait_lock.clone(),
                     iteration: locked.iteration,
-                });
+                    successful_handshake: false,
+                };
+
+                self.handshake(client, &mut stream)?;
+                let _ = locked.len.fetch_add(1, Ordering::SeqCst);
+                return Ok(stream);
             }
 
             // Release lock and wait for pool to be repopulated
             locked = try!(self.wait_lock.wait(locked));
         }
     }
-
 
     // Connects to a MongoDB server as defined by the initial configuration.
     fn connect(&self) -> Result<BufStream<Stream>> {
@@ -164,5 +180,44 @@ impl ConnectionPool {
             Ok(s) => Ok(BufStream::new(s)),
             Err(e) => Err(Error::from(e)),
         }
+    }
+
+    // This sends the client metadata to the server as described by the handshake spec.
+    //
+    // See https://github.com/mongodb/specifications/blob/master/source/mongodb-handshake/handshake.rst
+    fn handshake(&self, client: Client, stream: &mut PooledStream) -> Result<()> {
+        let mut options = FindOptions::new();
+        options.limit = Some(1);
+        options.batch_size = Some(1);
+
+        let flags = OpQueryFlags::with_find_options(&options);
+
+        Cursor::query_with_stream(
+            stream,
+            client,
+            String::from("local.$cmd"),
+            flags,
+            doc! {
+                "isMaster": 1i32,
+                "client": {
+                    "driver": {
+                        "name": ::DRIVER_NAME,
+                        "version": env!("CARGO_PKG_VERSION"),
+                    },
+                    "os": {
+                        "type": ::std::env::consts::OS,
+                        "architecture": ::std::env::consts::ARCH
+                    }
+                },
+            },
+            options,
+            CommandType::IsMaster,
+            false,
+            None,
+        )?;
+
+        stream.successful_handshake = true;
+
+        Ok(())
     }
 }

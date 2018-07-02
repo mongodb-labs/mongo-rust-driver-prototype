@@ -247,8 +247,8 @@ impl Server {
     }
 
     /// Returns a server stream from the connection pool.
-    pub fn acquire_stream(&self) -> Result<PooledStream> {
-        self.pool.acquire_stream()
+    pub fn acquire_stream(&self, client: Client) -> Result<PooledStream> {
+        self.pool.acquire_stream(client)
     }
 
     /// Request an update from the monitor on the server status.

@@ -225,7 +225,7 @@ impl Cursor {
     ) -> Result<Cursor> {
 
         // Select a server stream from the topology.
-        let (stream, slave_ok, send_read_pref) = if cmd_type.is_write_command() {
+        let (mut stream, slave_ok, send_read_pref) = if cmd_type.is_write_command() {
             (try!(client.acquire_write_stream()), false, false)
         } else {
             try!(client.acquire_stream(read_pref.to_owned()))
@@ -254,7 +254,7 @@ impl Cursor {
         };
 
         Cursor::query_with_stream(
-            stream,
+            &mut stream,
             client,
             namespace,
             new_flags,
@@ -267,7 +267,7 @@ impl Cursor {
     }
 
     pub fn query_with_stream(
-        stream: PooledStream,
+        stream: &mut PooledStream,
         client: Client,
         namespace: String,
         flags: OpQueryFlags,
@@ -278,7 +278,6 @@ impl Cursor {
         read_pref: Option<ReadPreference>,
     ) -> Result<Cursor> {
 
-        let mut stream = stream;
         let socket = stream.get_socket();
         let req_id = client.get_req_id();
 

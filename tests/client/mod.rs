@@ -6,6 +6,7 @@ mod db;
 mod cursor;
 mod error;
 mod gridfs;
+mod handshake;
 mod wire_protocol;
 
 use bson;

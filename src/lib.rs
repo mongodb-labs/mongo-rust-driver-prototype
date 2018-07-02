@@ -181,6 +181,8 @@ use topology::{Topology, TopologyDescription, TopologyType, DEFAULT_HEARTBEAT_FR
                DEFAULT_LOCAL_THRESHOLD_MS, DEFAULT_SERVER_SELECTION_TIMEOUT_MS};
 use topology::server::Server;
 
+pub const DRIVER_NAME: &'static str = "mongo-rust-driver-prototype";
+
 /// Interfaces with a MongoDB server or replica set.
 pub struct ClientInner {
     /// Indicates how a server should be selected for read operations.
@@ -415,11 +417,11 @@ impl ThreadedClient for Client {
         &self,
         read_preference: ReadPreference,
     ) -> Result<(PooledStream, bool, bool)> {
-        self.topology.acquire_stream(read_preference)
+        self.topology.acquire_stream(self.clone(), read_preference)
     }
 
     fn acquire_write_stream(&self) -> Result<PooledStream> {
-        self.topology.acquire_write_stream()
+        self.topology.acquire_write_stream(self.clone())
     }
 
     fn get_req_id(&self) -> i32 {
