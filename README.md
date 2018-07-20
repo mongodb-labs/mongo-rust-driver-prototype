@@ -23,7 +23,7 @@ The driver is available on crates.io. To use the MongoDB driver in your code, ad
 ```toml
 [dependencies]
 bson = "0.12.2"
-mongodb = "0.3.9"
+mongodb = "0.3.10"
 ```
 
 Alternately, you can use the MongoDB driver with SSL support. To do this, you must have OpenSSL installed on your system. Then, enable the `ssl` feature for MongoDB in your Cargo.toml:
@@ -31,7 +31,7 @@ Alternately, you can use the MongoDB driver with SSL support. To do this, you mu
 ```toml
 [dependencies]
 # ...
-mongodb = { version = "0.3.9", features = ["ssl"] }
+mongodb = { version = "0.3.10", features = ["ssl"] }
 ```
 
 Then, import the bson and driver libraries within your code.
