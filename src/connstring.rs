@@ -41,7 +41,7 @@ impl Host {
 }
 
 /// Encapsulates the options and read preference tags of a MongoDB connection.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConnectionOptions {
     pub options: BTreeMap<String, String>,
     pub read_pref_tags: Vec<String>,
@@ -139,12 +139,12 @@ pub fn parse(address: &str) -> Result<ConnectionString> {
     // Split on authentication and hosts
     if host_str.contains('@') {
         let (user_info, host_string) = rpartition(host_str, "@");
-        let (u, p) = try!(parse_user_info(user_info));
+        let (u, p) = parse_user_info(user_info)?;
         user = Some(String::from(u));
         password = Some(String::from(p));
-        hosts = try!(split_hosts(host_string));
+        hosts = split_hosts(host_string)?;
     } else {
-        hosts = try!(split_hosts(host_str));
+        hosts = split_hosts(host_str)?;
     }
 
     let mut opts = "";
@@ -257,7 +257,7 @@ fn split_hosts(host_str: &str) -> Result<Vec<Host>> {
                 String::from("Empty host, or extra comma in host list."),
             ));
         }
-        let host = try!(parse_host(entity));
+        let host = parse_host(entity)?;
         hosts.push(host);
     }
     Ok(hosts)
@@ -265,8 +265,8 @@ fn split_hosts(host_str: &str) -> Result<Vec<Host>> {
 
 // Parses the delimited string into its options and Read Preference Tags.
 fn parse_options(opts: &str, delim: Option<&str>) -> ConnectionOptions {
-    let mut options: BTreeMap<String, String> = BTreeMap::new();
-    let mut read_pref_tags: Vec<String> = Vec::new();
+    let mut options = BTreeMap::new();
+    let mut read_pref_tags = Vec::new();
 
     // Split and collect options into a vec
     let opt_list = match delim {

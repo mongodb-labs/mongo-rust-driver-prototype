@@ -11,6 +11,8 @@ use stream::{Stream, StreamConnector};
 use wire_protocol::flags::OpQueryFlags;
 
 use bufstream::BufStream;
+
+use std::fmt;
 use std::sync::{Arc, Condvar, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
@@ -27,6 +29,14 @@ pub struct ConnectionPool {
     // to be repopulated with available connections.
     wait_lock: Arc<Condvar>,
     stream_connector: StreamConnector,
+}
+
+impl fmt::Debug for ConnectionPool {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ConnectionPool")
+            .field("host", &self.host)
+            .finish()
+    }
 }
 
 struct Pool {
@@ -111,7 +121,7 @@ impl ConnectionPool {
                 "The connection pool size must be greater than zero.",
             )))
         } else {
-            let mut locked = try!(self.inner.lock());
+            let mut locked = self.inner.lock()?;
             locked.size = size;
             Ok(())
         }
@@ -130,7 +140,7 @@ impl ConnectionPool {
     /// the pool has not reached its maximum size, a new socket will connect.
     /// Otherwise, the function will block until a socket is returned to the pool.
     pub fn acquire_stream(&self, client: Client) -> Result<PooledStream> {
-        let mut locked = try!(self.inner.lock());
+        let mut locked = self.inner.lock()?;
         if locked.size == 0 {
             return Err(OperationError(String::from(
                 "The connection pool does not allow connections; increase the size of the pool.",
@@ -152,7 +162,7 @@ impl ConnectionPool {
             // Attempt to make a new connection
             let len = locked.len.load(Ordering::SeqCst);
             if len < locked.size {
-                let socket = try!(self.connect());
+                let socket = self.connect()?;
                 let mut stream = PooledStream {
                     socket: Some(socket),
                     pool: self.inner.clone(),
@@ -167,7 +177,7 @@ impl ConnectionPool {
             }
 
             // Release lock and wait for pool to be repopulated
-            locked = try!(self.wait_lock.wait(locked));
+            locked = self.wait_lock.wait(locked)?;
         }
     }
 

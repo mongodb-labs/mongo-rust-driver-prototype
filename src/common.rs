@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::str::FromStr;
 
 /// Indicates how a server should be selected during read operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ReadMode {
     Primary,
     PrimaryPreferred,
@@ -34,7 +34,7 @@ impl FromStr for ReadMode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ReadPreference {
     /// Indicates how a server should be selected during read operations.
     pub mode: ReadMode,
@@ -68,7 +68,7 @@ impl ReadPreference {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WriteConcern {
     /// Write replication
     pub w: i32,
@@ -91,11 +91,17 @@ impl WriteConcern {
     }
 
     pub fn to_bson(&self) -> bson::Document {
-        let mut bson = bson::Document::new();
-        bson.insert("w", Bson::I32(self.w));
-        bson.insert("wtimeout", Bson::I32(self.w_timeout));
-        bson.insert("j", Bson::Boolean(self.j));
-        bson
+        doc! {
+            "w": self.w,
+            "wtimeout": self.w_timeout,
+            "j": self.j,
+        }
+    }
+}
+
+impl Default for WriteConcern {
+    fn default() -> Self {
+        WriteConcern::new()
     }
 }
 
