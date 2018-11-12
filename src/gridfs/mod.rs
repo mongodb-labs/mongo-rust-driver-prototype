@@ -30,7 +30,7 @@
 //! ```
 pub mod file;
 
-use bson::{self, oid};
+use bson::{self, bson, doc, oid};
 
 use db::{Database, ThreadedDatabase};
 use coll::Collection;

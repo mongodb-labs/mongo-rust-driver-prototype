@@ -59,8 +59,7 @@ pub mod options;
 pub mod roles;
 
 use auth::Authenticator;
-use bson;
-use bson::Bson;
+use bson::{self, bson, doc, Bson};
 use {Client, CommandType, ThreadedClient, Result};
 use Error::{CursorNotFoundError, OperationError, ResponseError};
 use coll::Collection;

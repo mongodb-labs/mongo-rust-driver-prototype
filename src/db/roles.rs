@@ -1,7 +1,7 @@
 //! Role-based database and command authorization.
 use std::string::ToString;
 
-use bson::Bson;
+use bson::{Bson, bson, doc};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SingleDatabaseRole {

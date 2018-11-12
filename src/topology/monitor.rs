@@ -2,7 +2,7 @@
 use {Client, Result};
 use Error::{self, ArgumentError, OperationError};
 
-use bson::{self, Bson, oid};
+use bson::{self, Bson, bson, doc, oid};
 use chrono::{DateTime, Utc};
 
 use coll::options::FindOptions;

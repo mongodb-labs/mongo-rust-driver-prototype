@@ -126,8 +126,8 @@
 #[doc(html_root_url = "https://docs.rs/mongodb")]
 #[macro_use]
 extern crate bitflags;
-#[macro_use(bson, doc)]
 extern crate bson;
+pub use bson::{bson, doc};
 extern crate bufstream;
 extern crate byteorder;
 extern crate chrono;
