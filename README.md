@@ -53,7 +53,7 @@ Examples
 Here's a basic example of driver usage:
 
 ```rust
-use mongodb::Bson;
+use mongodb::{Bson, bson, doc};
 use mongodb::{Client, ThreadedClient};
 use mongodb::db::ThreadedDatabase;
 
@@ -63,7 +63,7 @@ fn main() {
 
     let coll = client.db("test").collection("movies");
 
-    let doc = doc! { 
+    let doc = doc! {
         "title": "Jaws",
         "array": [ 1, 2, 3 ],
     };
@@ -93,7 +93,7 @@ fn main() {
 To connect with SSL, use either `ClientOptions::with_ssl` or `ClientOptions::with_unauthenticated_ssl` and then `Client::connect_with_options`. Afterwards, the client can be used as above (note that the server will have to be configured to accept SSL connections and that you'll have to generate your own keys and certificates):
 
 ```rust
-use mongodb::Bson;
+use mongodb::{Bson, bson, doc};
 use mongodb::{Client, ClientOptions, ThreadedClient};
 use mongodb::db::ThreadedDatabase;
 
@@ -111,6 +111,13 @@ fn main() {
 
     let client = Client::connect_with_options("localhost", 27017, options)
         .expect("Failed to initialize standalone client.");
+
+    let coll = client.db("test").collection("movies");
+
+    let doc = doc! {
+        "title": "Jaws",
+        "array": [ 1, 2, 3 ],
+    };
 
     // Insert document into 'test.movies' collection
     coll.insert_one(doc.clone(), None)
