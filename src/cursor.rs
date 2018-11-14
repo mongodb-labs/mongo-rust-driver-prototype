@@ -26,7 +26,7 @@
 use {Client, CommandType, Error, ErrorCode, Result, ThreadedClient};
 use apm::{CommandStarted, CommandResult, EventRunner};
 
-use bson::{self, Bson};
+use bson::{self, bson, doc, Bson};
 use common::{merge_options, ReadMode, ReadPreference};
 use coll::options::FindOptions;
 use pool::PooledStream;

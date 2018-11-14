@@ -22,8 +22,7 @@ The driver is available on crates.io. To use the MongoDB driver in your code, ad
 
 ```toml
 [dependencies]
-bson = "0.12.2"
-mongodb = "0.3.10"
+mongodb = "0.3.11"
 ```
 
 Alternately, you can use the MongoDB driver with SSL support. To do this, you must have OpenSSL installed on your system. Then, enable the `ssl` feature for MongoDB in your Cargo.toml:
@@ -31,15 +30,21 @@ Alternately, you can use the MongoDB driver with SSL support. To do this, you mu
 ```toml
 [dependencies]
 # ...
-mongodb = { version = "0.3.10", features = ["ssl"] }
+mongodb = { version = "0.3.11", features = ["ssl"] }
 ```
 
 Then, import the bson and driver libraries within your code.
 
 ```rust
 #[macro_use(bson, doc)]
-extern crate bson;
 extern crate mongodb;
+```
+
+or with Rust 2018:
+
+```rust
+extern crate mongodb;
+use mongodb::{bson, doc};
 ```
 
 Examples
@@ -48,7 +53,7 @@ Examples
 Here's a basic example of driver usage:
 
 ```rust
-use bson::Bson;
+use mongodb::{Bson, bson, doc};
 use mongodb::{Client, ThreadedClient};
 use mongodb::db::ThreadedDatabase;
 
@@ -58,7 +63,7 @@ fn main() {
 
     let coll = client.db("test").collection("movies");
 
-    let doc = doc! { 
+    let doc = doc! {
         "title": "Jaws",
         "array": [ 1, 2, 3 ],
     };
@@ -88,7 +93,7 @@ fn main() {
 To connect with SSL, use either `ClientOptions::with_ssl` or `ClientOptions::with_unauthenticated_ssl` and then `Client::connect_with_options`. Afterwards, the client can be used as above (note that the server will have to be configured to accept SSL connections and that you'll have to generate your own keys and certificates):
 
 ```rust
-use bson::Bson;
+use mongodb::{Bson, bson, doc};
 use mongodb::{Client, ClientOptions, ThreadedClient};
 use mongodb::db::ThreadedDatabase;
 
@@ -106,6 +111,13 @@ fn main() {
 
     let client = Client::connect_with_options("localhost", 27017, options)
         .expect("Failed to initialize standalone client.");
+
+    let coll = client.db("test").collection("movies");
+
+    let doc = doc! {
+        "title": "Jaws",
+        "array": [ 1, 2, 3 ],
+    };
 
     // Insert document into 'test.movies' collection
     coll.insert_one(doc.clone(), None)

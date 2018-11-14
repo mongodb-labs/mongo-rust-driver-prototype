@@ -126,7 +126,6 @@
 #[doc(html_root_url = "https://docs.rs/mongodb")]
 #[macro_use]
 extern crate bitflags;
-#[macro_use(bson, doc)]
 extern crate bson;
 extern crate bufstream;
 extern crate byteorder;
@@ -163,6 +162,8 @@ mod apm;
 mod auth;
 mod command_type;
 
+pub use bson::*;
+
 pub use apm::{CommandStarted, CommandResult};
 pub use command_type::CommandType;
 pub use error::{Error, ErrorCode, Result};
@@ -175,7 +176,6 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 
 use apm::Listener;
-use bson::Bson;
 use common::{ReadPreference, ReadMode, WriteConcern};
 use connstring::ConnectionString;
 use db::{Database, ThreadedDatabase};

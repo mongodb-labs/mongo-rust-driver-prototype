@@ -4,7 +4,7 @@ pub mod error;
 pub mod options;
 pub mod results;
 
-use bson::{self, Bson, oid};
+use bson::{self, Bson, bson, doc, oid};
 use command_type::CommandType;
 
 use self::batch::{Batch, DeleteModel, UpdateModel};

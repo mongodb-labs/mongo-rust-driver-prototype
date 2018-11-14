@@ -1,6 +1,6 @@
 //! Authentication schemes.
 use bson::Bson::{self, Binary};
-use bson::Document;
+use bson::{Document, bson, doc};
 use bson::spec::BinarySubtype::Generic;
 use CommandType::Suppressed;
 use hmac::{Hmac, Mac};

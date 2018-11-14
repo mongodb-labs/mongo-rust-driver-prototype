@@ -1,7 +1,7 @@
 //! Models for collection-level batch operations.
 use super::options::WriteModel;
 
-use bson::{Bson, Document};
+use bson::{Bson, Document, bson, doc};
 use std::convert::From;
 
 #[derive(Debug, Clone, PartialEq)]

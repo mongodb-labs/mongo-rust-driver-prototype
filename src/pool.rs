@@ -10,6 +10,7 @@ use cursor::Cursor;
 use stream::{Stream, StreamConnector};
 use wire_protocol::flags::OpQueryFlags;
 
+use bson::{bson, doc};
 use bufstream::BufStream;
 
 use std::fmt;

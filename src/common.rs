@@ -2,7 +2,7 @@
 use Error::{self, ArgumentError};
 use Result;
 
-use bson::{self, Bson};
+use bson::{self, Bson, bson, doc};
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
