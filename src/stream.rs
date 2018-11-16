@@ -16,7 +16,7 @@ pub enum StreamConnector {
     ///
     /// Note that it's invalid to have one of certificate_file and key_file set but not the other.
     Ssl {
-        ca_file: String,
+        ca_file: Option<String>,
         certificate_file: Option<String>,
         key_file: Option<String>,
         verify_peer: bool,
@@ -50,13 +50,13 @@ impl StreamConnector {
     /// `key_file` - Path to the file containing the client private key.
     /// `verify_peer` - Whether or not to verify that the server's certificate is trusted.
     pub fn with_ssl(
-        ca_file: &str,
+        ca_file: Option<&str>,
         certificate_file: &str,
         key_file: &str,
         verify_peer: bool,
     ) -> Self {
         StreamConnector::Ssl {
-            ca_file: String::from(ca_file),
+            ca_file: ca_file.map(String::from),
             certificate_file: Some(String::from(certificate_file)),
             key_file: Some(String::from(key_file)),
             verify_peer: verify_peer,
@@ -80,9 +80,9 @@ impl StreamConnector {
     ///
     /// `ca_file` - Path to the file containing trusted CA certificates.
     /// `verify_peer` - Whether or not to verify that the server's certificate is trusted.
-    pub fn with_unauthenticated_ssl(ca_file: &str, verify_peer: bool) -> Self {
+    pub fn with_unauthenticated_ssl(ca_file: Option<&str>, verify_peer: bool) -> Self {
         StreamConnector::Ssl {
-            ca_file: String::from(ca_file),
+            ca_file: ca_file.map(String::from),
             certificate_file: None,
             key_file: None,
             verify_peer: verify_peer,
@@ -106,7 +106,10 @@ impl StreamConnector {
                 ssl_context.set_options(SslOptions::NO_SSLV2);
                 ssl_context.set_options(SslOptions::NO_SSLV3);
                 ssl_context.set_options(SslOptions::NO_COMPRESSION);
-                ssl_context.set_ca_file(ca_file)?;
+
+                if let Some(ca_file) = ca_file {
+                    ssl_context.set_ca_file(ca_file)?;
+                }
 
                 if let &Some(ref file) = certificate_file {
                     ssl_context.set_certificate_file(file, SslFiletype::PEM)?;

@@ -257,7 +257,7 @@ impl ClientOptions {
     #[cfg(feature = "ssl")]
     /// Creates a new options struct with a specified SSL certificate and key files.
     pub fn with_ssl(
-        ca_file: &str,
+        ca_file: Option<&str>,
         certificate_file: &str,
         key_file: &str,
         verify_peer: bool,
@@ -270,7 +270,7 @@ impl ClientOptions {
 
     #[cfg(feature = "ssl")]
     /// Creates a new options struct with a specified SSL certificate
-    pub fn with_unauthenticated_ssl(ca_file: &str, verify_peer: bool) -> ClientOptions {
+    pub fn with_unauthenticated_ssl(ca_file: Option<&str>, verify_peer: bool) -> ClientOptions {
         let mut options = ClientOptions::new();
         options.stream_connector = StreamConnector::with_unauthenticated_ssl(ca_file, verify_peer);
         options
