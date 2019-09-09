@@ -1,10 +1,10 @@
 //! Lower-level file and chunk representations in GridFS.
-use bson::{self, Bson, bson, doc, oid};
 use bson::spec::BinarySubtype;
+use bson::{self, bson, doc, oid, Bson};
 
 use chrono::{DateTime, Utc};
-use md5::{Md5, Digest};
 use hex;
+use md5::{Digest, Md5};
 
 use Error::{self, ArgumentError, OperationError, PoisonLockError};
 use Result;
@@ -12,12 +12,12 @@ use Result;
 use super::Store;
 use coll::options::IndexOptions;
 
-use std::{cmp, io, thread};
 use std::error::Error as ErrorTrait;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex, RwLock};
+use std::{cmp, io, thread};
 
 pub const DEFAULT_CHUNK_SIZE: i32 = 255 * 1024;
 pub const MEGABYTE: usize = 1024 * 1024;
@@ -189,7 +189,6 @@ impl File {
     /// file is dropped, but errors will be ignored. Therefore, this method should
     /// be called manually.
     pub fn close(&mut self) -> Result<()> {
-
         // Flush chunks
         if self.mode == Mode::Write {
             self.flush()?;
@@ -203,11 +202,13 @@ impl File {
                 if self.doc.upload_date.is_none() {
                     self.doc.upload_date = Some(Utc::now());
                 }
-                self.doc.md5 = hex::encode(self.wsum.result());
+
+                let wsum = std::mem::replace(&mut self.wsum, Md5::new());
+                self.doc.md5 = hex::encode(wsum.result());
                 self.gfs.files.insert_one(self.doc.to_bson(), None)?;
 
                 // Ensure indexes
-                self.gfs.files.create_index(doc!{ "filename": 1 }, None)?;
+                self.gfs.files.create_index(doc! { "filename": 1 }, None)?;
 
                 let mut opts = IndexOptions::new();
                 opts.unique = Some(true);
@@ -219,10 +220,9 @@ impl File {
                     Some(opts),
                 )?;
             } else {
-                self.gfs.chunks.delete_many(
-                    doc! { "files_id": self.doc.id.clone() },
-                    None,
-                )?;
+                self.gfs
+                    .chunks
+                    .delete_many(doc! { "files_id": self.doc.id.clone() }, None)?;
             }
         }
 
@@ -247,7 +247,6 @@ impl File {
 
     /// Inserts a file chunk into GridFS.
     fn insert_chunk(&self, n: i32, buf: &[u8]) -> Result<()> {
-
         // Start a pending write and copy the buffer and metadata into a bson document
         self.wpending.fetch_add(1, Ordering::SeqCst);
         let mut vec_buf = Vec::with_capacity(buf.len());
@@ -294,12 +293,10 @@ impl File {
         };
 
         match self.gfs.chunks.find_one(Some(filter), None)? {
-            Some(doc) => {
-                match doc.get("data") {
-                    Some(&Bson::Binary(_, ref buf)) => Ok(buf.clone()),
-                    _ => Err(OperationError(String::from("Chunk contained no data"))),
-                }
-            }
+            Some(doc) => match doc.get("data") {
+                Some(&Bson::Binary(_, ref buf)) => Ok(buf.clone()),
+                _ => Err(OperationError(String::from("Chunk contained no data"))),
+            },
             None => Err(OperationError(String::from("Chunk not found"))),
         }
     }
@@ -350,20 +347,18 @@ impl File {
                 );
 
                 match result {
-                    Ok(Some(doc)) => {
-                        match doc.get("data") {
-                            Some(&Bson::Binary(_, ref buf)) => {
-                                cache.data = buf.clone();
-                                cache.err = None;
-                            }
-                            _ => {
-                                cache.err = Some(OperationError(String::from(
-                                    "Chunk contained \
-                                                                              no data.",
-                                )))
-                            }
+                    Ok(Some(doc)) => match doc.get("data") {
+                        Some(&Bson::Binary(_, ref buf)) => {
+                            cache.data = buf.clone();
+                            cache.err = None;
                         }
-                    }
+                        _ => {
+                            cache.err = Some(OperationError(String::from(
+                                "Chunk contained \
+                                 no data.",
+                            )))
+                        }
+                    },
                     Ok(None) => cache.err = Some(OperationError(String::from("Chunk not found."))),
                     Err(err) => cache.err = Some(err),
                 }
@@ -407,7 +402,6 @@ impl io::Write for File {
 
         // Otherwise, form a chunk with the current buffer + data and flush to GridFS.
         if !self.wbuf.is_empty() {
-
             // Split data
             let missing = cmp::min(chunk_size - self.wbuf.len(), data.len());
             let (part1, part2) = data.split_at(missing);
@@ -421,8 +415,8 @@ impl io::Write for File {
             self.wsum.input(buf);
 
             // If over a megabyte is being written at once, wait for the load to reduce.
-            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >=
-                MEGABYTE as i32
+            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32
+                >= MEGABYTE as i32
             {
                 guard = match self.condvar.wait(guard) {
                     Ok(guard) => guard,
@@ -454,8 +448,8 @@ impl io::Write for File {
             self.wsum.input(buf);
 
             // Pending megabyte
-            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >=
-                MEGABYTE as i32
+            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32
+                >= MEGABYTE as i32
             {
                 guard = match self.condvar.wait(guard) {
                     Ok(guard) => guard,
@@ -495,8 +489,8 @@ impl io::Write for File {
             self.wsum.input(&self.wbuf);
 
             // Pending megabyte
-            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32 >=
-                MEGABYTE as i32
+            while self.doc.chunk_size * self.wpending.load(Ordering::SeqCst) as i32
+                >= MEGABYTE as i32
             {
                 guard = match self.condvar.wait(guard) {
                     Ok(guard) => guard,
@@ -547,7 +541,9 @@ impl io::Read for File {
         }
 
         // Read all required chunks into memory
-        while self.rbuf.len() < buf.len() && (self.chunk_num as i64) * (self.doc.chunk_size as i64) < self.doc.len {
+        while self.rbuf.len() < buf.len()
+            && (self.chunk_num as i64) * (self.doc.chunk_size as i64) < self.doc.len
+        {
             let chunk = self.get_chunk()?;
             self.rbuf.extend(chunk);
         }
@@ -682,9 +678,9 @@ impl CachedChunk {
         CachedChunk {
             n: n,
             data: Vec::new(),
-            err: Some(Error::DefaultError(
-                String::from("Chunk has not yet been initialized"),
-            )),
+            err: Some(Error::DefaultError(String::from(
+                "Chunk has not yet been initialized",
+            ))),
         }
     }
 }
